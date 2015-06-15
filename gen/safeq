@@ -1,0 +1,148 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Crypt::OpenSSL::AES;
+use Crypt::CBC;
+use MIME::Base64::URLSafe;
+
+#Forward Declaration
+sub processUsers;
+sub processCostCenters;
+
+local $::SERVICE_NAME = "safeq";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_USER_LOGIN;         *A_USER_LOGIN =        \'urn:perun:user:attribute-def:def:login-namespace:mu';
+our $A_USER_FIRST_NAME;    *A_USER_FIRST_NAME =   \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LAST_NAME;     *A_USER_LAST_NAME =    \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_MAIL;          *A_USER_MAIL =         \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_CHIP_NUM;      *A_USER_CHIP_NUM =     \'urn:perun:user:attribute-def:def:chipNumbers';
+our $A_USER_WORKPLACE;     *A_USER_WORKPLACE =    \'urn:perun:user:attribute-def:def:workplace';
+our $A_USER_WORKPLACE_ID;  *A_USER_WORKPLACE_ID = \'urn:perun:user:attribute-def:def:workplaceId';
+
+my $fileCenters = $DIRECTORY . "safeq_centers";
+my $fileUsers = $DIRECTORY . "safeq_users";
+
+my %costcentersById;
+my %usersByLogin;
+my $key = "PerunRulezzC7FE288D";
+my @resourcesData = $data->getChildElements;
+
+foreach my $rData (@resourcesData) {
+	my @membersData = $rData->getChildElements;
+
+	for my $memberAttributes (dataToAttributesHashes @membersData) {
+		processUsers $memberAttributes;
+	}
+}
+
+# safeq_users
+## dn: username=johndoe, ou=users, o=ysoftsafeq
+## objectclass: ysquser
+## username: johndoe
+## externaldn: cn=johndoe, ou=users, ou=mu, dc=ucn, dc=muni, dc=cz
+## firstname: John 
+## lastname: Doe
+## costcenter: costcenterid=1000001, ou=costcenters, o=ysoftsafeq
+## email: johndoe@muni.cz
+## card: CARD87654321
+## card: CARD98765432
+## role: everyone
+## prepaid: FALSE
+open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
+foreach my $login (sort keys %usersByLogin) {
+	my $attributes = $usersByLogin{$login};
+
+	print "\n";
+	print "dn: username=", $login,", ou=users, o=ysoftsafeq", "\n";
+	print "objectclass: ysquser", "\n";
+	print "username: ", $login, "\n";
+	print "externaldn: cn=", $login, ", ou=users, ou=mu, dc=ucn, dc=muni, dc=cz", "\n";
+	print "firstname: ", $attributes->{$A_USER_FIRST_NAME}, "\n";
+	print "lastname: ", $attributes->{$A_USER_LAST_NAME}, "\n";
+	print "costcenter: costcenterid=", $attributes->{$A_USER_WORKPLACE_ID}, ", ou=costcenters, o=ysoftsafeq", "\n";
+	print "email: ", $attributes->{$A_USER_MAIL}, "\n";
+
+	foreach my $chipNumber (@{$attributes->{$A_USER_CHIP_NUM}}) {
+		#prepare cipher
+		my $cipher = Crypt::CBC->new(
+			-key       => $key,
+			-keylength => '256',
+			-cipher    => "Crypt::OpenSSL::AES"
+		);
+
+		#encrypt secret
+		my $encryptedText;
+		eval {$encryptedText = $cipher->encrypt($chipNumber);};
+		if ($@) {
+			my $errorId = "1";
+			my $message = "Problem with encrypting data: $@";
+			my $name = "EncryptingFailedException";
+			print $name, " (error ", $errorId, "): ", $message;
+			exit 0;
+		}
+
+		#encode encrypted secret
+		my $encodedEncryptedText;
+		eval {$encodedEncryptedText = urlsafe_b64encode($encryptedText);};
+		if ($@) {
+			my $errorId = "2";
+			my $message = "Problem with encoding data: $@";
+			my $name = "EncodingFailedException";
+			print $name, " (error ", $errorId, "): ", $message;
+			exit 0;
+		}
+		
+		print "card: ", $encodedEncryptedText, "\n";
+	}
+	
+	print "role: everyone", "\n";
+	print "prepaid: FALSE", "\n";
+	print "\n";
+}
+close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
+
+# safeq_costcenters
+## dn: costcenterid=1000001, ou=costcenters, o=ysoftsafeq
+## objectclass: ysqcostcenter
+## costcenterid: 1000001
+## costcentername: Human Resources
+open FILE_CENTERS,">$fileCenters" or die "Cannot open $fileCenters: $! \n";
+foreach my $id (sort keys %costcentersById) {
+	print "\n";
+	print "dn: costcenterid=", $id, ", ou=costcenters, o=ysoftsafeq", "\n";
+	print "objectclass: ysqcostcenter", "\n";
+	print "costcenterid: ", $id, "\n";
+	print "costcentername: ", $costcentersById{$id}, "\n";
+	print "\n";
+}
+close (FILE_CENTERS) or die "Cannot close $fileCenters: $! \n";
+perunServicesInit::finalize;
+
+##############################################################################
+#   Only subs definitions down there
+##############################################################################
+
+sub processUsers {
+	my $memberAttributes = shift;    
+    
+	$usersByLogin{$memberAttributes->{$A_USER_LOGIN}} = $memberAttributes unless defined $usersByLogin{$memberAttributes->{$A_USER_LOGIN}};
+
+	processCostCenters $memberAttributes->{$A_USER_WORKPLACE_ID}, $memberAttributes->{$A_USER_WORKPLACE};
+}
+
+sub processCostCenters {
+	my $costCenterId = shift;
+	my $costCenterName = shift;
+    
+	$costcentersById{$costCenterId} = $costCenterName unless defined $costcentersById{$costCenterId};
+}
