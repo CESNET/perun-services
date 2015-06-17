@@ -27,6 +27,7 @@ our $A_EPPN;  *A_EPPN = \'urn:perun:user:attribute-def:def:preferredEduPersonPri
 our $A_EPPNS; *A_EPPNS = \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 our $A_O; *A_O = \'urn:perun:user:attribute-def:def:organization';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
+our $A_CN; *A_CN = \'urn:perun:user:attribute-def:def:cnCeitecAD';
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -85,6 +86,13 @@ for my $user (@userData) {
 
 	my %uAttributes = attributesToHash($user->getAttributes);
 
+	unless ($uAttributes{$A_CN} && $uAttributes{$A_LOGIN}) {
+		# skip users without CN or login
+		next;
+	}
+
+	my $cn = "$uAttributes{$A_CN}";
+
 	# Localy defined attributes
 	my $userLogin = "$uAttributes{$A_LOGIN}";
 	my $userPrincipalName = "$userLogin\@ceitec.local";
@@ -92,9 +100,8 @@ for my $user (@userData) {
 	my $displayName = "$uAttributes{$A_LAST_NAME} $uAttributes{$A_FIRST_NAME}";
 	
 	# print attributes, which are never empty
-	# TODO - use generated CN instead of login
-	print FILE "dn: cn=" . $userLogin . "," . $facilityAttributes{$A_F_BASE_DN} . "\n";
-	print FILE "cn: " . $userLogin . "\n";
+	print FILE "dn: cn=" . $cn . "," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+	print FILE "cn: " . $cn . "\n";
 
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
 	my $sn = $uAttributes{$A_LAST_NAME};
@@ -128,7 +135,7 @@ for my $user (@userData) {
 		print FILE "eduPersonPrincipalNames: " . $val . "\n";
 	}
 
-	# Set userAccountControl to 66048 which means Normal account + Password never expires
+	# Set userAccountControl to 66048 which means Normal account + Password never expires + enabled
 	# ONLY FOR CEITEC
 	print FILE "userAccountControl: 66048\n";
 
