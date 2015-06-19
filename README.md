@@ -1,12 +1,21 @@
 # Perun services #
 
-This repository contains all scripts, which are used to manage end-services by [Perun](http://perun.cesnet.cz/web/) on requested destination. 
+This repository contains all scripts, which are used by [Perun](http://perun.cesnet.cz/web/) to manage access to services on requested destinations. Sources of the server part of Perun are located in another [repository](https://github.com/CESNET/perun).
 
-> Sources of Perun itself are located in another [repository](https://github.com/CESNET/perun).
+> Perun can manage any kind of a service, which has either accessible API or has accessible config files. We will be happy to help you with writing your own scripts for managing your service.
 
-Please note, that Perun covers access management to such end-services and not their configuration as a whole. Perun uses _push model_, so when configuration change occur in a Perun, new config files are generated for affected services and sent to the destination, where they are processed. Result of such operation is then reported back to the Perun.
+## Contributing ##
 
-## Structure ##
+* Indent all sources by tabs, not spaces.
+* For perl sources:
+  * Use ``use strict`` and ``use warnings``.
+  * Use own global variables with caution (key word ``our``).
+  * For defined global variables (e.g. formatting ones $, $",...) always use ``local``.
+  * Brackets for function calls are not necessary, if it doesn't hurt code readability.
+  * Code commenting - the more, the better. For each function we comment input, output a how does it modify global variables (if used).
+  * ``man perlstyle``
+
+### Sources structure ###
 
 * **gen/** - These perl scripts fetch data from Perun and generate new configuration files for each service and destination.
 * **send/** - Scripts ensures transfer of configuration files to destination using SSH.
@@ -16,8 +25,10 @@ Gen and send scripts are located on your Perun instance and are used by _perun-e
 
 ## Deployment on destinations ##
 
+Perun uses _push model_, so when configuration change occur in a Perun, new config files are generated for affected services and sent to the destinations, where they are processed. Result of such operation is then reported back to the Perun.
+
 * Slave scripts can be automatically installed on destination machines as .deb or .rpm packages.
-* You can generate packages from source by running ``make clean && make`` in _slave/_ folder.
+  * You can generate packages from source by running ``make clean && make`` in _slave/_ folder.
 * You must allow access to destination from your Perun instance by SSH key as user with all necessary privileges (usually root).
 * You can specify different user in Perun and it's good practice to restrict access on destination to run only command ``/opt/perun/bin/perun``.
 * You can override default behavior of services on each destination by creating file ``/etc/perunv3.conf`` and put own config data here. As example, you can define white/black list of services, which you allow to configure on your destination. You can also set expected destination and facility names, so nobody can push own data to your destination from same Perun instance.
@@ -37,6 +48,8 @@ You can also configure each service on destination machine using _pre_ and _post
 Pre scripts are processed before slave script and post scripts are processed after. Pre scripts are usually used to configure the service. You can check example pre script for ldap service in ``slave/ldap.d/`` folder.
 
 ## License ##
+
+> FreeBSD license (yet we use components under different licenses, e.g. Apache, GNU, CC).
 
 Copyright (c) 2014, CESNET, CERIT-SC. All rights reserved.
 
