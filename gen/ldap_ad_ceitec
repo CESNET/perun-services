@@ -1,0 +1,123 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+local $::SERVICE_NAME = "ldap_ad_ceitec";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
+my $baseDnFileName = "$DIRECTORY/baseDN";
+
+my $data = perunServicesInit::getFlatData;
+
+#Constants
+our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDN';
+
+# User attributes
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+#our $A_EPPN;  *A_EPPN = \'urn:perun:user:attribute-def:def:preferredEduPersonPrincipalName';
+our $A_EPPNS; *A_EPPNS = \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
+our $A_O; *A_O = \'urn:perun:user:attribute-def:def:organization';
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
+our $A_CN; *A_CN = \'urn:perun:user:attribute-def:def:cnCeitecAD';
+
+# CHECK ON FACILITY ATTRIBUTES
+my %facilityAttributes = attributesToHash $data->getAttributes;
+if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+	exit 1;
+}
+
+#
+# PRINT BASE_DN FILE
+#
+open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
+print FILE $facilityAttributes{$A_F_BASE_DN};
+close(FILE);
+
+#
+# PRINT LDIF FILE
+#
+open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
+
+# FOR EACH USER ON FACILITY
+my @userData = ($data->getChildElements)[1]->getChildElements;  # users on facility
+
+for my $user (@userData) {
+
+	my %uAttributes = attributesToHash($user->getAttributes);
+
+	unless ($uAttributes{$A_CN} && $uAttributes{$A_LOGIN}) {
+		# skip users without CN or login
+		next;
+	}
+
+	my $cn = "$uAttributes{$A_CN}";
+
+	# Localy defined attributes
+	my $userLogin = "$uAttributes{$A_LOGIN}";
+	my $userPrincipalName = "$userLogin\@ceitec.local";
+	my $samAccountName = $userLogin;
+	my $displayName = "$uAttributes{$A_LAST_NAME} $uAttributes{$A_FIRST_NAME}";
+	
+	# print attributes, which are never empty
+	print FILE "dn: cn=" . $cn . "," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+	print FILE "cn: " . $cn . "\n";
+
+	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
+	my $sn = $uAttributes{$A_LAST_NAME};
+	my $givenName = $uAttributes{$A_FIRST_NAME};
+	my $mail = $uAttributes{$A_MAIL};
+	my $eppns = $uAttributes{$A_EPPNS};
+	my $o = $uAttributes{$A_O};
+
+	if (defined $displayName and length $displayName) {
+		print FILE "displayName: " . $displayName . "\n";
+	}
+	if (defined $sn and length $sn) {
+		print FILE "sn: " . $sn . "\n";
+	}
+	if (defined $givenName and length $givenName) {
+		print FILE "givenName: " . $givenName . "\n";
+	}
+	if (defined $mail and length $mail) {
+		print FILE "mail: " . $mail . "\n";
+	}
+	if (defined $o and length $o) {
+		print FILE "company: " . $o . "\n";
+	}
+	if (defined $samAccountName and length $samAccountName) {
+		print FILE "samAccountName: " . $samAccountName . "\n";
+	}
+	if (defined $userPrincipalName and length $userPrincipalName) {
+		print FILE "userPrincipalName: " . $userPrincipalName . "\n";
+	}
+	foreach my $val (@$eppns) {
+		print FILE "eduPersonPrincipalNames: " . $val . "\n";
+	}
+
+	# Set userAccountControl to 66048 which means Normal account + Password never expires + enabled
+	# ONLY FOR CEITEC
+	print FILE "userAccountControl: 66048\n";
+
+	# print classes
+	print FILE "objectclass: top\n";
+	print FILE "objectclass: person\n";
+	print FILE "objectclass: user\n";
+	print FILE "objectclass: organizationalPerson\n";
+
+	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
+	print FILE "\n";
+
+}
+
+close(FILE);
+
+perunServicesInit::finalize;
