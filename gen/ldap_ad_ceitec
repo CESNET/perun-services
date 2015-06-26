@@ -23,7 +23,7 @@ our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBas
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
-our $A_EPPN;  *A_EPPN = \'urn:perun:user:attribute-def:def:preferredEduPersonPrincipalName';
+#our $A_EPPN;  *A_EPPN = \'urn:perun:user:attribute-def:def:preferredEduPersonPrincipalName';
 our $A_EPPNS; *A_EPPNS = \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 our $A_O; *A_O = \'urn:perun:user:attribute-def:def:organization';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
@@ -46,38 +46,6 @@ close(FILE);
 # PRINT LDIF FILE
 #
 open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
-
-# print base entry
-
-print FILE "dn: " . $facilityAttributes{$A_F_BASE_DN} . "\n";
-# IF base start with dc=[something]
-if ($facilityAttributes{$A_F_BASE_DN} =~ m/^dc=/i) {
-
-	my $position = index($facilityAttributes{$A_F_BASE_DN}, ",");
-	print $facilityAttributes{$A_F_BASE_DN} . "\n";
-	print $position . "\n";
-	my $dc = undef;
-	if ($position > 0) {
-		$dc = substr $facilityAttributes{$A_F_BASE_DN}, 3, $position-3;
-	}
-	print FILE "dc: " . $dc . "\n";
-	print FILE "objectclass: top\n";
-	print FILE "objectclass: domain\n";  # we need at least one structural class
-	print FILE "objectclass: dcObject\n";
-}
-# IF base start with ou=[something]
-if ($facilityAttributes{$A_F_BASE_DN} =~ m/^ou=/i) {
-
-	my $position = index($facilityAttributes{$A_F_BASE_DN}, ",");
-	my $ou = undef;
-	if ($position > 0) {
-		$ou = substr($facilityAttributes{$A_F_BASE_DN}, 3, $position-3);
-	}
-	print FILE "ou: " . $ou . "\n";
-	print FILE "objectclass: organizationalUnit\n"
-}
-
-print FILE "\n";
 
 # FOR EACH USER ON FACILITY
 my @userData = ($data->getChildElements)[1]->getChildElements;  # users on facility
@@ -124,7 +92,7 @@ for my $user (@userData) {
 	}
 	if (defined $o and length $o) {
 		print FILE "company: " . $o . "\n";
-	}	
+	}
 	if (defined $samAccountName and length $samAccountName) {
 		print FILE "samAccountName: " . $samAccountName . "\n";
 	}
