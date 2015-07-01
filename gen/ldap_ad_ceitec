@@ -12,9 +12,11 @@ my $SCRIPT_VERSION = "3.0.0";
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
+my $fileNameGroups = "$DIRECTORY/$::SERVICE_NAME"."_groups.ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
+my $baseDnFileNameGroups = "$DIRECTORY/baseDNGroups";
 
-my $data = perunServicesInit::getFlatData;
+my $data = perunServicesInit::getHierarchicalData;
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDN';
@@ -28,6 +30,13 @@ our $A_EPPNS; *A_EPPNS = \'urn:perun:user:attribute-def:virt:eduPersonPrincipalN
 our $A_O; *A_O = \'urn:perun:user:attribute-def:def:organization';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
 our $A_CN; *A_CN = \'urn:perun:user:attribute-def:def:cnCeitecAD';
+our $A_R_SEC_GROUP_CN; *A_R_SEC_GROUP_CN = \'urn:perun:resource:attribute-def:def:secGroupCnCeitecAD';
+
+# GATHER USERS
+my $users;  # $users->{$login}->{ATTR} = $attrValue;
+my $userResources; # $userResources->{$login}->{$A_R_SEC_GROUP_CN} = 1;
+# GATHER USERS FROM RESOURCES
+my $usersByResource;  # $usersByResource->{$A_R_SEC_GROUP_CN}->{users DN} = 1
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -36,47 +45,112 @@ if (!defined($facilityAttributes{$A_F_BASE_DN})) {
 }
 
 #
-# PRINT BASE_DN FILE
+# PRINT BASE_DN FILEs
 #
+my $baseDNUsers = "OU=Users,".$facilityAttributes{$A_F_BASE_DN};
+my $baseDNGroups = "OU=Security Groups,".$facilityAttributes{$A_F_BASE_DN};
+
 open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
-print FILE $facilityAttributes{$A_F_BASE_DN};
+print FILE $baseDNUsers;
+close(FILE);
+
+open FILE,">:encoding(UTF-8)","$baseDnFileNameGroups" or die "Cannot open $baseDnFileNameGroups: $! \n";
+print FILE $baseDNGroups;
 close(FILE);
 
 #
-# PRINT LDIF FILE
+# AGGREGATE DATA
+#
+my @resourcesData = $data->getChildElements;
+
+# FOR EACH RESOURCE
+foreach my $rData (@resourcesData) {
+
+	my %rAttributes = attributesToHash $rData->getAttributes;
+
+	# process members
+	my @membersData = $rData->getChildElements;
+
+	# FOR EACH MEMBER ON RESOURCE
+	foreach my $mData (@membersData) {
+
+		my %mAttributes = attributesToHash $mData->getAttributes;
+		my $login = $mAttributes{$A_LOGIN};
+
+		unless ($mAttributes{$A_CN} && $mAttributes{$A_LOGIN}) {
+			# skip users without CN or login
+			next;
+		}
+
+		# store flat user structure
+		$users->{$login}->{$A_FIRST_NAME} = $mAttributes{$A_FIRST_NAME};
+		$users->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME};
+		$users->{$login}->{$A_MAIL} = $mAttributes{$A_MAIL};
+		$users->{$login}->{$A_EPPNS} = $mAttributes{$A_EPPNS};
+		$users->{$login}->{$A_O} = $mAttributes{$A_O};
+		$users->{$login}->{$A_CN} = $mAttributes{$A_CN};
+
+		# store on which resources user is
+		$userResources->{$login}->{"CN=" . $rAttributes{$A_R_SEC_GROUP_CN} . "," . $baseDNGroups} = 1;
+
+		# store which users (their DN) are on this resource
+		$usersByResource->{$rAttributes{$A_R_SEC_GROUP_CN}}->{"CN=" . $mAttributes{$A_CN} . "," . $baseDNUsers} = 1
+
+	}
+
+}
+
+#
+# Print group data LDIF
+#
+open FILE,">:encoding(UTF-8)","$fileNameGroups" or die "Cannot open $fileNameGroups: $! \n";
+
+my @groups = sort keys %{$usersByResource};
+for my $group (@groups) {
+
+	print FILE "dn: CN=" . $group . "," . $baseDNGroups . "\n";
+	print FILE "cn: " . $group . "\n";
+	print FILE "objectClass: group\n";
+	print FILE "objectClass: top\n";
+
+	my @groupMembers = sort keys %{$usersByResource->{$group}};
+	for my $member (@groupMembers) {
+		print FILE "member: " . $member . "\n";
+	}
+
+	# there must be empty line after each entry
+	print FILE "\n";
+
+}
+
+close FILE;
+
+#
+# PRINT user data LDIF
 #
 open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
 
 # FOR EACH USER ON FACILITY
-my @userData = ($data->getChildElements)[1]->getChildElements;  # users on facility
+my @logins = sort keys %{$users};
+for my $login (@logins) {
 
-for my $user (@userData) {
-
-	my %uAttributes = attributesToHash($user->getAttributes);
-
-	unless ($uAttributes{$A_CN} && $uAttributes{$A_LOGIN}) {
-		# skip users without CN or login
-		next;
-	}
-
-	my $cn = "$uAttributes{$A_CN}";
+	my $cn = "$users->{$login}->{$A_CN}";
 
 	# Localy defined attributes
-	my $userLogin = "$uAttributes{$A_LOGIN}";
-	my $userPrincipalName = "$userLogin\@ceitec.local";
-	my $samAccountName = $userLogin;
-	my $displayName = "$uAttributes{$A_LAST_NAME} $uAttributes{$A_FIRST_NAME}";
+	my $userPrincipalName = "$login\@ceitec.local";
+	my $samAccountName = $login;
+	my $displayName = "$users->{$login}->{$A_LAST_NAME} $users->{$login}->{$A_FIRST_NAME}";
 	
 	# print attributes, which are never empty
-	print FILE "dn: cn=" . $cn . "," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+	print FILE "dn: cn=" . $cn . "," . $baseDNUsers . "\n";
 	print FILE "cn: " . $cn . "\n";
 
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
-	my $sn = $uAttributes{$A_LAST_NAME};
-	my $givenName = $uAttributes{$A_FIRST_NAME};
-	my $mail = $uAttributes{$A_MAIL};
-	my $eppns = $uAttributes{$A_EPPNS};
-	my $o = $uAttributes{$A_O};
+	my $sn = $users->{$login}->{$A_LAST_NAME};
+	my $givenName = $users->{$login}->{$A_FIRST_NAME};
+	my $mail = $users->{$login}->{$A_MAIL};
+	my $eppns = $users->{$login}->{$A_EPPNS};
+	my $o = $users->{$login}->{$A_O};
 
 	if (defined $displayName and length $displayName) {
 		print FILE "displayName: " . $displayName . "\n";
@@ -101,6 +175,12 @@ for my $user (@userData) {
 	}
 	foreach my $val (@$eppns) {
 		print FILE "eduPersonPrincipalNames: " . $val . "\n";
+	}
+
+	# print group membership if any
+	my @memberOf = sort keys %{$userResources->{$login}};
+	for my $groupDN (@memberOf) {
+		print FILE "memberOf: " . $groupDN . "\n";
 	}
 
 	# Set userAccountControl to 66048 which means Normal account + Password never expires + enabled
