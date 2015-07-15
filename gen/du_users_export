@@ -179,6 +179,7 @@ for my $vo (keys %attributesByVo) {
 	my $voStruc = {};
 	$voStruc->{"FileType"} = "du_vo_export";
 	$voStruc->{"Name"} = $vo;
+	$voStruc->{"Facility"} = $facilityName;
 	$voStruc->{"PerunVOID"} = $attributesByVo{$vo}->{"PerunVOID"};
 	$voStruc->{"Resources"} = $attributesByVo{$vo}->{"Resources"};
 	$voStruc->{"Groups"} = \@groups;
@@ -186,8 +187,6 @@ for my $vo (keys %attributesByVo) {
 	my $fileName = "$DIRECTORY/data/$facilityName-$vo";
 	open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 	print FILE JSON::XS->new->utf8->pretty->encode($voStruc);
-	print FILE JSON::XS->new->utf8->pretty->encode($voStruc);
-	close FILE;
 	close FILE;
 }
 
