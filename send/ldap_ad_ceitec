@@ -1,0 +1,577 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Switch;
+use Net::LDAPS;
+use Net::LDAP::Entry;
+use Net::LDAP::Message;
+use Net::LDAP::LDIF;
+use Encode;
+use Net::LDAP::Control::Paged;
+use Net::LDAP::Constant qw( LDAP_CONTROL_PAGED );
+use String::Random qw( random_string );
+use MIME::Base64 qw( encode_base64 );
+use Data::Dumper;
+
+sub ldap_connect;
+sub ldap_disconnect;
+sub ldap_log;
+sub load_ad;
+sub load_perun;
+sub load_group_members;
+sub compare_entry;
+sub process_add;
+sub process_update;
+sub process_disable;
+sub process_groups;
+
+# define service
+my $service_name = "ldap_ad_ceitec";
+
+# ldap instance holder
+my $ldap = undef;
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+
+# BASE DN
+open my $file, '<', "$service_files_dir/baseDN";
+my $base_dn = <$file>;
+chomp($base_dn);
+close $file;
+
+# BASE DN for Groups
+open my $file_g, '<', "$service_files_dir/baseDNGroups";
+my $base_dn_groups = <$file_g>;
+chomp($base_dn_groups);
+close $file_g;
+
+# propagation destination
+my $ldap_location = $ARGV[1];
+chomp($ldap_location);
+
+# load authz
+my $namespace = "ceitec";
+
+# check if config file for namespace exists
+my $filename = "/etc/perun/pwchange.".$namespace.".ad";
+unless (-e $filename) {
+	ldap_log("Configuration file for namespace \"" . $namespace . "\" doesn't exist!");
+	exit 2; # login-namespace is not supported
+}
+
+# load configuration file
+open FILE, "<" . $filename;
+my @lines = <FILE>;
+close FILE;
+
+# remove new-line characters from the end of lines
+chomp @lines;
+
+# read configuration
+my $ldap_user = $lines[1];
+my $ldap_pass = $lines[2];
+
+# filter
+my $filter = '(objectClass=user)';
+my $filter_groups = '(cn=CF-*)';
+
+# entries to compare and process
+my @ad_entries = ();
+my @perun_entries = ();
+my @ad_entries_groups = ();
+my @perun_entries_groups = ();
+
+# log counters
+my $counter_add = 0;
+my $counter_updated = 0;
+my $counter_disabled = 0;
+my $counter_renamed = 0;
+my $counter_fail = 0;
+my $counter_group_updated = 0;
+my $counter_group_failed = 0;
+
+# connect to ad
+ldap_connect();
+
+# load all data
+load_perun();
+load_ad();
+
+# process data
+process_add();
+process_update();
+process_disable();
+process_groups();
+
+# disconnect
+ldap_disconnect();
+
+# log results
+ldap_log("Added: " . $counter_add . " entries.");
+ldap_log("Updated: " . $counter_updated . " entries.");
+ldap_log("Disabled: " . $counter_disabled . " entries.");
+ldap_log("Renamed: " . $counter_renamed . " entries.");
+ldap_log("Failed: " . $counter_fail. " entries.");
+ldap_log("Group updated: " . $counter_group_updated . " entries.");
+ldap_log("Group failed: " . $counter_group_failed . " entries.");
+
+# END of main script
+
+###########################################
+#
+# Main processing functions
+#
+###########################################
+
+#
+# Add new user entries to AD
+#
+sub process_add() {
+
+	foreach my $perun_entry (@perun_entries) {
+
+		my $found = 0;
+		foreach my $ad_entry (@ad_entries) {
+			if ($ad_entry->get_value('samAccountName') eq $perun_entry->get_value('samAccountName')) {
+				$found = 1;
+				last;
+			}
+		}
+
+		unless ($found) {
+
+			# Generate also random password
+			my $password = '"' . random_string("CCcc!ccnCn") . '"';
+			my $converted_pass = encode("UTF-16LE",'"'.$password.'"');
+			$perun_entry->add(
+				unicodePwd => $converted_pass
+			);
+
+			# Add new entry to AD
+			my $response = $perun_entry->update($ldap);
+			unless ($response->is_error()) {
+				# SUCCESS
+				ldap_log("Added: " . $perun_entry->dn());
+				$counter_add++;
+			} else {
+				# FAIL
+				ldap_log("NOT added: " . $perun_entry->dn() . " | " . $response->error());
+				ldap_log($perun_entry->ldif());
+				$counter_fail++;
+			}
+
+		}
+
+	}
+}
+
+
+#
+# Update existing entries in AD
+#
+sub process_update() {
+
+	foreach my $perun_entry (@perun_entries) {
+
+		foreach my $ad_entry (@ad_entries) {
+			if ($ad_entry->get_value('samAccountName') eq $perun_entry->get_value('samAccountName')) {
+
+				# attrs without cn since it's part of DN to be updated
+				my @attrs = ('displayName','sn','givenName','mail','company','eduPersonPrincipalNames','userAccountControl');
+				# stored log messages to check if entry should be updated
+				my @entry_changed = ();
+
+				# check each attribute
+				foreach my $attr (@attrs) {
+					if (compare_entry($ad_entry , $perun_entry , $attr) == 1) {
+						# store value for log
+						my @ad_val = $ad_entry->get_value($attr);
+						my @perun_val = $perun_entry->get_value($attr);
+						push(@entry_changed, "$attr | " . join(", ",sort(@ad_val)) .  " => " . join(", ",sort(@perun_val)));
+						# replace value
+						$ad_entry->replace(
+							$attr => \@perun_val
+						);
+					}
+				}
+
+				if (@entry_changed) {
+					# Update entry in AD
+					my $response = $ad_entry->update($ldap);
+					unless ($response->is_error()) {
+						# SUCCESS
+						foreach my $log_message (@entry_changed) {
+							ldap_log("Updated: " . $ad_entry->dn() . " | " . $log_message);
+						}
+						$counter_updated++;
+					} else {
+						# FAIL
+						ldap_log("NOT updated: " . $ad_entry->dn() . " | " . $response->error());
+						ldap_log($ad_entry->ldif());
+						$counter_fail++;
+					}
+				}
+
+				# If CN changed update DN of entry (move it)
+				my $ad_cn = $ad_entry->get_value('cn');
+				my $perun_cn = $perun_entry->get_value('cn');
+				unless ($ad_cn eq $perun_cn) {
+					my $ad_dn = $ad_entry->dn();
+					my $perun_dn = $perun_entry->dn();
+					my $response = $ldap->moddn($ad_entry, newrdn => "cn=" . $perun_cn , deleteoldrdn => 1);
+					unless ($response->is_error()) {
+						# SUCCESS
+						ldap_log("Renamed: " . $ad_dn . " => " . $perun_dn);
+						$counter_renamed++;
+					} else {
+						# FAIL
+						ldap_log("NOT renamed: " . $ad_dn . " | " . $response->error());
+						ldap_log($ad_entry->ldif());
+						$counter_fail++;
+					}
+				}
+
+				# entry found and/or updated
+				last;
+
+			}
+		}
+	}
+}
+
+#
+# Disable entries in AD
+#
+sub process_disable() {
+
+	foreach my $ad_entry (@ad_entries) {
+
+		my $found = 0;
+		foreach my $perun_entry (@perun_entries) {
+			if ($ad_entry->get_value('samAccountName') eq $perun_entry->get_value('samAccountName')) {
+				$found = 1;
+				last;
+			}
+		}
+
+		unless ($found) {
+			unless ($ad_entry->get_value('userAccountControl') == 66050) {
+				# disable entry in AD
+				$ad_entry->replace( userAccountControl => 66050 );
+				my $response = $ad_entry->update($ldap);
+				unless ($response->is_error()) {
+					ldap_log("Disabled entry: " . $ad_entry->dn());
+					$counter_disabled++;
+				} else {
+					ldap_log("NOT disabled: " . $ad_entry->dn() . " | " . $response->error());
+					ldap_log($ad_entry->ldif());
+					$counter_fail++;
+				}
+			}
+		}
+	}
+}
+
+#
+# Update group membership in AD
+#
+sub process_groups() {
+
+	foreach my $ad_entry (@ad_entries_groups) {
+
+		my $found = 0;
+		foreach my $perun_entry (@perun_entries_groups) {
+			if ($ad_entry->get_value('cn') eq $perun_entry->get_value('cn')) {
+				$found = 1;
+				if (compare_entry($ad_entry , $perun_entry , 'member') == 1) {
+
+					my @ad_val = $ad_entry->get_value('member');
+					my @per_val = $perun_entry->get_value('member');
+					my $response;
+
+					# if different, check if group members are not ranged (ad limits to 1500 entries)
+					unless(@ad_val) {
+						@ad_val = load_group_members($ad_entry->dn());
+						# sort for multi-valued
+						my @sorted_ad_val = sort(@ad_val);
+						my @sorted_perun_val = sort(@per_val);
+						# compare using smart-match (perl 5.10.1+)
+						unless(@sorted_ad_val ~~ @sorted_perun_val) {
+							# members of large group are not equals
+							$ad_entry->replace(
+								'member' => \@per_val
+							);
+							# Update entry in AD
+							$response = $ad_entry->update($ldap);
+						}
+					} else {
+						# small group, perform replace
+						$ad_entry->replace(
+							'member' => \@per_val
+						);
+						# Update entry in AD
+						$response = $ad_entry->update($ldap);
+					}
+
+					if ($response) {
+						unless ($response->is_error()) {
+							# SUCCESS
+							$counter_group_updated++;
+							ldap_log("Group members updated: " . $ad_entry->dn() . " | \n" . join(",\n",@ad_val) .  "\n=>\n" . join(",\n",@per_val));
+						} else {
+							# FAIL
+							$counter_group_failed++;
+							ldap_log("Group members NOT updated: " . $ad_entry->dn() . " | " . $response->error());
+							ldap_log($ad_entry->ldif());
+						}
+					}
+					# group not updated (has same members)
+				}
+				# group found and maybe updated
+				last;
+			}
+		}
+
+		unless ($found) {
+			ldap_log("Unknown CF-* group, is not in Perun: " . $ad_entry->dn());
+		}
+
+	}
+}
+
+###########################################
+#
+# Auxiliary functions used by main script
+#
+###########################################
+
+#
+# Compare new value with original entry value using Perls smart-match operator
+#
+# Takes:
+# $ad_entry entry from AD to check on
+# $perun_entry entry from Perun to compare with
+# $param name of param to compare
+#
+# Return:
+# 1 if param should be updated
+# 0 otherwise
+#
+sub compare_entry() {
+
+	my $ad_entry = (@_)[0];
+	my $perun_entry = (@_)[1];
+	my $param = (@_)[2];
+
+	# get value
+	my @ad_entry_value = $ad_entry->get_value($param);
+	my @perun_entry_value = $perun_entry->get_value($param);
+
+	# sort for multi-valued
+	my @sorted_ad_entry_value = sort(@ad_entry_value);
+	my @sorted_perun_entry_value = sort(@perun_entry_value);
+
+	# compare using smart-match (perl 5.10.1+)
+	unless(@sorted_ad_entry_value ~~ @sorted_perun_entry_value) {
+		# param values are not equals
+		return 1;
+	}
+
+	# values are equals
+	return 0;
+
+}
+
+#
+# Load data from Perun ldif files and store them in @perun_entries and @perun_entries_groups
+#
+sub load_perun(){
+
+	# load users
+	my $ldif = Net::LDAP::LDIF->new( $service_files_dir . "/ldap_ad_ceitec.ldif", "r", onerror => 'warn');
+
+	while( not $ldif->eof ( ) ) {
+		my $entry = $ldif->read_entry();
+		if ( $ldif->error() ) {
+			ldap_log("Error read Perun ldif:  " . $entry->get_value('samAccountName') . " | " . $ldif->error());
+		} else {
+			# push valid entry
+			push(@perun_entries, $entry) if ($entry->get_value('samAccountName'));
+		}
+	}
+
+	# load groups
+	my $ldif_groups = Net::LDAP::LDIF->new( $service_files_dir . "/ldap_ad_ceitec_groups.ldif", "r", onerror => 'warn');
+
+	while( not $ldif_groups->eof ( ) ) {
+		my $entry = $ldif_groups->read_entry();
+		if ( $ldif_groups->error() ) {
+			ldap_log("Error read Perun ldif_groups:  " . $entry->get_value('cn') . " | " . $ldif_groups->error());
+		} else {
+			# push valid entry
+			push(@perun_entries_groups, $entry) if ($entry->get_value('cn'));
+		}
+	}
+
+}
+
+#
+# Load data from AD and store them in @ad_entries and @ad_entries_groups variables
+#
+sub load_ad() {
+
+	# load users
+	my $page = Net::LDAP::Control::Paged->new(size => 9999);
+	my $mesg;
+	my $cookie;
+
+	while (1) {
+
+		$mesg = $ldap->search( base => $base_dn ,
+			scope => 'sub' ,
+			filter => $filter ,
+			attrs => ['displayName','cn','sn','givenName','mail','company','eduPersonPrincipalNames','samAccountName','userPrincipalName','userAccountControl'] ,
+			control => [$page]
+		);
+
+		$mesg->code && die "Error on search: $@ : " . $mesg->error;
+		ldap_log("Processing page with " . $mesg->count() . " users.");
+
+		for my $entry ($mesg->entries) {
+			# store only valid entry from AD
+			push(@ad_entries,$entry) if ($entry->get_value('samAccountName'));
+		}
+
+		# Paging Control
+		my ($resp) = $mesg->control(LDAP_CONTROL_PAGED) or last;
+		$cookie = $resp->cookie or last;
+		$page->cookie($cookie);
+
+	}
+
+	# load groups
+	my $page_groups = Net::LDAP::Control::Paged->new(size => 9999);
+	my $mesg_groups;
+	my $cookie_groups;
+
+	while (1) {
+
+		# Get all entries from AD
+		$mesg_groups = $ldap->search( base => $base_dn_groups ,
+			scope => 'sub' ,
+			filter => $filter_groups ,
+			attrs => ['cn','member'] ,
+			control => [$page_groups]
+		);
+
+		$mesg_groups->code && die "Error on search: $@ : " . $mesg_groups->error;
+		ldap_log("Processing page with " . $mesg_groups->count() . " groups.");
+
+		for my $entry ($mesg_groups->entries) {
+			# store only valid entry from AD
+			push(@ad_entries_groups,$entry) if ($entry->get_value('cn'));
+		}
+
+		# Paging Control
+		my ($resp) = $mesg_groups->control(LDAP_CONTROL_PAGED) or last;
+		$cookie_groups = $resp->cookie or last;
+		$page_groups->cookie($cookie_groups);
+
+	}
+
+}
+
+#
+# load all members of group (when more than 1500 members is in group)
+# param: group DN
+#
+sub load_group_members() {
+
+	my $base = (@_)[0];
+	my $mesg;
+	my @members = ();
+	my $index = 0;
+
+	while ($index ne '*') {
+		$mesg = $ldap->search( base => $base, filter => '(&(objectclass=group)(cn=CF-*))',
+			scope => 'base', attrs => [ ($index > 0) ? "member;range=$index-*" : 'member' ]
+		);
+		# if success
+		if ($mesg->code == 0) {
+			my $entry = $mesg->entry(0);
+			my $attr;
+
+			# large group: let's do the range option dance
+			if (($attr) = grep(/^member;range=/, $entry->attributes)) {
+				push(@members, $entry->get_value($attr));
+				if ($attr =~ /^member;range=\d+-(.*)$/) {
+					$index = $1;
+					$index++  if ($index ne '*');
+				}
+			} else {
+				# small group: no need for the range dance
+				@members = $entry->get_value('member');
+				last;
+			}
+		} else {
+			# failure
+			last;
+		}
+	}
+
+	if ($mesg->code == 0) {
+		# success: @members contains the members of the group
+		return @members;
+	} else {
+		# failure: deal with the error in $mesg
+		return undef;
+	}
+
+}
+
+#
+# Connects to LDAP using credentials stored in $ldap_user and $ldap_pass
+#
+sub ldap_connect() {
+
+	# LDAP connect
+	$ldap = Net::LDAPS->new( "$ldap_location" , onerror => 'warn' , timeout => 15);
+
+	# LDAP log-in
+	if ($ldap) {
+		my $mesg = $ldap->bind( "$ldap_user" , password => "$ldap_pass" );
+		ldap_log("[AD] connected as: $ldap_user");
+	} else {
+		ldap_log("[AD] can't connect to AD.");
+		exit 1;
+	}
+
+}
+
+#
+# Disconnect from LDAP if connected
+#
+sub ldap_disconnect() {
+	if ($ldap) {
+		my $mesg = $ldap->unbind;
+		ldap_log("[AD] disconnected.");
+	} else {
+		ldap_log("[AD] can't disconnect from AD (connection not exists).");
+	}
+}
+
+#
+# Log any message to log file located in same folder as the script.
+# Each message starts at new line with a date.
+#
+sub ldap_log() {
+	my $message = shift;
+	open(LOGFILE, ">>./ldap_ad_ceitec.log");
+	print LOGFILE (localtime(time) . ": " . $message . "\n");
+	close(LOGFILE);
+}
