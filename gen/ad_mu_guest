@@ -70,9 +70,9 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 
 	# store standard attrs
 	$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
-    $users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
-    $users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
-    $users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
+	$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
+	$users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
+	$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
 
 }
 
@@ -84,9 +84,14 @@ open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 # FOR EACH USER ON FACILITY
 my @logins = sort keys %{$users};
 for my $login (@logins) {
-	
+
 	# print attributes, which are never empty
 	print FILE "dn: " . $users->{$login}->{"DN"} . "\n";
+
+	print FILE "samAccountName: " . $login . "\n";
+	print FILE "userPrincipalName: " . $login . "\@ucn.muni.cz" . "\n";
+	# enable accounts (if not) using service propagation
+	print FILE "userAccountControl: " . 66080 . "\n";
 
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
 	my $sn = $users->{$login}->{$A_LAST_NAME};
