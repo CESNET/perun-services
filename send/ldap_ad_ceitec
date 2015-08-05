@@ -78,12 +78,13 @@ my $ldap_pass = $lines[2];
 
 # filter
 my $filter = '(objectClass=user)';
-my $filter_groups = '(cn=CF-*)';
+my $filter_groups = '(objectClass=group)';
 
 # entries to compare and process
 my @ad_entries = ();
 my @perun_entries = ();
-my @ad_entries_groups = ();
+# we do load each group on demand by data from Perun
+#my @ad_entries_groups = ();
 my @perun_entries_groups = ();
 
 # log counters
@@ -282,66 +283,61 @@ sub process_disable() {
 #
 sub process_groups() {
 
-	foreach my $ad_entry (@ad_entries_groups) {
+	foreach my $perun_entry (@perun_entries_groups) {
 
-		my $found = 0;
-		foreach my $perun_entry (@perun_entries_groups) {
-			if ($ad_entry->get_value('cn') eq $perun_entry->get_value('cn')) {
-				$found = 1;
-				if (compare_entry($ad_entry , $perun_entry , 'member') == 1) {
+		my @per_val = $perun_entry->get_value('member');
 
-					my @ad_val = $ad_entry->get_value('member');
-					my @per_val = $perun_entry->get_value('member');
-					my $response;
+		# load members of a group from AD based on DN in Perun => Group must exists in AD
+		my @ad_val = load_group_members($perun_entry->dn());
 
-					# if different, check if group members are not ranged (ad limits to 1500 entries)
-					unless(@ad_val) {
-						@ad_val = load_group_members($ad_entry->dn());
-						# sort for multi-valued
-						my @sorted_ad_val = sort(@ad_val);
-						my @sorted_perun_val = sort(@per_val);
-						# compare using smart-match (perl 5.10.1+)
-						unless(@sorted_ad_val ~~ @sorted_perun_val) {
-							# members of large group are not equals
-							$ad_entry->replace(
-								'member' => \@per_val
-							);
-							# Update entry in AD
-							$response = $ad_entry->update($ldap);
-						}
+		unless(@ad_val) {
+			ldap_log("Group from Perun is not in AD: " . $perun_entry->dn());
+			next;
+		}
+
+		# sort to compare
+		my @sorted_ad_val = sort(@ad_val);
+		my @sorted_per_val = sort(@per_val);
+
+		# compare using smart-match (perl 5.10.1+)
+		unless(@sorted_ad_val ~~ @sorted_per_val) {
+
+			# members of group are not equals
+			# we must get reference to real group from AD in order to call "replace"
+			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter_groups, scope => 'base' ] );
+			unless ($response_ad->is_error()) {
+				# SUCCESS
+				my $ad_entry = $response_ad->entry(0);
+				$ad_entry->replace(
+					'member' => \@per_val
+				);
+				# Update entry in AD
+				my $response = $ad_entry->update($ldap);
+
+				if ($response) {
+					unless ($response->is_error()) {
+						# SUCCESS (group updated)
+						$counter_group_updated++;
+						ldap_log("Group members updated: " . $ad_entry->dn() . " | \n" . join(",\n",@sorted_ad_val) .  "\n=>\n" . join(",\n",@sorted_per_val));
 					} else {
-						# small group, perform replace
-						$ad_entry->replace(
-							'member' => \@per_val
-						);
-						# Update entry in AD
-						$response = $ad_entry->update($ldap);
+						# FAIL (to update group)
+						$counter_group_failed++;
+						ldap_log("Group members NOT updated: " . $ad_entry->dn() . " | " . $response->error());
+						ldap_log($ad_entry->ldif());
 					}
-
-					if ($response) {
-						unless ($response->is_error()) {
-							# SUCCESS
-							$counter_group_updated++;
-							ldap_log("Group members updated: " . $ad_entry->dn() . " | \n" . join(",\n",@ad_val) .  "\n=>\n" . join(",\n",@per_val));
-						} else {
-							# FAIL
-							$counter_group_failed++;
-							ldap_log("Group members NOT updated: " . $ad_entry->dn() . " | " . $response->error());
-							ldap_log($ad_entry->ldif());
-						}
-					}
-					# group not updated (has same members)
 				}
-				# group found and maybe updated
-				last;
+
+			} else {
+				# FAIL (to get group from AD)
+				$counter_group_failed++;
+            	ldap_log("Group members NOT updated: " . $perun_entry->dn() . " | " . $response_ad->error());
 			}
 		}
 
-		unless ($found) {
-			ldap_log("Unknown CF-* group, is not in Perun: " . $ad_entry->dn());
-		}
+		# group is unchanged
 
 	}
+
 }
 
 ###########################################
@@ -454,36 +450,6 @@ sub load_ad() {
 
 	}
 
-	# load groups
-	my $page_groups = Net::LDAP::Control::Paged->new(size => 9999);
-	my $mesg_groups;
-	my $cookie_groups;
-
-	while (1) {
-
-		# Get all entries from AD
-		$mesg_groups = $ldap->search( base => $base_dn_groups ,
-			scope => 'sub' ,
-			filter => $filter_groups ,
-			attrs => ['cn','member'] ,
-			control => [$page_groups]
-		);
-
-		$mesg_groups->code && die "Error on search: $@ : " . $mesg_groups->error;
-		ldap_log("Processing page with " . $mesg_groups->count() . " groups.");
-
-		for my $entry ($mesg_groups->entries) {
-			# store only valid entry from AD
-			push(@ad_entries_groups,$entry) if ($entry->get_value('cn'));
-		}
-
-		# Paging Control
-		my ($resp) = $mesg_groups->control(LDAP_CONTROL_PAGED) or last;
-		$cookie_groups = $resp->cookie or last;
-		$page_groups->cookie($cookie_groups);
-
-	}
-
 }
 
 #
@@ -498,7 +464,7 @@ sub load_group_members() {
 	my $index = 0;
 
 	while ($index ne '*') {
-		$mesg = $ldap->search( base => $base, filter => '(&(objectclass=group)(cn=CF-*))',
+		$mesg = $ldap->search( base => $base, filter => $filter_groups,
 			scope => 'base', attrs => [ ($index > 0) ? "member;range=$index-*" : 'member' ]
 		);
 		# if success
