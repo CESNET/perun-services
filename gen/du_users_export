@@ -27,6 +27,8 @@ our $A_R_SOFT_QUOTA_DATA;        *A_R_SOFT_QUOTA_DATA =        \'urn:perun:resou
 our $A_R_SOFT_QUOTA_FILE;        *A_R_SOFT_QUOTA_FILE =        \'urn:perun:resource:attribute-def:def:defaultFilesQuota';
 our $A_R_HARD_QUOTA_DATA;        *A_R_HARD_QUOTA_DATA =        \'urn:perun:resource:attribute-def:def:defaultDataLimit';
 our $A_R_HARD_QUOTA_FILE;        *A_R_HARD_QUOTA_FILE =        \'urn:perun:resource:attribute-def:def:defaultFilesLimit';
+our $A_R_FS_VOLUME;              *A_R_FS_VOLUME =              \'urn:perun:resource:attribute-def:def:fsVolume';
+our $A_R_FS_HOME_MOUNT_POINT;    *A_R_FS_HOME_MOUNT_POINT =    \'urn:perun:resource:attribute-def:def:fsHomeMountPoint';
 our $A_MR_DATALIMIT;             *A_MR_DATALIMIT =             \'urn:perun:member_resource:attribute-def:def:dataLimit';
 our $A_MR_DATAQUOTA;             *A_MR_DATAQUOTA =             \'urn:perun:member_resource:attribute-def:def:dataQuota';
 our $A_MR_FILESLIMIT;            *A_MR_FILESLIMIT =            \'urn:perun:member_resource:attribute-def:def:filesLimit';
@@ -142,6 +144,8 @@ foreach my $rData (@resourcesData) {
 	push @{$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"Resources"}}, 
 					{
 						"Name"              => $resourcesAttributes{$A_RESOURCE_NAME},
+						"FSHomeMountPoint"  => $resourcesAttributes{$A_R_FS_HOME_MOUNT_POINT},
+						"FSVolume"          => $resourcesAttributes{$A_R_FS_VOLUME},
 						"PerunResourceID"   => $resourcesAttributes{$A_RESOURCE_ID},
 						"DefaultDataLimit"  => $resourcesAttributes{$A_R_HARD_QUOTA_DATA},
 						"DefaultDataQuota"  => $resourcesAttributes{$A_R_SOFT_QUOTA_DATA},
