@@ -1,0 +1,99 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Unicode::Normalize;
+
+local $::SERVICE_NAME = "crm_ceitec";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+
+my $data = perunServicesInit::getFlatData;
+
+# User attributes
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_EPPNS; *A_EPPNS = \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
+our $A_O; *A_O = \'urn:perun:user:attribute-def:def:organization';
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
+
+# GATHER USERS
+my $users;  # $users->{$login}->{ATTR} = $attrValue;
+
+# FOR EACH USER
+foreach my $user (($data->getChildElements)[1]->getChildElements) {
+
+    my %uAttributes = attributesToHash $user->getAttributes;
+
+    my $login = $uAttributes{$A_LOGIN};
+
+    # store standard attrs
+    $users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
+    $users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
+    $users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
+    $users->{$login}->{$A_O} = $uAttributes{$A_O};
+
+    # normalize Organization for comparison, since accents are UTF-8 vs. Unicode
+    my $str = $uAttributes{$A_O};
+    $str = NFKD ( $str );
+    $str =~ s/\p{NonspacingMark}//g;
+
+    # Safe EPPN -> institution ID only for MU and VUT
+    if ("Masarykova univerzita" eq $uAttributes{$A_O}) {
+        $users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
+    } elsif ("Vysoke uceni technicke v Brne" eq $str) {
+        $users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
+    }
+
+}
+
+# print result
+#
+# PRINT user data LDIF
+#
+open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
+
+# FOR EACH USER ON FACILITY
+my @logins = sort keys %{$users};
+for my $login (@logins) {
+
+    my $lastName = $users->{$login}->{$A_LAST_NAME};
+    my $firstName = $users->{$login}->{$A_FIRST_NAME};
+    my $mail = $users->{$login}->{$A_MAIL};
+    my $o = $users->{$login}->{$A_O};
+    my $eppns = $users->{$login}->{$A_EPPNS};
+
+    print FILE 'CEITEC\\' . "$login;" . "$firstName;" . "$lastName;" . "$mail;" . "$o;";
+
+    # normalize Organization for comparison, since accents are UTF-8 vs. Unicode
+    my $str = $o;
+    $str = NFKD ( $str );
+    $str =~ s/\p{NonspacingMark}//g;
+
+    if (defined $eppns) {
+        foreach my $val (@$eppns) {
+            if (("Masarykova univerzita" eq $o) && ($val =~ /\@muni.cz$/)) {
+                print FILE "$val";
+                last;
+            } elsif (("Vysoke uceni technicke v Brne" eq $str) && ($val =~ /\@vutbr.cz$/)) {
+                my $index = index($val , '@');
+                print FILE substr($val , 0, $index);
+                last;
+            }
+        }
+    }
+
+    print FILE "\n";
+
+}
+
+close(FILE);
+
+perunServicesInit::finalize;
