@@ -1,0 +1,5 @@
+perun-slave-process-group (3.1.0) stable; urgency=low
+
+  * New package version for perun-slave-process-group
+
+ -- Michal Stava <stavamichal@gmail.com>  Mon, 16 Nov 2015 13:54:00 +0200
