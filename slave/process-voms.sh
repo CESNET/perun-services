@@ -17,6 +17,7 @@ function process {
 
 	VO_USERS=`mktemp`
 	CURRENT_VO_USERS=`mktemp`
+	CURRENT_VO_RAW_USERS=`mktemp`
 	CAS=`mktemp`
 
 	# Get list of VOs
@@ -28,7 +29,13 @@ function process {
 		cat ${FROM_PERUN} | grep -P "^${VO}\t.*" | sed 's/emailAddress/Email/' | sort > ${VO_USERS}
 
 		# Get current users stored in VOMS and convert lines into PERUN format. VOMS also doesn't accept emailAddress in the DN, it must be converted to Email
-		voms-admin --vo "${VO}" list-users | sed "s/\(.*\),\(.*\),\(.*\)/${VO}\t\1\t\2\t\3/" | sed 's/emailAddress/Email/' | sort > ${CURRENT_VO_USERS}
+		voms-admin --vo "${VO}" list-users > ${CURRENT_VO_RAW_USERS}
+		if [ $? -ne 0 ]; then
+			printf "WARNING: VO \"${VO}\" does not exist or is inactive. Original message from voms-admin:\n\t\"`cat ${CURRENT_VO_RAW_USERS}`\"\n"
+			continue
+		fi
+
+		cat ${CURRENT_VO_RAW_USERS} | sed "s/\(.*\),\(.*\),\(.*\)/${VO}\t\1\t\2\t\3/" | sed 's/emailAddress/Email/' | sort > ${CURRENT_VO_USERS}
 
 		# Get list of accepted CAs
 		voms-admin --vo "${VO}" list-cas > ${CAS}
