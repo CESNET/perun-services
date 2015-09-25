@@ -38,7 +38,11 @@ function process {
 		cat ${CURRENT_VO_RAW_USERS} | sed "s/\(.*\),\(.*\),\(.*\)/${VO}\t\1\t\2\t\3/" | sed 's/emailAddress/Email/' | sort > ${CURRENT_VO_USERS}
 
 		# Get list of accepted CAs
-		voms-admin --vo "${VO}" list-cas > ${CAS}
+		voms-admin --vo "${VO}x" list-cas > ${CAS}
+		if [ $? -ne 0 ]; then
+			printf "WARNING: Failed getting accepted CAs for VO \"${VO}\". Original message from voms-admin:\n\t\"`cat ${CAS}`\"\n"
+			continue
+		fi
 
 		# Check who should be deleted
 		cat $CURRENT_VO_USERS | while read CURRENT_VO_USER; do
@@ -74,5 +78,6 @@ function process {
 
 	rm -f $VO_USERS
 	rm -f $CURRENT_VO_USERS
+	rm -f $CURRENT_VO_RAW_USERS
 	rm -f $CAS
 }
