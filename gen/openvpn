@@ -30,12 +30,19 @@ for my $rData (@resourcesData) {
 	}
 }
 
+my %membersDNs = ();
 foreach my $memberAttributes (@membersAttributes) {
-	foreach my $caDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
-		chomp $memberAttributes->{$A_USER_CERT_DNS}{$caDN};
-		#print FILE $caDN . ":" . $memberAttributes->{$A_USER_CERT_DNS}{$caDN} . "\n";
-		print FILE $caDN . "\n";
+	foreach my $subjectDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
+		chomp $memberAttributes->{$A_USER_CERT_DNS}{$subjectDN};
+		#remove prefix from subjectDN
+		my $subjectDNWithoutPrefix = $subjectDN;
+		$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
+		$membersDNs{$subjectDNWithoutPrefix} = 1;
 	}
+}
+
+foreach my $subjectDN (keys %membersDNs) {
+	print FILE $subjectDN . "\n";
 }
 
 close (FILE);

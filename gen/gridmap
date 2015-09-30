@@ -35,19 +35,27 @@ my @map;
 foreach my $memberAttributes (@membersAttributes) {
 	foreach my $login (@{$memberAttributes->{$A_USER_LOGINS}}) {
 		
-		foreach my $caDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
-			chomp $memberAttributes->{$A_USER_CERT_DNS}{$caDN};
-			my @entry = ($caDN, $login);
+		foreach my $subjectDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
+			chomp $memberAttributes->{$A_USER_CERT_DNS}{$subjectDN};
+			my @entry = ($subjectDN, $login);
 			push(@map, \@entry);
 		}
 	}
 }
 
+my %entries = ();
 foreach my $entry (@map) {
-	open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 	foreach my $entry (@map) {
+		my $subjectDNEntry = $$entry[0];
+		#remove prefix from subject DN
+		$subjectDNEntry =~ s/^[0-9]+[:]//;
 		# "userCertDN" login
-		print FILE "\"" . $$entry[0] . "\" " . $$entry[1] . "\n";
+		$entries{"\"" . $subjectDNEntry . "\" " . $$entry[1] . "\n"} = 1;
+	}
+	
+	open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+	foreach my $entry (keys %entries) {
+		print FILE $entry;
 	}
 	close (FILE);
 }
