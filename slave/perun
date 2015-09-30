@@ -40,6 +40,7 @@ E_STATE_FILE=(206 'State file parameter (for diff_update function) is missing')
 E_FROM_PERUN_FILE=(208 'FROM_PERUN file (to diff_update) does not exists or it is not readable')
 E_DESTINATION_FILE=(209 'Destination file (to diff_update) does not exists or do not have right persmissions')
 E_PERMISSIONS=(210 'Cannot set permissions')
+E_CHANGE_OWNER=(211 'Cannot set owner')
 
 ### Functions
 function log_msg {
@@ -133,6 +134,10 @@ function diff_mv {
 			DST_PERM=`stat -L -c %a "${DST}"`
 			# Set the original permissions on the source file
 			catch_error E_PERMISSIONS chmod $DST_PERM "${SRC}"
+			# Set also original owners on the source file
+			DST_USER=`ls -ld "${DST}" | awk '{ print $3; }'`
+			DST_GROUP=`ls -ld "${DST}" | awk '{ print $4; }'`
+			catch_error E_CHANGE_OWNER chown ${DST_USER}:${DST_GROUP} "${SRC}"
 		fi
 		catch_error E_MOVE_ERROR mv -f "${SRC}" "${DST}"
 
