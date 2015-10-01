@@ -9,6 +9,11 @@
 
 PROTOCOL_VERSION='3.0.0'
 
+function log_both {
+	logger Perun:$@
+	echo $@ 1>&2
+}
+
 function process {
 	### Status codes
 	I_CHANGED=(0 "${DST_FILE} updated")
@@ -41,7 +46,7 @@ function process {
 		# Get current users stored in VOMS and convert lines into PERUN format. VOMS also doesn't accept emailAddress in the DN, it must be converted to Email
 		voms-admin --vo "${VO}" list-users > ${CURRENT_VO_RAW_USERS}
 		if [ $? -ne 0 ]; then
-			logger "Perun:VO \"${VO}\" does not exist or is inactive. Original message from voms-admin: \"`cat ${CURRENT_VO_RAW_USERS}`\""
+			log_both "VO \"${VO}\" does not exist or is inactive. Original message from voms-admin: \"`cat ${CURRENT_VO_RAW_USERS}`\""
 			RETVAL=3
 			continue
 		fi
@@ -51,7 +56,7 @@ function process {
 		# Get list of accepted CAs
 		voms-admin --vo "${VO}" list-cas > ${CAS}
 		if [ $? -ne 0 ]; then
-			logger "Perun:Failed getting accepted CAs for VO \"${VO}\". Original message from voms-admin: \"`cat ${CAS}`\""
+			log_both "Failed getting accepted CAs for VO \"${VO}\". Original message from voms-admin: \"`cat ${CAS}`\""
 			if [ $RETVAL -lt 2 ]; then RETVAL=2; fi
 			continue
 		fi
@@ -65,11 +70,11 @@ function process {
 					if [ `grep -c "$CA_DN" $CAS` -gt 0 ]; then
 						voms-admin --nousercert --vo "${VO_SHORTNAME}" delete-user "$USER_DN" "$CA_DN" > ${USER_RESPONSE}
 						if [ $? -ne 0 ]; then
-							logger "Perun:Failed removing user from VO \"${VO}\". Original message from voms-admin: \"`cat ${USER_RESPONSE}`\""
+							log_both "Failed removing user from VO \"${VO}\". Original message from voms-admin: \"`cat ${USER_RESPONSE}`\""
 							if [ $RETVAL -lt 1 ]; then RETVAL=1; fi
 							continue
 						fi
-						logger Perun:VOMS user $USER_DN - $CA_DN removed from ${VO_SHORTNAME}
+						echo VOMS user $USER_DN - $CA_DN removed from ${VO_SHORTNAME}
 					fi
 				done
 
@@ -87,11 +92,11 @@ function process {
 						USER_CN=`echo $USER_DN | sed 's|^.*\/CN=\([^/]*\).*|\1|'`
 						voms-admin --nousercert --vo "${VO_SHORTNAME}" create-user "$USER_DN" "$CA_DN" "$USER_CN" "$USER_EMAIL" > ${USER_RESPONSE}
 						if [ $? -ne 0 ]; then
-							logger "Perun:Failed adding user to VO \"${VO}\". Original message from voms-admin: \"`cat ${USER_RESPONSE}`\""
+							log_both "Failed adding user to VO \"${VO}\". Original message from voms-admin: \"`cat ${USER_RESPONSE}`\""
 							if [ $RETVAL -lt 1 ]; then RETVAL=1; fi
 							continue
 						fi
-						logger Perun:VOMS user $USER_DN - $CA_DN added to ${VO_SHORTNAME}
+						echo VOMS user $USER_DN - $CA_DN added to ${VO_SHORTNAME}
 					fi
 				done
 			fi
@@ -105,8 +110,17 @@ function process {
 	rm -f $USER_RESPONSE
 
 	if [ $RETVAL -gt 0 ]; then
-		E_BACKUP_SAVE=(501 'VOMS slave failed')
-		catch_error E_BACKUP_SAVE /bin/false
+		E_VO_FAIL=(503 'VOMS slave failed contacting VO')
+		E_VO_AC_FAIL=(502 'VOMS slave failed checking CAs for VO')
+		E_VOMEMBER_FAIL=(501 'VOMS slave failed managing VO members')
+		case $RETVAL in
+			1)
+				log_msg E_VOMEMBER_FAIL;;
+			2)
+				log_msg E_VO_AC_FAIL;;
+			3)
+				log_msg E_VO_FAIL;;
+		esac
 	fi
 
 	exit $RETVAL
