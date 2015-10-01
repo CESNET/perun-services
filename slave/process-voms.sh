@@ -34,14 +34,14 @@ function process {
 	VOS=`cat ${FROM_PERUN} | sed 's/^\([[:alnum:]_.-]*\)\t.*/\1/' | uniq`
 
 	# Iterate through every VO and check which user will be added or removed
-	echo -e "$VOS" | while read VO; do
+	for VO in `echo -e $VOS`; do
 		# Get users from the VO, VOMS doesn't accept emailAddress in the DN, it must be converted to Email
 		cat ${FROM_PERUN} | grep -P "^${VO}\t.*" | sed 's/emailAddress/Email/' | sort > ${VO_USERS}
 
 		# Get current users stored in VOMS and convert lines into PERUN format. VOMS also doesn't accept emailAddress in the DN, it must be converted to Email
 		voms-admin --vo "${VO}" list-users > ${CURRENT_VO_RAW_USERS}
 		if [ $? -ne 0 ]; then
-#			logger "Perun:VO \"${VO}\" does not exist or is inactive. Original message from voms-admin: \"`cat ${CURRENT_VO_RAW_USERS}`\""
+			logger "Perun:VO \"${VO}\" does not exist or is inactive. Original message from voms-admin: \"`cat ${CURRENT_VO_RAW_USERS}`\""
 			RETVAL=3
 			continue
 		fi
@@ -51,7 +51,7 @@ function process {
 		# Get list of accepted CAs
 		voms-admin --vo "${VO}" list-cas > ${CAS}
 		if [ $? -ne 0 ]; then
-#			logger "Perun:Failed getting accepted CAs for VO \"${VO}\". Original message from voms-admin: \"`cat ${CAS}`\""
+			logger "Perun:Failed getting accepted CAs for VO \"${VO}\". Original message from voms-admin: \"`cat ${CAS}`\""
 			if [ $RETVAL -lt 2 ]; then RETVAL=2; fi
 			continue
 		fi
@@ -103,6 +103,11 @@ function process {
 	rm -f $CURRENT_VO_RAW_USERS
 	rm -f $CAS
 	rm -f $USER_RESPONSE
+
+	if [ $RETVAL -gt 0 ]; then
+		E_BACKUP_SAVE=(501 'VOMS slave failed')
+		catch_error E_BACKUP_SAVE /bin/false
+	fi
 
 	exit $RETVAL
 }
