@@ -1,0 +1,425 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Switch;
+use Net::LDAPS;
+use Net::LDAP::Entry;
+use Net::LDAP::Message;
+use Net::LDAP::LDIF;
+use Encode;
+use Net::LDAP::Control::Paged;
+use Net::LDAP::Constant qw( LDAP_CONTROL_PAGED );
+use String::Random qw( random_string );
+use MIME::Base64 qw( encode_base64 );
+use Data::Dumper;
+
+sub ldap_connect;
+sub ldap_disconnect;
+sub ldap_log;
+sub load_ad;
+sub load_perun;
+sub compare_entry;
+sub process_add;
+sub process_update;
+sub process_disable;
+
+# define service
+my $service_name = "ad_mu_guest";
+
+# ldap instance holder
+my $ldap = undef;
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+
+# BASE DN
+open my $file, '<', "$service_files_dir/baseDN";
+my $base_dn = <$file>;
+chomp($base_dn);
+close $file;
+
+# propagation destination
+my $ldap_location = $ARGV[1];
+chomp($ldap_location);
+
+# load authz
+my $namespace = "mu";
+
+# check if config file for namespace exists
+my $filename = "/etc/perun/pwchange.".$namespace.".ad";
+unless (-e $filename) {
+	ldap_log("Configuration file for namespace \"" . $namespace . "\" doesn't exist!");
+	exit 2; # login-namespace is not supported
+}
+
+# load configuration file
+open FILE, "<" . $filename;
+my @lines = <FILE>;
+close FILE;
+
+# remove new-line characters from the end of lines
+chomp @lines;
+
+# read configuration
+my $ldap_user = $lines[1];
+my $ldap_pass = $lines[2];
+
+# filter
+my $filter = '(objectClass=user)';
+
+# entries to compare and process
+my @ad_entries = ();
+my @perun_entries = ();
+
+# log counters
+my $counter_add = 0;
+my $counter_updated = 0;
+my $counter_disabled = 0;
+my $counter_renamed = 0;
+my $counter_fail = 0;
+
+# connect to ad
+ldap_connect();
+
+# load all data
+load_perun();
+load_ad();
+
+# process data
+process_add();
+process_update();
+process_disable();
+
+# disconnect
+ldap_disconnect();
+
+# log results
+ldap_log("Added: " . $counter_add . " entries.");
+ldap_log("Updated: " . $counter_updated . " entries.");
+ldap_log("Disabled: " . $counter_disabled . " entries.");
+ldap_log("Renamed: " . $counter_renamed . " entries.");
+ldap_log("Failed: " . $counter_fail. " entries.");
+
+# END of main script
+
+###########################################
+#
+# Main processing functions
+#
+###########################################
+
+#
+# Add new user entries to AD
+#
+sub process_add() {
+
+	foreach my $perun_entry (@perun_entries) {
+
+		my $found = 0;
+		foreach my $ad_entry (@ad_entries) {
+			if ($ad_entry->get_value('samAccountName') eq $perun_entry->get_value('samAccountName')) {
+				$found = 1;
+				last;
+			}
+		}
+
+		unless ($found) {
+
+			# Add new entry to AD
+			my $response = $perun_entry->update($ldap);
+			unless ($response->is_error()) {
+				# SUCCESS
+				ldap_log("Added: " . $perun_entry->dn());
+				$counter_add++;
+			} else {
+				# FAIL
+				ldap_log("NOT added: " . $perun_entry->dn() . " | " . $response->error());
+				ldap_log($perun_entry->ldif());
+				$counter_fail++;
+			}
+
+		}
+
+	}
+}
+
+
+#
+# Update existing entries in AD
+#
+sub process_update() {
+
+	foreach my $perun_entry (@perun_entries) {
+
+		foreach my $ad_entry (@ad_entries) {
+			if ($ad_entry->get_value('samAccountName') eq $perun_entry->get_value('samAccountName')) {
+
+				# attrs without cn since it's part of DN to be updated
+				my @attrs = ('displayName','sn','givenName','mail','userAccountControl');
+				# stored log messages to check if entry should be updated
+				my @entry_changed = ();
+
+				# check each attribute
+				foreach my $attr (@attrs) {
+					if (compare_entry($ad_entry , $perun_entry , $attr) == 1) {
+						# store value for log
+						my @ad_val = $ad_entry->get_value($attr);
+						my @perun_val = $perun_entry->get_value($attr);
+						push(@entry_changed, "$attr | " . join(", ",sort(@ad_val)) .  " => " . join(", ",sort(@perun_val)));
+						# replace value
+						$ad_entry->replace(
+							$attr => \@perun_val
+						);
+					}
+				}
+
+				if (@entry_changed) {
+					# Update entry in AD
+					my $response = $ad_entry->update($ldap);
+					unless ($response->is_error()) {
+						# SUCCESS
+						foreach my $log_message (@entry_changed) {
+							ldap_log("Updated: " . $ad_entry->dn() . " | " . $log_message);
+						}
+						$counter_updated++;
+					} else {
+						# FAIL
+						ldap_log("NOT updated: " . $ad_entry->dn() . " | " . $response->error());
+						ldap_log($ad_entry->ldif());
+						$counter_fail++;
+					}
+				}
+
+				# If CN changed update DN of entry (move it)
+				my $ad_cn = $ad_entry->get_value('cn');
+				my $perun_cn = $perun_entry->get_value('cn');
+				unless ($ad_cn eq $perun_cn) {
+					my $ad_dn = $ad_entry->dn();
+					my $perun_dn = $perun_entry->dn();
+					my $response = $ldap->moddn($ad_entry, newrdn => "cn=" . $perun_cn , deleteoldrdn => 1);
+					unless ($response->is_error()) {
+						# SUCCESS
+						ldap_log("Renamed: " . $ad_dn . " => " . $perun_dn);
+						$counter_renamed++;
+					} else {
+						# FAIL
+						ldap_log("NOT renamed: " . $ad_dn . " | " . $response->error());
+						ldap_log($ad_entry->ldif());
+						$counter_fail++;
+					}
+				}
+
+				# entry found and/or updated
+				last;
+
+			}
+		}
+	}
+}
+
+#
+# Disable entries in AD
+#
+sub process_disable() {
+
+	foreach my $ad_entry (@ad_entries) {
+
+		my $found = 0;
+		foreach my $perun_entry (@perun_entries) {
+			if ($ad_entry->get_value('samAccountName') eq $perun_entry->get_value('samAccountName')) {
+				$found = 1;
+				last;
+			}
+		}
+
+		unless ($found) {
+			unless ($ad_entry->get_value('userAccountControl') == 66082) {
+				# disable entry in AD
+				$ad_entry->replace( userAccountControl => 66082 );
+				my $response = $ad_entry->update($ldap);
+				unless ($response->is_error()) {
+					ldap_log("Disabled entry: " . $ad_entry->dn());
+					$counter_disabled++;
+				} else {
+					ldap_log("NOT disabled: " . $ad_entry->dn() . " | " . $response->error());
+					ldap_log($ad_entry->ldif());
+					$counter_fail++;
+				}
+			}
+		}
+	}
+}
+
+###########################################
+#
+# Auxiliary functions used by main script
+#
+###########################################
+
+#
+# Compare new value with original entry value using Perls smart-match operator
+#
+# Takes:
+# $ad_entry entry from AD to check on
+# $perun_entry entry from Perun to compare with
+# $param name of param to compare
+#
+# Return:
+# 1 if param should be updated
+# 0 otherwise
+#
+sub compare_entry() {
+
+	my $ad_entry = (@_)[0];
+	my $perun_entry = (@_)[1];
+	my $param = (@_)[2];
+
+	# get value
+	my @ad_entry_value = $ad_entry->get_value($param);
+	my @perun_entry_value = $perun_entry->get_value($param);
+
+	# sort for multi-valued
+	my @sorted_ad_entry_value = sort(@ad_entry_value);
+	my @sorted_perun_entry_value = sort(@perun_entry_value);
+
+	# compare using smart-match (perl 5.10.1+)
+	unless(@sorted_ad_entry_value ~~ @sorted_perun_entry_value) {
+		# param values are not equals
+		return 1;
+	}
+
+	# values are equals
+	return 0;
+
+}
+
+#
+# Load data from Perun ldif files and store them in @perun_entries
+#
+sub load_perun(){
+
+	# load users
+	my $ldif = Net::LDAP::LDIF->new( $service_files_dir . "/ad_mu_guest.ldif", "r", onerror => 'warn');
+
+	while( not $ldif->eof ( ) ) {
+		my $entry = $ldif->read_entry();
+		if ( $ldif->error() ) {
+			ldap_log("Error read Perun ldif:  " . $entry->get_value('samAccountName') . " | " . $ldif->error());
+		} else {
+			# push valid entry
+			push(@perun_entries, $entry) if ($entry->get_value('samAccountName'));
+		}
+	}
+
+}
+
+#
+# Load data from AD and store them in @ad_entries variable
+#
+sub load_ad() {
+
+	# load guest users
+	my $page = Net::LDAP::Control::Paged->new(size => 9999);
+	my $mesg;
+	my $cookie;
+
+	while (1) {
+
+		$mesg = $ldap->search( base => "OU=Guests," . $base_dn ,
+			scope => 'sub' ,
+			filter => $filter ,
+			attrs => ['displayName','cn','sn','givenName','mail','samAccountName','userPrincipalName','userAccountControl'] ,
+			control => [$page]
+		);
+
+		$mesg->code && die "Error on search: $@ : " . $mesg->error;
+		ldap_log("Processing page with " . $mesg->count() . " users.");
+
+		for my $entry ($mesg->entries) {
+			# store only valid entry from AD
+			push(@ad_entries,$entry) if ($entry->get_value('samAccountName'));
+		}
+
+		# Paging Control
+		my ($resp) = $mesg->control(LDAP_CONTROL_PAGED) or last;
+		$cookie = $resp->cookie or last;
+		$page->cookie($cookie);
+
+	}
+
+	# load service users
+	my $page2 = Net::LDAP::Control::Paged->new(size => 9999);
+	my $mesg2;
+	my $cookie2;
+
+	while (1) {
+
+		$mesg2 = $ldap->search( base => "OU=Services," . $base_dn ,
+			scope => 'sub' ,
+			filter => $filter ,
+			attrs => ['displayName','cn','sn','givenName','mail','samAccountName','userPrincipalName','userAccountControl'] ,
+			control => [$page2]
+		);
+
+		$mesg2->code && die "Error on search: $@ : " . $mesg2->error;
+		ldap_log("Processing page with " . $mesg2->count() . " users.");
+
+		for my $entry ($mesg2->entries) {
+			# store only valid entry from AD
+			push(@ad_entries,$entry) if ($entry->get_value('samAccountName'));
+		}
+
+		# Paging Control
+		my ($resp) = $mesg2->control(LDAP_CONTROL_PAGED) or last;
+		$cookie2 = $resp->cookie or last;
+		$page2->cookie($cookie2);
+
+	}
+
+}
+
+#
+# Connects to LDAP using credentials stored in $ldap_user and $ldap_pass
+#
+sub ldap_connect() {
+
+	# LDAP connect
+	$ldap = Net::LDAPS->new( "$ldap_location" , onerror => 'warn' , timeout => 15);
+
+	# LDAP log-in
+	if ($ldap) {
+		my $mesg = $ldap->bind( "$ldap_user" , password => "$ldap_pass" );
+		ldap_log("[AD] connected as: $ldap_user");
+	} else {
+		ldap_log("[AD] can't connect to AD.");
+		exit 1;
+	}
+
+}
+
+#
+# Disconnect from LDAP if connected
+#
+sub ldap_disconnect() {
+	if ($ldap) {
+		my $mesg = $ldap->unbind;
+		ldap_log("[AD] disconnected.");
+	} else {
+		ldap_log("[AD] can't disconnect from AD (connection not exists).");
+	}
+}
+
+#
+# Log any message to log file located in same folder as the script.
+# Each message starts at new line with a date.
+#
+sub ldap_log() {
+	my $message = shift;
+	open(LOGFILE, ">>./ad_mu_guest.log");
+	print LOGFILE (localtime(time) . ": " . $message . "\n");
+	close(LOGFILE);
+}

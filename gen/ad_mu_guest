@@ -79,7 +79,7 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 #
 # PRINT user data LDIF
 #
-open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
 
 # FOR EACH USER ON FACILITY
 my @logins = sort keys %{$users};
