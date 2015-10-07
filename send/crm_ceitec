@@ -1,0 +1,55 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+my $service_name = "crm_ceitec";
+my $protocol_version = "3.0.0";
+my $script_version = "3.0.0";
+
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+
+# Open gen file
+my $file = "../gen/spool/$facility_name/$service_name/$service_name";
+open my $info, $file or die "Could not open $file: $!";
+
+my $error = 0;
+
+# READ FILE AND PROCESS IT
+while( my $line = <$info>)  {
+
+    chomp($line);
+    my @array = split(";",$line);
+
+    my $command = "php $service_name.php";
+    my $counter = 1;
+    for my $val (@array) {
+        $counter++;
+        $command = $command . " '$val'";
+    }
+
+    # make all params complete (6 params)
+    while ($counter < 7) {
+        $command = $command . " ''";
+        $counter++;
+    }
+
+    my $result = `$command`;
+    if ($result =~ /^ERROR/) {
+        $error = 1;
+        # log to stderr which is read by engine and stored in task result
+        print STDERR $array[0] . " " . $result . "\n";
+    }
+
+}
+
+close $info;
+
+if ($error == 1) {
+    # some entries were not updated
+    print "Update ended with errors. See error log.";
+    exit 1;
+} else {
+    # ended OK
+    print "Update was successful.";
+}
