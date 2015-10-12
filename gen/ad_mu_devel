@@ -26,6 +26,8 @@ our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:mu';
+our $A_WORKPLACE; *A_WORKPLACE = \'urn:perun:user:attribute-def:def:workplace';
+our $A_WORKPLACE_ID; *A_WORKPLACE_ID = \'urn:perun:user:attribute-def:def:workplaceId';
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
@@ -62,6 +64,8 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 	$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
 	$users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
 	$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
+	$users->{$login}->{$A_WORKPLACE} = $uAttributes{$A_WORKPLACE};
+	$users->{$login}->{$A_WORKPLACE_ID} = $uAttributes{$A_WORKPLACE_ID};
 
 }
 
@@ -88,6 +92,9 @@ for my $login (@logins) {
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
 	my $displayName = $users->{$login}->{$A_DISPLAY_NAME};
 	my $mail = $users->{$login}->{$A_MAIL};
+	my $workplace = $users->{$login}->{$A_WORKPLACE};
+	my $workplaceId = $users->{$login}->{$A_WORKPLACE_ID};
+
 
 	if (defined $displayName and length $displayName) {
 		print FILE "displayName: " . $displayName . "\n";
@@ -100,6 +107,12 @@ for my $login (@logins) {
 	}
 	if (defined $mail and length $mail) {
 		print FILE "mail: " . $mail . "\n";
+	}
+	if (defined $workplace and length $workplace) {
+		print FILE "Department: " . $workplace . "\n";
+	}
+	if (defined $workplaceId and length $workplaceId) {
+		print FILE "departmentNumber: " . $workplaceId . "\n";
 	}
 
 	# print classes
