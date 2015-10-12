@@ -159,7 +159,7 @@ sub process_update() {
 			if ($ad_entry->get_value('samAccountName') eq $perun_entry->get_value('samAccountName')) {
 
 				# attrs without cn since it's part of DN to be updated
-				my @attrs = ('displayName','sn','givenName','mail','userAccountControl');
+				my @attrs = ('displayName','sn','givenName','mail','userAccountControl','Department','departmentNumber');
 				# stored log messages to check if entry should be updated
 				my @entry_changed = ();
 
@@ -189,25 +189,6 @@ sub process_update() {
 					} else {
 						# FAIL
 						ldap_log("NOT updated: " . $ad_entry->dn() . " | " . $response->error());
-						ldap_log($ad_entry->ldif());
-						$counter_fail++;
-					}
-				}
-
-				# If CN changed update DN of entry (move it)
-				my $ad_cn = $ad_entry->get_value('cn');
-				my $perun_cn = $perun_entry->get_value('cn');
-				unless ($ad_cn eq $perun_cn) {
-					my $ad_dn = $ad_entry->dn();
-					my $perun_dn = $perun_entry->dn();
-					my $response = $ldap->moddn($ad_entry, newrdn => "cn=" . $perun_cn , deleteoldrdn => 1);
-					unless ($response->is_error()) {
-						# SUCCESS
-						ldap_log("Renamed: " . $ad_dn . " => " . $perun_dn);
-						$counter_renamed++;
-					} else {
-						# FAIL
-						ldap_log("NOT renamed: " . $ad_dn . " | " . $response->error());
 						ldap_log($ad_entry->ldif());
 						$counter_fail++;
 					}
@@ -332,7 +313,7 @@ sub load_ad() {
 		$mesg = $ldap->search( base => "OU=Guests," . $base_dn ,
 			scope => 'sub' ,
 			filter => $filter ,
-			attrs => ['displayName','cn','sn','givenName','mail','samAccountName','userPrincipalName','userAccountControl'] ,
+			attrs => ['displayName','cn','sn','givenName','mail','Department','departmentNumber','samAccountName','userPrincipalName','userAccountControl'] ,
 			control => [$page]
 		);
 
