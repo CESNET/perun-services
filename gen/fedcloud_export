@@ -22,6 +22,7 @@ our $A_USER_CERT_DNS;               *A_USER_CERT_DNS =               \'urn:perun
 our $A_USER_FACILITY_UID;           *A_USER_FACILITY_UID =           \'urn:perun:user_facility:attribute-def:virt:UID';
 our $A_USER_SSH_KEY;                *A_USER_SSH_KEY =                \'urn:perun:user:attribute-def:def:sshPublicKey';
 our $A_F_DESTINATION_PLATFORM_MAP;  *A_F_DESTINATION_PLATFORM_MAP =  \'urn:perun:facility:attribute-def:def:cloudPlatformDestinationMap';
+our $A_U_F_BLACKLISTED;             *A_U_F_BLACKLISTED =             \'urn:perun:user_facility:attribute-def:virt:blacklisted';
 
 our $STATUS_VALID;                  *STATUS_VALID =                  \'VALID';
 
@@ -55,7 +56,8 @@ for my $rData (@resourcesData) {
 
 # DN uzivatele:DN certifikacni autority:jmeno uzivatele:email uzivatele
 foreach my $memberAttributes (@membersAttributes) {
-	if ($memberAttributes->{$A_MEMBER_STATUS} eq $STATUS_VALID) {
+	#do not add not valid users and blacklisted users
+	if (($memberAttributes->{$A_MEMBER_STATUS} eq $STATUS_VALID) && !defined($memberAttributes->{$A_U_F_BLACKLISTED})) {
 		my @DNs = keys %{$memberAttributes->{$A_USER_CERT_DNS}};
 		my $DN = $DNs[0];
 		my $uid = $memberAttributes->{$A_R_VO_SHORT_NAME} . "_" . $memberAttributes->{$A_USER_FACILITY_UID};
