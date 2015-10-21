@@ -6,7 +6,8 @@ use perunServicesInit;
 use perunServicesUtils;
 use Perun::Agent;
 use Perun::GroupsAgent;
-use open qw/:std :utf8/;
+#use open qw/:std :utf8/;
+use Data::Dumper;
 
 local $::SERVICE_NAME = "drupal_elixir";
 local $::PROTOCOL_VERSION = "3.0.0";
@@ -26,6 +27,7 @@ our $A_USER_ID;                   *A_USER_ID =               \'urn:perun:user:at
 our $A_USER_LOGIN;                *A_USER_LOGIN =            \'urn:perun:user:attribute-def:def:login-namespace:elixir';
 our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:attribute-def:core:status';
 our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_EPPNS;                *A_USER_EPPNS =            \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 our $A_USER_D_NAME;               *A_USER_D_NAME =           \'urn:perun:user:attribute-def:core:displayName';
 our $A_GROUP_ID;                  *A_GROUP_ID =              \'urn:perun:group:attribute-def:core:id';
 our $A_GROUP_NAME;                *A_GROUP_NAME =            \'urn:perun:group:attribute-def:core:name';
@@ -43,6 +45,7 @@ our $u_login = {};
 our $u_status = {};
 our $u_email = {};
 our $u_name = {};
+our $u_eppn = {};
 
 our $groupStruc = {};
 our $g_name = {};
@@ -68,7 +71,7 @@ foreach my $resourceData ($data->getChildElements) {
 # USERS: user_id login status e-mail display_name
 open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
 foreach my $uid (sort keys %$userStruc) {
-	print FILE_USERS "\"$uid\", \"$userStruc->{$uid}->{$u_login}\", \"$userStruc->{$uid}->{$u_status}\", \"$userStruc->{$uid}->{$u_email}\", \"$userStruc->{$uid}->{$u_name}\"", "\n";
+	print FILE_USERS "\"$uid\", \"$userStruc->{$uid}->{$u_login}\", \"$userStruc->{$uid}->{$u_status}\", \"$userStruc->{$uid}->{$u_email}\", \"$userStruc->{$uid}->{$u_name}\", \"$userStruc->{$uid}->{$u_eppn}\"","\n";
 }
 close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
 
@@ -77,10 +80,8 @@ open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
 foreach my $gid (sort keys %$groupStruc) {
 	print FILE_GROUPS "\"$gid\", \"$groupStruc->{$gid}->{$g_name}\", \"$groupStruc->{$gid}->{$g_type}\", ";
 	if ($groupStruc->{$gid}->{$g_parent_id}) {
-		# print parent group id
 		print FILE_GROUPS "\"$groupStruc->{$gid}->{$g_parent_id}\""
 	} else {
-		# Print 0 for top-level groups
 		print FILE_GROUPS "\"0\"";
 	}
 	print FILE_GROUPS "\n";
@@ -91,9 +92,15 @@ close (FILE_GROUPS) or die "Cannot close $fileGroups: $! \n";
 open FILE_MEMBERSHIPS,">$fileMemberships" or die "Cannot open $fileMemberships: $! \n";
 foreach my $uid (sort keys %$membershipStruc) {
 	foreach my $gid (sort keys %{$membershipStruc->{$uid}}){
-		foreach my $membershipType (sort keys %{$membershipStruc->{$uid}->{$gid}}){
-			print FILE_MEMBERSHIPS "\"$uid\", \"$gid\", \"$membershipType\"", "\n";
+		# If the user is member and also admin in the group, then store only admin role
+		my $membershipType = "";
+		foreach my $membershipTypeTmp (sort keys %{$membershipStruc->{$uid}->{$gid}}){
+			$membershipType = $membershipTypeTmp;
+			if ($membershipTypeTmp eq $A_M_TYPE_ADMIN) {
+				last;
+			}
 		}
+		print FILE_MEMBERSHIPS "\"$uid\", \"$gid\", \"$membershipType\"", "\n";
 	}
 }
 close (FILE_MEMBERSHIPS) or die "Cannot close $fileMemberships: $! \n";
@@ -106,7 +113,8 @@ perunServicesInit::finalize;
 ##############################################################################
 ## creates structure for users.csv file
 sub processUsers {
-	my ($gid, $memberData, @admins) = @_;
+	my ($gid, $memberData, $admins_ref) = @_;
+	my @admins = @$admins_ref;
 
 	my %memberAttributes = attributesToHash $memberData->getAttributes;
 	my $uid = $memberAttributes{$A_USER_ID};
@@ -115,6 +123,13 @@ sub processUsers {
 	my $email = $memberAttributes{$A_USER_EMAIL};
 	my $d_name = $memberAttributes{$A_USER_D_NAME};
 
+	# Select right eppn from the list of eppns, TEMPORARLY get google one, then we will use elixir
+	my @eppns = @{$memberAttributes{$A_USER_EPPNS}};
+
+
+	#select first eppn which ends with '@elixir-europe.org', if there is no one matching select first eppn, if there is no eppn at all use empty string
+	my $eppn = (grep /\@elixir-europe.org$/, @eppns)[0] || $eppns[0] || "";
+	
 	if(exists $userStruc->{$uid}->{$u_login}) {
 		my $memberStatus = $userStruc->{$uid}->{$u_status};
 
@@ -134,6 +149,7 @@ sub processUsers {
 		$userStruc->{$uid}->{$u_status} = $status;
 		$userStruc->{$uid}->{$u_email} = $email;
 		$userStruc->{$uid}->{$u_name} = $d_name;
+		$userStruc->{$uid}->{$u_eppn} = $eppn;
 	}
 
 	if(@admins) {
@@ -173,8 +189,8 @@ sub processGroups {
 
 		my @admins = $groupAgent->getAdmins(group => $gid);
 
-		foreach my $memberData($membersElement->getChildElements) {
-			processUsers $gid, $memberData, @admins;
+		foreach my $memberData ($membersElement->getChildElements) {
+			processUsers $gid, $memberData, \@admins;
 		}
 	}
 }
