@@ -1,0 +1,100 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+
+our $SERVICE_NAME = basename($0);
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+#our $A_USER_STATUS;                *A_USER_STATUS =                  \'urn:perun:member:attribute-def:core:status';
+our $A_UID;                        *A_UID =                          \'urn:perun:user_facility:attribute-def:virt:UID';
+our $A_UF_DATA_QUOTAS;             *A_UF_DATA_QUOTAS =               \'urn:perun:user_facility:attribute-def:virt:dataQuotas';
+our $A_UF_FILE_QUOTAS;             *A_UF_FILE_QUOTAS =               \'urn:perun:user_facility:attribute-def:virt:fileQuotas';
+
+our %uniqueUID = ();
+
+####### output file #######
+my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
+open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
+
+my %facilityAttributes = attributesToHash $data->getAttributes;
+
+my @resourcesData = $data->getChildElements;
+foreach my $rData (@resourcesData) {
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my @membersData = ($rData->getChildElements);  #[1]->getChildElements;
+
+	foreach my $mData (@membersData) {
+		my %memberAttributes = attributesToHash $mData->getAttributes;
+		my $UID = $memberAttributes{$A_UID};
+		
+		if($uniqueUID{$UID}) {
+			#if already added, then continue
+			next;
+		} else {
+			$uniqueUID{$UID} = 1;
+		}
+
+		#First go through data quota map and read file quota if exists or set unlimited
+		my %uniquePaths = ();
+		foreach my $path (keys %{$memberAttributes{$A_UF_DATA_QUOTAS}}) {
+			$uniquePaths{$path} = 1;
+			my $quota = $memberAttributes{$A_UF_DATA_QUOTAS}{$path};
+
+			my $softQuota = $quota;
+			$softQuota =~ s/:.*$//g;
+			my $hardQuota = $quota;
+			$hardQuota =~ s/^.*://g;
+
+			print SERVICE_FILE $UID . "\t";
+			print SERVICE_FILE $softQuota . "\t";
+			print SERVICE_FILE $hardQuota . "\t";
+
+			if($memberAttributes{$A_UF_FILE_QUOTAS}{$path}) {
+				$quota = $memberAttributes{$A_UF_FILE_QUOTAS}{$path};
+				$softQuota = $quota;
+				$softQuota =~ s/:.*$//g;
+				$hardQuota = $quota;
+				$hardQuota =~ s/^.*://g;
+				print SERVICE_FILE $softQuota . "\t";
+				print SERVICE_FILE $hardQuota . "\t";
+			} else {
+				print SERVICE_FILE "0\t0\t";
+			}
+
+			print SERVICE_FILE $path . "\n";
+		}
+
+		#Then go through file quota map and for not used files quota set unlimited data quota 
+		foreach my $path (keys %{$memberAttributes{$A_UF_FILE_QUOTAS}}) {
+			if($uniquePaths{$path}) {
+				next;
+			}
+			
+			print SERVICE_FILE $UID . "\t";
+			print SERVICE_FILE "0\t0\t";
+
+			my $quota = $memberAttributes{$A_UF_FILE_QUOTAS}{$path};
+      my $softQuota = $quota;
+      $softQuota =~ s/:.*$//g;
+      my $hardQuota = $quota;
+      $hardQuota =~ s/^.*://g;
+      print SERVICE_FILE $softQuota . "\t";
+      print SERVICE_FILE $hardQuota . "\t";
+			print SERVICE_FILE $path . "\n";
+		}
+	}
+}
+
+close(SERVICE_FILE);
+
+#####################################################
+perunServicesInit::finalize;
