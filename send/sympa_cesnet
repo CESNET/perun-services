@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="sympa_cesnet"
+
+. generic_send
