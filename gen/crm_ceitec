@@ -40,16 +40,18 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
     $users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
     $users->{$login}->{$A_O} = $uAttributes{$A_O};
 
-    # normalize Organization for comparison, since accents are UTF-8 vs. Unicode
-    my $str = $uAttributes{$A_O};
-    $str = NFKD ( $str );
-    $str =~ s/\p{NonspacingMark}//g;
+    if (defined $str and length $str) {
+        # normalize Organization for comparison, since accents are UTF-8 vs. Unicode
+        my $str = $uAttributes{$A_O};
+        $str = NFKD ( $str );
+        $str =~ s/\p{NonspacingMark}//g;
 
-    # Safe EPPN -> institution ID only for MU and VUT
-    if ("Masarykova univerzita" eq $uAttributes{$A_O}) {
-        $users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
-    } elsif ("Vysoke uceni technicke v Brne" eq $str) {
-        $users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
+        # Safe EPPN -> institution ID only for MU and VUT
+        if ("Masarykova univerzita" eq $uAttributes{$A_O}) {
+            $users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
+        } elsif ("Vysoke uceni technicke v Brne" eq $str) {
+            $users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
+        }
     }
 
 }
@@ -70,27 +72,34 @@ for my $login (@logins) {
     my $o = $users->{$login}->{$A_O};
     my $eppns = $users->{$login}->{$A_EPPNS};
 
-    print FILE 'CEITEC\\' . "$login;" . "$firstName;" . "$lastName;" . "$mail;" . "$o;";
+    if (defined $o and length $o) {
 
-    # normalize Organization for comparison, since accents are UTF-8 vs. Unicode
-    my $str = $o;
-    $str = NFKD ( $str );
-    $str =~ s/\p{NonspacingMark}//g;
+        print FILE 'CEITEC\\' . "$login;" . "$firstName;" . "$lastName;" . "$mail;" . "$o;";
 
-    if (defined $eppns) {
-        foreach my $val (@$eppns) {
-            if (("Masarykova univerzita" eq $o) && ($val =~ /\@muni.cz$/)) {
-                print FILE "$val";
-                last;
-            } elsif (("Vysoke uceni technicke v Brne" eq $str) && ($val =~ /\@vutbr.cz$/)) {
-                my $index = index($val , '@');
-                print FILE substr($val , 0, $index);
-                last;
+        # normalize Organization for comparison, since accents are UTF-8 vs. Unicode
+        my $str = $o;
+        $str = NFKD ( $str );
+        $str =~ s/\p{NonspacingMark}//g;
+
+        if (defined $eppns) {
+            foreach my $val (@$eppns) {
+                if (("Masarykova univerzita" eq $o) && ($val =~ /\@muni.cz$/)) {
+                    print FILE "$val";
+                    last;
+                } elsif (("Vysoke uceni technicke v Brne" eq $str) && ($val =~ /\@vutbr.cz$/)) {
+                    my $index = index($val, '@');
+                    print FILE substr($val, 0, $index);
+                    last;
+                }
             }
         }
-    }
 
-    print FILE "\n";
+        print FILE "\n";
+
+    } else {
+        # No organization provided
+        print FILE 'CEITEC\\' . "$login;" . "$firstName;" . "$lastName;" . "$mail;" . "\n";
+    }
 
 }
 
