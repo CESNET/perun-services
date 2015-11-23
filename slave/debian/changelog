@@ -1,3 +1,10 @@
+perun-slave (3.0.0-0.0.94) stable; urgency=low
+
+  * New special version of mailman and sympa for CESNET purpose. Use member_mail
+    instead of user_preferredMail because of HRADMIN
+
+ -- Michal Stava <stavamichal@gmail.com>  Mon, 16 Nov 2015 13:54:00 +0200
+
 perun-slave (3.0.0-0.0.93) stable; urgency=low
 
   * New slave script fs_quotas for setting user quotas on FS volumes
