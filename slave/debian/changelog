@@ -1,3 +1,11 @@
+perun-slave (3.0.0-0.0.95) stable; urgency=low
+
+  * Fuction to backup and recover files from special directory for this
+    purpose. If called it creates lock file and backups files in input. If they
+    are already backuped, then also recovers them from last backup.
+
+ -- Michal Stava <stavamichal@gmail.com>  Mon, 23 Nov 2015 14:40:00 +0200
+
 perun-slave (3.0.0-0.0.94) stable; urgency=low
 
   * New special version of mailman and sympa for CESNET purpose. Use member_mail

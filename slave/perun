@@ -21,6 +21,9 @@ umask 077
 I_FINISHED=(0 'Service ${SERVICE} processing done')
 I_PROTOCOL_MINOR_DIFF=(0 'Difference in protocol minor version')
 I_SERVICE_DISABLED=(0 'Service ${SERVICE} is disabled')
+I_FILE_RECOVERED=(0 'File ${BACKUP_DIR}/${LOCAL} was recoverd successfuly')
+I_FILE_CANT_RECOVER=(0 'File ${BACKUP_DIR}/${LOCAL} cannot be recovered because backup not exists, was skipped')
+I_BACKUP_COMPLETE=(0 'Backup files and lock file created in directory ${BACKUP_DIR}')
 
 E_WORK_DIR=(1 'Problem with working directory')
 E_TAR_FILES=(2 'Problem with extracting received files')
@@ -31,6 +34,11 @@ E_CONCURRENT_PROCESS=(6 'Concurrent process is running right now')
 E_LOCK_DELETE=(7 'Lock file cannot be deleted')
 E_LOCK_PIDFILE=(8 'Lock pid file cannot be created')
 E_DNS_ALIAS_NOT_WHITELISTED=(9 'Perun send configuration to this host via dns alias which was not whitelisted (Facility=${FACILITY},DNS_Alias=${SEND_TO_HOSTNAME})')
+E_BACKUP_DIR=(10 'Problem with backup directory')
+E_REMOVE_SERVICE_LOCK_FILE=(11 'Cannot remove service lock file and backup files while recovering process')
+E_FILE_CANT_RECOVER=(12 'File ${BACKUP_DIR}/${LOCAL} cannot be recovered. Moving file problems')
+E_CREATE_BACKUP_FILE=(13 'Cannot copy file ${FILE} to backup directory ${BACKUP_DIR}')
+E_CREATE_LOCK_FILE=(14 'Cannot create lock file in backup directory ${BACKUP_DIR}')
 E_PROTOCOL_VERSION=(200 'Wrong version of received files - (local=${PROTOCOL_VERSION},remote=${RECEIVED_PROTOCOL_VERSION})')
 E_PROTOCOL_VERSION_FILE=(201 'Remote protocol version file missing')
 E_PROTOCOL_VERSION_VARIABLE=(202 'PROTOCOL_VERSION variable not set')
@@ -215,6 +223,65 @@ function diff_update {
 	diff_mv "$TMP_DESTINATION_FILE" "$DESTINATION"
 }
 
+# If lock file exits, recover all existing files
+#
+# Recover only those files, which are represented in new 
+# list of files to backup (need to know path to recovering files)
+#
+# If lock not exists, remove everything from backup directory and
+# then backup new files (copy them to backup directory)
+#
+# Last step is to create lock file
+#
+# usage: backup_and_recover_files FILE FILE FILE ...
+# Params: FILE - absolute path to file (more files can be specified)
+function backup_and_recover_files {
+	FILES="$@"
+	SERVICE_LOCK_FILE="${BACKUP_DIR}/lock"
+	
+	#If backup dir for service not exists, create it
+	if [ ! -d "${BACKUP_DIR}" ]; then
+		catch_error E_BACKUP_DIR mkdir -p "${BACKUP_DIR}"
+	fi
+
+	#Service Lock file exists, first do recovering process
+	if [ -f "${SERVICE_LOCK_FILE}" ]; then
+
+		#recover existing backup files
+		for FILE in FILES; do
+			LOCAL=`echo $FILE | sed -e 's/^.*\///'`
+			if [ -f "${BACKUP_DIR}/${LOCAL}" ]; then
+				catch_error E_FILE_CANT_RECOVER  diff_mv "${BACKUP_DIR}/${LOCAL}" "${FILE}"
+				log_msg I_FILE_RECOVERED	
+			else
+				#if not, skip it and info about it
+				log_msg I_FILE_CANT_RECOVER
+			fi
+		done
+	fi
+
+	#remove all backup files and also lock file (and artefacts)
+	catch_error E_REMOVE_SERVICE_LOCK_FILE rm -r -f "${BACKUP_DIR}"
+	#create new empty backup directory
+	catch_error E_BACKUP_DIR mkdir -p "${BACKUP_DIR}"
+
+	#Create backup files
+	for FILE in FILES; do
+		catch_error E_CREATE_BACKUP_FILE cp -p "${FILE}" "${BACKUP_DIR}"
+	done
+
+	#Create lock file
+	catch_error E_CREATE_LOCK_FILE touch SERVICE_LOCK_FILE
+
+	log_msg I_BACKUP_COMPLETE
+}
+
+function remove_backup_files {
+	 if [ -d "${BACKUP_DIR}" ]; then
+		catch_error E_REMOVE_SERVICE_LOCK_FILE rm -r -f "${BACKUP_DIR}"
+	 fi
+}
+
 function run_pre_hooks {
 	for F in `ls "${SCRIPTS_DIR}/${SERVICE}.d"/pre_* 2>/dev/null` ;do . $F ; done
 }
@@ -241,7 +308,7 @@ SEND_TO_HOSTNAME=`head -n 1 "${WORK_DIR}/HOSTNAME"`
 FACILITY=`head -n 1 "${WORK_DIR}/FACILITY"`
 LOCK_FILE="${LOCK_DIR}/${NAME}-${SERVICE}.lock"
 LOCK_PIDFILE="$LOCK_FILE/pid"
-
+BACKUP_DIR="/var/tmp/perun/${SERVICE}/backup-state/"
 
 DNS_ALIAS_OK=0
 # check if perun send via allowed hostname 
@@ -288,5 +355,7 @@ version_check        #check the received version with version from slave script
 run_pre_hooks
 process              #execute slave skript (e.g. runs function process in process-passwd.sh script)
 run_post_hooks
+
+remove_backup_files
 
 log_msg I_FINISHED
