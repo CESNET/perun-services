@@ -42,6 +42,22 @@ function process {
 
 	# Iterate through every VO and check which user will be added or removed
 	for VO in `echo -e $VOS`; do
+		# First, check if some part should be skipped
+		if echo ${NO_CREATE_MEMBERS} | grep -wq ${VO}; then
+			DO_NOT_CREATE="1"
+		fi
+
+		if echo ${NO_DELETE_MEMBERS} | grep -wq ${VO}; then
+			# Check if this VO should be skipped altogehter
+			if [ "$DO_NOT_CREATE" == "1" ]; then
+				log_both "Membership changes for VO \"${VO}\" skipped by local choice"
+				unset DO_NOT_CREATE
+				continue
+			else
+				DO_NOT_DELETE="1"
+			fi
+		fi
+		
 		# Get users from the VO, VOMS doesn't accept emailAddress in the DN, it must be converted to Email
 		cat ${FROM_PERUN} | grep -P "^${VO}\t.*" | sed 's/emailAddress/Email/' | sort > ${VO_USERS}
 
@@ -65,46 +81,56 @@ function process {
 			continue
 		fi
 
-		# Check who should be deleted
-		while read CURRENT_VO_USER; do
-			if [ `grep -c "$CURRENT_VO_USER" $VO_USERS` -eq 0 ]; then
-				# User is not in VO anymore, so remove him
-				while IFS=`echo -ne "\t"` read VO_SHORTNAME USER_DN CA_DN USER_EMAIL; do
-					# Check if the user's certificate was issued by accepted CA
-					if [ `grep -c "$CA_DN" $CAS` -gt 0 ]; then
-						voms-admin --nousercert --vo "${VO_SHORTNAME}" delete-user "$USER_DN" "$CA_DN" > ${USER_RESPONSE}
-						if [ $? -ne 0 ]; then
-							log_both "Failed removing user from VO \"${VO}\". Original message from voms-admin: \"`cat ${USER_RESPONSE}`\""
-							if [ $RETVAL -lt 1 ]; then RETVAL=1; fi
-							continue
+		if [ "$DO_NOT_DELETE" == "1" ]; then
+			log_both "Deletion of members for VO \"${VO}\" skipped by local choice"
+		else
+			# Check who should be deleted
+			while read CURRENT_VO_USER; do
+				if [ `grep -c "$CURRENT_VO_USER" $VO_USERS` -eq 0 ]; then
+					# User is not in VO anymore, so remove him
+					while IFS=`echo -ne "\t"` read VO_SHORTNAME USER_DN CA_DN USER_EMAIL; do
+						# Check if the user's certificate was issued by accepted CA
+						if [ `grep -c "$CA_DN" $CAS` -gt 0 ]; then
+							voms-admin --nousercert --vo "${VO_SHORTNAME}" delete-user "$USER_DN" "$CA_DN" > ${USER_RESPONSE}
+							if [ $? -ne 0 ]; then
+								log_both "Failed removing user \"$USER_DN\" from VO \"${VO}\". Original message from voms-admin: \"`cat ${USER_RESPONSE}`\""
+								if [ $RETVAL -lt 1 ]; then RETVAL=1; fi
+								continue
+							fi
+							echo VOMS user $USER_DN - $CA_DN removed from ${VO_SHORTNAME}
 						fi
-						echo VOMS user $USER_DN - $CA_DN removed from ${VO_SHORTNAME}
-					fi
-				done <<<"`echo -e "$CURRENT_VO_USER"`"
+					done <<<"`echo -e "$CURRENT_VO_USER"`"
 
-			fi
-		done <${CURRENT_VO_USERS}
+				fi
+			done <${CURRENT_VO_USERS}
+		fi
 
-		####
-		# Check who should be added
-		while read VO_USER; do
-			if  [ `grep -c "$VO_USER" $CURRENT_VO_USERS` -eq 0 ]; then
-				# New user comming, so add him to the VO
-				echo -e "$VO_USER" | while IFS=`echo -ne "\t"` read VO_SHORTNAME USER_DN CA_DN USER_EMAIL; do
-					# Check if the user's certificate was issued by accepted CA
-					if [ `grep -c "$CA_DN" $CAS` -gt 0 ]; then
-						USER_CN=`echo $USER_DN | sed 's|^.*\/CN=\([^/]*\).*|\1|'`
-						voms-admin --nousercert --vo "${VO_SHORTNAME}" create-user "$USER_DN" "$CA_DN" "$USER_CN" "$USER_EMAIL" > ${USER_RESPONSE}
-						if [ $? -ne 0 ]; then
-							log_both "Failed adding user to VO \"${VO}\". Original message from voms-admin: \"`cat ${USER_RESPONSE}`\""
-							if [ $RETVAL -lt 1 ]; then RETVAL=1; fi
-							continue
+		if [ "$DO_NOT_CREATE" == "1" ]; then
+			log_both "Creation of members for VO \"${VO}\" skipped by local choice"
+		else
+			####
+			# Check who should be added
+			while read VO_USER; do
+				if  [ `grep -c "$VO_USER" $CURRENT_VO_USERS` -eq 0 ]; then
+					# New user comming, so add him to the VO
+					echo -e "$VO_USER" | while IFS=`echo -ne "\t"` read VO_SHORTNAME USER_DN CA_DN USER_EMAIL; do
+						# Check if the user's certificate was issued by accepted CA
+						if [ `grep -c "$CA_DN" $CAS` -gt 0 ]; then
+							USER_CN=`echo $USER_DN | sed 's|^.*\/CN=\([^/]*\).*|\1|'`
+							voms-admin --nousercert --vo "${VO_SHORTNAME}" create-user "$USER_DN" "$CA_DN" "$USER_CN" "$USER_EMAIL" > ${USER_RESPONSE}
+							if [ $? -ne 0 ]; then
+								log_both "Failed adding user to VO \"${VO}\". Original message from voms-admin: \"`cat ${USER_RESPONSE}`\""
+								if [ $RETVAL -lt 1 ]; then RETVAL=1; fi
+								continue
+							fi
+							echo VOMS user $USER_DN - $CA_DN added to ${VO_SHORTNAME}
 						fi
-						echo VOMS user $USER_DN - $CA_DN added to ${VO_SHORTNAME}
-					fi
-				done
-			fi
-		done <${VO_USERS}
+					done
+				fi
+			done <${VO_USERS}
+		fi
+		unset DO_NOT_CREATE
+		unset DO_NOT_DELETE
 	done
 
 	rm -f $VO_USERS
