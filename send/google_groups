@@ -1,0 +1,14 @@
+#!/bin/bash
+SERVICE_NAME="google_groups"
+
+FACILITY_NAME=$1
+
+SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
+SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
+
+#Just safety check. This should not happen.
+if [ ! -d "$SERVICE_FILES_DIR" ]; then echo '$SERVICE_FILES_DIR: '$SERVICE_FILES_DIR' is not a directory' >&2 ; exit 1; fi
+
+java -jar google-group-connector/GoogleGroupConnector-1.0-SNAPSHOT.jar "$SERVICE_FILES_DIR/google_groups" "`cat $SERVICE_FILES_DIR/google_groups_domain`"
+
+exit $?
