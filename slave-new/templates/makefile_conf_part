@@ -1,0 +1,2 @@
+	$(INSTALL) -d -m 755 $(CONFDIR)
+	$(INSTALL) ./conf/* $(CONFDIR)

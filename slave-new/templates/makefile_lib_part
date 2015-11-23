@@ -1,0 +1,2 @@
+	$(INSTALL) -d -m 755 $(LIBDIR)
+	$(INSTALL) ./lib/* $(LIBDIR)

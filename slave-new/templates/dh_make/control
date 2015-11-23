@@ -1,0 +1,10 @@
+Source: #PACKAGE#
+Section: utils
+Priority: extra
+Maintainer: #USERNAME# <#EMAIL#>
+Build-Depends: #BUILD_DEPS#
+Standards-Version: #POLICY#
+
+Package: #PACKAGE#
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
