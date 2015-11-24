@@ -1,4 +1,4 @@
-perun-slave (3.0.0-0.0.95) stable; urgency=low
+perun-slave (3.0.0-0.0.96) stable; urgency=low
 
   * Fuction to backup and recover files from special directory for this
     purpose. If called it creates lock file and backups files in input. If they
@@ -6,18 +6,24 @@ perun-slave (3.0.0-0.0.95) stable; urgency=low
 
  -- Michal Stava <stavamichal@gmail.com>  Mon, 23 Nov 2015 14:40:00 +0200
 
-perun-slave (3.0.0-0.0.94) stable; urgency=low
+perun-slave (3.0.0-0.0.95) stable; urgency=low
 
   * New special version of mailman and sympa for CESNET purpose. Use member_mail
     instead of user_preferredMail because of HRADMIN
 
  -- Michal Stava <stavamichal@gmail.com>  Mon, 16 Nov 2015 13:54:00 +0200
 
-perun-slave (3.0.0-0.0.93) stable; urgency=low
+perun-slave (3.0.0-0.0.94) stable; urgency=low
 
   * New slave script fs_quotas for setting user quotas on FS volumes
 
  -- Michal Stava <stavamichal@gmail.com>  Mon, 09 Nov 2015 15:28:00 +0200
+
+perun-slave (3.0.0-0.0.93) stable; urgency=low
+
+  * Add error handling and logging to voms service.
+
+ -- Slavek Licehammer <slavek@ics.muni.cz>  Thu, 05 Nov 2015 17:15:51 +0100
 
 perun-slave (3.0.0-0.0.92) stable; urgency=medium
 
