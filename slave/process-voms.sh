@@ -43,11 +43,11 @@ function process {
 	# Iterate through every VO and check which user will be added or removed
 	for VO in `echo -e $VOS`; do
 		# First, check if some part should be skipped
-		if echo ${NO_CREATE_MEMBERS} | grep -wq ${VO}; then
+		if echo ${NO_CREATE_MEMBERS} | grep -E "([[:space:]]|^)${VO}([[:space:]]|$)"; then
 			DO_NOT_CREATE="1"
 		fi
 
-		if echo ${NO_DELETE_MEMBERS} | grep -wq ${VO}; then
+		if echo ${NO_DELETE_MEMBERS} | grep -E "([[:space:]]|^)${VO}([[:space:]]|$)"; then
 			# Check if this VO should be skipped altogehter
 			if [ "$DO_NOT_CREATE" == "1" ]; then
 				log_both "Membership changes for VO \"${VO}\" skipped by local choice"
