@@ -50,7 +50,7 @@ function process {
 		if echo ${NO_DELETE_MEMBERS} | grep -E "([[:space:]]|^)${VO}([[:space:]]|$)"; then
 			# Check if this VO should be skipped altogehter
 			if [ "$DO_NOT_CREATE" == "1" ]; then
-				log_both "Membership changes for VO \"${VO}\" skipped by local choice"
+				log_both "All membership changes for VO \"${VO}\" skipped by local choice"
 				unset DO_NOT_CREATE
 				continue
 			else
@@ -61,13 +61,23 @@ function process {
 		# Get users from the VO, VOMS doesn't accept emailAddress in the DN, it must be converted to Email
 		cat ${FROM_PERUN} | grep -P "^${VO}\t.*" | sed 's/emailAddress/Email/' | sort > ${VO_USERS}
 
-		# Get current users stored in VOMS and convert lines into PERUN format. VOMS also doesn't accept emailAddress in the DN, it must be converted to Email
-		voms-admin --vo "${VO}" list-users > ${CURRENT_VO_RAW_USERS}
-		if [ $? -ne 0 ]; then
-			log_both "VO \"${VO}\" does not exist or is inactive. Original message from voms-admin: \"`cat ${CURRENT_VO_RAW_USERS}`\""
-			CONTACTFAIL="${CONTACTFAIL} ${VO}"
-			RETVAL=3
-			continue
+		# Before getting users, get their count.
+		# No other way to recognize an empty VO
+		VO_USER_COUNT=`voms-admin --vo "${VO}" count-users | grep -Eo "[0-9]*$"`
+
+		# Get current users stored in VOMS and convert lines into PERUN format.
+		# VOMS also doesn't accept emailAddress in the DN, it must be converted
+		# to Email. Produce empty variable if VO empty.
+		if [ $VO_USER_COUNT -gt 0 ]; then
+			voms-admin --vo "${VO}" list-users > ${CURRENT_VO_RAW_USERS}
+			if [ $? -ne 0 ]; then
+				log_both "VO \"${VO}\" does not exist or is inactive. Original message from voms-admin: \"`cat ${CURRENT_VO_RAW_USERS}`\""
+				CONTACTFAIL="${CONTACTFAIL} ${VO}"
+				RETVAL=3
+				continue
+			fi
+		else
+			CURRENT_VO_RAW_USERS=""
 		fi
 
 		cat ${CURRENT_VO_RAW_USERS} | sed "s/\(.*\),\(.*\),\(.*\)/${VO}\t\1\t\2\t\3/" | sed 's/emailAddress/Email/' | sort > ${CURRENT_VO_USERS}
