@@ -63,19 +63,20 @@ function process {
 
 		# Before getting users, get their count.
 		# No other way to recognize an empty VO
-		VO_USER_COUNT=`voms-admin --vo "${VO}" count-users | grep -Eo "[0-9]*$"`
+		VO_USER_COUNT_RAW=`voms-admin --vo "${VO}" count-users`
+		if [ $? -ne 0 ]; then
+			log_both "VO \"${VO}\" does not exist or is inactive. Original message from voms-admin: \"${VO_USER_COUNT_RAW}\""
+			CONTACTFAIL="${CONTACTFAIL} ${VO}"
+			RETVAL=3
+			continue
+		fi
+ 		VO_USER_COUNT=`echo "$VO_USER_COUNT_RAW" | grep -Eo "[0-9]*$"`
 
 		# Get current users stored in VOMS and convert lines into PERUN format.
 		# VOMS also doesn't accept emailAddress in the DN, it must be converted
 		# to Email. Produce empty variable if VO empty.
 		if [ $VO_USER_COUNT -gt 0 ]; then
 			voms-admin --vo "${VO}" list-users > ${CURRENT_VO_RAW_USERS}
-			if [ $? -ne 0 ]; then
-				log_both "VO \"${VO}\" does not exist or is inactive. Original message from voms-admin: \"`cat ${CURRENT_VO_RAW_USERS}`\""
-				CONTACTFAIL="${CONTACTFAIL} ${VO}"
-				RETVAL=3
-				continue
-			fi
 		else
 			CURRENT_VO_RAW_USERS=""
 		fi
