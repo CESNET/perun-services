@@ -54,6 +54,7 @@ foreach my $resourceData ($data->getChildElements) {
 
 # USERS: user_id name surname e-mail eppns
 open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
+binmode FILE_USERS, ":utf8";
 foreach my $uid (sort keys %$userStruc) {
 	print FILE_USERS "\"$uid\",\"$userStruc->{$uid}->{$u_name}\",\"$userStruc->{$uid}->{$u_surname}\",\"$userStruc->{$uid}->{$u_email}\",\"", join(",", @{$userStruc->{$uid}->{$u_eppns}}), "\"\n";
 }
@@ -61,6 +62,7 @@ close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
 
 # GROUPS: group_id group_name
 open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
+binmode FILE_GROUPS, ":utf8";
 foreach my $gid (sort keys %$groupStruc) {
 	print FILE_GROUPS "\"$gid\",\"$groupStruc->{$gid}->{$g_name}\"", "\n";
 }
