@@ -1,4 +1,12 @@
 #!/usr/bin/perl
+#
+# Script for ceitec_protemics service used at IDM MU.
+#
+# Generates 3 files:
+# - groups.csv contains list of all groups and subgroups assigned to resource
+# - users.csv contains list of all users from assigned groups
+# - memberships.csv contains list of pairs user-group and member status of the user in the group
+#
 
 use strict;
 use warnings;
