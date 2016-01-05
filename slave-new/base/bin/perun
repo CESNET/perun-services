@@ -1,6 +1,8 @@
 #!/bin/bash
 NAME='perunv3'
 SCRIPTS_DIR=`dirname $0`
+LIB_DIR='/opt/perun/lib/'
+CUSTOM_SCRIPTS_DIR="/etc/perun/"
 LOCK_DIR=${LOCK_DIR:=/var/lock}
 SERVICE_BLACKLIST=()	# syntax: (item1 item2 item3)
 SERVICE_WHITELIST=()
@@ -21,7 +23,7 @@ umask 077
 I_FINISHED=(0 'Service ${SERVICE} processing done')
 I_PROTOCOL_MINOR_DIFF=(0 'Difference in protocol minor version')
 I_SERVICE_DISABLED=(0 'Service ${SERVICE} is disabled')
-I_FILE_RECOVERED=(0 'File ${BACKUP_DIR}/${LOCAL} was recoverd successfuly')
+I_FILE_RECOVERED=(0 'File ${BACKUP_DIR}/${LOCAL} was recovered successfully')
 I_FILE_CANT_RECOVER=(0 'File ${BACKUP_DIR}/${LOCAL} cannot be recovered because backup not exists, was skipped')
 I_BACKUP_COMPLETE=(0 'Backup files and lock file created in directory ${BACKUP_DIR}')
 
@@ -46,7 +48,7 @@ E_UNSUPPORTED_SERVICE=(203 'Unsupported service')
 E_MOVE_ERROR=(205 'Could not move ${SRC} to ${DST}')
 E_STATE_FILE=(206 'State file parameter (for diff_update function) is missing')
 E_FROM_PERUN_FILE=(208 'FROM_PERUN file (to diff_update) does not exists or it is not readable')
-E_DESTINATION_FILE=(209 'Destination file (to diff_update) does not exists or do not have right persmissions')
+E_DESTINATION_FILE=(209 'Destination file (to diff_update) does not exists or do not have right permissions')
 E_PERMISSIONS=(210 'Cannot set permissions')
 E_CHANGE_OWNER=(211 'Cannot set owner')
 
@@ -283,15 +285,15 @@ function remove_backup_files {
 }
 
 function run_pre_hooks {
-	for F in `ls "${SCRIPTS_DIR}/${SERVICE}.d"/pre_* 2>/dev/null` ;do . $F ; done
+	for F in `ls "${CUSTOM_SCRIPTS_DIR}/process-${SERVICE}.d"/pre_* 2>/dev/null` ;do . $F ; done
 }
 
 function run_mid_hooks {
-	for F in `ls "${SCRIPTS_DIR}/${SERVICE}.d"/mid_* 2>/dev/null` ;do . $F ; done
+	for F in `ls "${CUSTOM_SCRIPTS_DIR}/process-${SERVICE}.d"/mid_* 2>/dev/null` ;do . $F ; done
 }
 
 function run_post_hooks {
-	for F in `ls "${SCRIPTS_DIR}/${SERVICE}.d"/post_* 2>/dev/null` ;do . $F ; done
+	for F in `ls "${CUSTOM_SCRIPTS_DIR}/process-${SERVICE}.d"/post_* 2>/dev/null` ;do . $F ; done
 }
 
 

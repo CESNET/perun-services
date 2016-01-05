@@ -14,8 +14,8 @@ function process {
 	E_WHEN_UPDATING_LDAP=(51 'Error when updating LDAP.')
 
 	# sort & diff scripts from CPAN
-	LDIFDIFF="${SCRIPTS_DIR}/ldap/ldifdiff.pl"
-	LDIFSORT="${SCRIPTS_DIR}/ldap/ldifsort.pl"
+	LDIFDIFF="${LIB_DIR}/process-${SERVICE}/ldifdiff.pl"
+	LDIFSORT="${LIB_DIR}/process-${SERVICE}/ldifsort.pl"
 
 	# work files location
 	INFILE="${WORK_DIR}/${SERVICE}_users.ldif"
