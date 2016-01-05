@@ -130,7 +130,7 @@ function process {
 							USER_CN=`echo $USER_DN | sed 's|^.*\/CN=\([^/]*\).*|\1|'`
 							voms-admin --nousercert --vo "${VO_SHORTNAME}" create-user "$USER_DN" "$CA_DN" "$USER_CN" "$USER_EMAIL" > ${USER_RESPONSE}
 							if [ $? -ne 0 ]; then
-								log_both "Failed adding user to VO \"${VO}\". Original message from voms-admin: \"`cat ${USER_RESPONSE}`\""
+								log_both "Failed adding user \"$USER_DN\" to VO \"${VO}\". Original message from voms-admin: \"`cat ${USER_RESPONSE}`\""
 								if [ $RETVAL -lt 1 ]; then RETVAL=1; fi
 								continue
 							fi
