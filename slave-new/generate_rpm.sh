@@ -82,6 +82,7 @@ cat > $SPEC_FILE_NAME <<EOF
 Name: ${PREFIX}full
 Version: ${VERSION}
 Release: ${RELEASE}
+Conflicts: perun-slave
 Summary: ${SUMMARY}
 License: ${LICENSE}
 Group: ${GROUP}
@@ -109,6 +110,7 @@ cat > $SPEC_FILE_NAME <<EOF
 Name: ${PREFIX}${GENERATE_RPM_FOR_SERVICE}
 Version: ${VERSION}
 Release: ${RELEASE}
+Conflicts: perun-slave
 Summary: ${SUMMARY}
 License: ${LICENSE}
 Group: ${GROUP}

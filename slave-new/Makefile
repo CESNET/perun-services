@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 SHELL=/bin/bash
-maintainer_name="Michal Kimle, Michal Stava"
-maintainer_email="kimle.michal@gmail.com, stavamichal@gmail.com"
+maintainer_name="Michal Stava"
+maintainer_email="stavamichal@gmail.com"
 comma:=,
 empty:=
 space:=$(empty) $(empty)
@@ -20,6 +20,7 @@ processes: $(processes)
 meta:
 	@cd meta && PACKAGE_NAME=$(package_prefix_name)$(meta_package_name) DEPENDENCIES="$(subst $(space),$(comma)$(space)$,$(addprefix $(package_prefix_name),$(processes)))" VERSION=`head -n 1 changelog | sed -e 's/.*\([0-9]\+[.][0-9]\+[.][0-9]\+\).*/\1/'` envsubst < ../templates/equivs/control > control
 	@cd meta && if [ -s short_desc ]; then echo "Description: `cat short_desc`" >> control; fi
+	@cd meta && echo "Conflicts: perun-slave" >> control;
 	@cd meta && if [ -s short_desc -a -s long_desc ]; then sed 's/^/ /g' long_desc >> control; fi
 	equivs-build meta/control
 	@rm meta/control
@@ -37,6 +38,7 @@ $(processes):
 	@cd $@ && if [ -s dependencies -a $@ = $(base_package_name) ]; then echo -en "\noverride_dh_gencontrol:\n\tdh_gencontrol -- -Vmisc:Depends=\"`cat dependencies`\"" >> ./debian/rules; fi
 	@cd $@ && if [ $@ != $(base_package_name) ]; then echo -en "\noverride_dh_gencontrol:\n\tdh_gencontrol -- -Vmisc:Depends=\"$(package_prefix_name)$(base_package_name)" >> ./debian/rules; fi
 	@cd $@ && if [ $@ !=  $(base_package_name) ]; then if [ -s dependencies ]; then echo -e ", `cat dependencies`\"" >> ./debian/rules; else echo -e "\"" >> ./debian/rules; fi; fi
+	@cd $@ && echo "Conflicts: perun-slave" >> debian/control;
 	@cd $@ && if [ -s short_desc ]; then echo "Description: `cat short_desc`" >> debian/control; fi
 	@cd $@ && if [ -s short_desc -a -s long_desc ]; then sed 's/^/ /g' long_desc >> debian/control; fi
 	@echo $(format) > $@/debian/source/format
