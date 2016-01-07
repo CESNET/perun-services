@@ -6,6 +6,7 @@ echo "--------------------------------------------"
 
 TMPDIR="/tmp/perun-slave-rpm-build"
 GENERATE_RPM_FOR_SERVICE=$@
+SERVICE_NAME=${GENERATE_RPM_FOR_SERVICE#process-}
 PREFIX="perun-slave-"
 CHANGELOG_FILE="$GENERATE_RPM_FOR_SERVICE/changelog"
 BIN_DIR="$GENERATE_RPM_FOR_SERVICE/bin/"
@@ -61,16 +62,16 @@ CUSTOM_CONF=""
 CUSTOM_FILE_DATA=""
 # conf predefined settings
 if [ $WITH_CONF == 1 ]; then
-	CUSTOM_CONF="mkdir -p %{buildroot}/etc/perun/${GENERATE_RPM_FOR_SERVICE}.d
-cp -r conf/* %{buildroot}/etc/perun/${GENERATE_RPM_FOR_SERVICE}.d"
-	CUSTOM_FILE_DATA="/etc/perun/${GENERATE_RPM_FOR_SERVICE}.d"
+	CUSTOM_CONF="mkdir -p %{buildroot}/etc/perun/${SERVICE_NAME}.d
+cp -r conf/* %{buildroot}/etc/perun/${SERVICE_NAME}.d"
+	CUSTOM_FILE_DATA="/etc/perun/${SERVICE_NAME}.d"
 fi
 if [ $WITH_LIB == 1 ]; then
   CUSTOM_CONF="$CUSTOM_CONF
-mkdir -p %{buildroot}/opt/perun/lib/${GENERATE_RPM_FOR_SERVICE}/
-cp -r lib/* %{buildroot}/opt/perun/lib/${GENERATE_RPM_FOR_SERVICE}/"
+mkdir -p %{buildroot}/opt/perun/lib/${SERVICE_NAME}/
+cp -r lib/* %{buildroot}/opt/perun/lib/${SERVICE_NAME}/"
   CUSTOM_FILE_DATA="$CUSTOM_FILE_DATA
-/opt/perun/lib/${GENERATE_RPM_FOR_SERVICE}/"
+/opt/perun/lib/${SERVICE_NAME}/"
 fi
 
 # generate spec file
