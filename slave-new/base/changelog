@@ -1,3 +1,14 @@
+perun-slave-base (3.1.2) stable; urgency=low
+
+  * Use also the old path for {service}.d (pre, mid, post) scripts. Old path 
+    is /opt/perun/bin/{service}.d/ and the new path is 
+    /etc/perun/{service}.d/. Same files in both paths has higher priority from 
+    old path (take these).
+  * Info to stderr if old path with scrips is still used (there are some
+    scripts)
+
+ -- Michal Stava <stavamichal@gmail.com>  Thu, 07 Jan 2016 13:22:00 +0200
+
 perun-slave-base (3.1.1) stable; urgency=low
 
   * New package version for perun-slave-base
