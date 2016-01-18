@@ -1,6 +1,10 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
+use File::Copy;
+
+sub diffCSV;
+sub logCRM;
 
 my $service_name = "crm_ceitec";
 my $protocol_version = "3.0.0";
@@ -9,47 +13,97 @@ my $script_version = "3.0.0";
 my $facility_name = $ARGV[0];
 chomp($facility_name);
 
-# Open gen file
-my $file = "../gen/spool/$facility_name/$service_name/$service_name";
-open my $info, $file or die "Could not open $file: $!";
+my @diff = diffCSV();
 
 my $error = 0;
 
 # READ FILE AND PROCESS IT
-while( my $line = <$info>)  {
+foreach my $line (@diff) {
 
-    chomp($line);
-    my @array = split(";",$line);
+	chomp($line);
+	my @array = split(";",$line);
 
-    my $command = "php $service_name.php";
-    my $counter = 1;
-    for my $val (@array) {
-        $counter++;
-        $command = $command . " '$val'";
-    }
+	my $command = "php $service_name.php";
+	my $counter = 1;
+	for my $val (@array) {
+		$counter++;
+		$command = $command . " '$val'";
+	}
 
-    # make all params complete (6 params)
-    while ($counter < 7) {
-        $command = $command . " ''";
-        $counter++;
-    }
+	# make all params complete (6 params)
+	while ($counter < 7) {
+		$command = $command . " ''";
+		$counter++;
+	}
 
-    my $result = `$command`;
-    if ($result =~ /^ERROR/) {
-        $error = 1;
-        # log to stderr which is read by engine and stored in task result
-        print STDERR $array[0] . " " . $result . "\n";
-    }
+	my $result = `$command`;
+	if ($result =~ /^ERROR/) {
+		$error = 1;
+		# log to stderr which is read by engine and stored in task result
+		print STDERR $array[0] . " " . $result . "\n";
+		logCRM("ERROR: " . $line);
+	} else {
+		logCRM("SUCCESS: " . $line);
+	}
 
 }
 
-close $info;
-
 if ($error == 1) {
-    # some entries were not updated
-    print "Update ended with errors. See error log.";
-    exit 1;
+	# some entries were not updated
+	print "Update ended with errors. See error log.";
+	exit 1;
 } else {
-    # ended OK
-    print "Update was successful.";
+	# ended OK
+	print "Update was successful.";
+
+	# IF runed OK, switch old to new
+	copy("../gen/spool/$facility_name/$service_name/$service_name","./$service_name.last") or die "Move failed: $!";
+
+}
+#
+# DIFF previous and new state of CRM
+#
+sub diffCSV() {
+
+	# Open last state file
+	my $storage_file_path = "./$service_name.last";
+	open my $storage_file, $storage_file_path or die "Could not open $storage_file_path: $!";
+
+	# Open new gen file
+	my $gen_file_path = "../gen/spool/$facility_name/$service_name/$service_name";
+	open my $gen_file, $gen_file_path or die "Could not open $gen_file_path: $!";
+
+	my %previous_state;
+	my @diff;
+
+	while(<$storage_file>) {
+		chomp($_);
+		$_ =~ /^([^;]*);/;
+		my $login = $1;
+		$previous_state{$login} = $_;
+	}
+
+	while(<$gen_file>) {
+		chomp($_);
+		$_ =~ /^([^;]*);/;
+		my $login = $1;
+		push @diff, $_ unless defined $previous_state{$login} && $previous_state{$login} eq $_;
+	}
+
+	close $storage_file;
+	close $gen_file;
+
+	return @diff;
+
+}
+
+#
+# Log any message to log file located in same folder as the script.
+# Each message starts at new line with a date.
+#
+sub logCRM() {
+	my $message = shift;
+	open(LOGFILE, ">>./crm_ceitec.log");
+	print LOGFILE (localtime(time) . ": " . $message . "\n");
+	close(LOGFILE);
 }
