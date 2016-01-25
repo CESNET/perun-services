@@ -59,7 +59,21 @@ foreach my $memberAttributes (@membersAttributes) {
 	#do not add not valid users and blacklisted users
 	if (($memberAttributes->{$A_MEMBER_STATUS} eq $STATUS_VALID) && !defined($memberAttributes->{$A_U_F_BLACKLISTED})) {
 		my @DNs = keys %{$memberAttributes->{$A_USER_CERT_DNS}};
-		my $DN = $DNs[0];
+		# take DN with the biggest number (the last in perun)
+		my $lastDN;
+		foreach my $DN (@DNs) {
+			if(!defined($lastDN)) { $lastDN=$DN; }
+			else {
+				my $lastDNNumber = $lastDN;
+				$lastDNNumber =~ s/[:].*$//;
+				my $DNNumber = $DN;
+				$DNNumber =~ s/[:].*$//;
+				if($DNNumber > $lastDNNumber) { $lastDN=$DN; }
+			}
+		}
+		my $DN = $lastDN;
+		# strip prefix from certificate
+		$DN =~ s/^[0-9]+[:]//;
 		my $uid = $memberAttributes->{$A_R_VO_SHORT_NAME} . "_" . $memberAttributes->{$A_USER_FACILITY_UID};
 
 		my $sshKeys = "";

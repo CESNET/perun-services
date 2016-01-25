@@ -1,0 +1,5 @@
+perun-slave-process-sshkeys-root (3.1.1) stable; urgency=low
+
+  * New package version for perun-slave-process-sshkeys-root
+
+ -- Michal Stava <stavamichal@gmail.com>  Mon, 16 Nov 2015 13:54:00 +0200

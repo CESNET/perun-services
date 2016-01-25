@@ -49,8 +49,12 @@ foreach my $rData ($data->getChildElements) {
 
 	my @output = ();
 	foreach my $memberAttributes (dataToAttributesHashes $rData->getChildElements) {
-		foreach my $caDN (keys %{$memberAttributes->{$A_U_CERT_DNS}}) {
-			push @output, '( %{SSL_CLIENT_I_DN} == "' . $memberAttributes->{$A_U_CERT_DNS}->{$caDN} .'" && %{SSL_CLIENT_S_DN} == "' .  $caDN . '" )';
+		foreach my $subjectDN (keys %{$memberAttributes->{$A_U_CERT_DNS}}) {
+			my $caDN = $memberAttributes->{$A_U_CERT_DNS}->{$subjectDN};
+			#strip prefixes from subjectDN
+			my $subjectDNWithoutPrefix = $subjectDN;
+			$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
+			push @output, '( %{SSL_CLIENT_I_DN} == "' . $caDN .'" && %{SSL_CLIENT_S_DN} == "' .  $subjectDNWithoutPrefix . '" )';
 		}
 	}
 

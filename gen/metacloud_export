@@ -93,14 +93,21 @@ sub processMembersData {
 		unless(exists $dataByUser->{$login}) {
 			my @certs =  (keys %{$memberAttributes{$A_U_CERT_DNS}}, '/C=CZ/O=CESNET/CN=' . $login . '@meta.cesnet.cz');
 
-			#check for certificates duplicities
+			#check for certificates duplicities between all users
+			my %allUsersCerts = ();
+
+			my @certsDNsWithoutPrefixes;
 			for my $cert (@certs) {
-				if($allCerts{$cert}++) { die "Duplicate certificate found $cert for $login" ; }
+				my $certDNWithoutPrefix = $cert;
+				$certDNWithoutPrefix =~ s/^[0-9]+[:]//;
+				push @certsDNsWithoutPrefixes, $certDNWithoutPrefix;
+				if($allUsersCerts{$certDNWithoutPrefix} && $allUsersCerts{$certDNWithoutPrefix} ne $login) { die "Duplicate certificate found $cert for logins: $login and $allUsersCerts{$certDNWithoutPrefix}" ; }
+				else { $allUsersCerts{$certDNWithoutPrefix} = $login; }
 			}
 
 			$dataByUser->{$login}->{"login"} = $login;
 			$dataByUser->{$login}->{"krb_principals"} = [ $login . '@META' ];
-			$dataByUser->{$login}->{"cert_dns"} = \@certs;
+			$dataByUser->{$login}->{"cert_dns"} = \@certsDNsWithoutPrefixes;
 			$dataByUser->{$login}->{"ssh_keys"} = $memberAttributes{$A_USER_SSH_KEY} || [];
 			$dataByUser->{$login}->{"mail"} = $memberAttributes{$A_USER_MAIL};
 			$dataByUser->{$login}->{"full_name"} = $memberAttributes{$A_USER_DISPLAY_NAME};

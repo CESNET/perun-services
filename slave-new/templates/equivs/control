@@ -1,0 +1,10 @@
+Source: ${PACKAGE_NAME}
+Section: utils
+Priority: extra
+Maintainer: ${NAME} <${EMAIL}>
+Standards-Version: 3.9.2
+
+Package: ${PACKAGE_NAME}
+Architecture: any
+Version: ${VERSION}
+Depends: ${DEPENDENCIES}

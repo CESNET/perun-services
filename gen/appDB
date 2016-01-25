@@ -71,9 +71,11 @@ for my $voData (@vosData) {
 
 			# prepare DNs
 			my @dn = ();
-			foreach my $dn (keys %{$memberAttributes{$A_USER_CERT_DNS}}) {
-				push @dn, { "content" => $dn,
-				            "ca" => $memberAttributes{$A_USER_CERT_DNS}->{$dn},
+			foreach my $subjectDN (keys %{$memberAttributes{$A_USER_CERT_DNS}}) {
+				my $subjectDNWithoutPrefix = $subjectDN;
+				$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
+				push @dn, { "content" => $subjectDNWithoutPrefix,
+				            "ca" => $memberAttributes{$A_USER_CERT_DNS}->{$subjectDN},
 				          };
 			}
 

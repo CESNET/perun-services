@@ -36,9 +36,12 @@ foreach my $memberAttributes (@membersAttributes) {
 	foreach my $kerberosLogin (@{$memberAttributes->{$A_USER_KERBEROS_LOGINS}}) {
 		# Get realm from the kerberosLogins
 		my ($login, $realm) = split('@', $kerberosLogin);
-		foreach my $caDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
-			chomp $memberAttributes->{$A_USER_CERT_DNS}{$caDN};
-			my @entry = ($kerberosLogin, convertNonAsciiToEscapedUtf8Form $caDN);
+		foreach my $subjectDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
+			chomp $memberAttributes->{$A_USER_CERT_DNS}{$subjectDN};
+			#remove prefix from subject DN
+			my $subjectDNWithoutPrefix = $subjectDN;
+			$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
+			my @entry = ($kerberosLogin, convertNonAsciiToEscapedUtf8Form $subjectDNWithoutPrefix);
 			push(@{$realms{$realm}}, \@entry);
 		}
 	}
@@ -48,9 +51,14 @@ foreach my $realm (keys %realms) {
 	open FILE,">$fileName." . lc($realm) or die "Cannot open $fileName.$realm: $! \n";
 	# Name of the realm on the first line
 	print FILE $realm . "\n";
+	my %uniqueEntriesInRealm = ();
 	foreach my $entry (@{$realms{$realm}}) {
 		# kerberosPrincipal:userCertDN
-		print FILE $$entry[0] . ":" . $$entry[1] . "\n";
+		$uniqueEntriesInRealm{$$entry[0] . ":" . $$entry[1] . "\n"} = 1;
+	}
+
+	foreach my $entry (keys %uniqueEntriesInRealm) {
+		print FILE $entry;
 	}
 	close (FILE);
 }
