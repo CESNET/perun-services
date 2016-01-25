@@ -1,0 +1,67 @@
+<vos>
+  <vo>
+    <name>vo.org</name>
+    <users>
+      <user>
+        <DN>/DC=cz/DC=cesnet-ca/O=CESNET/CN=Boris Parak</DN>
+        <CA-DN>/DC=cz/DC=cesnet-ca/O=CESNET CA/CN=CESNET CA 3</CA-DN>
+        <email>parak@cesnet.cz</email>
+        <roles>
+          <role>admin</role>
+        </roles>
+        <groups>
+          <group>
+            <name>cloudcommando</name>
+          </group>
+          <group>
+            <name>devops</name>
+            <roles>
+              <role>slave</role>
+            </roles>
+          </group>
+        </groups>
+      </user>
+      <user>
+        <DN>/DC=cz/DC=cesnet-ca/O=CESNET/CN=Pepa Bezrolek</DN>
+        <CA-DN>/DC=cz/DC=cesnet-ca/O=CESNET CA/CN=CESNET CA 3</CA-DN>
+        <email>bezrolek@cesnet.cz</email>
+        <groups>
+          <group>
+            <name>cloudcommando</name>
+          </group>
+          <group>
+            <name>devops</name>
+          </group>
+        </groups>
+      </user>
+      <user>
+        <DN>/DC=cz/DC=cesnet-ca/O=CESNET/CN=Pepa Admin</DN>
+        <CA-DN>/DC=cz/DC=cesnet-ca/O=CESNET CA/CN=CESNET CA 3</CA-DN>
+        <email>admin@cesnet.cz</email>
+        <roles>
+          <role>admin</role>
+        </roles>
+        <groups>
+          <group>
+            <name>cloudcommando</name>
+            <roles>
+              <role>admin</role>
+            </roles>
+          </group>
+          <group>
+            <name>devops</name>
+            <roles>
+              <role>admin</role>
+            </roles>
+          </group>
+        </groups>
+      </user>
+      <user>
+        <DN>/DC=cz/DC=cesnet-ca/O=CESNET/CN=Pepa Neskupa</DN>
+        <CA-DN>/DC=cz/DC=cesnet-ca/O=CESNET CA/CN=CESNET CA 3</CA-DN>
+        <email>neskupa@cesnet.cz</email>
+      </user>
+    </users>
+  </vo>
+</vos>
+
