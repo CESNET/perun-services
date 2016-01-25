@@ -18,41 +18,87 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $data = perunServicesInit::getHierarchicalData;
 
 # Constants
-our $YEAR;                      *YEAR                 =   \(60 * 60 * 24 * 365);
-our $HOW_OLD_PUBLICATIONS;      *HOW_OLD_PUBLICATIONS =   \3;   #in years
-
-our $A_USER_LOGIN;              *A_USER_LOGIN         =   \'urn:perun:user_facility:attribute-def:virt:login';
-our $A_USER_UID;                *A_USER_UID           =   \'urn:perun:user_facility:attribute-def:virt:UID';
-our $A_USER_ID;                 *A_USER_ID            =   \'urn:perun:user:attribute-def:core:id';
-our $A_USER_DISPLAY_NAME;       *A_USER_DISPLAY_NAME  =   \'urn:perun:user:attribute-def:core:displayName'; 
+our $YEAR;                         *YEAR                       =   \(60 * 60 * 24 * 365);
+our $HOW_OLD_PUBLICATIONS;         *HOW_OLD_PUBLICATIONS       =   \3;   #in years
+our $A_USER_LOGIN;                 *A_USER_LOGIN               =   \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_USER_ID;                    *A_USER_ID                  =   \'urn:perun:user:attribute-def:core:id';
+our $A_RESOURCE_FAIRSHARE_GNAME;   *A_RESOURCE_FAIRSHARE_GNAME =   \'urn:perun:resource:attribute-def:def:fairshareGroupName';
+our $A_RESOURCE_ID;                *A_RESOURCE_ID              =   \'urn:perun:resource:attribute-def:core:id';
 
 my $nowYear = (localtime)[5] + 1900;
 
-# load users 
-my $users = {};
-
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	for my $mData ($rData->getChildElements) {
-		my %mAttrs = attributesToHash $mData->getAttributes;
-		$users->{$mAttrs{$A_USER_ID}}->{"login"} = $mAttrs{$A_USER_LOGIN};
-		$users->{$mAttrs{$A_USER_ID}}->{"uid"} = $mAttrs{$A_USER_UID};
-		$users->{$mAttrs{$A_USER_ID}}->{"name"} = $mAttrs{$A_USER_DISPLAY_NAME};
-		$users->{$mAttrs{$A_USER_ID}}->{"weight"} = 1.0;
-		$users->{$mAttrs{$A_USER_ID}}->{"pubs"} = [];
-	}
-}
-
+#CABINET CALLINGS
 my $agent = Perun::Agent->new();
 my $cabinetAgent = $agent->getCabinetAgent;
 
+# categories
 my %categoriesRanks = ();
 $categoriesRanks{$_->getId} = $_->getRank foreach($cabinetAgent->findAllCategories);
 
+# get all authors from cabinet
+my $authorsByID = ();
 my @authors = $cabinetAgent->findAllAuthors;
+foreach my $author (@authors) {
+	$authorsByID->{$author->getId} = $author;
+}
 
+# load users which are not in fairshare group
+my $users = {};
+# load resources which are fairshare groups
+my $resources = {};
+
+my @resourcesData = $data->getChildElements;
+foreach my $rData (@resourcesData) {
+	my %rAttrs = attributesToHash $rData->getAttributes;
+	if($rAttrs{$A_RESOURCE_FAIRSHARE_GNAME}) {
+		$resources->{$rAttrs{$A_RESOURCE_ID}}->{"weight"} = 1.0;
+		$resources->{$rAttrs{$A_RESOURCE_ID}}->{"name"} = "G:" . $rAttrs{$A_RESOURCE_FAIRSHARE_GNAME};
+
+		#this resource is fairshare group
+		my $publicationsIDs = ();
+		for my $mData ($rData->getChildElements) {
+			my %mAttrs = attributesToHash $mData->getAttributes;
+			$resources->{$rAttrs{$A_RESOURCE_ID}}->{"weight"}++;
+			die if($users->{$mAttrs{$A_USER_ID}});
+			$users->{$mAttrs{$A_USER_ID}}->{"login"} = $mAttrs{$A_USER_LOGIN};
+			$users->{$mAttrs{$A_USER_ID}}->{"weight"} = 1.0;
+			$users->{$mAttrs{$A_USER_ID}}->{"group"} = "G:" . $rAttrs{$A_RESOURCE_FAIRSHARE_GNAME};
+
+			#add all user publications
+			my $userID = $mAttrs{$A_USER_ID};
+			next unless defined $authorsByID->{$userID};
+			my $author = $authorsByID->{$userID};
+			for my $authorship ($author->getAuthorships) {
+				$publicationsIDs->{$authorship->getPublicationId} = 1;
+			}
+		}
+
+		foreach my $publicationID (keys %$publicationsIDs) {
+			my $publication = $cabinetAgent->getPublicationById(id => $publicationID);
+			# filter out too old publications
+			if($publication->getYear < $nowYear - $HOW_OLD_PUBLICATIONS) { next; }
+
+				#### Start of fairshare algorithm ####
+				my $pubWeight = $categoriesRanks{$publication->getCategoryId} * (1 - (($nowYear - $publication->getYear - 1) / $HOW_OLD_PUBLICATIONS ));
+				$resources->{$rAttrs{$A_RESOURCE_ID}}->{"weight"} += $pubWeight;
+				#### End of fairshare algorithm ####
+		}
+	} else {
+		# this resource is not fairshare group
+		for my $mData ($rData->getChildElements) {
+			my %mAttrs = attributesToHash $mData->getAttributes;
+			die if($users->{$mAttrs{$A_USER_ID}});
+			$users->{$mAttrs{$A_USER_ID}}->{"login"} = $mAttrs{$A_USER_LOGIN};
+			$users->{$mAttrs{$A_USER_ID}}->{"weight"} = 1.0;
+			$users->{$mAttrs{$A_USER_ID}}->{"group"} = 'root';
+		}	
+	}	
+}
+
+#Count all root users fairshares
 for my $author (@authors) {
 	next unless defined $users->{$author->getId}; #filter out users which are not assigned on the facility for which this script is executed right now
+	next unless ($users->{$author->getId}->{'group'} eq 'root');
 
 	for my $authorship ($author->getAuthorships) {
 		# get the publication
@@ -61,20 +107,29 @@ for my $author (@authors) {
 		# filter out too old publications
 		if($publication->getYear < $nowYear - $HOW_OLD_PUBLICATIONS) { next; }
 
-
 		#### Start of fairshare algorithm ####
 		my $pubWeight = $categoriesRanks{$publication->getCategoryId} * (1 - (($nowYear - $publication->getYear - 1) / $HOW_OLD_PUBLICATIONS ));
 		$users->{$author->getId}->{"weight"} += $pubWeight;
 		push @{$users->{$author->getId}->{"pubs"}}, $pubWeight;
-		#### End of fairshare algorithm ####
-	
+		#### End of fairshare algorithm ####	
 	}
 }
 
+# start uid must be bigger than 1 so for example 10
+my $uid = 10;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $!";
+
+# first groups
+for my $resourceRef (sort { $b->{"weight"} <=> $a->{"weight"} } values %$resources) {
+	printf FILE "%s\t%d\t%s\t%.0f\n", $resourceRef->{"name"}, $uid, 'root', $resourceRef->{"weight"};
+	$uid++;
+}
+
+# then users
 for my $userRef (sort { $b->{"weight"} <=> $a->{"weight"} } values %$users) {
-	printf FILE "%s\t%d\troot\t%.0f\n", $userRef->{"login"}, $userRef->{"uid"}, $userRef->{"weight"};
+	printf FILE "%s\t%d\t%s\t%.0f\n", $userRef->{"login"}, $uid, $userRef->{"group"}, $userRef->{"weight"};
+	$uid++;
 }
 
 close (FILE);
