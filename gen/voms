@@ -40,9 +40,12 @@ for my $rData (@resourcesData) {
 foreach my $memberAttributes (@membersAttributes) {
 	next unless $memberAttributes->{$A_USER_STATUS} eq $STATUS_VALID;
 
-	foreach my $caDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
-		chomp $memberAttributes->{$A_USER_CERT_DNS}{$caDN};
-		print FILE $memberAttributes->{$A_R_VO_SHORT_NAME} . "\t" . $caDN . "\t" . $memberAttributes->{$A_USER_CERT_DNS}{$caDN} . "\t";
+	foreach my $subjectDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
+		chomp $memberAttributes->{$A_USER_CERT_DNS}{$subjectDN};
+		#remove prefix from subjectDN
+		my $subjectDNWithoutPrefix = $subjectDN;
+		$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
+		print FILE $memberAttributes->{$A_R_VO_SHORT_NAME} . "\t" . $subjectDNWithoutPrefix . "\t" . $memberAttributes->{$A_USER_CERT_DNS}{$subjectDN} . "\t";
 		print FILE $memberAttributes->{$A_USER_MAIL}."\n";
 	}
 }
