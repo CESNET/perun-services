@@ -72,6 +72,8 @@ foreach my $memberAttributes (@membersAttributes) {
 			}
 		}
 		my $DN = $lastDN;
+		# skip users without any certificates
+		next if(!defined($DN));
 		# strip prefix from certificate
 		$DN =~ s/^[0-9]+[:]//;
 		my $uid = $memberAttributes->{$A_R_VO_SHORT_NAME} . "_" . $memberAttributes->{$A_USER_FACILITY_UID};
