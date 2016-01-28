@@ -1,11 +1,5 @@
 #!/usr/bin/perl
 
-# Potentially useful VOMS links
-#https://voms2.cern.ch:8443/voms/alice/services/VOMSAdmin?method=listSubGroups
-#https://voms2.cern.ch:8443/voms/alice/services/VOMSAdmin?method=listSubGroups&groupname=/alice/alarm
-#https://voms2.cern.ch:8443/voms/alice/services/VOMSAdmin?method=listMembers&groupname=/alice/alarm
-#https://voms2.cern.ch:8443/voms/alice/services/VOMSAdmin?method=listRoles
-
 # initialize parser and read the file
 use XML::Simple;
 use Data::Dumper;
@@ -13,13 +7,15 @@ $vos = XMLin( '-' );
 
 #print(Dumper($vos));
 
-printf "-------\n";
-
-# serialize the structure
-foreach my $name (keys $vos->{'vo'}) {
+# Main parsing loop for the input XML file
+foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	$vo=$vos->{'vo'}->{$name};
+
 	printf "${name}\n";
-	foreach my $user (values $vo->{'users'}->{'user'}) {
+	#Collect all lists from voms-admin
+
+#	print(Dumper($vo));
+	foreach my $user (@{$vo->{'users'}->{'user'}}) {
 		printf "\t\"%s\" \"%s\"\n",$user->{'DN'},$user->{'CA'};
 	}
 }
