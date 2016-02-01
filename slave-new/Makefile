@@ -45,7 +45,7 @@ $(processes):
 	cd $@ && debuild -us -uc
 	@echo "Cleaing after $@ building process..."
 	@rm -rf "$@/"{Makefile,debian}
-	@rm "$(package_prefix_name)$@_"*.{build,changes,dsc,tar.gz}
+	@rm -f "$(package_prefix_name)$@_"*.{build,changes,dsc,tar.gz,tar.xz}
 	@echo "Generate spec file for $@..."
 	@./generate_rpm.sh $@
 
