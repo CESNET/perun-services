@@ -14,6 +14,11 @@ if [ -f "/etc/${NAME}.conf" ]; then
 	. "/etc/${NAME}.conf"
 fi
 
+# read custom configurations
+if [ -d "/etc/${NAME}.d/" ]; then
+	for F in `ls "/etc/${NAME}.d"/* 2>/dev/null` ;do . "$F" ; done
+fi
+
 # Temporarily set umask to 077 in order to have all temp configuration files private
 umask 077
 

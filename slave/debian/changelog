@@ -1,3 +1,10 @@
+perun-slave (3.0.0-0.0.98) stable; urgency=low
+
+  * New custom configuration from '/etc/perunv3.d/' directory, take all files
+    in this directory
+
+ -- Michal Stava <stavamichal@gmail.com>  Thu, 04 Feb 2016 15:35:00 +0200
+
 perun-slave (3.0.0-0.0.97) stable; urgency=low
 
   * New service operations_portal_egi
