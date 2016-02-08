@@ -1,0 +1,3 @@
+SERVICE_NAME="mailman_elixir"
+
+# Do nothing, data are pulled via web server from this machine
