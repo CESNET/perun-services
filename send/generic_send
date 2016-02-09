@@ -39,13 +39,11 @@ case $DESTINATION_TYPE in
 	host)
 		HOSTNAME="$DESTINATION"
 		HOST="root@$DESTINATION"
-		SLAVE_COMMAND="/opt/perun/bin/perun"
 		;;
 	user@host)
 		# Get the user name from the destination
 		HOSTNAME=`echo $DESTINATION | sed -e 's/^.*@//'`
 		HOST="$DESTINATION"
-		SLAVE_COMMAND="~/perun/bin/perun"
 		;;
 	*)
 		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
