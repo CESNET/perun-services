@@ -18,6 +18,438 @@
           <role>voAdmin</role>
         </roles>
       </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <DN>/C=CZ/O=Masaryk University/CN=Zora Sebestianova/unstructuredName=71378</DN>
+        <email>zora@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>voAdmin</role>
+              <role>Perun</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>worldAdmin</role>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA eScience Personal CA</CA>
+        <DN>/DC=org/DC=terena/DC=tcs/C=CZ/O=CESNET/CN=Michal Prochazka 8497</DN>
+        <email>michalp@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>groupAdmin</role>
+          <role>voAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/ST=Noord-Holland/L=Amsterdam/O=TERENA/CN=TERENA Personal CA 2</CA>
+        <DN>/C=CZ/O=CESNET/CN=Pavel Zlamal/unstructuredName=1010</DN>
+        <email>zlamal@cesnet.cz</email>
+        <groups>
+          <group>
+            <name>voms1</name>
+            <roles>
+              <role>groupAdmin</role>
+              <role>carAdmin</role>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <DN>/C=CZ/O=CESNET/CN=Michal Prochazka/unstructuredName=8497</DN>
+        <email>michalp@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA eScience Personal CA</CA>
+        <DN>/DC=org/DC=terena/DC=tcs/C=CZ/O=CESNET/CN=Michal Stava 5555</DN>
+        <email>stava.michal@gmail.com</email>
+        <groups>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>voAdmin</role>
+              <role>Perun</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms1</name>
+            <roles>
+              <role>carAdmin</role>
+              <role>groupAdmin</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>worldAdmin</role>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <DN>/C=CZ/O=Masarykova univerzita/CN=Michal Proch\xC3\xA1zka/unstructuredName=39700</DN>
+        <email>michalp@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <DN>/C=CZ/O=Masarykova univerzita/CN=Zora Sebestianova/unstructuredName=71378</DN>
+        <email>zora@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>voAdmin</role>
+              <role>Perun</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+          <role>worldAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <DN>/C=CZ/O=Masarykova univerzita/CN=Michal \xC5\xA0\xC5\xA5ava/unstructuredName=255739</DN>
+        <email>stava.michal@gmail.com</email>
+        <groups>
+          <group>
+            <name>voms1</name>
+            <roles>
+              <role>carAdmin</role>
+              <role>groupAdmin</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>Perun</role>
+              <role>voAdmin</role>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>groupAdmin</role>
+          <role>voAdmin</role>
+          <role>worldAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/ST=Noord-Holland/L=Amsterdam/O=TERENA/CN=TERENA Personal CA 2</CA>
+        <DN>/C=CZ/O=Masarykova univerzita/CN=Michal Stava/unstructuredName=255739</DN>
+        <email>stava.michal@gmail.com</email>
+        <groups>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>voAdmin</role>
+              <role>Perun</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+          <group>
+            <name>voms1</name>
+            <roles>
+              <role>carAdmin</role>
+              <role>groupAdmin</role>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>worldAdmin</role>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/DC=cz/DC=cesnet-ca/O=CESNET CA/CN=CESNET CA 3</CA>
+        <DN>/DC=cz/DC=cesnet-ca/O=CESNET/CN=Michal Stava</DN>
+        <email>stava.michal@gmail.com</email>
+        <groups>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>voAdmin</role>
+              <role>Perun</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+          <group>
+            <name>voms1</name>
+            <roles>
+              <role>carAdmin</role>
+              <role>groupAdmin</role>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>worldAdmin</role>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <DN>/C=CZ/O=Masarykova univerzita/CN=Slavek Licehammer/unstructuredName=255920</DN>
+        <email>slavek@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>voAdmin</role>
+              <role>Perun</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms1</name>
+            <roles>
+              <role>groupAdmin</role>
+              <role>carAdmin</role>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>groupAdmin</role>
+          <role>voAdmin</role>
+          <role>worldAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA eScience Personal CA</CA>
+        <DN>/DC=org/DC=terena/DC=tcs/C=CZ/O=Masaryk University/CN=Slavek Licehammer 255920</DN>
+        <email>slavek@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms1</name>
+            <roles>
+              <role>carAdmin</role>
+              <role>groupAdmin</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>voAdmin</role>
+              <role>Perun</role>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+          <role>worldAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=CZ/O=METACentrum/CN=METACentrum Certification Authority</CA>
+        <DN>/C=CZ/O=METACentrum/CN=Zora Sebestianova/CN=zora</DN>
+        <email>zora@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>voAdmin</role>
+              <role>Perun</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>groupAdmin</role>
+          <role>voAdmin</role>
+          <role>worldAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <DN>/C=CZ/O=Masaryk University/CN=Slavek Licehammer/unstructuredName=255920</DN>
+        <email>slavek@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms1</name>
+            <roles>
+              <role>groupAdmin</role>
+              <role>carAdmin</role>
+            </roles>
+          </group>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>Perun</role>
+              <role>voAdmin</role>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+          <role>worldAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA eScience Personal CA</CA>
+        <DN>/DC=org/DC=terena/DC=tcs/C=CZ/O=Masaryk University/CN=Michal Prochazka 39700</DN>
+        <email>michalp@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>groupAdmin</role>
+          <role>voAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA eScience Personal CA</CA>
+        <DN>/DC=org/DC=terena/DC=tcs/C=CZ/O=Masaryk University/CN=Zora Sebestianova 71378</DN>
+        <email>zora@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+          <group>
+            <name>voms3</name>
+            <roles>
+              <role>Perun</role>
+              <role>voAdmin</role>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+          <role>worldAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/DC=cz/DC=cesnet-ca/O=CESNET CA/CN=CESNET CA 3</CA>
+        <DN>/DC=cz/DC=cesnet-ca/O=CESNET/CN=Pavel Zlamal</DN>
+        <email>zlamal@cesnet.cz</email>
+        <groups>
+          <group>
+            <name>voms1</name>
+            <roles>
+              <role>carAdmin</role>
+              <role>groupAdmin</role>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>voAdmin</role>
+          <role>groupAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <DN>/C=CZ/O=Masarykova univerzita/CN=Pavel Zl\xC3\xA1mal/unstructuredName=256627</DN>
+        <email>zlamal@cesnet.cz</email>
+        <groups>
+          <group>
+            <name>voms1</name>
+            <roles>
+              <role>carAdmin</role>
+              <role>groupAdmin</role>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>groupAdmin</role>
+          <role>voAdmin</role>
+        </roles>
+      </user>
+      <user>
+        <CA>/DC=cz/DC=cesnet-ca/O=CESNET CA/CN=CESNET CA 3</CA>
+        <DN>/DC=cz/DC=cesnet-ca/O=Masaryk University/CN=Michal Prochazka</DN>
+        <email>michalp@ics.muni.cz</email>
+        <groups>
+          <group>
+            <name>voms2</name>
+            <roles>
+            </roles>
+          </group>
+        </groups>
+        <roles>
+          <role>groupAdmin</role>
+          <role>voAdmin</role>
+        </roles>
+      </user>
     </users>
   </vo>
   <vo>
