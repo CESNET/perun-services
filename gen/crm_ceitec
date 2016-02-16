@@ -8,52 +8,66 @@ use Unicode::Normalize;
 
 local $::SERVICE_NAME = "crm_ceitec";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 
-my $data = perunServicesInit::getFlatData;
+my $data = perunServicesInit::getHierarchicalData;
 
 # User attributes
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_EPPNS; *A_EPPNS = \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
-our $A_O; *A_O = \'urn:perun:user:attribute-def:def:organization';
+our $A_O; *A_O = \'urn:perun:member:attribute-def:def:organization';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
 
-# FOR EACH USER
-foreach my $user (($data->getChildElements)[1]->getChildElements) {
+#
+# AGGREGATE DATA
+#
+my @resourcesData = $data->getChildElements;
 
-    my %uAttributes = attributesToHash $user->getAttributes;
+# FOR EACH RESOURCE
+foreach my $rData (@resourcesData) {
 
-    my $login = $uAttributes{$A_LOGIN};
+    # process members
+    my @membersData = $rData->getChildElements;
 
-    # store standard attrs
-    $users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
-    $users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
-    $users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
-    $users->{$login}->{$A_O} = $uAttributes{$A_O};
+    # FOR EACH MEMBER ON RESOURCE
+    foreach my $mData (@membersData) {
 
-    if (defined $str and length $str) {
+        my %mAttributes = attributesToHash $mData->getAttributes;
+        my $login = $mAttributes{$A_LOGIN};
+
+        # store standard attrs
+        $users->{$login}->{$A_FIRST_NAME} = $mAttributes{$A_FIRST_NAME};
+        $users->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME};
+        $users->{$login}->{$A_MAIL} = $mAttributes{$A_MAIL};
+        $users->{$login}->{$A_O} = $mAttributes{$A_O};
+
         # normalize Organization for comparison, since accents are UTF-8 vs. Unicode
-        my $str = $uAttributes{$A_O};
-        $str = NFKD ( $str );
-        $str =~ s/\p{NonspacingMark}//g;
+        my $str = $mAttributes{$A_O};
 
-        # Safe EPPN -> institution ID only for MU and VUT
-        if ("Masarykova univerzita" eq $uAttributes{$A_O}) {
-            $users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
-        } elsif ("Vysoke uceni technicke v Brne" eq $str) {
-            $users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
+        if (defined $str and length $str) {
+            # normalize Organization for comparison, since accents are UTF-8 vs. Unicode
+            my $str = $mAttributes{$A_O};
+            $str = NFKD ( $str );
+            $str =~ s/\p{NonspacingMark}//g;
+
+            # Safe EPPN -> institution ID only for MU and VUT
+            if ("Masarykova univerzita" eq $mAttributes{$A_O}) {
+                $users->{$login}->{$A_EPPNS} = $mAttributes{$A_EPPNS};
+            } elsif ("Vysoke uceni technicke v Brne" eq $str) {
+                $users->{$login}->{$A_EPPNS} = $mAttributes{$A_EPPNS};
+            }
         }
-    }
 
+    }
 }
 
 # print result

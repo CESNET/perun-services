@@ -11,7 +11,6 @@ use Text::Unidecode;
 
 our $SERVICE_NAME = "pbs_publication_fairshare";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -59,7 +58,7 @@ foreach my $rData (@resourcesData) {
 		for my $mData ($rData->getChildElements) {
 			my %mAttrs = attributesToHash $mData->getAttributes;
 			$resources->{$rAttrs{$A_RESOURCE_ID}}->{"weight"}++;
-			die if($users->{$mAttrs{$A_USER_ID}});
+			die if($users->{$mAttrs{$A_USER_ID}} && $users->{$mAttrs{$A_USER_ID}}->{"group"} ne 'root');
 			$users->{$mAttrs{$A_USER_ID}}->{"login"} = $mAttrs{$A_USER_LOGIN};
 			$users->{$mAttrs{$A_USER_ID}}->{"weight"} = 1.0;
 			$users->{$mAttrs{$A_USER_ID}}->{"group"} = "G:" . $rAttrs{$A_RESOURCE_FAIRSHARE_GNAME};
@@ -87,7 +86,8 @@ foreach my $rData (@resourcesData) {
 		# this resource is not fairshare group
 		for my $mData ($rData->getChildElements) {
 			my %mAttrs = attributesToHash $mData->getAttributes;
-			die if($users->{$mAttrs{$A_USER_ID}});
+			#if user is already there, we can skip him (take the one from the group instead)
+			next if($users->{$mAttrs{$A_USER_ID}});
 			$users->{$mAttrs{$A_USER_ID}}->{"login"} = $mAttrs{$A_USER_LOGIN};
 			$users->{$mAttrs{$A_USER_ID}}->{"weight"} = 1.0;
 			$users->{$mAttrs{$A_USER_ID}}->{"group"} = 'root';
