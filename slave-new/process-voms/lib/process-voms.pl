@@ -7,27 +7,29 @@ use Data::Dumper;
 $vos = XMLin( '-' );
 my $csv = Text::CSV->new({ sep_char => ',' });
 
+### listToHashes accepts a three-column CSV and produces an array of hashes with the following structure:
+#	DN	VO Member DN
+#	CA	Certificate Authority that vouches for the member
+#	email	The email address of the user
 sub listToHashes {
 	my @hashes;
 	foreach $line (@_) {
 		chomp($line);
 		$csv->parse($line);
 		my @components = $csv->fields();
-		my %mbr= ( 'dn' => "${components[0]}",'ca' => "${components[1]}", 'mail' => "${components[2]}" );
+		my %mbr= ( 'DN' => "${components[0]}",'CA' => "${components[1]}", 'email' => "${components[2]}" );
 		push( @hashes, \%mbr );
 	}
 	return \@hashes;
 }
 
 
-
-#print(Dumper($vos));
-
 # Main parsing loop for the input XML file
 foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	$vo=$vos->{'vo'}->{$name};
 	printf "---\nVO:\t${name}\n";
 
+	#Collect lists from voms-admin
 	@groups_current=`voms-admin --vo ${name} list-groups`;
 	chomp(@groups_current);
 	s/^\s*// for @groups_current;
@@ -38,48 +40,63 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 
 	@users_current=`voms-admin --vo ${name} list-users`;
 	chomp(@users_current);
-#	print "Roles:";
-#	foreach $role (@roles_current) {
-#		printf "\t%s\n",$role;
-#	}
-#	print "Groups:";
-#	foreach $group (@groups_current) {
-#		printf "\t%s\n",$group;
-#	}
-#	print "Users:";
-#	foreach $user (@users_current) {
-#		printf "\t%s\n",$user;
-#	}
 
 	#Collect current Group Membership and Role assignment
-	my %groupRoles;
-	my %groupMembers;
+	my %groupRoles_current;
+	my %groupMembers_current;
 	foreach $group (@groups_current) {
 		#Store members
-		$groupMembers{"$group"}=listToHashes(`voms-admin --vo ${name} list-members "${group}"`);
+		$groupMembers_current{"$group"}=listToHashes(`voms-admin --vo ${name} list-members "${group}"`);
 
 		#Role Membership
 		foreach $role (@roles_current) {
-			$groupRoles{"$group"}{"$role"}=listToHashes(`voms-admin --vo ${name} list-users-with-role "${group}" "${role}"`);
+			$groupRoles_current{"$group"}{"$role"}=listToHashes(`voms-admin --vo ${name} list-users-with-role "${group}" "${role}"`);
 	        }
 	}
 
 	foreach $group (@groups_current) {
-		foreach $user (@{$groupMembers{"$group"}}) {
-			printf "G\t%s\t%s\n",$group,$user->{'mail'};
+		foreach $user (@{$groupMembers_current{"$group"}}) {
+			printf "=G\t%s\t%s\n",$group,$user->{'DN'};
 		}
 		foreach $role (@roles_current) {
-			foreach $user (@{$groupRoles{"$group"}{"$role"}}) {
-				printf " R\t%s\t%s\t%s\n",$group,$role,$user->{'mail'};
+			foreach $user (@{$groupRoles_current{"$group"}{"$role"}}) {
+				printf "= R\t%s\t%s\t%s\n",$group,$role,$user->{'DN'};
 			}
 		}
 	}
 
-	#Collect all lists from voms-admin
+
+
 
 #	print(Dumper($vo));
-#	foreach my $user (@{$vo->{'users'}->{'user'}}) {
-#		printf "\t\"%s\"\n",$user->{'DN'};
-#		printf "\t\"%s\"\n\t\t\"%s\"\n",$user->{'DN'},$user->{'CA'};
-#	}
+	my %groupRoles_toBe;
+	my %groupMembers_toBe;
+	my @groups_toBe = ( "/$name" );
+	my @roles_toBe;
+	foreach $user (@{$vo->{'users'}->{'user'}}) {
+		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'email' => "$user->{'email'}" );
+		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
+		foreach $group ($user->{'groups'}->{'group'}) {
+			if (defined $group->{'name'}) {
+				push(@groups_toBe, "/$name/$group->{'name'}") unless grep{$_ eq "/$name/$group->{'name'}"} @groups_toBe;
+				push(@{$groupMembers_toBe{"/$name/$group->{'name'}"}}, \%theUser);
+				foreach $role (@{$group->{'roles'}->{'role'}}) {
+					push(@roles_toBe, "$role") unless grep{$_ eq "$role"} @roles_toBe;
+					push(@{$groupRoles_toBe{"/$name/$group->{'name'}"}{"$role"}}, \%theUser);
+				}
+			}
+		}
+	}
+
+        foreach $group (@groups_toBe) {
+                foreach $user (@{$groupMembers_toBe{"$group"}}) {
+                        printf "+G\t%s\t%s\n",$group,$user->{'DN'};
+                }
+                foreach $role (@roles_toBe) {
+                        foreach $user (@{$groupRoles_toBe{"$group"}{"$role"}}) {
+                                printf "+ R\t%s\t%s\t%s\n",$group,$role,$user->{'DN'};
+                        }
+                }
+        }
+
 }
