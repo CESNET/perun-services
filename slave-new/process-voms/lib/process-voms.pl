@@ -30,20 +30,20 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	printf "---\nVO:\t${name}\n";
 
 	#Collect lists from voms-admin
-	@groups_current=`voms-admin --vo ${name} list-groups`;
+	my @groups_current=`voms-admin --vo ${name} list-groups`;
 	chomp(@groups_current);
 	s/^\s*// for @groups_current;
 
-	@roles_current=`voms-admin --vo ${name} list-roles`;
+	my @roles_current=`voms-admin --vo ${name} list-roles`;
 	chomp(@roles_current);
 	s/^\s*Role=// for @roles_current;
 
-	@users_current=`voms-admin --vo ${name} list-users`;
+	my @users_current=`voms-admin --vo ${name} list-users`;
 	chomp(@users_current);
 
 	#Collect current Group Membership and Role assignment
-	my %groupRoles_current;
-	my %groupMembers_current;
+	my %groupRoles_current;		# Current assignment of users to (per group) roles
+	my %groupMembers_current;	# Current membership in groups (pure, disregarding roles)
 	foreach $group (@groups_current) {
 		#Store members
 		$groupMembers_current{"$group"}=listToHashes(`voms-admin --vo ${name} list-members "${group}"`);
@@ -67,12 +67,12 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 
 
 
-
+	# Produce comparable data structure from input data
 #	print(Dumper($vo));
-	my %groupRoles_toBe;
-	my %groupMembers_toBe;
-	my @groups_toBe = ( "/$name" );
-	my @roles_toBe;
+	my %groupRoles_toBe;		# Desired assignment of users to (per group) roles
+	my %groupMembers_toBe;		# Desired membership in groups (pure, disregarding roles)
+	my @groups_toBe = ( "/$name" );	# Desired list of groups
+	my @roles_toBe;			# Desired list of roles
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
 		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'email' => "$user->{'email'}" );
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
@@ -87,6 +87,11 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 			}
 		}
 	}
+
+
+
+
+
 
         foreach $group (@groups_toBe) {
                 foreach $user (@{$groupMembers_toBe{"$group"}}) {
