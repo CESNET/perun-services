@@ -40,7 +40,6 @@ sub effectCall {
 # Main parsing loop for the input XML file
 foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	$vo=$vos->{'vo'}->{$name};
-#	printf "---\nVO:\t${name}\n";
 
 	#Collect lists from voms-admin
 	my @groups_current=`voms-admin --vo ${name} list-groups`;
@@ -67,21 +66,9 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	        }
 	}
 
-#	foreach $group (@groups_current) {
-#		foreach $user (@{$groupMembers_current{"$group"}}) {
-#			printf "=G\t%s\t%s\n",$group,$user->{'DN'};
-#		}
-#		foreach $role (@roles_current) {
-#			foreach $user (@{$groupRoles_current{"$group"}{"$role"}}) {
-#				printf "= R\t%s\t%s\t%s\n",$group,$role,$user->{'DN'};
-#			}
-#		}
-#	}
-
 
 
 	# Produce comparable data structure from input data
-#	print(Dumper($vo));
 	my %groupRoles_toBe;		# Desired assignment of users to (per group) roles
 	my %groupMembers_toBe;		# Desired membership in groups (pure, disregarding roles)
 	my @groups_toBe = ( "/$name" );	# Desired list of groups
@@ -125,18 +112,6 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
         }
 
 
-
-
-#        foreach $group (@groups_toBe) {
-#                foreach $user (@{$groupMembers_toBe{"$group"}}) {
-#                        printf "+G\t%s\t%s\n",$group,$user->{'DN'};
-#                }
-#                foreach $role (@roles_toBe) {
-#                        foreach $user (@{$groupRoles_toBe{"$group"}{"$role"}}) {
-#                                printf "+ R\t%s\t%s\t%s\n",$group,$role,$user->{'DN'};
-#                        }
-#                }
-#        }
 
 
 	# Effect changes
