@@ -28,19 +28,35 @@ sub listToHashes {
 ### logMsg accepts a string, prints it on STDERR and logs it with syslog
 #	$message	Message to log
 sub logMsg {
-	$message = $_[0];
+	$message = shift;
 
 	printf "$message\n";
 }
 
-###  effectCall runs actual voms-admin commands. It accepts three arguments:
+### effectCall runs actual voms-admin commands. It accepts three arguments:
 #	$command	The shell command to run
 #	$debugMsg	Message to log on execution
 sub effectCall {
-	$command = $_[0];
-	$debugMsg = $_[1];
+	$command = shift;
+	$debugMsg = shift;
 
+	print "$command\n";
 	logMsg "$debugMsg";
+}
+
+### knownCA indicates whether a given CA is known to the VOMS server. It accepts the user structure
+#	%user		The user whose CA should be checked (DN, CA, email)
+#	%list		Reference to the list of known CAs
+sub knownCA {
+	%user = shift;
+	$list = shift;
+
+        if( $user->{'CA'} ~~ @{$list}) {
+		return true;
+	} else {
+		logMsg "Unknown CA \"$user->{'CA'}\" requested with user \"$user->{'DN'}\"";
+		return false;
+	}
 }
 
 # Main parsing loop for the input XML file
@@ -92,6 +108,7 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	my @groups_toBe = ( "/$name" );	# Desired list of groups
 	my @roles_toBe;			# Desired list of roles
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
+		next unless knownCA($user->{'CA'}, \@cas);
 		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'email' => "$user->{'email'}" );
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
 		foreach $group ($user->{'groups'}->{'group'}) {
