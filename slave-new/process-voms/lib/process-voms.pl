@@ -25,16 +25,22 @@ sub listToHashes {
 }
 
 
+### logMsg accepts a string, prints it on STDERR and logs it with syslog
+#	$message	Message to log
+sub logMsg {
+	$message = $_[0];
+
+	printf "$message\n";
+}
+
 ###  effectCall runs actual voms-admin commands. It accepts three arguments:
 #	$command	The shell command to run
 #	$debugMsg	Message to log on execution
-#	$failMsg	Message to log in case of failure
 sub effectCall {
 	$command = $_[0];
 	$debugMsg = $_[1];
-	$failMsg = $_[2];
 
-	print "$command\n";
+	logMsg "$debugMsg";
 }
 
 # Main parsing loop for the input XML file
@@ -43,15 +49,27 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 
 	#Collect lists from voms-admin
 	my @groups_current=`voms-admin --vo ${name} list-groups`;
+	if ( $? != 0 ) {
+		logMsg "Failed listing groups in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		next;
+	}
 	chomp(@groups_current);
 	s/^\s*// for @groups_current;
 
 	my @roles_current=`voms-admin --vo ${name} list-roles`;
+	if ( $? != 0 ) {
+		logMsg "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		next;
+	}
 	chomp(@roles_current);
 	s/^\s*Role=// for @roles_current;
 
-	my @users_current=`voms-admin --vo ${name} list-users`;
-	chomp(@users_current);
+	my @cas=`voms-admin --vo ${name} list-cas`;
+	if ( $? != 0 ) {
+		logMsg "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		next;
+	}
+	chomp(@cas);
 
 	#Collect current Group Membership and Role assignment
 	my %groupRoles_current;		# Current assignment of users to (per group) roles
@@ -117,27 +135,33 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	# Effect changes
 	# 1. create / delete groups
 	foreach $group (@groupsToDelete) {
-		effectCall "voms-admin --vo $name delete-group \"$group\""
+		effectCall "voms-admin --vo $name delete-group \"$group\"",
+		"deleting Group \"$group\" from VO \"$name\"";
 	}
 	foreach $group (@groupsToCreate) {
-		effectCall "voms-admin --vo $name create-group \"$group\""
+		effectCall "voms-admin --vo $name create-group \"$group\"",
+		"creating Group \"$group\" in VO \"$name\"";
 	}
 
 	# 2. create / delete roles
 	foreach $role (@rolesToDelete) {
-		effectCall "voms-admin --vo $name delete-role \"$role\""
+		effectCall "voms-admin --vo $name delete-role \"$role\"",
+		"deleting Role \"$role\" from VO \"$name\".";
 	}
 	foreach $role (@rolesToCreate) {
-		effectCall "voms-admin --vo $name create-role \"$role\""
+		effectCall "voms-admin --vo $name create-role \"$role\"",
+		"creating Role \"$role\" in VO \"$name\".";
 	}
 
 	# 3. add members to/remove members from groups
 	foreach $group (@groups_toBe) {
 		foreach $user (@{$membersToAdd{"$group"}}) {
-			effectCall "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"";
+			effectCall "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+			"adding user \"$user->{'DN'}\" to Group \"$group\" in VO \"$name\".";
 		}
 		foreach $user (@{$membersToRemove{"$group"}}) {
-			effectCall "voms-admin --nousercert --vo $name remove-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"";
+			effectCall "voms-admin --nousercert --vo $name remove-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+			"removing user \"$user->{'DN'}\" from Group \"$group\" in VO \"$name\".";
 		}
 	}
 
@@ -145,10 +169,12 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	foreach $group (@groups_toBe) {
 		foreach $role (@roles_toBe) {
 			foreach $user (@{$rolesToAssign{"$group"}{"$role"}}) {
-				effectCall "voms-admin --nousercert --vo $name assign-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"";
+				effectCall "voms-admin --nousercert --vo $name assign-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				"assigning Role \"$role\" to user \"$user->{'DN'}\" for Group \"$group\" in VO \"$name\"";
 			}
 			foreach $user (@{$rolesToDismiss{"$group"}{"$role"}}) {
-				effectCall "voms-admin --nousercert --vo $name dismiss-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"";
+				effectCall "voms-admin --nousercert --vo $name dismiss-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				"stripping user \"$user->{'DN'}\" of Role \"$role\" for Group \"$group\" in VO \"$name\"";
 			}
 		}
 	}
