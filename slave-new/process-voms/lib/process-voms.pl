@@ -25,6 +25,18 @@ sub listToHashes {
 }
 
 
+###  effectCall runs actual voms-admin commands. It accepts three arguments:
+#	$command	The shell command to run
+#	$debugMsg	Message to log on execution
+#	$failMsg	Message to log in case of failure
+sub effectCall {
+	$command = $_[0];
+	$debugMsg = $_[1];
+	$failMsg = $_[2];
+
+	print "$command\n";
+}
+
 # Main parsing loop for the input XML file
 foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	$vo=$vos->{'vo'}->{$name};
@@ -130,27 +142,27 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	# Effect changes
 	# 1. create / delete groups
 	foreach $group (@groupsToDelete) {
-		print "voms-admin --vo $name delete-group \"$group\"\n"
+		effectCall "voms-admin --vo $name delete-group \"$group\""
 	}
 	foreach $group (@groupsToCreate) {
-		print "voms-admin --vo $name create-group \"$group\"\n"
+		effectCall "voms-admin --vo $name create-group \"$group\""
 	}
 
 	# 2. create / delete roles
 	foreach $role (@rolesToDelete) {
-		print "voms-admin --vo $name delete-role \"$role\"\n"
+		effectCall "voms-admin --vo $name delete-role \"$role\""
 	}
 	foreach $role (@rolesToCreate) {
-		print "voms-admin --vo $name create-role \"$role\"\n"
+		effectCall "voms-admin --vo $name create-role \"$role\""
 	}
 
 	# 3. add members to/remove members from groups
 	foreach $group (@groups_toBe) {
 		foreach $user (@{$membersToAdd{"$group"}}) {
-			print "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"\n";
+			effectCall "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"";
 		}
 		foreach $user (@{$membersToRemove{"$group"}}) {
-			print "voms-admin --nousercert --vo $name remove-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"\n";
+			effectCall "voms-admin --nousercert --vo $name remove-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"";
 		}
 	}
 
@@ -158,10 +170,10 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	foreach $group (@groups_toBe) {
 		foreach $role (@roles_toBe) {
 			foreach $user (@{$rolesToAssign{"$group"}{"$role"}}) {
-				print "voms-admin --nousercert --vo $name assign-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"\n";
+				effectCall "voms-admin --nousercert --vo $name assign-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"";
 			}
 			foreach $user (@{$rolesToDismiss{"$group"}{"$role"}}) {
-				print "voms-admin --nousercert --vo $name dismiss-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"\n";
+				effectCall "voms-admin --nousercert --vo $name dismiss-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"";
 			}
 		}
 	}
