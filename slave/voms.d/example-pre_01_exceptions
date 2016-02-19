@@ -1,0 +1,16 @@
+#!/bin/sh
+# Setting VOs that should be skipped when updating various aspects of membership information
+# All lists should be give as space-delimited, e.g., "vo1.or vo2.org vo3"
+
+# Give a space-separated list of VOs that MUST NEVER be CREATED:
+#NO_CREATE_VOS=""
+
+# Give a space-separated list of VOs that MUST NEVER be DELETED:
+#NO_DELETE_VOS=""
+
+# Give a space-separated list of VOs where members MUST NOT be CREATED:
+#NO_CREATE_MEMBERS=""
+
+# Give a space-separated list of VOs where members MUST NOT be DELETED:
+#NO_DELETE_MEMBERS=""
+
