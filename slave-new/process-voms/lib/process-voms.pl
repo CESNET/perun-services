@@ -4,6 +4,7 @@
 use XML::Simple;
 use Text::CSV;
 use Data::Dumper;
+use Array::Utils qw(:all);
 $vos = XMLin( '-' );
 my $csv = Text::CSV->new({ sep_char => ',' });
 
@@ -27,7 +28,7 @@ sub listToHashes {
 # Main parsing loop for the input XML file
 foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	$vo=$vos->{'vo'}->{$name};
-	printf "---\nVO:\t${name}\n";
+#	printf "---\nVO:\t${name}\n";
 
 	#Collect lists from voms-admin
 	my @groups_current=`voms-admin --vo ${name} list-groups`;
@@ -54,16 +55,16 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	        }
 	}
 
-	foreach $group (@groups_current) {
-		foreach $user (@{$groupMembers_current{"$group"}}) {
-			printf "=G\t%s\t%s\n",$group,$user->{'DN'};
-		}
-		foreach $role (@roles_current) {
-			foreach $user (@{$groupRoles_current{"$group"}{"$role"}}) {
-				printf "= R\t%s\t%s\t%s\n",$group,$role,$user->{'DN'};
-			}
-		}
-	}
+#	foreach $group (@groups_current) {
+#		foreach $user (@{$groupMembers_current{"$group"}}) {
+#			printf "=G\t%s\t%s\n",$group,$user->{'DN'};
+#		}
+#		foreach $role (@roles_current) {
+#			foreach $user (@{$groupRoles_current{"$group"}{"$role"}}) {
+#				printf "= R\t%s\t%s\t%s\n",$group,$role,$user->{'DN'};
+#			}
+#		}
+#	}
 
 
 
@@ -91,17 +92,80 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 
 
 
+	# Make comparisons
+	my @groupsToDelete = array_minus( @groups_current, @groups_toBe );
+	my @groupsToCreate = array_minus( @groups_toBe, @groups_current );
 
+	my @rolesToDelete = array_minus( @roles_current, @roles_toBe );
+	my @rolesToCreate = array_minus( @roles_toBe, @roles_current );
 
+	my %membersToAdd;
+	my %membersToAdd;
+	my %rolesToAssign;
+	my %rolesToDismiss;
         foreach $group (@groups_toBe) {
-                foreach $user (@{$groupMembers_toBe{"$group"}}) {
-                        printf "+G\t%s\t%s\n",$group,$user->{'DN'};
-                }
-                foreach $role (@roles_toBe) {
-                        foreach $user (@{$groupRoles_toBe{"$group"}{"$role"}}) {
-                                printf "+ R\t%s\t%s\t%s\n",$group,$role,$user->{'DN'};
-                        }
-                }
+		@{$membersToRemove{"$group"}} = array_minus(@{$groupMembers_current{"$group"}}, @{$groupMembers_toBe{"$group"}});
+		@{$membersToAdd{"$group"}} = array_minus(@{$groupMembers_toBe{"$group"}}, @{$groupMembers_current{"$group"}});
+		foreach $role (@roles_toBe) {
+			@{$rolesToAssign{"$group"}{"$role"}} = array_minus(@{$groupRoles_toBe{"$group"}{"$role"}}, @{$groupRoles_current{"$group"}{"$role"}});
+			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus(@{$groupRoles_current{"$group"}{"$role"}}, @{$groupRoles_toBe{"$group"}{"$role"}});
+		}
         }
+
+
+
+
+#        foreach $group (@groups_toBe) {
+#                foreach $user (@{$groupMembers_toBe{"$group"}}) {
+#                        printf "+G\t%s\t%s\n",$group,$user->{'DN'};
+#                }
+#                foreach $role (@roles_toBe) {
+#                        foreach $user (@{$groupRoles_toBe{"$group"}{"$role"}}) {
+#                                printf "+ R\t%s\t%s\t%s\n",$group,$role,$user->{'DN'};
+#                        }
+#                }
+#        }
+
+
+	# Effect changes
+	# 1. create / delete groups
+	foreach $group (@groupsToDelete) {
+		print "voms-admin --vo $name delete-group \"$group\"\n"
+	}
+	foreach $group (@groupsToCreate) {
+		print "voms-admin --vo $name create-group \"$group\"\n"
+	}
+
+	# 2. create / delete roles
+	foreach $role (@rolesToDelete) {
+		print "voms-admin --vo $name delete-role \"$role\"\n"
+	}
+	foreach $role (@rolesToCreate) {
+		print "voms-admin --vo $name create-role \"$role\"\n"
+	}
+
+	# 3. add members to/remove members from groups
+	foreach $group (@groups_toBe) {
+		foreach $user (@{$membersToAdd{"$group"}}) {
+			print "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"\n";
+		}
+		foreach $user (@{$membersToRemove{"$group"}}) {
+			print "voms-admin --nousercert --vo $name remove-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"\n";
+		}
+	}
+
+	# 4. assign/dismiss roles
+	foreach $group (@groups_toBe) {
+		foreach $role (@roles_toBe) {
+			foreach $user (@{$rolesToAssign{"$group"}{"$role"}}) {
+				print "voms-admin --nousercert --vo $name assign-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"\n";
+			}
+			foreach $user (@{$rolesToDismiss{"$group"}{"$role"}}) {
+				print "voms-admin --nousercert --vo $name dismiss-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"\n";
+			}
+		}
+	}
+
+
 
 }
