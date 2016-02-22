@@ -3,7 +3,7 @@
     <name>vo.org</name>
     <users>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Michal Prochazka/unstructuredName=39700</DN>
         <email>michalp@ics.muni.cz</email>
         <groups>
@@ -19,7 +19,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masaryk University/CN=Zora Sebestianova/unstructuredName=71378</DN>
         <email>zora@ics.muni.cz</email>
         <groups>
@@ -77,7 +77,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=CESNET/CN=Michal Prochazka/unstructuredName=8497</DN>
         <email>michalp@ics.muni.cz</email>
         <groups>
@@ -124,7 +124,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Michal Proch\xC3\xA1zka/unstructuredName=39700</DN>
         <email>michalp@ics.muni.cz</email>
         <groups>
@@ -140,7 +140,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Zora Sebestianova/unstructuredName=71378</DN>
         <email>zora@ics.muni.cz</email>
         <groups>
@@ -164,7 +164,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Michal \xC5\xA0\xC5\xA5ava/unstructuredName=255739</DN>
         <email>stava.michal@gmail.com</email>
         <groups>
@@ -257,7 +257,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Slavek Licehammer/unstructuredName=255920</DN>
         <email>slavek@ics.muni.cz</email>
         <groups>
@@ -333,7 +333,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masaryk University/CN=Slavek Licehammer/unstructuredName=255920</DN>
         <email>slavek@ics.muni.cz</email>
         <groups>
@@ -417,7 +417,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Pavel Zl\xC3\xA1mal/unstructuredName=256627</DN>
         <email>zlamal@cesnet.cz</email>
         <groups>
@@ -456,7 +456,7 @@
     <name>provozmeta</name>
     <users>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Michal Prochazka/unstructuredName=39700</DN>
         <email>michalp@ics.muni.cz</email>
         <groups>
@@ -472,7 +472,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masaryk University/CN=Zora Sebestianova/unstructuredName=71378</DN>
         <email>zora@ics.muni.cz</email>
         <groups>
@@ -530,7 +530,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=CESNET/CN=Michal Prochazka/unstructuredName=8497</DN>
         <email>michalp@ics.muni.cz</email>
         <groups>
@@ -577,7 +577,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Michal Proch\xC3\xA1zka/unstructuredName=39700</DN>
         <email>michalp@ics.muni.cz</email>
         <groups>
@@ -593,7 +593,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Zora Sebestianova/unstructuredName=71378</DN>
         <email>zora@ics.muni.cz</email>
         <groups>
@@ -617,7 +617,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Michal \xC5\xA0\xC5\xA5ava/unstructuredName=255739</DN>
         <email>stava.michal@gmail.com</email>
         <groups>
@@ -710,7 +710,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Slavek Licehammer/unstructuredName=255920</DN>
         <email>slavek@ics.muni.cz</email>
         <groups>
@@ -786,7 +786,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masaryk University/CN=Slavek Licehammer/unstructuredName=255920</DN>
         <email>slavek@ics.muni.cz</email>
         <groups>
@@ -870,7 +870,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Pavel Zl\xC3\xA1mal/unstructuredName=256627</DN>
         <email>zlamal@cesnet.cz</email>
         <groups>
@@ -909,7 +909,7 @@
     <name>cesnet</name>
     <users>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Michal \xC5\xA0\xC5\xA5ava/unstructuredName=255739</DN>
         <email>stava.michal@gmail.com</email>
         <groups>
@@ -992,7 +992,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Slavek Licehammer/unstructuredName=255920</DN>
         <email>slavek@ics.muni.cz</email>
         <groups>
@@ -1009,7 +1009,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masaryk University/CN=Slavek Licehammer/unstructuredName=255920</DN>
         <email>slavek@ics.muni.cz</email>
         <groups>
@@ -1060,7 +1060,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Pavel Zl\xC3\xA1mal/unstructuredName=256627</DN>
         <email>zlamal@cesnet.cz</email>
         <groups>
@@ -1094,7 +1094,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Michal Prochazka/unstructuredName=39700</DN>
         <email>michalp@ics.muni.cz</email>
         <groups>
@@ -1164,7 +1164,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=CESNET/CN=Michal Prochazka/unstructuredName=8497</DN>
         <email>michalp@ics.muni.cz</email>
         <groups>
@@ -1178,7 +1178,7 @@
         </roles>
       </user>
       <user>
-        <CA>/C=NL/O=TERENA/CN=TERENA Personal CA</CA>
+        <CA>/DC=IN/DC=GARUDAINDIA/CN=Indian Grid Certification Authority|</CA>
         <DN>/C=CZ/O=Masarykova univerzita/CN=Michal Proch\xC3\xA1zka/unstructuredName=39700</DN>
         <email>michalp@ics.muni.cz</email>
         <groups>
