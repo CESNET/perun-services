@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 # initialize parser and read the file
+use Sys::Syslog;
 use XML::Simple;
 use Text::CSV;
 use Data::Dumper;
@@ -25,14 +26,6 @@ sub listToHashes {
 }
 
 
-### logMsg accepts a string, prints it on STDERR and logs it with syslog
-#	$message	Message to log
-sub logMsg {
-	$message = shift;
-
-	printf "$message\n";
-}
-
 ### effectCall runs actual voms-admin commands. It accepts three arguments:
 #	$command	The shell command to run
 #	$debugMsg	Message to log on execution
@@ -40,8 +33,15 @@ sub effectCall {
 	$command = shift;
 	$debugMsg = shift;
 
-	print "$command\n";
-	logMsg "$debugMsg";
+	printf "\$\$\$ $command\n";
+	@out=`$command`
+	if ( $? != 0 ) {
+		syslog(LOG_INFO, "Done $message");
+	}
+	else {
+		syslog(LOG_ERR, "Failed $message Original message: @out");
+		print STDERR "Failed $message Original message: @out";
+	}
 }
 
 ### knownCA indicates whether a given CA is known to the VOMS server. It accepts the user structure
@@ -54,10 +54,17 @@ sub knownCA {
         if( $user->{'CA'} ~~ @{$list}) {
 		return true;
 	} else {
-		logMsg "Unknown CA \"$user->{'CA'}\" requested with user \"$user->{'DN'}\"";
+		syslog LOG_ERR, "Unknown CA \"$user->{'CA'}\" requested with user \"$user->{'DN'}\"";
 		return false;
 	}
 }
+
+
+# This is the actual start.
+
+openlog($program, 'cons,pid', 'user');
+my $retval;
+
 
 # Main parsing loop for the input XML file
 foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
@@ -66,7 +73,7 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	#Collect lists from voms-admin
 	my @groups_current=`voms-admin --vo ${name} list-groups`;
 	if ( $? != 0 ) {
-		logMsg "Failed listing groups in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		syslog LOG_ERR, "Failed listing groups in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
 		next;
 	}
 	chomp(@groups_current);
@@ -74,7 +81,7 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 
 	my @roles_current=`voms-admin --vo ${name} list-roles`;
 	if ( $? != 0 ) {
-		logMsg "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		syslog LOG_ERR, "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
 		next;
 	}
 	chomp(@roles_current);
@@ -82,7 +89,7 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 
 	my @cas=`voms-admin --vo ${name} list-cas`;
 	if ( $? != 0 ) {
-		logMsg "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		syslog LOG_ERR, "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
 		next;
 	}
 	chomp(@cas);
@@ -173,8 +180,15 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	# 3. add members to/remove members from groups
 	foreach $group (@groups_toBe) {
 		foreach $user (@{$membersToAdd{"$group"}}) {
-			effectCall "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
-			"adding user \"$user->{'DN'}\" to Group \"$group\" in VO \"$name\".";
+			if( "$group" == "/$name" ) { # Root group?
+				effectCall "voms-admin --nousercert --vo $name add-member 'My DN' 'My CA' 'My CN' 'My Email'
+ \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				"adding user \"$user->{'DN'}\" to Group \"$group\" in VO \"$name\".";
+			}
+			else {
+				effectCall "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				"adding user \"$user->{'DN'}\" to Group \"$group\" in VO \"$name\".";
+			}
 		}
 		foreach $user (@{$membersToRemove{"$group"}}) {
 			effectCall "voms-admin --nousercert --vo $name remove-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
@@ -195,7 +209,9 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 			}
 		}
 	}
-
-
-
 }
+
+closelog();
+
+return $retval;
+
