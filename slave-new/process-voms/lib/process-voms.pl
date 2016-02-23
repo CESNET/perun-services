@@ -204,16 +204,6 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 
 	# 3. add members to/remove members from groups
 	foreach $group (@groups_toBe) {
-		foreach $user (@{$membersToAdd{"$group"}}) {
-			if( "$group" eq "/$name" ) { # Root group?
-				effectCall "voms-admin --nousercert --vo $name create-user \"$user->{'DN'}\" \"$user->{'CA'}\" \"$user->{'CN'}\" \"$user->{'email'}\"",
-				"creating user \"$user->{'DN'}\" in VO \"$name\".";
-			}
-			else {
-				effectCall "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
-				"adding user \"$user->{'DN'}\" to Group \"$group\" in VO \"$name\".";
-			}
-		}
 		foreach $user (@{$membersToRemove{"$group"}}) {
 			if( "$group" eq "/$name" ) { # Root group?
 				effectCall "voms-admin --nousercert --vo $name delete-user \"$user->{'DN'}\" \"$user->{'CA'}\"",
@@ -224,18 +214,28 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 				"removing user \"$user->{'DN'}\" from Group \"$group\" in VO \"$name\".";
 			}
 		}
+		foreach $user (@{$membersToAdd{"$group"}}) {
+			if( "$group" eq "/$name" ) { # Root group?
+				effectCall "voms-admin --nousercert --vo $name create-user \"$user->{'DN'}\" \"$user->{'CA'}\" \"$user->{'CN'}\" \"$user->{'email'}\"",
+				"creating user \"$user->{'DN'}\" in VO \"$name\".";
+			}
+			else {
+				effectCall "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				"adding user \"$user->{'DN'}\" to Group \"$group\" in VO \"$name\".";
+			}
+		}
 	}
 
 	# 4. assign/dismiss roles
 	foreach $group (@groups_toBe) {
 		foreach $role (@roles_toBe) {
-			foreach $user (@{$rolesToAssign{"$group"}{"$role"}}) {
-				effectCall "voms-admin --nousercert --vo $name assign-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
-				"assigning Role \"$role\" to user \"$user->{'DN'}\" for Group \"$group\" in VO \"$name\"";
-			}
 			foreach $user (@{$rolesToDismiss{"$group"}{"$role"}}) {
 				effectCall "voms-admin --nousercert --vo $name dismiss-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
 				"stripping user \"$user->{'DN'}\" of Role \"$role\" for Group \"$group\" in VO \"$name\"";
+			}
+			foreach $user (@{$rolesToAssign{"$group"}{"$role"}}) {
+				effectCall "voms-admin --nousercert --vo $name assign-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				"assigning Role \"$role\" to user \"$user->{'DN'}\" for Group \"$group\" in VO \"$name\"";
 			}
 		}
 	}
