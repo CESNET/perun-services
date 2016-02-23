@@ -6,12 +6,34 @@ use XML::Simple;
 use Text::CSV;
 use Data::Dumper;
 use Array::Utils qw(:all);
+use JSON::XS;
 $vos = XMLin( '-' );
 my $csv = Text::CSV->new({ sep_char => ',' });
+
+sub serialize {
+    JSON::XS->new->relaxed(0)->ascii(1)->canonical(1)->encode($_[0]);
+}
+
+sub array_minus_deep(\@\@) {
+    my ($array,$minus) = @_;
+
+    my %minus = map( ( serialize($_) => 1 ), @$minus );
+    grep !$minus{ serialize($_) }, @$array
+}
+
+### getCN extracts a CN from DN. It accepts one aregument:
+#	DN	DN to process
+sub getCN {
+	my $cn = shift;
+	$cn =~ s/.*\/CN=//;
+	$cn =~ s/\/.*//;
+	return $cn;
+}
 
 ### listToHashes accepts a three-column CSV and produces an array of hashes with the following structure:
 #	DN	VO Member DN
 #	CA	Certificate Authority that vouches for the member
+#	CN	VO Member CD, extracted from DN
 #	email	The email address of the user
 sub listToHashes {
 	my @hashes;
@@ -19,8 +41,10 @@ sub listToHashes {
 		chomp($line);
 		$csv->parse($line);
 		my @components = $csv->fields();
-		my %mbr= ( 'DN' => "${components[0]}",'CA' => "${components[1]}", 'email' => "${components[2]}" );
-		push( @hashes, \%mbr );
+		if ( scalar @components > 1 ) { #Crude way to filter out "No members..." messages
+			my %mbr= ( 'DN' => "${components[0]}",'CA' => "${components[1]}", 'CN' => getCN($components[0]), 'email' => "${components[2]}" );
+			push( @hashes, \%mbr );
+		}
 	}
 	return \@hashes;
 }
@@ -33,14 +57,16 @@ sub effectCall {
 	$command = shift;
 	$debugMsg = shift;
 
-	printf "\$\$\$ $command\n";
-	@out=`$command`
-	if ( $? != 0 ) {
-		syslog(LOG_INFO, "Done $message");
+#	printf "$command\n\n";
+	@out=`$command 2>&1`;
+
+	if ( $? == 0 ) {
+		syslog(LOG_INFO, "Done $debugMsg");
 	}
 	else {
-		syslog(LOG_ERR, "Failed $message Original message: @out");
-		print STDERR "Failed $message Original message: @out";
+		chomp(@out);
+		syslog(LOG_ERR, "Failed $debugMsg Original message: @out");
+		print STDERR "Failed $debugMsg\nOriginal message: @out\nOriginal command: $command\n";
 	}
 }
 
@@ -70,6 +96,8 @@ my $retval;
 foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	$vo=$vos->{'vo'}->{$name};
 
+
+#	print(Dumper($vo));
 	#Collect lists from voms-admin
 	my @groups_current=`voms-admin --vo ${name} list-groups`;
 	if ( $? != 0 ) {
@@ -108,7 +136,6 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	}
 
 
-
 	# Produce comparable data structure from input data
 	my %groupRoles_toBe;		# Desired assignment of users to (per group) roles
 	my %groupMembers_toBe;		# Desired membership in groups (pure, disregarding roles)
@@ -116,7 +143,7 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	my @roles_toBe;			# Desired list of roles
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
 		next unless knownCA($user->{'CA'}, \@cas);
-		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'email' => "$user->{'email'}" );
+		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
 		foreach $group ($user->{'groups'}->{'group'}) {
 			if (defined $group->{'name'}) {
@@ -145,15 +172,13 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	my %rolesToAssign;
 	my %rolesToDismiss;
         foreach $group (@groups_toBe) {
-		@{$membersToRemove{"$group"}} = array_minus(@{$groupMembers_current{"$group"}}, @{$groupMembers_toBe{"$group"}});
-		@{$membersToAdd{"$group"}} = array_minus(@{$groupMembers_toBe{"$group"}}, @{$groupMembers_current{"$group"}});
+		@{$membersToRemove{"$group"}} = array_minus_deep(@{$groupMembers_current{"$group"}}, @{$groupMembers_toBe{"$group"}});
+		@{$membersToAdd{"$group"}} = array_minus_deep(@{$groupMembers_toBe{"$group"}}, @{$groupMembers_current{"$group"}});
 		foreach $role (@roles_toBe) {
-			@{$rolesToAssign{"$group"}{"$role"}} = array_minus(@{$groupRoles_toBe{"$group"}{"$role"}}, @{$groupRoles_current{"$group"}{"$role"}});
-			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus(@{$groupRoles_current{"$group"}{"$role"}}, @{$groupRoles_toBe{"$group"}{"$role"}});
+			@{$rolesToAssign{"$group"}{"$role"}} = array_minus_deep(@{$groupRoles_toBe{"$group"}{"$role"}}, @{$groupRoles_current{"$group"}{"$role"}});
+			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$groupRoles_current{"$group"}{"$role"}}, @{$groupRoles_toBe{"$group"}{"$role"}});
 		}
         }
-
-
 
 
 	# Effect changes
@@ -180,10 +205,9 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 	# 3. add members to/remove members from groups
 	foreach $group (@groups_toBe) {
 		foreach $user (@{$membersToAdd{"$group"}}) {
-			if( "$group" == "/$name" ) { # Root group?
-				effectCall "voms-admin --nousercert --vo $name add-member 'My DN' 'My CA' 'My CN' 'My Email'
- \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
-				"adding user \"$user->{'DN'}\" to Group \"$group\" in VO \"$name\".";
+			if( "$group" eq "/$name" ) { # Root group?
+				effectCall "voms-admin --nousercert --vo $name create-user \"$user->{'DN'}\" \"$user->{'CA'}\" \"$user->{'CN'}\" \"$user->{'email'}\"",
+				"creating user \"$user->{'DN'}\" in VO \"$name\".";
 			}
 			else {
 				effectCall "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
@@ -191,8 +215,14 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 			}
 		}
 		foreach $user (@{$membersToRemove{"$group"}}) {
-			effectCall "voms-admin --nousercert --vo $name remove-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
-			"removing user \"$user->{'DN'}\" from Group \"$group\" in VO \"$name\".";
+			if( "$group" eq "/$name" ) { # Root group?
+				effectCall "voms-admin --nousercert --vo $name delete-user \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				"deleting user \"$user->{'DN'}\" from VO \"$name\".";
+			}
+			else {
+				effectCall "voms-admin --nousercert --vo $name remove-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				"removing user \"$user->{'DN'}\" from Group \"$group\" in VO \"$name\".";
+			}
 		}
 	}
 
@@ -213,5 +243,5 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 
 closelog();
 
-return $retval;
+$retval;
 
