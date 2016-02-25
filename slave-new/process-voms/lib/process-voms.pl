@@ -7,7 +7,10 @@ use Text::CSV;
 use Data::Dumper;
 use Array::Utils qw(:all);
 use JSON::XS;
-$vos = XMLin( '-' );
+my $vos = XMLin( '-',
+	ForceArray => [ 'role', 'group', 'user', 'vo' ],
+#	GroupTags => { role => 'roles', groups => 'group', users => 'user', vos => 'vo' },
+	KeyAttr => [] );
 my $csv = Text::CSV->new({ sep_char => ',' });
 
 ### serialize is used to turn an array of hash references into a manageable structure
@@ -95,11 +98,10 @@ my $retval;
 
 
 # Main parsing loop for the input XML file
-foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
-	$vo=$vos->{'vo'}->{$name};
+foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
+	$name = $vo->{'name'};
 
 
-#	print(Dumper($vo));
 	#Collect lists from voms-admin
 	my @groups_current=`voms-admin --vo ${name} list-groups`;
 	if ( $? != 0 ) {
@@ -147,14 +149,12 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 		next unless knownCA($user->{'CA'}, \@cas);
 		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
-		foreach $group ($user->{'groups'}->{'group'}) {
-			if (defined $group->{'name'}) {
-				push(@groups_toBe, "/$name/$group->{'name'}") unless grep{$_ eq "/$name/$group->{'name'}"} @groups_toBe;
-				push(@{$groupMembers_toBe{"/$name/$group->{'name'}"}}, \%theUser);
-				foreach $role (@{$group->{'roles'}->{'role'}}) {
-					push(@roles_toBe, "$role") unless grep{$_ eq "$role"} @roles_toBe;
-					push(@{$groupRoles_toBe{"/$name/$group->{'name'}"}{"$role"}}, \%theUser);
-				}
+		foreach $group (@{$user->{'groups'}->{'group'}}){
+			push(@groups_toBe, "/$name/$group->{'name'}") unless grep{$_ eq "/$name/$group->{'name'}"} @groups_toBe;
+			push(@{$groupMembers_toBe{"/$name/$group->{'name'}"}}, \%theUser);
+			foreach $role (@{$group->{'roles'}->{'role'}}) {
+				push(@roles_toBe, "$role") unless grep{$_ eq "$role"} @roles_toBe;
+				push(@{$groupRoles_toBe{"/$name/$group->{'name'}"}{"$role"}}, \%theUser);
 			}
 		}
 		foreach $role (@{$user->{'roles'}->{'role'}}) { # Global roles
@@ -162,7 +162,6 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 			push(@{$groupRoles_toBe{"/$name"}{"$role"}}, \%theUser);
 		}
 	}
-
 
 
 
