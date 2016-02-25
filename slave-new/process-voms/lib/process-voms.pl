@@ -10,10 +10,12 @@ use JSON::XS;
 $vos = XMLin( '-' );
 my $csv = Text::CSV->new({ sep_char => ',' });
 
+### serialize is used to turn an array of hash references into a manageable structure
 sub serialize {
     JSON::XS->new->relaxed(0)->ascii(1)->canonical(1)->encode($_[0]);
 }
 
+### array_minus_deep is a replacement for array_minu that expands hash references
 sub array_minus_deep(\@\@) {
     my ($array,$minus) = @_;
 
@@ -155,6 +157,10 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 				}
 			}
 		}
+		foreach $role (@{$user->{'roles'}->{'role'}}) { # Global roles
+			push(@roles_toBe, "$role") unless grep{$_ eq "$role"} @roles_toBe;
+			push(@{$groupRoles_toBe{"/$name"}{"$role"}}, \%theUser);
+		}
 	}
 
 
@@ -178,7 +184,8 @@ foreach my $name (keys %{$vos->{'vo'}}) { # Iterating through individual VOs in 
 		foreach $role (@roles_toBe) {
 			@{$rolesToAssign{"$group"}{"$role"}} = array_minus_deep(@{$groupRoles_toBe{"$group"}{"$role"}}, @{$groupRoles_current{"$group"}{"$role"}});
 			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$groupRoles_current{"$group"}{"$role"}}, @{$groupRoles_toBe{"$group"}{"$role"}});
-			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$rolesToDismiss{"$group"}{"$role"}}, @{$rolesToDismiss{"/$name"}{"$role"}}) unless( "$group" eq "/$name" ); # No need to revoke roles if the user is going to be fully removed
+			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$rolesToDismiss{"$group"}{"$role"}}, @{$membersToRemove{"/$name"}}); # No need to revoke roles if the user is going to be fully removed
+			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$rolesToDismiss{"$group"}{"$role"}}, @{$membersToRemove{"$group"}}); # No need to revoke roles if the user is going to be removed from the group
 		}
         }
 
