@@ -79,14 +79,15 @@ sub effectCall {
 #	%user		The user whose CA should be checked (DN, CA, email)
 #	%list		Reference to the list of known CAs
 sub knownCA {
-	%user = shift;
+	$ca = shift;
 	$list = shift;
 
-        if( $user->{'CA'} ~~ @{$list}) {
-		return true;
+        if( "$ca" ~~ @{$list}) {
+		return 1;
 	} else {
 		syslog LOG_ERR, "Unknown CA \"$user->{'CA'}\" requested with user \"$user->{'DN'}\"";
-		return false;
+		print STDERR "Unknown CA \"$user->{'CA'}\" requested with user \"$user->{'DN'}\"\n";
+		return 0;
 	}
 }
 
