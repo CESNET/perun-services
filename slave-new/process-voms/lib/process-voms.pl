@@ -148,7 +148,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @roles_toBe;			# Desired list of roles
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
 		next unless knownCA($user->{'CA'}, \@cas);
-		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'CN' => (exists $user->{'CN'}) ? $user->{'CN'} : getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
+		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
 		foreach $group (@{$user->{'groups'}->{'group'}}){
 			push(@groups_toBe, "/$name/$group->{'name'}") unless grep{$_ eq "/$name/$group->{'name'}"} @groups_toBe;
