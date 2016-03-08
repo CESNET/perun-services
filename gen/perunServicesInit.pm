@@ -17,6 +17,17 @@ use Data::Dumper;
 use IO::Compress::Gzip qw(gzip $GzipError) ;
 use Storable;
 
+# variables define possible getData methods what can be execute
+our $DATA_TYPE_HIERARCHICAL="hierarchical";
+our $DATA_TYPE_FLAT="flat";
+our $DATA_TYPE_WITH_GROUPS="withgroups";
+our $DATA_TYPE_WITH_VOS="withvos";
+our $DATA_TYPE = {
+	$DATA_TYPE_HIERARCHICAL => sub {getHierarchicalData(@_)},
+	$DATA_TYPE_FLAT => sub {getFlatData(@_)},
+	$DATA_TYPE_WITH_GROUPS => sub {getDataWithGroups(@_)},
+	$DATA_TYPE_WITH_VOS => sub {getDataWithVos(@_)},
+};
 
 #die at the very end of skript when any warning occured during executing
 our $DIE_AT_END=0;
@@ -36,9 +47,20 @@ sub init {
 
 	unless(defined $::SERVICE_NAME) { die; }
 	unless(defined $::PROTOCOL_VERSION) {die;}
-	
-	my ($facilityId, $facilityName, $local_data_file);
-	GetOptions ("facilityId|f=i" => \$facilityId, "facilityName|F=s" => \$facilityName, "data|d=s" => \$local_data_file ) or die; 
+
+	my ($facilityId, $facilityName, $local_data_file, $serviceName, $getDataType);
+	GetOptions ("facilityId|f=i" => \$facilityId, "facilityName|F=s" => \$facilityName, "data|d=s" => \$local_data_file, "serviceName|s=s" => \$serviceName, "getDataType|t=s" => \$getDataType) or die; 
+	# serviceName is way how to specify service from argument, use it instead local SERVICE_NAME if set
+	if(defined $serviceName) { $::SERVICE_NAME = $serviceName; }
+
+	# some services support variable getData method type, default is hierarchical
+	# if service does not support this variable behavior, then it does not care about this setting
+	if(!defined($getDataType)) { $getDataType = "hierarchical"; }
+	if(defined($DATA_TYPE->{$getDataType})) {
+		$::GET_DATA_METHOD = $DATA_TYPE->{$getDataType};
+	} else {
+		die "Not supported getData type $getDataType! Use one of these: '$DATA_TYPE_HIERARCHICAL', '$DATA_TYPE_FLAT', '$DATA_TYPE_WITH_GROUPS' or '$DATA_TYPE_WITH_VOS'.";
+	}
 
 	if(defined $local_data_file) {
 		die "ERROR facilityName required" unless defined $facilityName;
