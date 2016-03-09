@@ -304,7 +304,7 @@ sub process_groups() {
 
 			# members of group are not equals
 			# we must get reference to real group from AD in order to call "replace"
-			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter_groups, scope => 'base' ] );
+			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter_groups, scope => 'base' );
 			unless ($response_ad->is_error()) {
 				# SUCCESS
 				my $ad_entry = $response_ad->entry(0);
