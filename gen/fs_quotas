@@ -55,8 +55,10 @@ foreach my $rData (@resourcesData) {
 			$hardQuota =~ s/^.*://g;
 
 			print SERVICE_FILE $UID . "\t";
-			print SERVICE_FILE $softQuota . "\t";
-			print SERVICE_FILE $hardQuota . "\t";
+			print SERVICE_FILE quotaToKb $softQuota;
+			print SERVICE_FILE "\t";
+			print SERVICE_FILE quotaToKb $hardQuota;
+			print SERVICE_FILE "\t";
 
 			if($memberAttributes{$A_UF_FILE_QUOTAS}{$path}) {
 				$quota = $memberAttributes{$A_UF_FILE_QUOTAS}{$path};
