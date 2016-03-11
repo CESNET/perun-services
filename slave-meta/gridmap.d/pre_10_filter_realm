@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# Get only @META realm
+
+PASSWD_FROM_PERUN="${WORK_DIR}/gridmap"
+
+TMP_FILE=`mktemp`
+
+grep "@META$" $PASSWD_FROM_PERUN > $TMP_FILE
+
+# Overwrite ogirinal file with sorted one
+cat $TMP_FILE > $PASSWD_FROM_PERUN
+
+rm -f $TMP_FILE
