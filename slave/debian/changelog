@@ -1,3 +1,9 @@
+perun-slave (3.0.0-0.0.99) stable; urgency=low
+
+  * Fixed some deb lintian warning for this package.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Fri, 11 Mar 2016 10:00:00 +0100
+
 perun-slave (3.0.0-0.0.98) stable; urgency=low
 
   * New custom configuration from '/etc/perunv3.d/' directory, take all files
@@ -581,7 +587,7 @@ perun-slave (3.0.0-0.0.18) stable; urgency=low
    * Received files are extracted with --no-same-permissions option. Umask is
      applied on extracted files
 
- -- Slavek Licehammer <glory@ics.muni.cz>  Mon, 4 Jud 2012 18:00:00 +0100
+ -- Slavek Licehammer <glory@ics.muni.cz>  Mon, 4 Jun 2012 18:00:00 +0100
 
 perun-slave (3.0.0-0.0.17) stable; urgency=low
    

@@ -1,6 +1,6 @@
 VERSION = x.x
 
-default: deb rpm
+all: deb rpm
 
 deb:
 	dpkg-buildpackage -us -uc
@@ -10,7 +10,6 @@ rpm:
 
 clean:
 	rm -rf debian/tmp
-	rm -rf debian/perun-slave*
+	rm -rf debian/perun-slave-meta*
 	rm -f debian/files
-	rm -f ../perun-slave_*
-	rm -f ../perun-slave-*.rpm
+	rm -f ../perun-slave-meta*

@@ -9,5 +9,7 @@ Package: perun-slave
 Section: utils
 Priority: optional
 Architecture: all
-Depends: bash (>= 2.05a-11), sed (>= 3.02-8), grep (>= 2.4.2-3), coreutils (>= 5.0-5), perl-base
+Depends: bash (>= 2.05a-11), sed (>= 3.02-8), grep (>= 2.4.2-3), coreutils (>= 5.0-5), perl-base (>= 5.10.1-17)
 Description: Perun slave scripts
+ Slave scripts for user provisioning and service management which are called
+ remotely by Perun.
