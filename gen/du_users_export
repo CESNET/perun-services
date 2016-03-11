@@ -49,6 +49,12 @@ our $A_RESOURCE_ID;              *A_RESOURCE_ID =              \'urn:perun:resou
 our $A_RESOURCE_VO_ID;           *A_RESOURCE_VO_ID =           \'urn:perun:resource:attribute-def:core:voId';
 our $A_M_STATUS;                 *A_M_STATUS =                 \'urn:perun:member:attribute-def:core:status';
 our $A_USER_ID;                  *A_USER_ID =                  \'urn:perun:user:attribute-def:core:id';
+our $A_USER_FIRSTNAME;           *A_USER_FIRSTNAME =           \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LASTNAME;            *A_USER_LASTNAME =            \'urn:perun:user:attribute-def:core:lastName';
+
+our $A_VO_TOEMAIL;               *A_VO_TOEMAIL =               \'urn:perun:vo:attribute-def:def:toEmail';
+our $A_VO_FROMEMAIL;             *A_VO_FROMEMAIL =             \'urn:perun:vo:attribute-def:def:fromEmail';
+our $A_VO_NAME;                  *A_VO_NAME =                  \'urn:perun:vo:attribute-def:core:name';
 
 my %attributesByLogin;
 my %attributesByVo;
@@ -90,6 +96,8 @@ foreach my $rData (@resourcesData) {
 									"Kerberos"       => \@kerberosLogins,
 									"Shibboleth"     => \@shibbolethLogins,
 									"PerunUserID"    => $memberAttributes{$A_USER_ID},
+									"FirstName"      => $memberAttributes{$A_USER_FIRSTNAME},
+									"LastName"       => $memberAttributes{$A_USER_LASTNAME},
 									"ResearchGroup"  => defined $memberAttributes{$A_U_RESEARCH_GROUP} ? $memberAttributes{$A_U_RESEARCH_GROUP} : "",
 									"Organization"   => defined $memberAttributes{$A_U_ORGANIZATION} ? $memberAttributes{$A_U_ORGANIZATION} : "",
 								};
@@ -140,6 +148,9 @@ foreach my $rData (@resourcesData) {
 	}
 
 	$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"PerunVOID"} = $resourcesAttributes{$A_RESOURCE_VO_ID};
+	$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"PerunVOLongName"} = $resourcesAttributes{$A_VO_NAME};
+	$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"FromEmail"} = $resourcesAttributes{$A_VO_FROMEMAIL};
+	$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"ToEmail"} = $resourcesAttributes{$A_VO_TOEMAIL};
 
 	push @{$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"Resources"}}, 
 					{
@@ -183,6 +194,9 @@ for my $vo (keys %attributesByVo) {
 	my $voStruc = {};
 	$voStruc->{"FileType"} = "du_vo_export";
 	$voStruc->{"Name"} = $vo;
+	$voStruc->{"LongName"} = $attributesByVo{$vo}->{"PerunVOLongName"};
+	$voStruc->{"FromEmail"} = $attributesByVo{$vo}->{"FromEmail"};
+	$voStruc->{"ToEmail"} = $attributesByVo{$vo}->{"ToEmail"};
 	$voStruc->{"Facility"} = $facilityName;
 	$voStruc->{"PerunVOID"} = $attributesByVo{$vo}->{"PerunVOID"};
 	$voStruc->{"Resources"} = $attributesByVo{$vo}->{"Resources"};
