@@ -10,5 +10,7 @@ rpm:
 
 clean:
 	rm -rf debian/tmp
+	rm -rf debian/perun-slave*
+	rm -f debian/files
 	rm -f ../perun-slave_*
 	rm -f ../perun-slave-*.rpm
