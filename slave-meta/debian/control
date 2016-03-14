@@ -11,6 +11,7 @@ Priority: optional
 Architecture: all
 #Maintainer: Pavel Zlamal <zlamal@cesnet.cz>
 Depends: bash (>= 2.05a-11), sed (>= 3.02-8), grep (>= 2.4.2-3), coreutils (>= 5.0-5), perl-base (>= 5.10.1-17), perun-slave (>= 3.0.0-0.0.5), remctl-client, heimdal-clients | krb5-user, openssh-server
+Conflicts: perun-propagate
 Description: Perun support scripts for slave scripts in MetaCentrum
  Perun support scripts for slave scripts in MetaCentrum. Including
  perun_propagate init.d script.

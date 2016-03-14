@@ -1,5 +1,7 @@
 VERSION = x.x
 
+default: deb rpm
+
 all: deb rpm
 
 deb:
