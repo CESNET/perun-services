@@ -1,0 +1,102 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Data::Dumper;
+use utf8;
+
+local $::SERVICE_NAME = "tinia_winpak";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_USER_FIRSTNAME;     *A_USER_FIRSTNAME =      \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LASTNAME;      *A_USER_LASTNAME =       \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_LOGIN_MU;      *A_USER_LOGIN_MU =       \'urn:perun:user:attribute-def:def:login-namespace:mu';
+our $A_USER_CHIP_NUMBERS;  *A_USER_CHIP_NUMBERS =   \'urn:perun:user:attribute-def:def:chipNumbers';
+
+our $A_RESOURCE_ACC_GROUP; *A_RESOURCE_ACC_GROUP =   \'urn:perun:resource:attribute-def:def:tiniaAccessGroup';
+our $A_RESOURCE_GOLD;      *A_RESOURCE_GOLD =        \'urn:perun:resource:attribute-def:def:tiniaWinpakGold';
+our $A_RESOURCE_ARMING;    *A_RESOURCE_ARMING =      \'urn:perun:resource:attribute-def:def:tiniaWinpakArming';
+our $A_V_RM_IS_BANNED;     *A_V_RM_IS_BANNED =       \'urn:perun:member_resource:attribute-def:virt:isBanned';
+
+our $FIRSTNAME = 'FIRSTNAME';
+our $LASTNAME = 'LASTNAME';
+our $GOLD = 'GOLD';
+our $ARMING = 'ARMING';
+our $ACC_GROUPS = 'ACC_GROUPS';
+our $LOGIN = 'LOGIN';
+our $TYPE = 'TYPE';
+
+my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+my $dataByChip = {};
+
+#Process resource by resource
+my @resourcesData = $data->getChildElements;
+foreach my $rData (@resourcesData) {
+	my %resourceAttrs = attributesToHash $rData->getAttributes;
+
+	my $resourceGold = $resourceAttrs{$A_RESOURCE_GOLD};
+	my $resourceArming = $resourceAttrs{$A_RESOURCE_ARMING};
+	my $resourceAccGroup = $resourceAttrs{$A_RESOURCE_ACC_GROUP};
+
+	my @membersData = $rData->getChildElements;
+	for my $memberData (@membersData) {
+		my %memberAttributes = attributesToHash $memberData->getAttributes;
+
+		my $firstName = (defined $memberAttributes{$A_USER_FIRSTNAME} and length $memberAttributes{$A_USER_FIRSTNAME}) ? $memberAttributes{$A_USER_FIRSTNAME} : '-';
+		my $lastName = (defined $memberAttributes{$A_USER_LASTNAME} and length $memberAttributes{$A_USER_LASTNAME}) ? $memberAttributes{$A_USER_LASTNAME} : '-';
+		my $loginMU = $memberAttributes{$A_USER_LOGIN_MU};
+		my $chipNumbers = $memberAttributes{$A_USER_CHIP_NUMBERS};
+		my $isBanned = $memberAttributes{$A_V_RM_IS_BANNED};
+		#1 Person, 2 Externist
+		my $type = "1";
+
+		foreach my $chipNumber (@{$chipNumbers}) {
+			if(!defined($dataByChip->{$chipNumber})) {
+				$dataByChip->{$chipNumber}->{$FIRSTNAME} = $firstName;
+				$dataByChip->{$chipNumber}->{$LASTNAME} = $lastName;
+				$dataByChip->{$chipNumber}->{$GOLD} = $resourceGold ? 1 : 0;
+				$dataByChip->{$chipNumber}->{$ARMING} = $resourceArming ? 1 : 0;
+				$dataByChip->{$chipNumber}->{$TYPE} = $type;
+				if($isBanned eq 1) {
+					$dataByChip->{$chipNumber}->{$ACC_GROUPS}->{$resourceAccGroup . "-BAN"} = 1;
+				} else {
+					$dataByChip->{$chipNumber}->{$ACC_GROUPS}->{$resourceAccGroup} = 1;
+				}
+				$dataByChip->{$chipNumber}->{$LOGIN} = $loginMU;
+			} else {
+				if($dataByChip->{$chipNumber}->{$LOGIN} ne $loginMU) {
+					die "There are two same chips with different user logins in namespace MU: '" . $loginMU . "' and '" . $dataByChip->{$chipNumber}->{'LOGIN'} . "'!\n";
+				}
+
+				if($resourceGold) { $dataByChip->{$chipNumber}->{$GOLD} = 1; }
+				if($resourceArming) { $dataByChip->{$chipNumber}->{$ARMING} = 1; };
+				$dataByChip->{$chipNumber}->{$ACC_GROUPS}->{$resourceAccGroup} = 1;
+			}
+		}
+	}
+}
+
+foreach my $chipNumber (sort keys $dataByChip) {
+	print FILE $chipNumber . "\t";
+	print FILE $dataByChip->{$chipNumber}->{$FIRSTNAME} . "\t";
+	print FILE $dataByChip->{$chipNumber}->{$LASTNAME} . "\t";
+	print FILE $dataByChip->{$chipNumber}->{$LOGIN} . "\t";
+	print FILE $dataByChip->{$chipNumber}->{$TYPE} . "\t";
+	print FILE $dataByChip->{$chipNumber}->{$GOLD} . "\t";
+	print FILE $dataByChip->{$chipNumber}->{$ARMING} . "\t";
+	print FILE join(',',keys $dataByChip->{$chipNumber}->{$ACC_GROUPS}) . "\n";
+}
+
+close (FILE);
+perunServicesInit::finalize;
