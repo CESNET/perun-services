@@ -1,3 +1,9 @@
+perun-slave-process-operations-portal-egi (3.1.2) stable; urgency=medium
+
+  * Fix detection whether DST_FILE variable is set. 
+
+ -- Slavek Licehammer <slavek@ics.muni.cz>  Mon, 21 Mar 2016 11:05:17 +0100
+
 perun-slave-process-operations-portal-egi (3.1.1) stable; urgency=low
 
   * New package version for perun-slave-process-operations-portal-egi

@@ -12,7 +12,7 @@ function process {
 	FROM_PERUN="${WORK_DIR}/operations_portal_egi"
 
 	if [ -z ${DST_FILE} ]; then
-		catch_error E_MISSING_DST
+		log_msg E_MISSING_DST
 	fi
 
 	create_lock
