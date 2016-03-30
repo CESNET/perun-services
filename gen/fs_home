@@ -4,6 +4,7 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 use File::Basename;
+no if $] >= 5.018, warnings => "experimental";
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.6.0";
