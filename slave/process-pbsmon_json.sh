@@ -19,7 +19,7 @@ function process {
 
 	chmod 0644 "$FROM_PERUN"
 
-	diff_mv "${FROM_PERUN}" "${DST_FILE}"
+	diff_mv_sync "${FROM_PERUN}" "${DST_FILE}"
 	if [ $? -eq 0 ]; then
 		log_msg I_CHANGED
 		if [ -x "$DST_DIR/pbsmon_machines_changed.sh" ] ; then

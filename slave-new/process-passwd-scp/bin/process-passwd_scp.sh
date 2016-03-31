@@ -53,7 +53,7 @@ function process {
 	[ "x${DUPLICATE_LOGNAMES}" == 'x' ] || log_msg E_PASSWD_DUPLICATES
 
 	# move only in case there are any changes
-	diff_mv "${NEW_PASSWD}" "${PASSWD_DST_FILE}" \
+	diff_mv_sync "${NEW_PASSWD}" "${PASSWD_DST_FILE}" \
 		&& log_msg I_P_CHANGED \
 		|| log_msg I_P_NOT_CHANGED
 }

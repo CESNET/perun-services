@@ -28,7 +28,7 @@ function process {
 	done 3< "${FROM_PERUN}"
 	IFS=$IFSTMP
 
-	diff_mv "${TMP_FILE}" "${DST_FILE}" \
+	diff_mv_sync "${TMP_FILE}" "${DST_FILE}" \
 		&& (log_msg I_CHANGED && /etc/init.d/radius restart) \
 		|| log_msg I_NOT_CHANGED
 }

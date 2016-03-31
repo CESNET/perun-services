@@ -40,7 +40,7 @@ function process {
 	fail_if_duplicits_found "${ETC_ALIASES}" "${FROM_PERUN}" `find "${ETC_ALIASESD_DIR}" -type f -not -name ${GENERIC_FILE} -not -name "*.db" -print`
 
 	### If no duplicits found, move new generic_file to /etc/aliases.d/
-	diff_mv "${FROM_PERUN}" "${ETC_ALIASESD_DIR}/${GENERIC_FILE}" && log_msg I_CHANGED || log_msg I_NOT_CHANGED
+	diff_mv_sync "${FROM_PERUN}" "${ETC_ALIASESD_DIR}/${GENERIC_FILE}" && log_msg I_CHANGED || log_msg I_NOT_CHANGED
 
 	### call new aliases
 	newaliases

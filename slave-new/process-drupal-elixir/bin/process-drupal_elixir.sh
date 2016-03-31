@@ -28,7 +28,7 @@ function process {
 	HOME_DIR=`eval echo ~`
 
 	for FILE in $FILE_USERS $FILE_GROUPS $FILE_MEMBERSHIPS ; do
-		diff_mv "$WORK_DIR/$FILE" "$HOME_DIR/$FILE"
+		diff_mv_sync "$WORK_DIR/$FILE" "$HOME_DIR/$FILE"
 
 		if [ $? -eq 0 ]; then
 			log_msg I_CHANGED

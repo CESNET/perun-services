@@ -1,3 +1,10 @@
+perun-slave-process-eduroam-radius (3.1.2) stable; urgency=low
+
+  * Use new function diff_mv_sync instead of diff_mv. Using sync before
+    and after using move.
+
+ -- Michal Stava <stavamichal@gmail.com>  Mon, 04 Apr 2016 09:15:00 +0200
+
 perun-slave-process-eduroam-radius (3.1.1) stable; urgency=low
 
   * New package version for perun-slave-process-eduroam-radius

@@ -16,7 +16,7 @@ function process {
 	create_lock
 
 	# Create diff between old.perun and .new
-	diff_mv "${FROM_PERUN}" "${DST_FILE}" \
+	diff_mv_sync "${FROM_PERUN}" "${DST_FILE}" \
 		&&  log_msg I_CHANGED \
 		|| log_msg I_NOT_CHANGED
 }

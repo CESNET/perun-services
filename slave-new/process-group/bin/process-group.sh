@@ -142,7 +142,7 @@ function process {
 		[ "x${DUPLICATE_GROUP_GIDS}" == 'x' ] || log_msg E_GID_DUPLICATES
 
 
-		diff_mv "${NOW_ADDED_USERS}" "${PREVIOUSLY_ADDED_USERS}" \
+		diff_mv_sync "${NOW_ADDED_USERS}" "${PREVIOUSLY_ADDED_USERS}" \
 			&& log_msg I_PREVIOUSLY_ADDED_USERS_CHANGED \
 			|| log_msg I_PREVIOUSLY_ADDED_USERS_NOT_CHANGED
 

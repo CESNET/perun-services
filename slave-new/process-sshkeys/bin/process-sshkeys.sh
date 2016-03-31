@@ -46,7 +46,9 @@ function process {
 
 		if [ -f "$SSH_AUTHORIZED_KEYS" ]; then
 			catch_error E_MERGE_SSH_KEYS sort -u "$SSH_AUTHORIZED_KEYS" "$FROM_PERUN_AUTHORIZED_KEYS" > "$TMP_FILE"
+			sync
 			catch_error E_IO mv "$TMP_FILE" "$FROM_PERUN_AUTHORIZED_KEYS"
+			sync
 		else
 			touch "$SSH_AUTHORIZED_KEYS" || log_msg E_IO
 			USER_PRIMARY_GROUP_ID=`id -g $USER` || log_msg E_PRIMARY_GROUP_ID_NOT_FOUND
@@ -55,7 +57,7 @@ function process {
 			chmod "$PERM_ON_SSH_FILE" "$SSH_AUTHORIZED_KEYS" || log_msg E_CHANGE_PERMISSIONS_ON_SSH_FILE
 		fi
 
-		diff_mv "$FROM_PERUN_AUTHORIZED_KEYS" "$SSH_AUTHORIZED_KEYS" && log_msg I_CHANGED || log_msg I_NOT_CHANGED
+		diff_mv_sync "$FROM_PERUN_AUTHORIZED_KEYS" "$SSH_AUTHORIZED_KEYS" && log_msg I_CHANGED || log_msg I_NOT_CHANGED
 
 	done
 }
