@@ -45,11 +45,20 @@ case $DESTINATION_TYPE in
 		HOSTNAME=`echo $DESTINATION | sed -e 's/^.*@//'`
 		HOST="$DESTINATION"
 		;;
+	user@host:port)
+		HOST=`echo $DESTINATION | sed -e 's/:.*//'`
+		HOSTNAME=`echo $HOST | sed -e 's/^.*@//'`
+		PORT=`echo $DESTINATION | sed -e 's/^.*://'`
+		;;
 	*)
 		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
 		exit 1;
 		;;
 esac
+
+if [ -n "${PORT}" ]; then
+	TRANSPORT_COMMAND="${TRANSPORT_COMMAND} -p ${PORT}"
+fi
 
 TMP_HOSTNAME_DIR="`mktemp -d /tmp/perun-send.XXXXXXXXXX`"
 if [ $? -ne 0 ]; then
