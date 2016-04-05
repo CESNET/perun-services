@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
+no if $] >= 5.018, warnings => "smartmatch";
 use Net::LDAPS;
 use Net::LDAP::Entry;
 use Net::LDAP::Message;

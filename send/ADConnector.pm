@@ -1,10 +1,11 @@
 package ADConnector;
 use Exporter 'import';
 @ISA = ('Exporter');
-@EXPORT = qw(init_config resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members);
+@EXPORT = qw(init_config resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members compare_entry);
 
 use strict;
 use warnings;
+no if $] >= 5.018, warnings => "smartmatch";
 
 =pod
 
@@ -63,6 +64,10 @@ Load data from AD and return them as array of Net::LDAP::Entry. Expected params 
 =head2 load_group_members()
 
 Load members of a group from AD. (when it has more than 1500 items). Takes Net:LDAP connection, string base DN and search filter.
+
+=head2 compare_entry()
+
+Takes two entries and compares specified attribute. Return 1 if attr value differs (hence entry should be updated in AD).
 
 =head2 ldap_log()
 
@@ -337,5 +342,42 @@ sub load_group_members($$$) {
 		# failure: deal with the error in $mesg
 		return $mesg->code();
 	}
+
+}
+
+#
+# Compare new value with original entry value using Perls smart-match operator
+#
+# Takes:
+# $ad_entry entry from AD to check on
+# $perun_entry entry from Perun to compare with
+# $param name of param to compare
+#
+# Return:
+# 1 if param should be updated
+# 0 otherwise
+#
+sub compare_entry($$$) {
+
+	my $ad_entry = (@_)[0];
+	my $perun_entry = (@_)[1];
+	my $param = (@_)[2];
+
+	# get value
+	my @ad_entry_value = $ad_entry->get_value($param);
+	my @perun_entry_value = $perun_entry->get_value($param);
+
+	# sort for multi-valued
+	my @sorted_ad_entry_value = sort(@ad_entry_value);
+	my @sorted_perun_entry_value = sort(@perun_entry_value);
+
+	# compare using smart-match (perl 5.10.1+)
+	unless(@sorted_ad_entry_value ~~ @sorted_perun_entry_value) {
+		# param values are not equals
+		return 1;
+	}
+
+	# values are equals
+	return 0;
 
 }
