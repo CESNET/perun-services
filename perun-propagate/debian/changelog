@@ -1,0 +1,5 @@
+perun-propagate (3.0.0-0.0.1) stable; urgency=low
+
+  * Separated perun_propagate init.d script from package perun-slave-meta.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Fri, 11 Mar 2016 10:00:00 +0100

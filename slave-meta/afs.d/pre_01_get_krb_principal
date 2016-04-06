@@ -1,0 +1,4 @@
+KRB5CCNAME=/tmp/krb5cc_afs
+export KRB5CCNAME
+kauth -t /home/perun/private/keytab perun/admin@ICS.MUNI.CZ
+klist

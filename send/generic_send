@@ -12,7 +12,7 @@ FACILITY_NAME=$1
 DESTINATION=$2
 DESTINATION_TYPE=$3
 
-TRANSPORT_COMMAND="ssh -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o ConnectTimeout=5  -i `echo ~`/.ssh/id_rsa"
+TRANSPORT_COMMAND="ssh -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5  -i `echo ~`/.ssh/id_rsa"
 SLAVE_COMMAND="/opt/perun/bin/perun"
 SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
 SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
@@ -45,11 +45,20 @@ case $DESTINATION_TYPE in
 		HOSTNAME=`echo $DESTINATION | sed -e 's/^.*@//'`
 		HOST="$DESTINATION"
 		;;
+	user@host:port)
+		HOST=`echo $DESTINATION | sed -e 's/:.*//'`
+		HOSTNAME=`echo $HOST | sed -e 's/^.*@//'`
+		PORT=`echo $DESTINATION | sed -e 's/^.*://'`
+		;;
 	*)
 		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
 		exit 1;
 		;;
 esac
+
+if [ -n "${PORT}" ]; then
+	TRANSPORT_COMMAND="${TRANSPORT_COMMAND} -p ${PORT}"
+fi
 
 TMP_HOSTNAME_DIR="`mktemp -d /tmp/perun-send.XXXXXXXXXX`"
 if [ $? -ne 0 ]; then

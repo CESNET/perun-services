@@ -15,13 +15,15 @@ use File::Temp qw/ :mktemp  /;
 use File::Copy;
 use Data::Dumper;
 use IO::Compress::Gzip qw(gzip $GzipError) ;
+use Storable;
+
 
 #die at the very end of skript when any warning occured during executing
 our $DIE_AT_END=0;
 $SIG{__WARN__} = sub { $DIE_AT_END=1; warn @_; };
 END { if($DIE_AT_END) { die "Died because of warning(s) occured during procesing.\n"; } };
 
-my ($agent, $service, $facility, $servicesAgent, $directory, $tmp_directory, $tmp_directory_destination, $getData_directory);
+my ($agent, $service, $facility, $servicesAgent, $directory, $tmp_directory, $tmp_directory_destination, $getData_directory, $local_data);
 
 # Prepare direactory for file which will be generated
 # Create VERSION file in this directory. This file contains protocol version
@@ -35,21 +37,30 @@ sub init {
 	unless(defined $::SERVICE_NAME) { die; }
 	unless(defined $::PROTOCOL_VERSION) {die;}
 	
-	my $facilityId;
-	GetOptions ("facilityId|f=i" => \$facilityId) || die;
+	my ($facilityId, $facilityName, $local_data_file);
+	GetOptions ("facilityId|f=i" => \$facilityId, "facilityName|F=s" => \$facilityName, "data|d=s" => \$local_data_file ) or die; 
 
-	unless(defined $facilityId) { die "ERROR: facilityId required"; }
+	if(defined $local_data_file) {
+		die "ERROR facilityName required" unless defined $facilityName;
+		die "ERROR: Cannot read $local_data_file: $! " unless -r $local_data_file;
 
-	$agent = Perun::Agent->new();
-	$servicesAgent = $agent->getServicesAgent;
-	my $facilitiesAgent = $agent->getFacilitiesAgent;
-	$service = $servicesAgent->getServiceByName( name => $::SERVICE_NAME);
-	$facility = $facilitiesAgent->getFacilityById( id => $facilityId);
+		$local_data = retrieve $local_data_file;
 
-	$directory = "spool/" . $facility->getName . "/" . $service->getName."/";
-	$tmp_directory = "spool/tmp/" . $facility->getName . "/" . $service->getName."/";
+	} else {
+		unless(defined $facilityId) { die "ERROR: facilityId required"; }
+
+		$agent = Perun::Agent->new();
+		$servicesAgent = $agent->getServicesAgent;
+		my $facilitiesAgent = $agent->getFacilitiesAgent;
+		$service = $servicesAgent->getServiceByName( name => $::SERVICE_NAME);
+		$facility = $facilitiesAgent->getFacilityById( id => $facilityId);
+		$facilityName = $facility->getName;
+	}
+
+	$directory = "spool/" . $facilityName . "/" . $::SERVICE_NAME."/";
+	$tmp_directory = "spool/tmp/" . $facilityName . "/" . $::SERVICE_NAME."/";
 	$tmp_directory_destination = $tmp_directory . "/_destination/";
-	$getData_directory = "spool/tmp/getData/" . $facility->getName . "/" . $service->getName."/";
+	$getData_directory = "spool/tmp/getData/" . $facilityName . "/" . $::SERVICE_NAME."/";
 
 	my $err;
 	rmtree($tmp_directory,  { error => \$err } );
@@ -60,7 +71,7 @@ sub init {
 	if(@$err) { die "Can't mkpath( $tmp_directory_destination  )" };
 	createVersionFile();
 	createServicesFile();
-	createFacilityNameFile($facility->getName);
+	createFacilityNameFile($facilityName);
 
 	rmtree($getData_directory);
 	if(@$err) { die "Can't rmtree( $getData_directory  )" };
@@ -98,24 +109,28 @@ sub getFacility {
 }
 
 sub getHierarchicalData {
+	if(defined $local_data) { return $local_data; }
 	my $data = $servicesAgent->getHierarchicalData(service => $service->getId, facility => $facility->getId);
 	logData $data, 'hierarchicalData';
 	return $data;
 }
 
 sub getFlatData {
+	if(defined $local_data) { return $local_data; }
 	my $data = $servicesAgent->getFlatData(service => $service->getId, facility => $facility->getId);
 	logData $data, 'flatData';
 	return $data;
 }
 
 sub getDataWithGroups {
+	if(defined $local_data) { return $local_data; }
 	my $data = $servicesAgent->getDataWithGroups(service => $service->getId, facility => $facility->getId);
 	logData $data, 'dataWithGroups';
 	return $data;
 }
 
 sub getDataWithVos {
+	if(defined $local_data) { return $local_data; }
 	my $data = $servicesAgent->getDataWithVos(service => $service->getId, facility => $facility->getId);
 	logData $data, 'dataWithVos';
 	return $data;
