@@ -1,3 +1,10 @@
+perun-slave-process-voms (3.1.2) stable; urgency=medium
+
+  * Overall reimplementation of the script
+  * Now supports also synchronization of VOMS Roles and Group membership
+
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Wed Apr  6 16:01:02 CEST 2016
+
 perun-slave-process-voms (3.1.1) stable; urgency=low
 
   * New package version for perun-slave-process-voms
