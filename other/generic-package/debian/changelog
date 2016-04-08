@@ -1,0 +1,5 @@
+generic-package (0.0.1) stable; urgency=low
+
+  * Changelog to generic package for perun
+
+ -- Michal Stava <stavamichal@gmail.com>  Mon, 16 Nov 2015 13:54:00 +0200
