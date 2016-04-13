@@ -57,7 +57,7 @@ function process {
 			chown $USER_NAME:$GID $DST_FILE
 			chmod 644 $DST_FILE
 		else
-			diff_mv "${FROM_PERUN_FILE}" "${DST_FILE}"
+			diff_mv_sync "${FROM_PERUN_FILE}" "${DST_FILE}"
 			# If diff is ok, than set also permissions 
 			if [ $? -eq 0 ]; then
 				#separate GID for user from passwd file (4th column)

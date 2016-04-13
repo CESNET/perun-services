@@ -1,3 +1,9 @@
+perun-slave-process-sympa-cesnet (3.1.2) stable; urgency=low
+
+  * Use sync before and after mv (to synchronize data on FS).
+
+ -- Michal Stava <stavamichal@gmail.com>  Mon, 04 Apr 2016 09:15:00 +0200
+
 perun-slave-process-sympa-cesnet (3.1.1) stable; urgency=low
 
   * New package version for perun-slave-process-sympa-cesnet

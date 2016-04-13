@@ -1,3 +1,11 @@
+perun-slave-base (3.1.4) stable; urgency=low
+
+  * New function diff_mv_sync using sync before and after diff_mv itself, it
+    is better to get actual state of data on file system. Use this new
+    function where needed.
+
+ -- Michal Stava <stavamichal@gmail.com>  Thu, 31 Mar 2016 14:30:00 +0200
+
 perun-slave-base (3.1.3) stable; urgency=low
 
   * New custom configuration from '/etc/perunv3.d/' directory, take all files

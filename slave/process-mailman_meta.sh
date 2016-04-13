@@ -23,7 +23,7 @@ function process {
 		DST_FILE=${DST_DIR}/$FILE
 		CHANGED=0
 		# Create diff between old.perun and .new
-		diff_mv "${FROM_PERUN_DIR}/$FILE" "${DST_FILE}" \
+		diff_mv_sync "${FROM_PERUN_DIR}/$FILE" "${DST_FILE}" \
 			&&  log_msg I_CHANGED && CHANGED=1 \
 			|| log_msg I_NOT_CHANGED
 

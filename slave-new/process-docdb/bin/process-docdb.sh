@@ -14,7 +14,7 @@ function process {
 
 	CHANGED=0
 	# Create diff between old and new
-	diff_mv "$FROM_PERUN" "${DST_FILE}" \
+	diff_mv_sync "$FROM_PERUN" "${DST_FILE}" \
 		&&  log_msg I_CHANGED && CHANGED=1 \
 		|| log_msg I_NOT_CHANGED
 

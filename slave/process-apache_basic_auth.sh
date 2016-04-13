@@ -18,7 +18,7 @@ function process {
 	for DIR in `ls -d $FROM_PERUN_DIR/*/`; do
 		DST_FILE=`cat $DIR/path`
 		SRC_FILE="$DIR/$FILENAME"
-		if diff_mv "$SRC_FILE" "$DST_FILE" ;then
+		if diff_mv_sync "$SRC_FILE" "$DST_FILE" ;then
 			RELOAD_APACHE=1
 			log_msg I_CHANGED
 		else

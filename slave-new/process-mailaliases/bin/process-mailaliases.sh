@@ -77,7 +77,7 @@ function process {
 			touch "${ALIASESD_PERUN}"
 			chmod 644 "${ALIASESD_PERUN}"
 		fi
-		diff_mv "${FROM_PERUN}" "${ALIASESD_PERUN}" && log_msg I_CHANGED || log_msg I_NOT_CHANGED
+		diff_mv_sync "${FROM_PERUN}" "${ALIASESD_PERUN}" && log_msg I_CHANGED || log_msg I_NOT_CHANGED
 		### If there not exists folder aliases.d, use DST_FILE
 	else
 		diff_update "${FROM_PERUN}" "${DST_FILE}" "${LAST_STATE}" && log_msg I_CHANGED || log_msg I_NOT_CHANGED
@@ -139,19 +139,19 @@ function save_backup_files {
 function recover_backup_files {
 	### DST_BACKUP must exist
 	if [ -f "${DST_BACKUP}" ]; then
-		diff_mv "${DST_BACKUP}" "${DST_FILE}"
+		diff_mv_sync "${DST_BACKUP}" "${DST_FILE}"
 	else
 		log_msg E_BACKUP_RECOVER
 	fi
 
 	### STATE_BACKUP not need to exist
 	if [ -f "${STATE_BACKUP}" ]; then
-		diff_mv "${STATE_BACKUP}" "${LAST_STATE}"
+		diff_mv_sync "${STATE_BACKUP}" "${LAST_STATE}"
 	fi
 
 	### ALIASESD_BACKUP not need to exist
 	if [ -f "${ALIASESD_BACKUP}" ]; then
-		diff_mv "${ALIASESD_BACKUP}" "${ALIASESD_PERUN}"
+		diff_mv_sync "${ALIASESD_BACKUP}" "${ALIASESD_PERUN}"
 	fi
 
 	return 0

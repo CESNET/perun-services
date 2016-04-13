@@ -137,6 +137,18 @@ function version_check {
 	[ ${RECEIVED_PROTOCOL_VERSION} = ${PROTOCOL_VERSION} ] || log_msg I_PROTOCOL_MINOR_DIFF
 }
 
+function diff_mv_sync {
+	SRC="$1"
+	DST="$2"
+
+	sync
+	diff_mv $SRC $DST
+	RET=$?;
+	sync
+
+	return $RET;
+}
+
 function diff_mv {
 	SRC="$1"
 	DST="$2"
@@ -176,7 +188,7 @@ function mv_chmod {
 		catch_error E_PERMISSIONS chmod $DST_PERM "${SRC}"
 	fi
 
-	diff_mv "${SRC}" "${DST}"
+	diff_mv_sync "${SRC}" "${DST}"
 
 	return $?
 }
@@ -225,7 +237,7 @@ function diff_update {
 	grep -F -x -v -f "$DESTINATION_WITHOUT_STATE" "$FROM_PERUN" > "$STATE"
 
 	catch_error E_IO cat "$DESTINATION_WITHOUT_STATE" "$STATE" > "$TMP_DESTINATION_FILE"
-	diff_mv "$TMP_DESTINATION_FILE" "$DESTINATION"
+	diff_mv_sync "$TMP_DESTINATION_FILE" "$DESTINATION"
 }
 
 # If lock file exits, recover all existing files
@@ -256,7 +268,7 @@ function backup_and_recover_files {
 		for FILE in FILES; do
 			LOCAL=`echo $FILE | sed -e 's/^.*\///'`
 			if [ -f "${BACKUP_DIR}/${LOCAL}" ]; then
-				catch_error E_FILE_CANT_RECOVER  diff_mv "${BACKUP_DIR}/${LOCAL}" "${FILE}"
+				catch_error E_FILE_CANT_RECOVER  diff_mv_sync "${BACKUP_DIR}/${LOCAL}" "${FILE}"
 				log_msg I_FILE_RECOVERED	
 			else
 				#if not, skip it and info about it

@@ -146,12 +146,12 @@ function process {
 	DUPLICATE_GROUP_GIDS=`cut -d: -f3 "${NEW_GROUP}" | sort | uniq -d`
 	[ "x${DUPLICATE_GROUP_GIDS}" == 'x' ] || log_msg E_GID_DUPLICATES
 
-	diff_mv "${NOW_ADDED_USERS}" "${PREVIOUSLY_ADDED_USERS}" \
+	diff_mv_sync "${NOW_ADDED_USERS}" "${PREVIOUSLY_ADDED_USERS}" \
 		&& log_msg I_PREVIOUSLY_ADDED_USERS_CHANGED \
 		|| log_msg I_PREVIOUSLY_ADDED_USERS_NOT_CHANGED
 
 	# move only in case there are any changes
-	diff_mv "${NEW_GROUP}" "${DST_FILE}" \
+	diff_mv_sync "${NEW_GROUP}" "${DST_FILE}" \
 		&& log_msg I_CHANGED \
 		|| log_msg I_NOT_CHANGED
 }
