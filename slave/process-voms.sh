@@ -8,6 +8,7 @@ function process {
 
 	EXECSCRIPT="${SCRIPTS_DIR}/voms/process-voms.pl"
 
+	create_lock
 
-	$EXECSCRIPT -
+	perl $EXECSCRIPT -
 }

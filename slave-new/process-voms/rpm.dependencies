@@ -1,1 +1,4 @@
 perun-slave-base
+perl-XML-Simple
+perl-Cpanel-JSON-XS
+perl-Array-Utils
