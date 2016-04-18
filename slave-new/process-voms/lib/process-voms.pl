@@ -80,8 +80,8 @@ sub effectCall {
 #	%user		The user whose CA should be checked (DN, CA, email)
 #	%list		Reference to the list of known CAs
 sub knownCA {
-	$ca = shift;
-	$list = shift;
+	$ca = $_[0];
+	@list = @{$_[1]};
 
 	if(grep {$_ eq "$ca"} @list) {
 		return 1;

@@ -10,5 +10,5 @@ function process {
 
 	create_lock
 
-	perl $EXECSCRIPT -
+	perl $EXECSCRIPT < $FROM_PERUN
 }

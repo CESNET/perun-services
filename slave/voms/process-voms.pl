@@ -18,7 +18,7 @@ sub serialize {
     JSON::XS->new->relaxed(0)->ascii(1)->canonical(1)->encode($_[0]);
 }
 
-### array_minus_deep is a replacement for array_minu that expands hash references
+### array_minus_deep is a replacement for array_minus that expands hash references
 sub array_minus_deep(\@\@) {
     my ($array,$minus) = @_;
 
@@ -72,6 +72,7 @@ sub effectCall {
 		chomp(@out);
 		syslog(LOG_ERR, "Failed $debugMsg Original message: @out");
 		print STDERR "Failed $debugMsg\nOriginal message: @out\nOriginal command: $command\n";
+		$retval = 1;
 	}
 }
 
@@ -79,10 +80,10 @@ sub effectCall {
 #	%user		The user whose CA should be checked (DN, CA, email)
 #	%list		Reference to the list of known CAs
 sub knownCA {
-	$ca = shift;
-	$list = shift;
+	$ca = $_[0];
+	@list = @{$_[1]};
 
-        if( "$ca" ~~ @{$list}) {
+	if(grep {$_ eq "$ca"} @list) {
 		return 1;
 	} else {
 		syslog LOG_ERR, "Unknown CA \"$user->{'CA'}\" requested with user \"$user->{'DN'}\"";
@@ -95,7 +96,7 @@ sub knownCA {
 # This is the actual start.
 
 openlog($program, 'cons,pid', 'user');
-my $retval;
+my $retval = 0;
 
 
 # Main parsing loop for the input XML file
@@ -107,6 +108,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @groups_current=`voms-admin --vo ${name} list-groups`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing groups in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		$retval = 1;
 		next;
 	}
 	chomp(@groups_current);
@@ -115,6 +117,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @roles_current=`voms-admin --vo ${name} list-roles`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		$retval = 1;
 		next;
 	}
 	chomp(@roles_current);
@@ -123,6 +126,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @cas=`voms-admin --vo ${name} list-cas`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		$retval = 1;
 		next;
 	}
 	chomp(@cas);
