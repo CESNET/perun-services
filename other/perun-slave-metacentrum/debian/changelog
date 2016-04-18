@@ -1,0 +1,6 @@
+perun-slave-metacentrum (3.0.1) stable; urgency=low
+
+  * New package to define all required dependencies of slave
+    packages for Metacentrum.
+
+ -- Michal Stava <stavamichal@gmail.com>  Mon, 18 Apr 2016 13:54:00 +0200

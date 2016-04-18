@@ -12,9 +12,6 @@ SOURCE_DIR1="$2"
 SOURCE_DIR2="$4"
 SOURCE_DIR3="$6"
 
-echo $3
-echo "'$4'"
-
 DEST_DIR1="$3"
 DEST_DIR2="$5"
 DEST_DIR3="$7"
@@ -31,14 +28,13 @@ if [ ! -d "$SERVICE_NAME" ]; then
 	exit 1;
 fi
 
-if [ -z "$SOURCE_DIR1" -o -z "$DEST_DIR1" ]; then
-	echo "We need to know at least one directory with files.";
-	exit 1;
-fi
-
-if [ ! -d "$SERVICE_NAME/$SOURCE_DIR1" ]; then
-	echo "Need at least one directory!"
-	exit 1;
+WITH_DIR1=0;
+if [ ! -z "$SOURCE_DIR1" -a -d "$SERVICE_NAME/$SOURCE_DIR1" ]; then
+	if [ -z "$DEST_DIR1" ]; then
+		echo "It is defined first source directory but missing path to first destination directory!"
+		exit 1;
+	fi		
+	WITH_DIR1=1;
 fi
 
 WITH_DIR2=0;
@@ -87,7 +83,13 @@ if [ -f "$DEPENDENCIES" ]; then
 	fi
 fi
 
-echo 'ABRAKADABRA: ' . $REQUIRES
+BASIC_CONF=""
+BASIC_CONF_DATA=""
+if [ $WITH_DIR1 == 1 ]; then
+	BASIC_CONF="mkdir -p %{buildroot}/$DEST_DIR1
+cp -r ./$SOURCE_DIR1/* %{buildroot}/$DEST_DIR1/"
+	BASIC_CONF_DATA="/$DEST_DIR1/*"
+fi
 
 CUSTOM_CONF=""
 CUSTOM_FILE_DATA=""
@@ -131,12 +133,11 @@ $DESCRIPTION
 %build
 
 %install
-mkdir -p %{buildroot}/$DEST_DIR1/
-cp -r ./$SOURCE_DIR1/* %{buildroot}/$DEST_DIR1/
+$BASIC_CONF
 $CUSTOM_CONF
 
 %files
-/$DEST_DIR1/*
+$BASIC_CONF_DATA
 $CUSTOM_FILE_DATA
 EOF
 

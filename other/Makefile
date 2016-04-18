@@ -1,9 +1,18 @@
 #!/usr/bin/make -f
 SHELL=/bin/bash
 
-.PHONY: all generic-package perun-propagate clean
+.PHONY: all generic-package perun-propagate perun-slave-metacentrum clean
 
-all: generic-package perun-propagate
+all: generic-package perun-propagate perun-slave-metacentrum
+
+perun-slave-metacentrum:
+	cd $@ && debuild -us -uc
+	@echo "Cleaing after $@ building process..."
+	@rm -f *.{build,changes,dsc,tar.gz,tar.xz}
+	@rm -rf ./$@/debian/$@*
+	@rm -f ./$@/debian/files
+	@echo "Generate spec file for $@..."
+	@./generate_rpm.sh $@
 
 perun-propagate:
 	cd $@ && debuild -us -uc
