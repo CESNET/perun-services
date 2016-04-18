@@ -1,0 +1,12 @@
+Source: perun-propagate
+Section: utils
+Priority: extra
+Maintainer: Pavel Zlamal <zlamal@cesnet.cz>
+Build-Depends: debhelper (>= 7)
+Standards-Version: 3.9.1
+
+Package: perun-propagate
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: perun-slave-meta
+Description: Perun propagate init.d script. Perun propagate init.d script., which is used to force user provisioning and service configuration by calling Perun API.

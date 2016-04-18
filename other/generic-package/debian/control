@@ -1,0 +1,12 @@
+Source: generic-package
+Section: utils
+Priority: extra
+Maintainer: Michal Stava <stavamichal@gmail.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+
+Package: generic-package
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: other-generic-package
+Description: Short description of generic package
