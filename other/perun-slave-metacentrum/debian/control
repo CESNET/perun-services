@@ -10,3 +10,5 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts:
 Description: Package with required dependencies for slave scripts in Metacentrum.
+ Package containing all dependencies needed for regular 
+ work of Perun in the Metacentrum.

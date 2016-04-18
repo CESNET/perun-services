@@ -10,3 +10,4 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts: other-generic-package
 Description: Short description of generic package
+ Extended description for generic package.
