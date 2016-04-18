@@ -3,7 +3,7 @@ Section: utils
 Priority: extra
 Maintainer: Pavel Zlamal <zlamal@cesnet.cz>
 Build-Depends: debhelper (>= 7)
-Standards-Version: 3.9.1
+Standards-Version: 3.9.5
 
 Package: perun-propagate
 Architecture: any
