@@ -9,4 +9,6 @@ Package: perun-propagate
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts: perun-slave-meta
-Description: Perun propagate init.d script. Perun propagate init.d script., which is used to force user provisioning and service configuration by calling Perun API.
+Description: Perun propagate init.d script.
+ Perun propagate init.d script., which is used to force user 
+ provisioning and service configuration by calling Perun API.
