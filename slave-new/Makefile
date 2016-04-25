@@ -32,7 +32,7 @@ $(processes):
 	@cd $@ && NAME=$(subst process-,,$@) envsubst < ../templates/Makefile > Makefile
 	@cd $@ && if [ -d conf ]; then cat ../templates/makefile_conf_part >> Makefile; fi
 	@cd $@ && if [ -d lib ]; then cat ../templates/makefile_lib_part >> Makefile; fi
-	cd $@ && DEBEMAIL=$(maintainer_email) DEBFULLNAME=$(maintainer_name) dh_make -s -i -y -n -p "$(package_prefix_name)$@_`head -n 1 changelog | sed -e 's/.*\([0-9]\+[.][0-9]\+[.][0-9]\+\).*/\1/'`" -t "$(realpath templates/dh_make)" --createorig
+	cd $@ && DEBEMAIL=$(maintainer_email) DEBFULLNAME=$(maintainer_name) dh_make -i -y -n -p "$(package_prefix_name)$@_`head -n 1 changelog | sed -e 's/.*\([0-9]\+[.][0-9]\+[.][0-9]\+\).*/\1/'`" -t "$(realpath templates/dh_make)" --createorig
 	@cd $@/debian && rm *.ex *.EX README.*
 	@cd $@ && if [ -s changelog ]; then cp changelog ./debian/; fi
 	@cd $@ && if [ -s dependencies -a $@ = $(base_package_name) ]; then echo -en "\noverride_dh_gencontrol:\n\tdh_gencontrol -- -Vmisc:Depends=\"`cat dependencies`\"" >> ./debian/rules; fi
