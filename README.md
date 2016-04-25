@@ -14,15 +14,35 @@ This repository contains all scripts, which are used by [Perun](https://perun.ce
 * **gen/** - These perl scripts fetch data from Perun and generate new configuration files for each service and destination.
 * **send/** - Scripts ensures transfer of configuration files to destination using SSH.
 * **slave-new/** - These (mainly bash) scripts process new files on destination machine and perform change itself.
+* **other/perun-propagate/** - New packaging of perun-propagate to force service propagation from client side.
+* **other/perun-slave-metacentrum/** - Meta package to install all perun services used by MetaCentrum.
+* **scripts/** - Server side of perun-propagate service located on Perun instance.
+* **slave/** and **slave-meta/** - Deprecated old version of slave scripts packaging, will be removed.
+* **perun-propagate/** - Deprecated old version of perun-propagate package will be removed.
 
 Gen and send scripts are located on your Perun instance and are used by _perun-engine_ component. Slave scripts are then located on destination machines.
+
+### Build ###
+
+* Install required dependencies:
+
+```
+apt-get install dh-make rpm equivs
+```
+
+* Go to _slave-new/_ folder and run:
+
+```
+make all
+```
+
+To build only specific service you can use ``make process-passwd`` for _passwd_ service etc. To build a metapackage, which will install all slave scripts you can use ``make meta``.
 
 ### Deployment on destinations ###
 
 Perun uses _push model_, so when configuration change occur in a Perun, new config files are generated for affected services and sent to the destinations, where they are processed. Result of such operation is then reported back to the Perun.
 
 * Slave scripts for each service can be automatically installed on destination machines as .deb or .rpm packages.
-  * You can generate packages from source by running ``make clean && make`` in _slave-new/_ folder.
 * You must allow access to destination from your Perun instance by SSH key as user with all necessary privileges (usually root).
 * You can specify different user in Perun and it's good practice to restrict access on destination to run only command ``/opt/perun/bin/perun``.
 * You can override default behavior of services on each destination by creating file ``/etc/perunv3.conf`` and put own config data here. As example, you can define white/black list of services, which you allow to configure on your destination. You can also set expected destination and facility names, so nobody can push own data to your destination from same Perun instance.
