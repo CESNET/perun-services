@@ -46,9 +46,20 @@ sub listToHashes {
 		chomp($line);
 		$csv->parse($line);
 		my @components = $csv->fields();
-		if ( scalar @components > 1 ) { #Crude way to filter out "No members..." messages
+		if ( scalar @components == 3 ) { #Crude way to filter out "No members..." messages
 			my %mbr= ( 'DN' => "${components[0]}",'CA' => "${components[1]}", 'CN' => getCN($components[0]), 'email' => "${components[2]}" );
 			push( @hashes, \%mbr );
+		}
+		else {
+			if ( scalar @components > 3 ) { # Using slower algorithm to match members with commas in their subjects
+				foreach $ca ( @cas ) {
+					$pattern = qr/$ca/;
+					if ( $line =~ /^(.*),${pattern},([^,]*)$/ ) {
+						my %mbr= ( 'DN' => "$1",'CA' => "$ca", 'CN' => getCN($1), 'email' => "$2" );
+						push( @hashes, \%mbr );
+					}
+				}
+			}
 		}
 	}
 	return \@hashes;
@@ -78,12 +89,10 @@ sub effectCall {
 
 ### knownCA indicates whether a given CA is known to the VOMS server. It accepts the user structure
 #	%user		The user whose CA should be checked (DN, CA, email)
-#	%list		Reference to the list of known CAs
 sub knownCA {
 	$ca = $_[0];
-	@list = @{$_[1]};
 
-	if(grep {$_ eq "$ca"} @list) {
+	if(grep {$_ eq "$ca"} @cas) {
 		return 1;
 	} else {
 		syslog LOG_ERR, "Unknown CA \"$user->{'CA'}\" requested with user \"$user->{'DN'}\"";
@@ -123,7 +132,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	chomp(@roles_current);
 	s/^\s*Role=// for @roles_current;
 
-	my @cas=`voms-admin --vo ${name} list-cas`;
+	our @cas=`voms-admin --vo ${name} list-cas`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
 		$retval = 1;
@@ -149,9 +158,9 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my %groupRoles_toBe;		# Desired assignment of users to (per group) roles
 	my %groupMembers_toBe;		# Desired membership in groups (pure, disregarding roles)
 	my @groups_toBe = ( "/$name" );	# Desired list of groups
-	my @roles_toBe;			# Desired list of roles
+	my @roles_toBe = ( "VO-Admin" );# Desired list of roles, plus the default VO-Admin role
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
-		next unless knownCA($user->{'CA'}, \@cas);
+		next unless knownCA($user->{'CA'});
 		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
 		foreach $group (@{$user->{'groups'}->{'group'}}){
