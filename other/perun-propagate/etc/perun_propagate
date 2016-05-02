@@ -12,12 +12,15 @@
 # Description:       Start the perun propagate process
 ### END INIT INFO
 
+KEYTAB=/etc/krb5.keytab
 NAME=perun-propagate
 DESC="Perun propagation"
 PERUN_SERVER='perun.ics.muni.cz'
+#Timeout in seconds
 TIMEOUT=120
 LOG=/var/log/$NAME
-KEYTAB=/etc/krb5.keytab
+#Remove content of old log file
+> "$LOG"
 
 umask 077
 
@@ -29,6 +32,12 @@ fi
 # Load lsb functions
 . /lib/lsb/init-functions
 
+#---------------------------- ADDITIONAL FUNCTIONS ----------
+# Return 0 if process with PID is still runing, 1 if not
+is_process_running() {
+	kill -0 "$1" 2>/dev/null 1>&2 && return 0 || return 1
+}
+
 check() {
 	for C in ktutil kinit remctl; do
 		which "${C}" &>/dev/null || {
@@ -38,42 +47,134 @@ check() {
 	done
 }
 
-perun_propagate_start() {
-	CC_FILE=`mktemp`
-	trap "unlink ${CC_FILE}" ERR
-	export KRB5CCNAME="FILE:${CC_FILE}"
+# for purpose of evaluating all on_exit items
+function on_exit()
+{
+    for i in "${on_exit_items[@]}"
+    do
+        eval $i
+    done
+}
 
+# add new on_exit item
+function add_on_exit()
+{
+    local n=${#on_exit_items[*]}
+    on_exit_items[$n]="$*"
+    if [[ $n -eq 0 ]]; then
+        trap on_exit EXIT
+    fi
+}
+
+#----------------------------- MAIN FUNTION -----------------
+
+perun_propagate_start() {
+	HOST_NOT_FOUND="doesn't have assigned any facility";
+
+	#choose the type of kerberos and prepare Principals (all unique hosts)
 	set -e
 	if ktutil --version </dev/null 2>&1 | grep -qi heimdal; then
 		# Heimdal
-		PRINCIPAL=`ktutil list 2>/dev/null | awk '($3~"^host/") && ($3!~"\\\.ipv6\\\.") { print $3 }' | head -1`
-		kinit --no-afslog --keytab="${KEYTAB}" "${PRINCIPAL}"
+		PRINCIPALS=`ktutil list 2>/dev/null | awk '($3~"^host/") && ($3!~"\\\.ipv6\\\.") { print $3 }' 2>/dev/null | sort | uniq`
+		KERBEROS_TYPE="heimdal"
 	else
 		# MIT Kerberos
-		PRINCIPAL=`echo -e "read_kt ${KEYTAB}\nlist" | ktutil list 2>/dev/null | awk '($3~"^host/") && ($3!~"\\\.ipv6\\\.") { print $3 }' | head -1`
-		kinit -k -t "${KEYTAB}" "${PRINCIPAL}"
+		PRINCIPALS=`echo -e "read_kt ${KEYTAB}\nlist" | ktutil list 2>/dev/null | awk '($3~"^host/") && ($3!~"\\\.ipv6\\\.") { print $3 }' 2>/dev/null | sort | uniq `
+		KERBEROS_TYPE="mit"
 	fi
 
+	#For every unique Principal do kinit and start perun-propagate
 	set +e
-	if which timeout stdbuf &>/dev/null; then
-		OUT=`timeout ${TIMEOUT} stdbuf -oL -eL remctl "${PERUN_SERVER}" perun propagate 2>&1`
-		EXIT_CODE=$?
-	else
-		OUT=`remctl "${PERUN_SERVER}" perun propagate 2>&1`
-		EXIT_CODE=$?
+	ITERATOR=0;
+	while read -r LINE; do
+		CC_FILE=`mktemp --tmpdir=/tmp/ perun-propagate-ccfile.XXXXXXXXX`
+		export KRB5CCNAME="FILE:${CC_FILE}"
+		add_on_exit "kdestroy -c ${KRB5CCNAME}"
+		if [ "${KERBEROS_TYPE}" = "heimdal" ]; then
+			kinit -k -t "${KEYTAB}" "${LINE}"
+		else	
+			kinit --no-afslog --keytab="${KEYTAB}" "${LINE}"
+		fi
+		TMP_ERROR=`mktemp --tmpdir=/tmp/ perun-propagate.XXXXXXXXX`
+		add_on_exit "rm -f ${TMP_ERROR}"
+		remctl "${PERUN_SERVER}" perun propagate 2>&1 | tee ${TMP_ERROR} | sed "s;^;$LINE:;" >> ${LOG} &
+		PID=$!
+		PID_ARRAY[$ITERATOR]=$PID
+		TMP_ERROR_ARRAY[$ITERATOR]=$TMP_ERROR
+		PRINCIPAL_ARRAY[$ITERATOR]=$LINE
+		ITERATOR=`expr $ITERATOR + 1`
+	done <<< "$PRINCIPALS"
+
+	#Start time of propagation in seconds
+	START_TIME=`date +%s`
+	#Prepare firt run of while with same START_TIME
+	NOW_TIME=$START_TIME
+	#Count of all processes in PIDS_ARRAY to know how much of them still running
+	PROCESSES_COUNT=${#PID_ARRAY[@]}
+	#Waiting for all running processes but not more than TIMEOUT in seconds
+	while [ `expr $NOW_TIME - $START_TIME` -lt "$TIMEOUT" ]; do
+		DONE_PROCESSES=0
+		for i in ${!PID_ARRAY[*]}; do
+			if is_process_running ${PID_ARRAY[$i]} ; then
+				sleep 1
+				break
+			else
+				DONE_PROCESSES=`expr $DONE_PROCESSES + 1`
+			fi
+		done
+		#All processes ended so we can continue
+		if [ "$DONE_PROCESSES" -eq "$PROCESSES_COUNT" ]; then
+			break
+		fi
+		NOW_TIME=`date +%s`
+	done
+	#Get all statuses and errors and prepare messages and exit code
+	for i in ${!PID_ARRAY[*]}; do
+		is_process_running ${PID_ARRAY[$i]}
+		#process $i is still running
+		if [ "$?" -eq 0 ]; then
+			#if still running, we want to belive this is ok so we set exit code to 0 if not in error yet
+			OUT="${OUT}Perun_propagate for host ${PRINCIPAL_ARRAY[$i]} still running even after timeout.\n"
+			if [ "${EXIT_CODE}" != "1" ]; then
+				EXIT_CODE=0
+			fi
+		else
+			#script ends so we need to get info about exit code of this script
+			WAITING_ID=`expr $i + 1`
+			wait %$WAITING_ID
+			SCRIPT_EXIT_CODE=$?
+			if [ "$SCRIPT_EXIT_CODE" -eq 0 ]; then
+				#scripts ends without error, so just add info from TMP FILE and set exit code to 0 if not in error yet
+				OUT="${OUT}Perun_propagate for host ${PRINCIPAL_ARRAY[$i]} ends with status 0.\n"
+				if [ "${EXIT_CODE}" != "1" ]; then
+					EXIT_CODE=0
+				fi
+			else
+				#script ends with error so we need to get info if this error is just a problem with host or some other problem
+				grep -q "${HOST_NOT_FOUND}" "${TMP_ERROR_ARRAY[$i]}"
+				#skip if destination not found, set error in other case
+				if [ "$?" -ne 0 ]; then
+					OUT="${OUT}Perun_propagate for host ${PRINCIPAL_ARRAY[$i]} ends with status ${SCRIPT_EXIT_CODE}.\n"
+					EXIT_CODE=1
+				fi
+			fi
+		fi
+	done
+	#Empty exit code means no found destination
+	if [ -z "${EXIT_CODE}" ]; then
+		EXIT_CODE=2
+		OUT="${OUT}No destination found for propagation!"
 	fi
 
-	kdestroy &>/dev/null
-
-	trap - ERR
-	echo "${OUT}" >"${LOG}"
-	[ ${EXIT_CODE} -ne 0 ] && echo "${OUT}" >&2
+	echo -e "${OUT}" >> "${LOG}"
+	[ "${EXIT_CODE}" != "0" ] && echo "${OUT}" >&2
 	return ${EXIT_CODE}
 }
 
+#---------------------------- MAIN METHOD WITH CASE ----------
 
 case "$1" in
-	start)
+	start|restart)
 		# Check if krb5.keytab exists
 		test ! -f "${KEYTAB}" && log_failure_msg "keytab missing" && exit 0 # Quit silently
 		
@@ -82,7 +183,7 @@ case "$1" in
 		log_end_msg $?
 		;;
 
-	stop|force-stop|restart|force-reload|status)
+	stop|force-stop|force-reload|status)
 		exit 0
 		;;
 
