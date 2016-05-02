@@ -115,6 +115,10 @@ for my $login (@logins) {
 		print FILE "mail: " . $mail . "\n";
 	}
     if (defined $workplace and length $workplace) {
+        if (length $workplace > 64) {
+            # AD has internal limit to 64 chars for department attribute
+            $workplace = substr($workplace, 0, 64);
+        }
         print FILE "Department: " . $workplace . "\n";
     }
     if (defined $workplaceId and length $workplaceId) {
