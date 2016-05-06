@@ -45,7 +45,7 @@ install: build-stamp
 	#INSTALLDOC#
 
 	# install listed folders and files only
-	dh_install -i -X .svn -X prepare_rpm_spec_file ldap voms *.d opt/perun/bin
+	dh_install -i -X .svn -X prepare_rpm_spec_file ldap voms freeipa *.d opt/perun/bin
 
 binary-arch: build install
 
