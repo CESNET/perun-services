@@ -1,9 +1,18 @@
+perun-slave (3.0.0-0.0.101) stable; urgency=medium
+
+  * Overall reimplementation of the service voms
+  * Now supports also synchronization of VOMS Roles and Group membership
+
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Wed, 6 Apr 2016 16:01:02 +0100
+
 perun-slave (3.0.0-0.0.100) stable; urgency=low
 
   * New function diff_mv_sync using sync before and after diff_mv itself, it
     is better to get actual state of data on file system.
   * Use diff_mv_sync in all services where needed instead of diff_mv.
   * Before mv and after mv use sync.
+
+ -- Michal Stava <stavamichal@gmail.com>  Tue, 22 Mar 2016 14:00:00 +0100
 
 perun-slave (3.0.0-0.0.99) stable; urgency=low
 
