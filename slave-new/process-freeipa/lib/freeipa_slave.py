@@ -49,37 +49,37 @@ def main(file, user, password, url):
         check_group(group, subgroups)
 
     print "Modify user list"
-    # users_from_perun = []
-    # for member in decoded['members']:
-    #     print " - "+member["user_login"]
-    #     # check if user exists
-    #     response = ipa_query("user_show", member["user_login"], {"no_members": True}, [4001])
-    #
-    #     user_params = {"givenname": unicode("%s %s" % (member["first_name"], member["middle_name"])).strip(),
-    #                    "displayname": unicode("%s %s %s %s %s" % (
-    #                        member["title_before"], member["first_name"], member["middle_name"], member["last_name"],
-    #                        member["title_after"])).strip(),
-    #                    "sn": member["last_name"],
-    #                    "mail": [member["mail"]],
-    #                    "title": member["title_before"]+":"+member["title_after"]}
-    #
-    #     # if user exists, update
-    #     if response['error'] is None:
-    #         # When account needs no modification, return error with code 4202 [EmptyModList]
-    #         ipa_query("user_mod", member["user_login"], user_params, [4202])
-    #
-    #     elif response['error']['code'] == 4001:
-    #         # when user doesnt exists just create it
-    #         ipa_query("user_add", member["user_login"], user_params)
-    #
-    #     for group in member['groups']:
-    #         ipa_query("group_add_member", group, {"user": member['user_login']})
-    #     users_from_perun.append(member["user_login"])
-    #
-    # print "Disable unactive users..."
-    # users_to_delete = list(set(ipa_users) - set(users_from_perun))
-    # for user in users_to_delete:
-    #     ipa_query("user_disable", user)
+    users_from_perun = []
+    for member in decoded['members']:
+        print " - "+member["user_login"]
+        # check if user exists
+        response = ipa_query("user_show", member["user_login"], {"no_members": True}, [4001])
+
+        user_params = {"givenname": unicode("%s %s" % (member["first_name"], member["middle_name"])).strip(),
+                       "displayname": unicode("%s %s %s %s %s" % (
+                           member["title_before"], member["first_name"], member["middle_name"], member["last_name"],
+                           member["title_after"])).strip(),
+                       "sn": member["last_name"],
+                       "mail": [member["mail"]],
+                       "title": member["title_before"]+":"+member["title_after"]}
+
+        # if user exists, update
+        if response['error'] is None:
+            # When account needs no modification, return error with code 4202 [EmptyModList]
+            ipa_query("user_mod", member["user_login"], user_params, [4202])
+
+        elif response['error']['code'] == 4001:
+            # when user doesnt exists just create it
+            ipa_query("user_add", member["user_login"], user_params)
+
+        for group in member['groups']:
+            ipa_query("group_add_member", group, {"user": member['user_login']})
+        users_from_perun.append(member["user_login"])
+
+    print "Disable unactive users..."
+    users_to_delete = list(set(ipa_users) - set(users_from_perun))
+    for user in users_to_delete:
+        ipa_query("user_disable", user)
 
     perun_groups = [x.lower() for x in decoded["groups"][0].keys()]
     groups_to_delete = list(set(ipa_groups) - set(perun_groups) - set(IPA_SERVICE_GROUPS))

@@ -10,7 +10,7 @@ urllib3.disable_warnings()
 # IPA connection init
 LOGIN_HEADERS = {'Content-Type': 'application/x-www-form-urlencoded'}
 ALLOWED_ERROR_CODES = []
-IPA_SERVICE_GROUPS = [u"admins"]
+IPA_SERVICE_GROUPS = [u"admins", u"ipausers"]
 
 
 def main(file, user, password, url):
@@ -31,22 +31,27 @@ def main(file, user, password, url):
 
     decoded = json.loads(input, "utf-8")
 
+    print "Get current users list..."
     # get current users lists
     response = ipa_query("user_find", "", {"in_group": "members", "pkey_only": True})
     ipa_users = []
     for member in response["result"]["result"]:
         ipa_users.append(member["uid"][0])
 
+    print "Get current groups list..."
     response = ipa_query("group_find", "", {"pkey_only": True})
     ipa_groups = []
     for group in response["result"]["result"]:
         ipa_groups.append(group["cn"][0])
 
+    print "Checking groups..."
     for group, subgroups in decoded['groups'][0].iteritems():
         check_group(group, subgroups)
 
+    print "Modify user list"
     users_from_perun = []
     for member in decoded['members']:
+        print " - "+member["user_login"]
         # check if user exists
         response = ipa_query("user_show", member["user_login"], {"no_members": True}, [4001])
 
@@ -71,15 +76,20 @@ def main(file, user, password, url):
             ipa_query("group_add_member", group, {"user": member['user_login']})
         users_from_perun.append(member["user_login"])
 
+    print "Disable unactive users..."
     users_to_delete = list(set(ipa_users) - set(users_from_perun))
     for user in users_to_delete:
-        ipa_query("user_del", user)
+        ipa_query("user_disable", user)
 
     perun_groups = [x.lower() for x in decoded["groups"][0].keys()]
     groups_to_delete = list(set(ipa_groups) - set(perun_groups) - set(IPA_SERVICE_GROUPS))
 
+    print "Delete needless groups..."
     for group in groups_to_delete:
-        ipa_query("user_del", group, {}, [4001])
+        # 4018 - systemgroup, 4309 - ProtectedEntryError
+        ipa_query("group_del", group, {}, [4018, 4309])
+
+    return 0
 
 
 def ipa_query(method, args=[], options={}, accepted_errors=[]):
