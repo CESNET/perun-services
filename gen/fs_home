@@ -126,8 +126,9 @@ foreach my $rData (@resourcesData) {
 		}
 	}
 }
-				
-for my $userAttributesByMount (values %$memberAttributesByLoginAndMount) {
+
+foreach my $sortedKey (sort keys %$memberAttributesByLoginAndMount) {
+    my $userAttributesByMount = $memberAttributesByLoginAndMount->{$sortedKey};
 	for my $userAttributes (values %$userAttributesByMount) {
 		for my $mountPoint (keys %{$userAttributes->{$A_HOME_MOUNTPOINT}}) {
 			print SERVICE_FILE $mountPoint . "\t";
@@ -140,7 +141,7 @@ for my $userAttributesByMount (values %$memberAttributesByLoginAndMount) {
 			print SERVICE_FILE $userAttributes->{$A_MR_FILESLIMIT} . "\t";
 			print SERVICE_FILE $userAttributes->{$A_HOME_MOUNTPOINT}->{$mountPoint}->{$A_USER_STATUS} . "\t";
 
-			print SERVICE_FILE join ',', map { $_ . ">" . ($userAttributes->{$STRUC_GROUPS}->{$_} || "") } keys %{$userAttributes->{$STRUC_GROUPS}};
+			print SERVICE_FILE join ',', map { $_ . ">" . ($userAttributes->{$STRUC_GROUPS}->{$_} || "") } sort keys %{$userAttributes->{$STRUC_GROUPS}};
 			print SERVICE_FILE "\n";
 
 		}
