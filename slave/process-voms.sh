@@ -13,4 +13,6 @@ function process {
 	FROM_PERUN="${WORK_DIR}/voms"
 
 	perl $EXECSCRIPT < $FROM_PERUN
+
+	exit $?
 }

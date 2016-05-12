@@ -117,6 +117,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @groups_current=`voms-admin --vo ${name} list-groups`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing groups in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		print STDERR "Failed listing groups in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
 		$retval = 1;
 		next;
 	}
@@ -126,6 +127,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @roles_current=`voms-admin --vo ${name} list-roles`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		print STDERR "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
 		$retval = 1;
 		next;
 	}
@@ -135,6 +137,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	our @cas=`voms-admin --vo ${name} list-cas`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		print STDERR "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
 		$retval = 1;
 		next;
 	}
@@ -264,5 +267,5 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 
 closelog();
 
-$retval;
+exit $retval;
 
