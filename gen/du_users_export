@@ -9,11 +9,15 @@ use Tie::IxHash;
 
 our $SERVICE_NAME = "du_users_export";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.1.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $data = perunServicesInit::getDataWithGroups;
+
+my $agent = perunServicesInit->getAgent;
+my $vosAgent = $agent->getVosAgent;
+my $usersAgent = $agent->getUsersAgent;
 
 #Constants
 our $A_USER_MAIL;                *A_USER_MAIL =                \'urn:perun:user:attribute-def:def:preferredMail';
@@ -51,6 +55,7 @@ our $A_M_STATUS;                 *A_M_STATUS =                 \'urn:perun:membe
 our $A_USER_ID;                  *A_USER_ID =                  \'urn:perun:user:attribute-def:core:id';
 our $A_USER_FIRSTNAME;           *A_USER_FIRSTNAME =           \'urn:perun:user:attribute-def:core:firstName';
 our $A_USER_LASTNAME;            *A_USER_LASTNAME =            \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_SERVICE_USER;        *A_USER_SERVICE_USER =        \'urn:perun:user:attribute-def:core:serviceUser';
 
 our $A_VO_TOEMAIL;               *A_VO_TOEMAIL =               \'urn:perun:vo:attribute-def:def:toEmail';
 our $A_VO_FROMEMAIL;             *A_VO_FROMEMAIL =             \'urn:perun:vo:attribute-def:def:fromEmail';
@@ -80,6 +85,7 @@ foreach my $rData (@resourcesData) {
 															};
 			}
 
+			#prepare shibboleth logins in required format
 			my @shibbolethLogins = ();
 			for my $idpIdentifier (keys %{$memberAttributes{$A_U_SHIBBOLETH_EXT_SOURCES}}) {
 				push @shibbolethLogins, { "src" => $idpIdentifier, 
@@ -87,19 +93,63 @@ foreach my $rData (@resourcesData) {
 																};
 			}			
 
-			#prepare shibboleth logins in required format
+			#prepare all associated users (TODO)
+			my @associatedUsers = ();
+			if($memberAttributes{$A_USER_SERVICE_USER}) {
+				my @specificUsers = $usersAgent->getUsersBySpecificUser(specificUser => $memberAttributes{$A_USER_ID});
+				my @richAssocUsersWithAttributes = $usersAgent->getRichUsersFromListOfUsersWithAttributes(users => \@specificUsers);
+				foreach my $richUser (@richAssocUsersWithAttributes) {
+				
+					#prepare attributes to hash
+					my $assocUserAttrs = {};
+					foreach my $attribute (@{$richUser->{'_userAttributes'}}) {
+						$assocUserAttrs->{$attribute->{'namespace'} . ':' . $attribute->{'friendlyName'}} = $attribute->{'value'};
+					}
+
+					#prepare kerberos logins in required format
+					my @assocUserKerberosLogins = ();
+					for my $assocUserKerberosLogin (@{$assocUserAttrs->{$A_U_KERBEROS_LOGINS}}) {
+						my $realm = $assocUserKerberosLogin;
+						$realm =~ s/^.*@//;
+						push @assocUserKerberosLogins, { "src" => $realm, 
+						                                 "id"  => $assocUserKerberosLogin, 
+						                               };
+					}
+
+					my @assocUserShibbolethLogins = ();
+					for my $idpIdentifier (keys %{$assocUserAttrs->{$A_U_SHIBBOLETH_EXT_SOURCES}}) {
+						push @assocUserShibbolethLogins, { "src" => $idpIdentifier, 
+						                                   "id"  => $assocUserAttrs->{$A_U_SHIBBOLETH_EXT_SOURCES}->{$idpIdentifier},
+						                                 };
+					}
+
+					push @associatedUsers, 
+										{
+											"PerunUserID" => $richUser->{'_id'},
+											"FirstName" => $richUser->{'_firstName'},
+											"LastName" => $richUser->{'_lastName'},
+											"PreferredMail" => $assocUserAttrs->{$A_USER_MAIL},
+											"LoginInEINFRA" => $assocUserAttrs->{$A_USER_LOGIN_EINFRA} ? $assocUserAttrs->{$A_USER_LOGIN_EINFRA}  : "",
+											"KerberosPrincipals" => \@assocUserKerberosLogins,
+											"ShibbolethPrincipals" => \@assocUserShibbolethLogins,
+										};
+				}
+			}
+			#End of associated users structure
 
 			$attributesByLogin{$memberAttributes{$A_USER_LOGIN_EINFRA}} = 
 								{
-									"LoginInEINFRA"  => $memberAttributes{$A_USER_LOGIN_EINFRA},
-									"PreferredMail"  => $memberAttributes{$A_USER_MAIL},
-									"Kerberos"       => \@kerberosLogins,
-									"Shibboleth"     => \@shibbolethLogins,
-									"PerunUserID"    => $memberAttributes{$A_USER_ID},
-									"FirstName"      => $memberAttributes{$A_USER_FIRSTNAME},
-									"LastName"       => $memberAttributes{$A_USER_LASTNAME},
-									"ResearchGroup"  => defined $memberAttributes{$A_U_RESEARCH_GROUP} ? $memberAttributes{$A_U_RESEARCH_GROUP} : "",
-									"Organization"   => defined $memberAttributes{$A_U_ORGANIZATION} ? $memberAttributes{$A_U_ORGANIZATION} : "",
+									"LoginInEINFRA"   => $memberAttributes{$A_USER_LOGIN_EINFRA},
+									"PreferredMail"   => $memberAttributes{$A_USER_MAIL},
+									"IsServiceUser"   => $memberAttributes{$A_USER_SERVICE_USER},
+									"AssociatedUsers" => \@associatedUsers,
+									"Kerberos"        => \@kerberosLogins,
+									"Shibboleth"      => \@shibbolethLogins,
+									"PerunUserID"     => $memberAttributes{$A_USER_ID},
+									"FirstName"       => $memberAttributes{$A_USER_FIRSTNAME},
+									"LastName"        => $memberAttributes{$A_USER_LASTNAME},
+									"ResearchGroup"   => defined $memberAttributes{$A_U_RESEARCH_GROUP} ? $memberAttributes{$A_U_RESEARCH_GROUP} : "",
+									"Organization"    => defined $memberAttributes{$A_U_ORGANIZATION} ? $memberAttributes{$A_U_ORGANIZATION} : "",
 								};
 
 		}
@@ -180,6 +230,52 @@ print FILE JSON::XS->new->utf8->pretty->encode($struc);
 close FILE;
 
 for my $vo (keys %attributesByVo) {
+	my $voID = $attributesByVo{$vo}->{"PerunVOID"};
+
+	#Prepare VO Admins (TODO)
+	my @specificAttributes = ($A_USER_MAIL,
+	                          $A_USER_LOGIN_EINFRA,
+	                          $A_U_KERBEROS_LOGINS,
+	                          $A_U_SHIBBOLETH_EXT_SOURCES);
+	my @voAdmins = ();
+	my @richAdmins = $vosAgent->getRichAdmins(vo => $voID, role => 'VOADMIN', specificAttributes => \@specificAttributes, allUserAttributes => 0, onlyDirectAdmins => 0,);
+	foreach my $richAdmin (@richAdmins) {
+			#prepare attributes to hash
+			my $adminAttributes = {};
+			foreach my $attribute (@{$richAdmin->{'_userAttributes'}}) {
+				$adminAttributes->{$attribute->{'namespace'} . ':' . $attribute->{'friendlyName'}} = $attribute->{'value'};
+			}
+
+			#prepare kerberos logins in required format
+	my @kerberosLogins = ();
+	for my $kerberosLogin (@{$adminAttributes->{$A_U_KERBEROS_LOGINS}}) {
+		my $realm = $kerberosLogin;
+		$realm =~ s/^.*@//;
+		push @kerberosLogins, { "src" => $realm, 
+	                          "id"  => $kerberosLogin, 
+	                        };
+	}
+
+	my @shibbolethLogins = ();
+	for my $idpIdentifier (keys %{$adminAttributes->{$A_U_SHIBBOLETH_EXT_SOURCES}}) {
+		push @shibbolethLogins, { "src" => $idpIdentifier, 
+	                            "id"  => $adminAttributes->{$A_U_SHIBBOLETH_EXT_SOURCES}->{$idpIdentifier},
+	                          };
+	}
+
+			push @voAdmins, 
+					{
+						"PerunUserID" => $richAdmin->{'_id'},
+						"FirstName" => $richAdmin->{'_firstName'},
+						"LastName" => $richAdmin->{'_lastName'},
+						"PreferredMail" => $adminAttributes->{$A_USER_MAIL},
+						"LoginInEINFRA" => $adminAttributes->{$A_USER_LOGIN_EINFRA} ? $adminAttributes->{$A_USER_LOGIN_EINFRA}  : "",
+						"KerberosPrincipals" => \@kerberosLogins,
+						"ShibbolethPrincipals" => \@shibbolethLogins,
+					};
+	}
+	#End of structure of VO Admins
+	
 	my @groups = ();
 	for my $groupName (keys %{$attributesByVo{$vo}->{"Groups"}}) {
 		push @groups,
@@ -201,6 +297,7 @@ for my $vo (keys %attributesByVo) {
 	$voStruc->{"PerunVOID"} = $attributesByVo{$vo}->{"PerunVOID"};
 	$voStruc->{"Resources"} = $attributesByVo{$vo}->{"Resources"};
 	$voStruc->{"Groups"} = \@groups;
+	$voStruc->{"Managers"} = \@voAdmins;
 
 	my $fileName = "$DIRECTORY/data/$facilityName-$vo";
 	open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
