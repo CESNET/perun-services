@@ -33,7 +33,11 @@ foreach my $rData (@resourcesData) {
 
 foreach my $login (sort keys %mailByLogin) {
 	print FILE $login . ": ";
-	print FILE $mailByLogin{$login};
+	if($mailByLogin{$login} =~ /^[\w.-]+@/) {
+		print FILE $mailByLogin{$login};
+	} else {
+		print FILE "\"$mailByLogin{$login}\"";
+	}
 	print FILE "\n";
 }
 
