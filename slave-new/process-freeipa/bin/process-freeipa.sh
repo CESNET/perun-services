@@ -10,4 +10,5 @@ function process {
 	
 	python2 $EXEC_SCRIPT --perun-file $FROM_PERUN --user $USER --password $PASSWORD --host-url $IPA_HOST
 	
+	exit $?
 }
