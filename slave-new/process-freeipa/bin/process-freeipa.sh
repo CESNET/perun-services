@@ -4,7 +4,7 @@ PROTOCOL_VERSION='3.0.0'
 function process {
 
 	FROM_PERUN="${WORK_DIR}/freeipa"
-	EXEC_SCRIPT="${SCRIPTS_DIR}/freeipa/process-freeipa.py"
+	EXEC_SCRIPT="${LIB_DIR}/freeipa/process-freeipa.py"
 
 	create_lock
 	
