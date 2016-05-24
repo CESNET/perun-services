@@ -12,7 +12,7 @@ use Data::Dumper;
 sub processGroupData; 
 sub processGroupName;
 
-local $::SERVICE_NAME = "free_ipa";
+local $::SERVICE_NAME = "freeipa";
 local $::PROTOCOL_VERSION = "3.0.0";
 my $SCRIPT_VERSION = "3.0.0";
 
@@ -46,7 +46,7 @@ foreach my $resourceData ($data->getChildElements) {
 
 for my $login (keys %{$members}) {
 	my $member = $members->{$login};
-	my @groups = keys $member->{'groups'};
+	my @groups = keys %{$member->{'groups'}};
 	$member->{'groups'} =  \@groups;
 	push @{$outputData->{'members'}}, $member;
 }
