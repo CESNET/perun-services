@@ -1,12 +1,5 @@
 #!/bin/bash
-
 PROTOCOL_VERSION='3.0.0'
-
-
-function log_both {
-	logger Perun:$@
-	echo $@ 1>&2
-}
 
 function process {
 
