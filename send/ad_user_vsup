@@ -52,6 +52,17 @@ ldap_bind($ldap, $conf[1], $conf[2]);
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
 my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn','displayName','sn','givenName','mail','userAccountControl','samAccountName']);
 
+my %ad_entries_map = ();
+
+foreach my $ad_entry (@ad_entries) {
+
+    my $login = $ad_entry->get_value('samAccountName');
+    if ($login =~ /^[0-9]+$/) {
+        $ad_entries_map{ $login } = $ad_entry;
+    }
+
+}
+
 # process data
 process_add();
 process_update();
@@ -74,21 +85,13 @@ ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
 
 #
 # Add new user entries to AD
-# We create only entries for normal UČO users
 #
 sub process_add() {
 
-	foreach my $perun_entry (@perun_entries) {
+    foreach my $perun_entry (@perun_entries) {
 
-		my $found = 0;
-		foreach my $ad_entry (@ad_entries) {
-			if ($ad_entry->get_value('samAccountName') eq $perun_entry->get_value('samAccountName')) {
-				$found = 1;
-				last;
-			}
-		}
-		
-		unless ($found) {
+        my $login = $perun_entry->get_value('samAccountName');
+        unless (exists $ad_entries_map{$login}) {
 
             # Set random password
             my $password = '"' . random_string("Cncc!ccnCn") . '"';
@@ -99,20 +102,21 @@ sub process_add() {
 
             # Add new entry to AD
             my $response = $perun_entry->update($ldap);
-			unless ($response->is_error()) {
-				# SUCCESS
-				ldap_log($service_name, "Added: " . $perun_entry->dn());
-				$counter_add++;
-			} else {
-				# FAIL
-				ldap_log($service_name, "NOT added: " . $perun_entry->dn() . " | " . $response->error());
-				ldap_log($service_name, $perun_entry->ldif());
-				$counter_fail++;
-			}
+            unless ($response->is_error()) {
+                # SUCCESS
+                ldap_log($service_name, "Added: " . $perun_entry->dn());
+                $counter_add++;
+            } else {
+                # FAIL
+                ldap_log($service_name, "NOT added: " . $perun_entry->dn() . " | " . $response->error());
+                ldap_log($service_name, $perun_entry->ldif());
+                $counter_fail++;
+            }
 
-		}
+        }
 
-	}
+    }
+
 }
 
 #
@@ -120,52 +124,49 @@ sub process_add() {
 #
 sub process_update() {
 
-	foreach my $perun_entry (@perun_entries) {
+    foreach my $perun_entry (@perun_entries) {
 
-		foreach my $ad_entry (@ad_entries) {
-			if ($ad_entry->get_value('samAccountName') eq $perun_entry->get_value('samAccountName')) {
+        if (exists $ad_entries_map{$perun_entry->get_value('samAccountName')}) {
 
-				# attrs without cn since it's part of DN to be updated
-				my @attrs = ('displayName','sn','givenName','mail','userAccountControl');
+            my $ad_entry = $ad_entries_map{$perun_entry->get_value( 'samAccountName' )};
 
-				# stored log messages to check if entry should be updated
-				my @entry_changed = ();
+            # attrs without cn since it's part of DN to be updated
+            my @attrs = ('displayName', 'sn', 'givenName', 'mail', 'userAccountControl');
 
-				# check each attribute
-				foreach my $attr (@attrs) {
-					if (compare_entry($ad_entry , $perun_entry , $attr) == 1) {
-						# store value for log
-						my @ad_val = $ad_entry->get_value($attr);
-						my @perun_val = $perun_entry->get_value($attr);
-						push(@entry_changed, "$attr | " . join(", ",sort(@ad_val)) .  " => " . join(", ",sort(@perun_val)));
-						# replace value
-						$ad_entry->replace(
-							$attr => \@perun_val
-						);
-					}
-				}
+            # stored log messages to check if entry should be updated
+            my @entry_changed = ();
 
-				if (@entry_changed) {
-					# Update entry in AD
-					my $response = $ad_entry->update($ldap);
-					unless ($response->is_error()) {
-						# SUCCESS
-						foreach my $log_message (@entry_changed) {
-							ldap_log($service_name, "Updated: " . $ad_entry->dn() . " | " . $log_message);
-						}
-						$counter_update++;
-					} else {
-						# FAIL
-						ldap_log($service_name, "NOT updated: " . $ad_entry->dn() . " | " . $response->error());
-						ldap_log($service_name, $ad_entry->ldif());
-						$counter_fail++;
-					}
-				}
+            # check each attribute
+            foreach my $attr (@attrs) {
+                if (compare_entry( $ad_entry, $perun_entry, $attr ) == 1) {
+                    # store value for log
+                    my @ad_val = $ad_entry->get_value( $attr );
+                    my @perun_val = $perun_entry->get_value( $attr );
+                    push( @entry_changed,
+                        "$attr | ".join( ", ", sort(@ad_val) )." => ".join( ", ", sort(@perun_val) ) );
+                    # replace value
+                    $ad_entry->replace(
+                        $attr => \@perun_val
+                    );
+                }
+            }
 
-				# entry found and/or updated
-				last;
-
-			}
-		}
-	}
+            if (@entry_changed) {
+                # Update entry in AD
+                my $response = $ad_entry->update( $ldap );
+                unless ($response->is_error()) {
+                    # SUCCESS
+                    foreach my $log_message (@entry_changed) {
+                        ldap_log( $service_name, "Updated: ".$ad_entry->dn()." | ".$log_message );
+                    }
+                    $counter_update++;
+                } else {
+                    # FAIL
+                    ldap_log( $service_name, "NOT updated: ".$ad_entry->dn()." | ".$response->error() );
+                    ldap_log( $service_name, $ad_entry->ldif() );
+                    $counter_fail++;
+                }
+            }
+        }
+    }
 }
