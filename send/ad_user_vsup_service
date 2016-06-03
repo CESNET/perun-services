@@ -26,7 +26,7 @@ my $counter_disable = 0;
 my $counter_fail = 0;
 
 # define service
-my $service_name = "ad_user_vsup";
+my $service_name = "ad_user_vsup_service";
 
 # GEN folder location
 my $facility_name = $ARGV[0];
@@ -235,6 +235,8 @@ sub process_disable() {
     }
 
 }
+
+
 
 #
 # Return single entry by users login
