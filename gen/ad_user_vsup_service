@@ -24,7 +24,6 @@ our $A_F_UAC;  *A_F_UAC = \'urn:perun:facility:attribute-def:def:adUAC';
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
-our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
 
@@ -80,7 +79,6 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
         $users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
         $users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
         $users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
-        $users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
 
     }
 
@@ -109,7 +107,6 @@ for my $login (@logins) {
 	my $sn = $users->{$login}->{$A_LAST_NAME};
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
 	my $displayName = $users->{$login}->{$A_DISPLAY_NAME};
-	my $mail = $users->{$login}->{$A_MAIL};
 
 	if (defined $displayName and length $displayName) {
 		print FILE "displayName: " . $displayName . "\n";
@@ -120,9 +117,8 @@ for my $login (@logins) {
 	if (defined $givenName and length $givenName) {
 		print FILE "givenName: " . $givenName . "\n";
 	}
-	if (defined $mail and length $mail) {
-		print FILE "mail: " . $mail . "\n";
-	}
+
+    print FILE "mail: " . $login . "\@" . $domain . "\n";
 
 	# print classes
 	print FILE "objectclass: top\n";
