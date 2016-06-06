@@ -165,7 +165,7 @@ sub process_update() {
             my $ad_entry = $ad_entries_map{$login};
 
             # attrs without cn since it's part of DN to be updated
-            my @attrs = ('displayName', 'sn', 'givenName', 'mail', 'userAccountControl');
+            my @attrs = ('displayName', 'sn', 'givenName', 'mail');
 
             # stored log messages to check if entry should be updated
             my @entry_changed = ();
@@ -183,6 +183,21 @@ sub process_update() {
                         $attr => \@perun_val
                     );
                 }
+            }
+
+            # check UAC
+            my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
+
+            # if disabled -> enable it
+            unless (is_uac_enabled($ad_entry_uac) == 1) {
+
+                my $original_ad_entry_uac = $ad_entry_uac;
+                my $new_ad_entry_uac = enable_uac($ad_entry_uac);
+                push( @entry_changed, "userAccountControl | $original_ad_entry_uac => $new_ad_entry_uac" );
+                $ad_entry->replace(
+                    'userAccountControl' => $new_ad_entry_uac
+                );
+
             }
 
             if (@entry_changed) {
@@ -214,11 +229,13 @@ sub process_disable() {
         my $login = $ad_entry->get_value('samAccountName');
         unless (exists $perun_entries_map{$login}) {
 
-            # if not already disabled
-            unless ($ad_entry->get_value('userAccountControl') == 514) {
+            my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
+
+            # if enabled -> disable it
+            if (is_uac_enabled($ad_entry_uac) == 1) {
 
                 # disable entry in AD
-                $ad_entry->replace( userAccountControl => 514 );
+                $ad_entry->replace( userAccountControl => disable_uac($ad_entry_uac) );
                 my $response = $ad_entry->update($ldap);
                 unless ($response->is_error()) {
                     ldap_log($service_name, "Disabled entry: " . $ad_entry->dn());

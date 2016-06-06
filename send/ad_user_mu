@@ -128,7 +128,7 @@ sub process_update() {
             my $ad_entry = $ad_entries_map{$perun_entry->get_value('samAccountName')};
 
             # attrs without cn since it's part of DN to be updated
-            my @attrs = ('displayName','sn','givenName','mail','userAccountControl','Department','departmentNumber');
+            my @attrs = ('displayName','sn','givenName','mail','Department','departmentNumber');
 
             # stored log messages to check if entry should be updated
             my @entry_changed = ();
@@ -145,6 +145,21 @@ sub process_update() {
                         $attr => \@perun_val
                     );
                 }
+            }
+
+            # check UAC
+            my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
+
+            # if disabled -> enable it
+            unless (is_uac_enabled($ad_entry_uac) == 1) {
+
+                my $original_ad_entry_uac = $ad_entry_uac;
+                my $new_ad_entry_uac = enable_uac($ad_entry_uac);
+                push( @entry_changed, "userAccountControl | $original_ad_entry_uac => $new_ad_entry_uac" );
+                $ad_entry->replace(
+                    'userAccountControl' => $new_ad_entry_uac
+                );
+
             }
 
             if (@entry_changed) {

@@ -1,7 +1,7 @@
 package ADConnector;
 use Exporter 'import';
 @ISA = ('Exporter');
-@EXPORT = qw(init_config resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members compare_entry);
+@EXPORT = qw(init_config resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members compare_entry enable_uac disable_uac is_uac_enabled);
 
 use strict;
 use warnings;
@@ -379,5 +379,62 @@ sub compare_entry($$$) {
 
 	# values are equals
 	return 0;
+
+}
+
+#
+# Set MS AD UAC value to "enabled" by setting 2nd bit of passed value to 0.
+# It doesn't modify other UAC settings !!
+#
+# Takes:
+# $uac UAC value to be set to "enabled" state
+#
+# Return:
+# UAC value in "enabled" state (with 2nd bit = 0).
+#
+sub enable_uac($) {
+
+	my $uac = shift;
+	$uac = $uac & ~2;
+	return $uac;
+
+}
+
+#
+# Set MS AD UAC value to "disabled" by setting 2nd bit of passed value to 1.
+# It doesn't modify other UAC settings !!
+#
+# Takes:
+# $uac UAC value to be set to "disabled" state
+#
+# Return:
+# UAC value in "disabled" state (with 2nd bit = 1).
+#
+sub disable_uac($) {
+
+	my $uac = shift;
+	$uac = $uac | (1<<1);
+	return $uac;
+
+}
+
+#
+# Return 1 if MS AD UAC value is "enabled", 0 if "disabled".
+#
+# Takes:
+# $uac UAC value to check "enabled" state (check in 2nd bit is set)
+#
+# Return:
+# 1 if enabled (true)
+# 0 if disabled (false)
+#
+sub is_uac_enabled($) {
+
+	my $uac = shift;
+	if ($uac & (1<<1)) {
+		return 0;
+	} else {
+		return 1;
+	}
 
 }
