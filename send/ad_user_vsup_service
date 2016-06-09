@@ -272,11 +272,10 @@ sub get_entry_by_login() {
 
     unless ($response->is_error()) {
 
-        if ($response->entries != 1) {
-            ldap_log( $service_name, "More than 1 entry found for samAccountName=$login in " . $top_dn );
-            return undef;
+        my @entries = $response->entries;
+        if (@entries != 1) {
+            ldap_log( $service_name, @entries . " entries found for samAccountName=$login in " . $top_dn );
         } else {
-            my @entries = $response->entries;
             my $entry = pop(@entries);
             return $entry;
         }

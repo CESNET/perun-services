@@ -20,7 +20,7 @@ my $data = perunServicesInit::getFlatData;
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adServiceBaseDN';
 our $A_F_DOMAIN;  *A_F_DOMAIN = \'urn:perun:facility:attribute-def:def:adDomain';
-our $A_F_UAC;  *A_F_UAC = \'urn:perun:facility:attribute-def:def:adUAC';
+our $A_F_UAC;  *A_F_UAC = \'urn:perun:facility:attribute-def:def:adServiceUAC';
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
