@@ -89,6 +89,12 @@ foreach my $resourceData ($data->getChildElements) {
 					foreach my $role (@rolesInVoForGroup) {
 						$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'groups'}->{$vomsGroupName}->{'roles'}->{$role} = 1;
 					}
+				# if name is not filled set all these roles for vo instead of group
+				} else {
+					#fill vo roles defined by group without name
+					foreach my $role (@rolesInVoForGroup) {
+						$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'roles'}->{$role} = 1;
+					}
 				}
 			}
 		}
