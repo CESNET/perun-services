@@ -82,6 +82,6 @@ else
 fi
 ERR_CODE=$?
 
-echo "Slave script ends with return code: $ERR_CODE" >&2
+echo "Communcation with slave script ends with return code: $ERR_CODE" >&2
 
 exit $ERR_CODE
