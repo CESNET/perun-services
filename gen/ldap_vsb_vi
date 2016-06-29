@@ -194,7 +194,7 @@ for my $g (@gs) {
 
 		# PRINT ALL USERS FROM RESOURCE
 		for my $u (@usrs) {
-			print FILE "uniquemember: cn=" . $u . ",ou=perun," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+			print FILE "uniquemember: cn=" . $u . ",ou=perun,ou=users," . $facilityAttributes{$A_F_BASE_DN} . "\n";
 		}
 
 		# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
