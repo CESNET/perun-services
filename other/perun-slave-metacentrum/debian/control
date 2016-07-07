@@ -8,7 +8,7 @@ Standards-Version: 3.9.5
 Package: perun-slave-metacentrum
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Conflicts:
+Conflicts: perun-slave-meta, perun-slave
 Description: Package with required dependencies for slave scripts in Metacentrum.
  Package containing all dependencies needed for regular 
  work of Perun in the Metacentrum.
