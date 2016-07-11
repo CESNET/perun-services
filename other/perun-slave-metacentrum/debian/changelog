@@ -1,3 +1,9 @@
+perun-slave-metacentrum (3.0.3) stable; urgency=low
+
+  * Create directories for pre/post scripts used by Metacentrum
+
+ -- Slavek Licehammer <slavek@ics.muni.cz>  Mon, 11 Jul 2016 15:39:58 +0200
+
 perun-slave-metacentrum (3.0.2) stable; urgency=low
 
   * Remove non-existing dependencies
