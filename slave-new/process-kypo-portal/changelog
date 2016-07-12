@@ -1,0 +1,5 @@
+perun-slave-process-kypo-portal (3.0.0) stable; urgency=low
+
+  * Added service perun-slave-kypo-portal
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Tue, 12 Jul 2016 11:35:00 +0200
