@@ -27,7 +27,7 @@ Gen and send scripts are located on your Perun instance and are used by _perun-e
 * Install required dependencies:
 
 ```
-apt-get install dh-make rpm equivs
+apt-get install dh-make rpm equivs devscripts
 ```
 
 * Go to _slave-new/_ folder and run:
