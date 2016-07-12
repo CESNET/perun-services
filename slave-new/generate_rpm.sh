@@ -7,6 +7,7 @@ echo "--------------------------------------------"
 TMPDIR="/tmp/perun-slave-rpm-build"
 GENERATE_RPM_FOR_SERVICE=$@
 SERVICE_NAME=${GENERATE_RPM_FOR_SERVICE#process-}
+CONF_SERVICE_NAME=`echo $SERVICE_NAME | tr '-' '_'`
 PREFIX="perun-slave-"
 CHANGELOG_FILE="$GENERATE_RPM_FOR_SERVICE/changelog"
 BIN_DIR="$GENERATE_RPM_FOR_SERVICE/bin/"
@@ -63,9 +64,9 @@ CUSTOM_CONF=""
 CUSTOM_FILE_DATA=""
 # conf predefined settings
 if [ $WITH_CONF == 1 ]; then
-	CUSTOM_CONF="mkdir -p %{buildroot}/etc/perun/${SERVICE_NAME}.d
-if ls -A conf/* > /dev/null 2>&1 ; then cp -r conf/* %{buildroot}/etc/perun/${SERVICE_NAME}.d ;fi"
-	CUSTOM_FILE_DATA="/etc/perun/${SERVICE_NAME}.d"
+	CUSTOM_CONF="mkdir -p %{buildroot}/etc/perun/${CONF_SERVICE_NAME}.d
+if ls -A conf/* > /dev/null 2>&1 ; then cp -r conf/* %{buildroot}/etc/perun/${CONF_SERVICE_NAME}.d ;fi"
+	CUSTOM_FILE_DATA="/etc/perun/${CONF_SERVICE_NAME}.d"
 fi
 if [ $WITH_LIB == 1 ]; then
   CUSTOM_CONF="$CUSTOM_CONF

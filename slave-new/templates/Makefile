@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 INSTALL = install
-CONFDIR = $(DESTDIR)/etc/perun/${NAME}.d
+CONFDIR = $(DESTDIR)/etc/perun/$(subst -,_,${NAME}).d
 BINDIR = $(DESTDIR)/opt/perun/bin
 LIBDIR = $(DESTDIR)/opt/perun/lib/${NAME}
 
