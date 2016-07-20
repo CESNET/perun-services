@@ -1,0 +1,108 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+local $::SERVICE_NAME = "ad_group_mu_ucn";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
+my $baseDnFileName = "$DIRECTORY/baseDN";
+
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
+our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
+our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName';
+
+# CHECK ON FACILITY ATTRIBUTES
+my %facilityAttributes = attributesToHash $data->getAttributes;
+if (!defined($facilityAttributes{$A_F_GROUP_BASE_DN})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+	exit 1;
+}
+
+my $baseGroupDN = $facilityAttributes{$A_F_GROUP_BASE_DN};
+my $baseDN = $facilityAttributes{$A_F_BASE_DN};
+my $baseDNforSpecial = "OU=Services,OU=Perun,OU=MU,DC=ucn,DC=muni,DC=cz";
+
+#
+# PRINT BASE_DN FILE
+#
+open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
+print FILE $baseGroupDN;
+close(FILE);
+
+my @resourcesData = $data->getChildElements;
+my @groups = ();
+my $usersByResource = {};
+
+# FOR EACH RESOURCE
+foreach my $rData (@resourcesData) {
+
+	my %rAttributes = attributesToHash $rData->getAttributes;
+	my $group = $rAttributes{$A_R_GROUP_NAME};
+	push(@groups, $group);
+
+	# process members
+	my @membersData = $rData->getChildElements;
+
+	# FOR EACH MEMBER ON RESOURCE
+	foreach my $mData (@membersData) {
+
+		my %mAttributes = attributesToHash $mData->getAttributes;
+		my $login = $mAttributes{$A_LOGIN};
+
+        # allow only UČO, 9UČO and s-[smth] logins
+
+		if ($login =~ /^9[0-9]{1,6}$/ or $login =~ /^[0-9]{1,6}$/) {
+
+            # store UČO and 9UČO users
+            $usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDN} = 1
+
+		} elsif ($login =~ /^s-/) {
+
+            # store "s-[something]" users - hack to be compatible with existing accounts
+            $usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDNforSpecial} = 1
+
+        }
+
+
+	}
+
+}
+
+#
+# Print group data LDIF
+#
+open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
+
+for my $group (sort @groups) {
+
+	print FILE "dn: CN=" . $group . "," . $baseGroupDN . "\n";
+	print FILE "cn: " . $group . "\n";
+	print FILE "objectClass: group\n";
+	print FILE "objectClass: top\n";
+
+	my @groupMembers = sort keys %{$usersByResource->{$group}};
+	for my $member (@groupMembers) {
+		print FILE "member: " . $member . "\n";
+	}
+
+	# there must be empty line after each entry
+	print FILE "\n";
+
+}
+
+close FILE;
+
+perunServicesInit::finalize;

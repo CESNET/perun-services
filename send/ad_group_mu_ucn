@@ -1,0 +1,201 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+no if $] >= 5.018, warnings => "smartmatch";
+use Net::LDAPS;
+use Net::LDAP::Entry;
+use Net::LDAP::Message;
+use Net::LDAP::LDIF;
+
+# Import shared AD library
+use ADConnector;
+
+sub process_add;
+sub process_remove;
+sub process_update;
+
+# log counters
+my $counter_add = 0;
+my $counter_remove = 0;
+my $counter_update = 0;
+my $counter_fail = 0;
+
+# define service
+my $service_name = "ad_group";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+
+# BASE DN
+open my $file, '<', "$service_files_dir/baseDN";
+my $base_dn = <$file>;
+chomp($base_dn);
+close $file;
+
+# propagation destination
+my $namespace = $ARGV[1];
+chomp($namespace);
+
+# init configuration
+my @conf = init_config($namespace);
+my $ldap_location = resolve_pdc($conf[0]);
+my $ldap = ldap_connect($ldap_location);
+my $filter = '(objectClass=group)';
+
+# connect
+ldap_bind($ldap, $conf[1], $conf[2]);
+
+# load all data
+my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
+my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn']);
+
+my %ad_entries_map = ();
+my %perun_entries_map = ();
+
+foreach my $ad_entry (@ad_entries) {
+    my $cn = $ad_entry->get_value('cn');
+    $ad_entries_map{ $cn } = $ad_entry;
+}
+foreach my $perun_entry (@perun_entries) {
+    my $cn = $perun_entry->get_value('cn');
+    $perun_entries_map{ $cn } = $perun_entry;
+}
+
+# process data
+process_add();
+process_remove();
+process_update();
+
+# disconnect
+ldap_unbind($ldap);
+
+# log results
+ldap_log($service_name, "Added: " . $counter_add . " entries.");
+ldap_log($service_name, "Removed: " . $counter_remove . " entries.");
+ldap_log($service_name, "Updated: " . $counter_update. " entries.");
+ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
+
+# END of main script
+
+###########################################
+#
+# Main processing functions
+#
+###########################################
+
+#
+# Add new group entries to AD
+#
+sub process_add() {
+
+    foreach my $perun_entry (@perun_entries) {
+
+        my $cn = $perun_entry->get_value('cn');
+        unless (exists $ad_entries_map{$cn}) {
+
+            # Add new entry to AD
+            my $response = $perun_entry->update($ldap);
+            unless ($response->is_error()) {
+                # SUCCESS
+                ldap_log($service_name, "Added: " . $perun_entry->dn());
+                $counter_add++;
+            } else {
+                # FAIL
+                ldap_log($service_name, "NOT added: " . $perun_entry->dn() . " | " . $response->error());
+                ldap_log($service_name, $perun_entry->ldif());
+                $counter_fail++;
+            }
+
+        }
+    }
+
+}
+
+#
+# Remove group entries in AD
+#
+sub process_remove() {
+
+    foreach my $ad_entry (@ad_entries) {
+        my $cn = $ad_entry->get_value('cn');
+        unless (exists $perun_entries_map{$cn}) {
+
+            my $response = $ldap->delete($ad_entry);
+            unless ($response->is_error()) {
+                ldap_log($service_name, "Deleted entry: " . $ad_entry->dn());
+                $counter_remove++;
+            } else {
+                ldap_log($service_name, "NOT deleted: " . $ad_entry->dn() . " | " . $response->error());
+                ldap_log($service_name, $ad_entry->ldif());
+                $counter_fail++;
+            }
+
+        }
+    }
+
+}
+
+#
+# Update group members in AD
+#
+sub process_update() {
+
+	foreach my $perun_entry (@perun_entries) {
+
+		my @per_val = $perun_entry->get_value('member');
+
+		# load members of a group from AD based on DN in Perun => Group must exists in AD
+		my @ad_val = load_group_members($ldap, $perun_entry->dn(), $filter);
+
+		if ($? != 0) {
+			ldap_log($service_name, "Unable to load Perun group members from AD: " . $perun_entry->dn());
+			next;
+		}
+
+		# sort to compare
+		my @sorted_ad_val = sort(@ad_val);
+		my @sorted_per_val = sort(@per_val);
+
+		# compare using smart-match (perl 5.10.1+)
+		unless(@sorted_ad_val ~~ @sorted_per_val) {
+
+			# members of group are not equals
+			# we must get reference to real group from AD in order to call "replace"
+			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'base' );
+			unless ($response_ad->is_error()) {
+				# SUCCESS
+				my $ad_entry = $response_ad->entry(0);
+				$ad_entry->replace(
+					'member' => \@per_val
+				);
+				# Update entry in AD
+				my $response = $ad_entry->update($ldap);
+
+				if ($response) {
+					unless ($response->is_error()) {
+						# SUCCESS (group updated)
+						$counter_update++;
+						ldap_log($service_name, "Group members updated: " . $ad_entry->dn() . " | \n" . join(",\n",@sorted_ad_val) .  "\n=>\n" . join(",\n",@sorted_per_val));
+					} else {
+						# FAIL (to update group)
+						$counter_fail++;
+						ldap_log($service_name, "Group members NOT updated: " . $ad_entry->dn() . " | " . $response->error());
+						ldap_log($service_name, $ad_entry->ldif());
+					}
+				}
+
+			} else {
+				# FAIL (to get group from AD)
+				$counter_fail++;
+				ldap_log($service_name, "Group members NOT updated: " . $perun_entry->dn() . " | " . $response_ad->error());
+			}
+		}
+
+		# group is unchanged
+
+	}
+
+}
