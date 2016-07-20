@@ -7,7 +7,7 @@ use Net::LDAP::Entry;
 use Net::LDAP::Message;
 use Net::LDAP::LDIF;
 use String::Random qw( random_string );
-use MIME::Base64 qw( encode_base64 );
+use Encode;
 
 # Import shared AD library
 use ADConnector;
