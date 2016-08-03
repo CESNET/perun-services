@@ -1,0 +1,175 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use MIME::Base64;
+use utf8;
+
+#Forward Declaration
+sub processUsers;
+sub processCostCenters;
+sub checkAttributeValue;
+
+local $::SERVICE_NAME = "safeq";
+local $::PROTOCOL_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_USER_LOGIN;             *A_USER_LOGIN =            \'urn:perun:user:attribute-def:def:login-namespace:mu';
+our $A_USER_FIRST_NAME;        *A_USER_FIRST_NAME =       \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LAST_NAME;         *A_USER_LAST_NAME =        \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_MAIL;              *A_USER_MAIL =             \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_CHIP_NUM;          *A_USER_CHIP_NUM =         \'urn:perun:user:attribute-def:def:chipNumbers';
+our $A_USER_WORKPLACE;         *A_USER_WORKPLACE =        \'urn:perun:user:attribute-def:def:workplace';
+our $A_USER_WORKPLACE_ID;      *A_USER_WORKPLACE_ID =     \'urn:perun:user:attribute-def:def:workplaceId';
+our $A_RESOURCE_ROLE;          *A_RESOURCE_ROLE =         \'urn:perun:resource:attribute-def:def:safeq-role';
+our $A_RESOURCE_BILLING_CODE;  *A_RESOURCE_BILLING_CODE = \'urn:perun:resource:attribute-def:def:safeq-billingcode';
+our $A_R_PREPAID;              *A_R_PREPAID =             \'urn:perun:resource:attribute-def:def:safeq-prepaid';
+our $A_R_PRINT_FOR_FREE;       *A_R_PRINT_FOR_FREE =      \'urn:perun:resource:attribute-def:def:safeq-printForFree';
+
+my $file = $DIRECTORY . "safeq";
+
+my $STRUC_ROLES = \0;
+my $STRUC_BILLINGCODES = \1;
+
+my %costcentersById = ( 100 => "Uživatelé bez přiřazeného pracoviště");
+my $usersByLogin;
+my $resourceAttrsByUserLogin;
+
+my @resources = $data->getChildElements;
+
+foreach my $resourceData (@resources) {
+	my @membersData = $resourceData->getChildElements;
+	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
+
+	for my $memberAttributes (dataToAttributesHashes @membersData) {
+		processUsers $memberAttributes, \%resourceAttributes;
+	}
+}
+
+
+open FILE,">$file" or die "Cannot open $file: $! \n";
+binmode FILE,":utf8";
+
+# safeq_costcenters
+## dn: costcenterno=1000001, ou=costcenters, o=ysoftsafeq
+## objectclass: ysqcostcenter
+## costcenterno: 1000001
+## costcentername: Human Resources
+foreach my $id (sort keys %costcentersById) {
+	print FILE "dn: costcenterno=", $id, ", ou=costcenters, o=ysoftsafeq", "\n";
+	print FILE "objectclass: ysqcostcenter", "\n";
+	print FILE "costcenterno: ", $id, "\n";
+	print FILE "costcentername: ", checkAttributeValue($costcentersById{$id}), "\n";
+	print FILE "\n";
+}
+
+
+
+
+# safeq_users
+## dn: username=johndoe, ou=users, o=ysoftsafeq
+## objectclass: ysquser
+## username: johndoe
+## ldapauthdn: cn=johndoe, ou=users, ou=mu, dc=ucn, dc=muni, dc=cz
+## firstname: John
+## lastname: Doe
+## costcenter: costcenterno=1000001, ou=costcenters, o=ysoftsafeq
+## email: johndoe@muni.cz
+## card: CARD87654321
+## card: CARD98765432
+## role: rolename=student, ou=roles, o=ysoftsafeq
+## billingcode: billincode=bc1, ou=billingcodes, o=ysoftsafeq
+## prepaid: FALSE
+foreach my $login (sort keys %$usersByLogin) {
+	my $attributes = $usersByLogin->{$login};
+
+	print FILE "dn: username=", $login,", ou=users, o=ysoftsafeq", "\n";
+	print FILE "objectclass: ysquser", "\n";
+	print FILE "username: ", $login, "\n";
+	print FILE "ldapauthdn: cn=", $login, ", ou=users, ou=mu, dc=ucn, dc=muni, dc=cz", "\n";
+	print FILE "firstname: ", checkAttributeValue($attributes->{$A_USER_FIRST_NAME}), "\n";
+	print FILE "lastname: ", checkAttributeValue($attributes->{$A_USER_LAST_NAME}), "\n";
+	print FILE "costcenter: costcenterno=", $attributes->{$A_USER_WORKPLACE_ID} || 100, ", ou=costcenters, o=ysoftsafeq", "\n";
+	print FILE "email: ", checkAttributeValue($attributes->{$A_USER_MAIL}), "\n";
+	print FILE "homedir:: ", encode_base64('\\\\nfs' . ($attributes->{$A_USER_LOGIN} % 7 + 1) . '.ucn.muni.cz\\profiles\\' . $attributes->{$A_USER_LOGIN});
+
+	foreach my $chipNumber (@{$attributes->{$A_USER_CHIP_NUM}}) {
+		print FILE "card: ", $chipNumber, "\n";
+	}
+
+	foreach my $role (keys %{$resourceAttrsByUserLogin->{$login}->{$STRUC_ROLES}}) {
+		  print FILE "role: $role\n";
+	}
+	print FILE "role: everyone", "\n";
+
+	foreach my $billingcode (keys %{$resourceAttrsByUserLogin->{$login}->{$STRUC_BILLINGCODES}}) {
+		print FILE "billingcode: billingcode=", $billingcode, ", ou=billingcodes, o=ysoftsafeq", "\n";
+	}
+
+	if($attributes->{$A_R_PRINT_FOR_FREE}) {
+		print FILE "pricelistname: bezplatny tisk - zamestnanci\n";
+	}
+
+	print FILE "prepaid: ", $attributes->{$A_R_PREPAID} ? "TRUE" : "FALSE", "\n";
+	print FILE "\n";
+}
+
+close (FILE) or die "Cannot close $file: $! \n";
+perunServicesInit::finalize;
+
+##############################################################################
+#   Only subs definitions down there
+##############################################################################
+
+sub processUsers {
+	my $memberAttributes = shift;
+	my $resourceAttributes = shift;
+	my $login = $memberAttributes->{$A_USER_LOGIN};
+
+	unless(defined $usersByLogin->{$memberAttributes->{$A_USER_LOGIN}}) {
+	my %tmp =  ( %$memberAttributes, %$resourceAttributes );
+		$usersByLogin->{$memberAttributes->{$A_USER_LOGIN}} = $memberAttributes;
+		$usersByLogin->{$memberAttributes->{$A_USER_LOGIN}}->{$A_R_PREPAID} = $resourceAttributes->{$A_R_PREPAID};
+		$usersByLogin->{$memberAttributes->{$A_USER_LOGIN}}->{$A_R_PRINT_FOR_FREE} = ( $resourceAttributes->{$A_R_PRINT_FOR_FREE} || 0) ;
+	} else {
+		$usersByLogin->{$memberAttributes->{$A_USER_LOGIN}}->{$A_R_PREPAID} |= ($resourceAttributes->{$A_R_PREPAID} || 0);
+		$usersByLogin->{$memberAttributes->{$A_USER_LOGIN}}->{$A_R_PRINT_FOR_FREE} |= ( $resourceAttributes->{$A_R_PRINT_FOR_FREE} || 0) ;
+	}
+
+	$resourceAttrsByUserLogin->{$login}->{$STRUC_ROLES}->{$resourceAttributes->{$A_RESOURCE_ROLE}} = 1 if defined $resourceAttributes->{$A_RESOURCE_ROLE};
+	$resourceAttrsByUserLogin->{$login}->{$STRUC_BILLINGCODES}->{$resourceAttributes->{$A_RESOURCE_BILLING_CODE}} = 1 if defined $resourceAttributes->{$A_RESOURCE_BILLING_CODE};
+
+	if($memberAttributes->{$A_USER_WORKPLACE_ID}) {
+		processCostCenters $memberAttributes->{$A_USER_WORKPLACE_ID}, $memberAttributes->{$A_USER_WORKPLACE};
+	}
+}
+
+sub processCostCenters {
+	my $costCenterId = shift;
+	my $costCenterName = shift;
+
+	$costcentersById{$costCenterId} = $costCenterName unless defined $costcentersById{$costCenterId};
+}
+
+# method looks for specific characters/symbols in the scalar $value
+# and escapes each of them using backslash
+sub checkAttributeValue {
+	my $value = shift;
+
+	# escape one of the characters inside the string: ",", "+", """, "\", "<", ">" or ";"
+	#$value =~ s/[,+"\\><;]/\\${^MATCH}/pg;
+
+	# escape a whitespace or "#" character occurring at the beginning of the string
+	#$value =~ s/^\s|^#/\\${^MATCH}/pg;
+
+	# escape a whitespace character occurring at the end of the string
+	#$value =~ s/\s$/\\ /g;
+
+	return $value;
+}
