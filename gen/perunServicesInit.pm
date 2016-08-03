@@ -1,4 +1,4 @@
-	#!/usr/bin/perl
+#!/usr/bin/perl
 package perunServicesInit;
 
 use Exporter 'import';
@@ -49,7 +49,7 @@ sub init {
 	} else {
 		unless(defined $facilityId) { die "ERROR: facilityId required"; }
 
-		$agent = Perun::Agent->new();
+		$agent = Perun::Agent->new('jsonsimple');
 		$servicesAgent = $agent->getServicesAgent;
 		my $facilitiesAgent = $agent->getFacilitiesAgent;
 		$service = $servicesAgent->getServiceByName( name => $::SERVICE_NAME);
