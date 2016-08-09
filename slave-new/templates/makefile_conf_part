@@ -1,2 +1,2 @@
 	$(INSTALL) -d -m 755 $(CONFDIR)
-	$(INSTALL) ./conf/* $(CONFDIR)
+	if ls -A ./conf/* > /dev/null 2>&1 ; then $(INSTALL) ./conf/* $(CONFDIR) ;fi

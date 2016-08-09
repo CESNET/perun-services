@@ -25,7 +25,8 @@ if [ ! -d "$GENERATE_RPM_FOR_SERVICE" ]; then
 fi
 
 WITH_CONF=0
-if [ -d "$CONF_DIR" ]; then
+# If this is process-XY, set config dir (not for base or meta)
+if echo ${GENERATE_RPM_FOR_SERVICE} | grep --quiet 'process-'; then
 	WITH_CONF=1
 fi
 
@@ -63,7 +64,7 @@ CUSTOM_FILE_DATA=""
 # conf predefined settings
 if [ $WITH_CONF == 1 ]; then
 	CUSTOM_CONF="mkdir -p %{buildroot}/etc/perun/${SERVICE_NAME}.d
-cp -r conf/* %{buildroot}/etc/perun/${SERVICE_NAME}.d"
+if ls -A conf/* > /dev/null 2>&1 ; then cp -r conf/* %{buildroot}/etc/perun/${SERVICE_NAME}.d ;fi"
 	CUSTOM_FILE_DATA="/etc/perun/${SERVICE_NAME}.d"
 fi
 if [ $WITH_LIB == 1 ]; then
