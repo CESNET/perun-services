@@ -64,7 +64,7 @@ foreach my $rData (@resourcesData) {
 
         # allow only UČO, 9UČO and s-[smth] logins
 
-		if ($login =~ /^9[0-9]{1,6}$/ or $login =~ /^[0-9]{1,6}$/) {
+		if ($login =~ /^9[0-9]{6}$/ or $login =~ /^[0-9]{1,6}$/) {
 
             # store UČO and 9UČO users
             $usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDN} = 1

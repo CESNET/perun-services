@@ -81,7 +81,7 @@ binmode FILE, ":utf8";
 my @logins = sort keys %{$users};
 for my $login (@logins) {
 
-	unless ($login =~ /^9[0-9]{1,6}$/) {
+	unless ($login =~ /^9[0-9]{6}$/) {
 		# Allow only 9UČO users !!
 		next;
 	}

@@ -55,7 +55,7 @@ my %ad_entries_map = ();
 foreach my $ad_entry (@ad_entries) {
 
     my $login = $ad_entry->get_value('samAccountName');
-    if ($login =~ /^9[0-9]{1,6}$/) {
+    if ($login =~ /^9[0-9]{6}$/) {
         # We now always skip non-9UČO users !!
         $ad_entries_map{ $login } = $ad_entry;
     }
@@ -92,7 +92,7 @@ sub process_add() {
 
 		# We create only entries for normal UČO users
         my $login = $perun_entry->get_value('samAccountName');
-        unless ($login =~ /^9[0-9]{1,6}$/) {
+        unless ($login =~ /^9[0-9]{6}$/) {
             # We now always skip non-9UČO users !!
             next;
         }
