@@ -1,0 +1,87 @@
+#!/bin/bash
+
+SERVICE_NAME="safeq"
+
+TIMEOUT="5400" #90s * 60 sec = 1.5h
+TIMEOUT_KILL="60" # 60 sec to kill after timeout
+
+FACILITY_NAME=$1
+DESTINATION=$2
+DESTINATION_TYPE=$3
+
+SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
+SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
+
+#Just safety check. This should not happen.
+if [ ! -d "$SERVICE_FILES_DIR" ]; then echo '$SERVICE_FILES_DIR: '$SERVICE_FILES_DIR' is not a directory' >&2 ; exit 1; fi
+
+#unless specific configuration for destination exists use common configuration for all destination
+[ -d "$SERVICE_FILES_FOR_DESTINATION" ] || SERVICE_FILES_FOR_DESTINATION="$SERVICE_FILES_DIR/_destination/all"
+
+
+#if there is no destination type, use default 'host'
+if [ -z "$DESTINATION_TYPE" ]; then
+	DESTINATION_TYPE="service-specific"
+fi
+
+case $DESTINATION_TYPE in
+	service-specific)
+		DESTINATION_DIR="$DESTINATION"
+		;;
+	*)
+		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
+		exit 1;
+		;;
+esac
+
+
+	# sort & diff scripts from CPAN
+LDIFDIFF="./ldifdiff.pl"
+LDIFSORT="./ldifsort.pl"
+
+SAFEQ_LDIF_SORT="./safeq-ldif-sort.pl";
+
+
+# work files location
+INFILE="$SERVICE_FILES_DIR/safeq"
+OLD_FILE="$DESTINATION_DIR/safeq-content.ldif"
+
+# sorted work files
+SINFILE=`mktemp --tmpdir=/tmp sorted-safeq-XXXXXX.ldif`
+S_OLD_FILE=`mktemp --tmpdir=/tmp sorted-safeq-old-XXXXXXX.ldif`
+
+FINAL=`mktemp safeq-final-XXXXXX.ldif`
+
+if test -s "$OLD_FILE"; then
+# LDAP is not empty under base DN
+
+	# SORT LDIFs
+	$LDIFSORT -k dn $OLD_FILE >$S_OLD_FILE
+	$LDIFSORT -k dn $INFILE >$SINFILE
+
+	# DIFF LDIFs
+	$LDIFDIFF -k dn $SINFILE $S_OLD_FILE | sed '1,1{/^$/d; }; /^[^ ].*/N; s/\n //g' | $SAFEQ_LDIF_SORT > "$FINAL"
+
+else
+# LDAP is empty under base DN
+
+	echo "File with old stat is missing: $OLD_FILE"  >&2
+	exit 5;
+
+	#$LDIFSORT -k dn $INFILE >$SINFILE
+
+	#$LDIFDIFF -k dn $SINFILE /dev/null | sed '1,1{/^$/d; }; /^[^ ].*/N; s/\n //g' | $SAFEQ_LDIF_SORT  > "$FINAL"
+
+fi
+
+rm "$SINFILE" "$S_OLD_FILE"
+TIMESTAMP=`date "+%F_%H.%M.%S"`
+
+if [ `stat -c %s "$FINAL"` -gt 1  ]; then #first line of file is always empty
+	mv "$FINAL" "$DESTINATION_DIR/data/safeq-$TIMESTAMP.ldif"
+else
+	rm "$FINAL"
+	echo No changes
+fi
+mv "$OLD_FILE" "$DESTINATION_DIR/data-from-perun/safeq-content-$TIMESTAMP.ldif"
+cp "$INFILE" "$OLD_FILE"
