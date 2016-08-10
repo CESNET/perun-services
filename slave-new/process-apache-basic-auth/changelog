@@ -1,3 +1,10 @@
+perun-slave-process-apache-basic-auth (3.1.3) stable; urgency=medium
+
+  * Generate configuration directory /etc/perun/X_Y.d automatically even
+    if there is no configuration file in it
+
+ -- Michal Stava <stavamichal@gmail.com>  Wed, 10 Aug 2016 13:51:02 +0200
+
 perun-slave-process-apache-basic-auth (3.1.2) stable; urgency=low
 
   * Use new function diff_mv_sync instead of diff_mv. Using sync before
