@@ -4,9 +4,8 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
-use Data::Dumper;
 
-local $::SERVICE_NAME = "ad_mu_guest";
+local $::SERVICE_NAME = "ad_user_vsup";
 local $::PROTOCOL_VERSION = "3.0.0";
 my $SCRIPT_VERSION = "3.0.0";
 
@@ -14,72 +13,82 @@ perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
+my $topDnFileName = "$DIRECTORY/topDN";
 
 my $data = perunServicesInit::getFlatData;
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
-
-# User attributes
+our $A_F_DOMAIN;  *A_F_DOMAIN = \'urn:perun:facility:attribute-def:def:adDomain';
+our $A_F_UAC;  *A_F_UAC = \'urn:perun:facility:attribute-def:def:adUAC';
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
-our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
-our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:mu';
-
-# GATHER USERS
-my $users;  # $users->{$login}->{ATTR} = $attrValue;
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
 if (!defined($facilityAttributes{$A_F_BASE_DN})) {
 	exit 1;
 }
+if (!defined($facilityAttributes{$A_F_DOMAIN})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_UAC})) {
+	exit 1;
+}
+
+my $baseDN = $facilityAttributes{$A_F_BASE_DN};
+my $domain = $facilityAttributes{$A_F_DOMAIN};
+my $uac = $facilityAttributes{$A_F_UAC};
+
+# GATHER USERS
+my $users;  # $users->{$login}->{ATTR} = $attrValue;
 
 #
-# PRINT BASE_DN FILEs
+# PRINT BASE_DN FILE
 #
-my $base_guests = "OU=Guests,".$facilityAttributes{$A_F_BASE_DN};
-my $base_service = "OU=Services,".$facilityAttributes{$A_F_BASE_DN};
+open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
+print FILE $baseDN;
+close(FILE);
 
-open FILE,">$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
-print FILE $facilityAttributes{$A_F_BASE_DN};
+#
+# PRINT TOP_DN FILE
+#
+open FILE,">:encoding(UTF-8)","$topDnFileName" or die "Cannot open $topDnFileName: $! \n";
+$baseDN =~ m/(dc=(.*))/;
+print FILE $1;
 close(FILE);
 
 #
 # AGGREGATE DATA
 #
-
 # FOR EACH USER
 foreach my $user (($data->getChildElements)[1]->getChildElements) {
 
 	my %uAttributes = attributesToHash $user->getAttributes;
 
-	my $login = $uAttributes{$A_LOGIN};
+    # Print only standard user accounts
+    unless (defined $uAttributes{$A_IS_SERVICE} and ($uAttributes{$A_IS_SERVICE} == 1)) {
 
-	if ( $login =~ /^s-/ ) {
-		# is service user
-		$users->{$login}->{"DN"} = "CN=" . $uAttributes{$A_LOGIN} . "," . $base_service;
-	} elsif ($login =~ /^e[0-9]{1,6}$/) {
-		# is guest user
-		$users->{$login}->{"DN"} = "CN=" . $uAttributes{$A_LOGIN} . "," . $base_guests;
-	} else {
-		# skip standard MU users !!
-		next;
-	}
+        my $login = $uAttributes{$A_LOGIN};
 
-	# store standard attrs
-	$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
-	$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
-	$users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
-	$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
+        $users->{$login}->{"DN"} = "CN=".$uAttributes{$A_LOGIN}.",".$baseDN;
+        # store standard attrs
+        $users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
+        $users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
+        $users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
+
+    }
 
 }
 
 #
 # PRINT user data LDIF
 #
-open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
 
 # FOR EACH USER ON FACILITY
 my @logins = sort keys %{$users};
@@ -88,16 +97,16 @@ for my $login (@logins) {
 	# print attributes, which are never empty
 	print FILE "dn: " . $users->{$login}->{"DN"} . "\n";
 
+	print FILE "cn: " . $login . "\n";
 	print FILE "samAccountName: " . $login . "\n";
-	print FILE "userPrincipalName: " . $login . "\@ucn.muni.cz" . "\n";
+	print FILE "userPrincipalName: " . $login . "\@" . $domain . "\n";
 	# enable accounts (if not) using service propagation
-	print FILE "userAccountControl: " . 66080 . "\n";
+	print FILE "userAccountControl: " . $uac . "\n";
 
-	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
+	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME,...)
 	my $sn = $users->{$login}->{$A_LAST_NAME};
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
 	my $displayName = $users->{$login}->{$A_DISPLAY_NAME};
-	my $mail = $users->{$login}->{$A_MAIL};
 
 	if (defined $displayName and length $displayName) {
 		print FILE "displayName: " . $displayName . "\n";
@@ -108,9 +117,8 @@ for my $login (@logins) {
 	if (defined $givenName and length $givenName) {
 		print FILE "givenName: " . $givenName . "\n";
 	}
-	if (defined $mail and length $mail) {
-		print FILE "mail: " . $mail . "\n";
-	}
+
+    print FILE "mail: " . $login . "\@" . $domain . "\n";
 
 	# print classes
 	print FILE "objectclass: top\n";

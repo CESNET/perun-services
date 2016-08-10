@@ -21,7 +21,7 @@ my $counter_update = 0;
 my $counter_fail = 0;
 
 # define service
-my $service_name = "ad_group";
+my $service_name = "ad_group_mu_ucn";
 
 # GEN folder location
 my $facility_name = $ARGV[0];

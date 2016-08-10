@@ -1,0 +1,321 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+no if $] >= 5.018, warnings => "smartmatch";
+use Net::LDAPS;
+use Net::LDAP::Entry;
+use Net::LDAP::Message;
+use Net::LDAP::LDIF;
+use String::Random qw( random_string );
+use Encode;
+
+# Import shared AD library
+use ADConnector;
+
+sub process_add;
+sub process_update;
+sub process_disable;
+sub get_entry_by_login;
+sub move_entry;
+
+# log counters
+my $counter_add = 0;
+my $counter_move = 0;
+my $counter_update = 0;
+my $counter_disable = 0;
+my $counter_fail = 0;
+
+# define service
+my $service_name = "ad_user_vsup";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+
+# BASE DN
+open my $file, '<', "$service_files_dir/baseDN";
+my $base_dn = <$file>;
+chomp($base_dn);
+close $file;
+
+# TOP DN
+open my $file2, '<', "$service_files_dir/topDN";
+my $top_dn = <$file2>;
+chomp($top_dn);
+close $file2;
+
+# propagation destination
+my $namespace = $ARGV[1];
+chomp($namespace);
+
+# init configuration
+my @conf = init_config($namespace);
+my $ldap_location = resolve_pdc($conf[0]);
+my $ldap = ldap_connect($ldap_location);
+my $filter = '(objectClass=person)';
+
+# connect
+ldap_bind($ldap, $conf[1], $conf[2]);
+
+# load all data
+my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
+my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn','displayName','sn','givenName','mail','userAccountControl','samAccountName']);
+
+# put it in a mep to speed processing
+my %ad_entries_map = ();
+my %perun_entries_map = ();
+
+foreach my $ad_entry (@ad_entries) {
+    my $login = $ad_entry->get_value('samAccountName');
+    $ad_entries_map{ $login } = $ad_entry;
+}
+foreach my $perun_entry (@perun_entries) {
+    my $login = $perun_entry->get_value('samAccountName');
+    $perun_entries_map{ $login } = $perun_entry;
+}
+
+# process data
+process_add();
+process_update();
+process_disable();
+
+# disconnect
+ldap_unbind($ldap);
+
+# log results
+ldap_log($service_name, "Added: " . $counter_add . " entries.");
+ldap_log($service_name, "Renamed: " . $counter_move . " entries.");
+ldap_log($service_name, "Updated: " . $counter_update. " entries (including renamed).");
+ldap_log($service_name, "Disabled: " . $counter_disable. " entries.");
+ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
+
+# END of main script
+
+###########################################
+#
+# Main processing functions
+#
+###########################################
+
+#
+# Add new user entries to AD
+#
+sub process_add() {
+
+    foreach my $perun_entry (@perun_entries) {
+
+        my $login = $perun_entry->get_value('samAccountName');
+        unless (exists $ad_entries_map{$login}) {
+
+            # CHECK IF NOT IN different OU: OU=New or OU=vsup
+            my $existing_entry = get_entry_by_login($login);
+
+            if (defined $existing_entry) {
+
+                # Move entry to correct OU
+                move_entry($existing_entry, $login, $base_dn);
+
+                # put it between ad_entries so it got updated in a next step
+                $ad_entries_map{$login} = $existing_entry;
+
+            } else {
+
+                # create new entry with random password
+
+                my $password = '"' . random_string("Cncc!ccnCn") . '"';
+                my $converted_pass = encode("UTF-16LE",'"'.$password.'"');
+                $perun_entry->add(
+                    unicodePwd => $converted_pass
+                );
+
+                # Add new entry to AD
+                my $response = $perun_entry->update($ldap);
+                unless ($response->is_error()) {
+                    # SUCCESS
+                    ldap_log($service_name, "Added: " . $perun_entry->dn());
+                    $counter_add++;
+                } else {
+                    # FAIL
+                    ldap_log($service_name, "NOT added: " . $perun_entry->dn() . " | " . $response->error());
+                    ldap_log($service_name, $perun_entry->ldif());
+                    $counter_fail++;
+                }
+
+            }
+
+        }
+
+    }
+
+}
+
+#
+# Update existing user entries in AD
+#
+sub process_update() {
+
+    foreach my $perun_entry (@perun_entries) {
+
+        my $login = $perun_entry->get_value('samAccountName');
+
+        if (exists $ad_entries_map{$login}) {
+
+            my $ad_entry = $ad_entries_map{$login};
+
+            # attrs without cn since it's part of DN to be updated
+            my @attrs = ('displayName', 'sn', 'givenName', 'mail');
+
+            # stored log messages to check if entry should be updated
+            my @entry_changed = ();
+
+            # check each attribute
+            foreach my $attr (@attrs) {
+                if (compare_entry( $ad_entry, $perun_entry, $attr ) == 1) {
+                    # store value for log
+                    my @ad_val = $ad_entry->get_value( $attr );
+                    my @perun_val = $perun_entry->get_value( $attr );
+                    push( @entry_changed,
+                        "$attr | ".join( ", ", sort(@ad_val) )." => ".join( ", ", sort(@perun_val) ) );
+                    # replace value
+                    $ad_entry->replace(
+                        $attr => \@perun_val
+                    );
+                }
+            }
+
+            # check UAC
+            my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
+
+            # if disabled -> enable it
+            unless (is_uac_enabled($ad_entry_uac) == 1) {
+
+                my $original_ad_entry_uac = $ad_entry_uac;
+                my $new_ad_entry_uac = enable_uac($ad_entry_uac);
+                push( @entry_changed, "userAccountControl | $original_ad_entry_uac => $new_ad_entry_uac" );
+                $ad_entry->replace(
+                    'userAccountControl' => $new_ad_entry_uac
+                );
+
+            }
+
+            if (@entry_changed) {
+                # Update entry in AD
+                my $response = $ad_entry->update( $ldap );
+                unless ($response->is_error()) {
+                    # SUCCESS
+                    foreach my $log_message (@entry_changed) {
+                        ldap_log( $service_name, "Updated: ".$ad_entry->dn()." | ".$log_message );
+                    }
+                    $counter_update++;
+                } else {
+                    # FAIL
+                    ldap_log( $service_name, "NOT updated: ".$ad_entry->dn()." | ".$response->error() );
+                    ldap_log( $service_name, $ad_entry->ldif() );
+                    $counter_fail++;
+                }
+            }
+        }
+    }
+}
+
+#
+# Disable user entries in AD which are not present in Perun
+#
+sub process_disable() {
+
+    foreach my $ad_entry (@ad_entries) {
+        my $login = $ad_entry->get_value('samAccountName');
+        unless (exists $perun_entries_map{$login}) {
+
+            my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
+
+            # if enabled -> disable it
+            if (is_uac_enabled($ad_entry_uac) == 1) {
+
+                # disable entry in AD
+                $ad_entry->replace( userAccountControl => disable_uac($ad_entry_uac) );
+                my $response = $ad_entry->update($ldap);
+                unless ($response->is_error()) {
+                    ldap_log($service_name, "Disabled entry: " . $ad_entry->dn());
+                    $counter_disable++;
+                } else {
+                    ldap_log($service_name, "NOT disabled: " . $ad_entry->dn() . " | " . $response->error());
+                    ldap_log($service_name, $ad_entry->ldif());
+                    $counter_fail++;
+                }
+
+            }
+
+        }
+    }
+
+}
+
+#
+# Return single entry by users login
+#
+sub get_entry_by_login() {
+
+    my $login = shift;
+    my $filter = "(samAccountName=$login)";
+
+    # Get current entry from AD
+    my $response = $ldap->search( base => $top_dn ,
+        scope => 'sub' ,
+        filter => $filter ,
+        attrs => ['cn','displayName','sn','givenName','mail','userAccountControl','samAccountName']
+    );
+
+    unless ($response->is_error()) {
+
+        my @entries = $response->entries;
+        if (@entries != 1) {
+            ldap_log( $service_name, @entries . " entries found for samAccountName=$login in " . $top_dn );
+            return undef;
+        } else {
+            my $entry = pop(@entries);
+            return $entry;
+        }
+
+    } else {
+
+        ldap_log( $service_name, "samAccountName=$login NOT found in " . $top_dn . " " . $response->error() );
+        return undef;
+
+    }
+
+}
+
+#
+# Move AD/LDAP entry (by changing DN) to CN=newCN,[defined superior entry].
+#
+# @param $ad_entry 		NET::LDAP::Entry retrieved from AD/LDAP
+# @param $perun_cn 		String new CN of entry (to rename to)
+# @param $branch  		String DN of new superior entry (where to move entry to)
+#
+sub move_entry() {
+
+    my $ad_entry = shift;
+    my $perun_cn = shift;
+    my $branch = shift;
+
+    # If CN changed update DN of entry (move it)
+    my $ad_cn = $ad_entry->get_value('cn');
+    if ($ad_cn eq $perun_cn) {
+        my $ad_dn = $ad_entry->dn();
+        my $response = $ldap->moddn($ad_entry, newrdn => "CN=" . $perun_cn , deleteoldrdn => 1, newsuperior => $branch);
+        unless ($response->is_error()) {
+            # SUCCESS
+            ldap_log( $service_name, "Renamed: " . $ad_dn . " => " . "CN=" . $perun_cn . "," . $branch);
+            $counter_move++;
+        } else {
+            # FAIL
+            ldap_log( $service_name, "NOT renamed: " . $ad_dn . " | " . $response->error());
+            ldap_log( $service_name, $ad_entry->ldif());
+            $counter_fail++;
+        }
+    }
+
+}
