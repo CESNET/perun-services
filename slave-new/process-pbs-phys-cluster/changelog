@@ -1,3 +1,11 @@
+perun-slave-process-pbs-phys-cluster (3.1.3) stable; urgency=medium
+
+  * Change service name in /etc/perun/{service}.d/ to match real service
+    name, not name taken from package name. (Usually that means
+    substitute '_' for '-').
+
+ -- Slavek Licehammer <slavek@ics.muni.cz>  Thu, 11 Aug 2016 13:02:06 +0200
+
 perun-slave-process-pbs-phys-cluster (3.1.2) stable; urgency=low
 
   * Change path from /etc/perun/process-{service}.d/ to /etc/perun/{service}.d
