@@ -1,3 +1,12 @@
+perun-slave-metacentrum (3.0.4) stable; urgency=low
+
+  * No changes, only verion bump.
+  * There was some changes in other perun-slave-* packages, but technicians
+    from Metacentrum having trouble to update them without updating this one.
+    Therefore version of this package must be increased.
+
+ -- Slavek Licehammer <slavek@ics.muni.cz>  Fri, 12 Aug 2016 16:05:19 +0200
+
 perun-slave-metacentrum (3.0.3) stable; urgency=low
 
   * Create directories for pre/post scripts used by Metacentrum
