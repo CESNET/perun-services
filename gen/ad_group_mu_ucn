@@ -90,6 +90,7 @@ for my $group (sort @groups) {
 
 	print FILE "dn: CN=" . $group . "," . $baseGroupDN . "\n";
 	print FILE "cn: " . $group . "\n";
+	print FILE "samAccountName: " . $group . "\n";
 	print FILE "objectClass: group\n";
 	print FILE "objectClass: top\n";
 
