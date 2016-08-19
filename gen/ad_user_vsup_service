@@ -26,6 +26,7 @@ our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
+our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -79,6 +80,7 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
         $users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
         $users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
         $users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
+		$users->{$login}->{$A_UCO} = $uAttributes{$A_UCO};
 
     }
 
@@ -107,6 +109,7 @@ for my $login (@logins) {
 	my $sn = $users->{$login}->{$A_LAST_NAME};
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
 	my $displayName = $users->{$login}->{$A_DISPLAY_NAME};
+	my $uco = $users->{$login}->{$A_UCO};
 
 	if (defined $displayName and length $displayName) {
 		print FILE "displayName: " . $displayName . "\n";
@@ -119,6 +122,10 @@ for my $login (@logins) {
 	}
 
     print FILE "mail: " . $login . "\@" . $domain . "\n";
+
+	if (defined $uco and length $uco) {
+		print FILE "vsupPersonPersonalId: " . $uco . "\n";
+	}
 
 	# print classes
 	print FILE "objectclass: top\n";

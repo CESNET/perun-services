@@ -9,6 +9,7 @@ use Net::LDAP::LDIF;
 
 # Import shared AD library
 use ADConnector;
+use SendUtils;
 
 sub process_add;
 sub process_remove;
@@ -38,6 +39,9 @@ close $file;
 # propagation destination
 my $namespace = $ARGV[1];
 chomp($namespace);
+
+# create service lock
+SendUtils::lock_file($facility_name . "_" . $service_name . "_" . $namespace);
 
 # init configuration
 my @conf = init_config($namespace);
@@ -77,6 +81,8 @@ ldap_log($service_name, "Added: " . $counter_add . " entries.");
 ldap_log($service_name, "Removed: " . $counter_remove . " entries.");
 ldap_log($service_name, "Updated: " . $counter_update. " entries.");
 ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
+
+SendUtils::unlock_file();
 
 # END of main script
 
