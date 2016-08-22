@@ -22,7 +22,7 @@ sub lock_file {
 	my ($lockDirName) = @_;
 	unless(defined($lockDirName)) { die "Missing log dir name - $!\n"; }
 
-	my $lockMainDir = "/var/lock";
+	my $lockMainDir = "lock";
 	my $lockDir = $lockMainDir . "/" . $lockDirName . ".lock";
 	my $lockPidFile = $lockDir . "/pid";
 	unless(-d $lockDir) { mkdir $lockDir or die "Cannot create $lockDir - $!\n"; }
