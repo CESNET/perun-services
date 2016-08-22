@@ -15,7 +15,7 @@ my $facility_name = $ARGV[0];
 chomp($facility_name);
 
 # create service lock
-SendUtils::lock_file($facility_name . "_" . $service_name);
+my $lock = SendUtils::lock_file($facility_name . "_" . $service_name);
 
 my @diff = diffCSV();
 
@@ -62,7 +62,7 @@ foreach my $line (@diff) {
 if ($error == 1) {
 	# some entries were not updated
 	print "Update ended with errors. See error log.";
-	SendUtils::unlock_file();
+	SendUtils::unlock_file($lock);
 	exit 1;
 } else {
 	# ended OK
@@ -70,7 +70,7 @@ if ($error == 1) {
 
 	# IF runed OK, switch old to new
 	copy("../gen/spool/$facility_name/$service_name/$service_name","./$service_name.last") or die "Move failed: $!";
-	SendUtils::unlock_file();
+	SendUtils::unlock_file($lock);
 }
 #
 # DIFF previous and new state of CRM

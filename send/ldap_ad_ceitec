@@ -48,7 +48,7 @@ my $namespace = $ARGV[1];
 chomp($namespace);
 
 # create service lock
-SendUtils::lock_file($facility_name . "_" . $service_name . "_" . $namespace);
+my $lock = SendUtils::lock_file($facility_name . "_" . $service_name . "_" . $namespace);
 
 # init configuration
 my @conf = init_config($namespace);
@@ -108,7 +108,7 @@ ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
 ldap_log($service_name, "Group updated: " . $counter_group_updated . " entries.");
 ldap_log($service_name, "Group failed: " . $counter_group_failed . " entries.");
 
-SendUtils::unlock_file();
+SendUtils::unlock_file($lock);
 
 # END of main script
 

@@ -27,7 +27,7 @@ my $destination = $ARGV[1];
 chomp($destination);
 
 # create service lock
-SendUtils::lock_file($facility_name . "_" . $service_name . "_" . $destination);
+my $lock = SendUtils::lock_file($facility_name . "_" . $service_name . "_" . $destination);
 
 # parse destination
 my ($db_machine,$db_port,$db_name) = split(/:/, $destination);
@@ -121,6 +121,6 @@ print "Found and skiped: \t$foundAndSkipped\n";
 print "Found and updated:\t$foundAndUpdated\n";
 print "=======================================\n";
 
-SendUtils::unlock_file();
+SendUtils::unlock_file($lock);
 
 exit 0;
