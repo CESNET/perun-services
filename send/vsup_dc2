@@ -10,6 +10,7 @@ use SendUtils;
 my $username;
 my $password;
 my $tableName = 'IDM2PAM_OSOBY';
+my $encoding = 'cp1250'; # for Oracle EE8MSWIN1250
 
 # define service
 my $service_name = "vsup_dc2";
@@ -75,20 +76,20 @@ foreach my $osbId (sort keys $dataByOsbId) {
 	my $EMAIL = $dataByOsbId->{$osbId}->{'EMAIL'};
 
 	# There is
-	my $chipExists = $dbh->prepare(qq{select 1 from $tableName where OSB_ID=?});
-	$chipExists->execute(encode("iso-8859-2", $osbId));
+	my $personExists = $dbh->prepare(qq{select 1 from $tableName where OSB_ID=?});
+	$personExists->execute(encode($encoding, $osbId));
 
-	if($chipExists->fetch) {
+	if($personExists->fetch) {
 		if($DEBUG == 1) { print "FIND: $osbId\n"; }
 
 		#we need to know if these two records are without changes, if yes, skip them
 		my $recordAreEquals = $dbh->prepare(qq{SELECT 1 from $tableName where OSB_ID=? and UCO=? and USERNAME=? and EMAIL_SKOLNI=?});
-		$recordAreEquals->execute(encode("iso-8859-2", $osbId), encode("iso-8859-2", $UCO), encode("iso-8859-2", $LOGIN), encode("iso-8859-2", $EMAIL));
+		$recordAreEquals->execute(encode($encoding, $osbId), encode($encoding, $UCO), encode($encoding, $LOGIN), encode($encoding, $EMAIL));
 
 		if(!$recordAreEquals->fetch) {
 
-			my $updateChip = $dbh->prepare(qq{UPDATE $tableName SET UCO=? , USERNAME=? , EMAIL_SKOLNI=? , ZMENENO_KDY=sysdate WHERE OSB_ID=?});
-			$updateChip->execute(encode("iso-8859-2", $UCO), encode("iso-8859-2", $LOGIN), encode("iso-8859-2", $EMAIL), encode("iso-8859-2", $osbId));
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET UCO=? , USERNAME=? , EMAIL_SKOLNI=? , ZMENENO_KDY=sysdate WHERE OSB_ID=?});
+			$updatePerson->execute(encode($encoding, $UCO), encode($encoding, $LOGIN), encode($encoding, $EMAIL), encode($encoding, $osbId));
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $osbId\n"; }
 			$foundAndUpdated++;
 
@@ -104,8 +105,8 @@ foreach my $osbId (sort keys $dataByOsbId) {
 		if($DEBUG == 1) { print "INSERT NEW RECORD: $osbId\n"; }
 		$inserted++;
 		# we will do insert
-		my $insertChip = $dbh->prepare(qq{INSERT INTO $tableName (OSB_ID, UCO, USERNAME, EMAIL_SKOLNI, ZMENENO_KDY) VALUES (?,?,?,?,sysdate)});
-		$insertChip->execute(encode("iso-8859-2", $osbId), encode("iso-8859-2", $UCO), encode("iso-8859-2", $LOGIN), encode("iso-8859-2", $EMAIL));
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (OSB_ID, UCO, USERNAME, EMAIL_SKOLNI, ZMENENO_KDY) VALUES (?,?,?,?,sysdate)});
+		$insertPerson->execute(encode($encoding, $osbId), encode($encoding, $UCO), encode($encoding, $LOGIN), encode($encoding, $EMAIL));
 
 	}
 }
