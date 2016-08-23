@@ -233,7 +233,7 @@ sub load_perun($){
 			ldap_log('ad_connection', "Error read Perun ldif:  " . $entry->get_value('cn') . " | " . $ldif->error());
 		} else {
 			# push valid entry
-			push(@perun_entries, $entry) if ($entry->get_value('cn'));
+			push(@perun_entries, $entry) if (defined $entry and $entry->get_value('cn'));
 		}
 	}
 
