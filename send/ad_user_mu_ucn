@@ -39,7 +39,8 @@ my $namespace = $ARGV[1];
 chomp($namespace);
 
 # create service lock
-my $lock = SendUtils::lock_file($facility_name . "_" . $service_name . "_" . $namespace);
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespace);
+$lock->lock();
 
 # init configuration
 my @conf = init_config($namespace);
@@ -78,7 +79,7 @@ ldap_log($service_name, "Added: " . $counter_add . " entries.");
 ldap_log($service_name, "Updated: " . $counter_update. " entries.");
 ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
 
-SendUtils::unlock_file($lock);
+$lock->unlock();
 
 # END of main script
 
