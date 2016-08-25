@@ -1,0 +1,115 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+local $::SERVICE_NAME = "vsup_kos";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
+my $data = perunServicesInit::getDataWithGroups;
+
+# Constants
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_OSB_ID_KOS; *A_OSB_ID_KOS = \'urn:perun:user:attribute-def:def:osbIdkos';
+our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
+
+our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
+
+our $A_BIRTH_LAST_NAME;  *A_BIRTH_LAST_NAME = \'urn:perun:user:attribute-def:def:birthLastName';
+our $A_BIRTH_NUMBER;  *A_BIRTH_NUMBER = \'urn:perun:user:attribute-def:def:birthNumber';
+our $A_GENDER;  *A_GENDER = \'urn:perun:user:attribute-def:def:gender';
+our $A_JOB;  *A_JOB = \'urn:perun:user:attribute-def:def:job';
+
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phone';
+our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMail';
+our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
+
+our $A_GROUP_NAME; *A_GROUP_NAME = \'urn:perun:group:attribute-def:core:name';
+
+# GATHER USERS
+my $users;  # $users->{$osbIddc2}->{ATTR} = $attrValue;
+
+#
+# AGGREGATE DATA
+#
+# FOR EACH RESOURCE
+foreach my $rData ($data->getChildElements) {
+
+	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
+
+	foreach my $group (@groupsData) {
+
+		my %gAttributes = attributesToHash $group->getAttributes;
+
+		if (($gAttributes{$A_GROUP_NAME} eq "Studenti") or ($gAttributes{$A_GROUP_NAME} eq "Zamestnanci:Pedagog")) {
+
+			my @membersData = ($group->getChildElements)[1]->getChildElements;
+			foreach my $member (@membersData) {
+
+				my %uAttributes = attributesToHash $member->getAttributes;
+
+				my $key = $uAttributes{$A_UCO} . ":" . (($gAttributes{$A_GROUP_NAME} eq "Studenti") ? "S" : "P");
+				$users->{$key}->{$A_UCO} = $uAttributes{$A_UCO};
+				$users->{$key}->{$A_OSB_ID_KOS} = (defined $uAttributes{$A_OSB_ID_KOS} ? $uAttributes{$A_OSB_ID_KOS} : '');
+				$users->{$key}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
+				$users->{$key}->{'EMAIL'} = $uAttributes{$A_LOGIN}.'@vsup.cz';
+				$users->{$key}->{'TYP_ZAZN'} = (($gAttributes{$A_GROUP_NAME} eq "Studenti") ? "S" : "P");
+
+				$users->{$key}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE} ? $uAttributes{$A_TITLE_BEFORE} : '');
+				$users->{$key}->{$A_FIRST_NAME} = (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : '');
+				$users->{$key}->{$A_LAST_NAME} = (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : '');
+				$users->{$key}->{$A_TITLE_AFTER} = (defined $uAttributes{$A_TITLE_AFTER} ? $uAttributes{$A_TITLE_AFTER} : '');
+
+				$users->{$key}->{$A_BIRTH_LAST_NAME} = (defined $uAttributes{$A_BIRTH_LAST_NAME} ? $uAttributes{$A_BIRTH_LAST_NAME} : '');
+				$users->{$key}->{$A_BIRTH_NUMBER} = (defined $uAttributes{$A_BIRTH_NUMBER} ? $uAttributes{$A_BIRTH_NUMBER} : '');
+				$users->{$key}->{$A_GENDER} = (defined $uAttributes{$A_GENDER} ? $uAttributes{$A_GENDER} : '');
+				$users->{$key}->{$A_JOB} = (defined $uAttributes{$A_JOB} ? $uAttributes{$A_JOB} : '');
+
+				$users->{$key}->{$A_PHONE} = (defined $uAttributes{$A_PHONE} ? $uAttributes{$A_PHONE} : '');
+				$users->{$key}->{$A_EMAIL_PRIV} = (defined $uAttributes{$A_EMAIL_PRIV} ? $uAttributes{$A_EMAIL_PRIV} : '');
+				$users->{$key}->{$A_PHONE_PRIV} = (defined $uAttributes{$A_PHONE_PRIV} ? $uAttributes{$A_PHONE_PRIV} : '');
+
+			}
+
+		} else {
+			next;
+		}
+
+	}
+
+}
+
+#
+# PRINT user data LDIF
+#
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+# FOR EACH USER ON FACILITY
+my @keys = sort keys %{$users};
+for my $key (@keys) {
+
+	# print attributes, which are never empty
+	print FILE $key . "\t" . $users->{$key}->{$A_UCO}. "\t" . $users->{$key}->{$A_OSB_ID_KOS} . "\t" . $users->{$key}->{$A_LOGIN} . "\t" .
+			$users->{$key}->{'EMAIL'} . "\t" . $users->{$key}->{'TYP_ZAZN'} . "\t" .
+			$users->{$key}->{$A_TITLE_BEFORE} . "\t" . $users->{$key}->{$A_FIRST_NAME} . "\t" .
+			$users->{$key}->{$A_LAST_NAME} . "\t" . $users->{$key}->{$A_TITLE_AFTER} . "\t" .
+			$users->{$key}->{$A_BIRTH_LAST_NAME} . "\t" . $users->{$key}->{$A_BIRTH_NUMBER} . "\t" .
+			$users->{$key}->{$A_GENDER} . "\t" . $users->{$key}->{$A_JOB} . "\t" .
+			$users->{$key}->{$A_PHONE} . "\t" . $users->{$key}->{$A_EMAIL_PRIV} . "\t" .
+			$users->{$key}->{$A_PHONE_PRIV} . "\n";
+
+}
+
+close(FILE);
+
+perunServicesInit::finalize;
