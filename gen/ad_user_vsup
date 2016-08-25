@@ -75,16 +75,16 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 
 	my %uAttributes = attributesToHash $user->getAttributes;
 
-    # Print only standard user accounts
-    unless (defined $uAttributes{$A_IS_SERVICE} and ($uAttributes{$A_IS_SERVICE} == 1)) {
+	# Print only standard user accounts
+	unless (defined $uAttributes{$A_IS_SERVICE} and ($uAttributes{$A_IS_SERVICE} == 1)) {
 
-        my $login = $uAttributes{$A_LOGIN};
+		my $login = $uAttributes{$A_LOGIN};
 
-        $users->{$login}->{"DN"} = "CN=".$uAttributes{$A_LOGIN}.",".$baseDN;
-        # store standard attrs
-        $users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
-        $users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
-        $users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
+		$users->{$login}->{"DN"} = "CN=".$uAttributes{$A_LOGIN}.",".$baseDN;
+		# store standard attrs
+		$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
+		$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
+		$users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
 		$users->{$login}->{$A_UCO} = $uAttributes{$A_UCO};
 		$users->{$login}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE};
 		$users->{$login}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER};
@@ -92,7 +92,7 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 		$users->{$login}->{$A_CARD_BARCODES} = $uAttributes{$A_CARD_BARCODES};
 		$users->{$login}->{$A_CARD_CHIP_NUMBERS} = $uAttributes{$A_CARD_CHIP_NUMBERS};
 
-    }
+	}
 
 }
 
@@ -136,7 +136,7 @@ for my $login (@logins) {
 		print FILE "givenName: " . $givenName . "\n";
 	}
 
-    print FILE "mail: " . $login . "\@" . $domain . "\n";
+	print FILE "mail: " . $login . "\@" . $domain . "\n";
 
 	if (defined $uco and length $uco) {
 		print FILE "vsupPersonPersonalId: " . $uco . "\n";

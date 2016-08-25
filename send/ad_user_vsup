@@ -73,12 +73,12 @@ my %ad_entries_map = ();
 my %perun_entries_map = ();
 
 foreach my $ad_entry (@ad_entries) {
-    my $login = $ad_entry->get_value('samAccountName');
-    $ad_entries_map{ $login } = $ad_entry;
+	my $login = $ad_entry->get_value('samAccountName');
+	$ad_entries_map{ $login } = $ad_entry;
 }
 foreach my $perun_entry (@perun_entries) {
-    my $login = $perun_entry->get_value('samAccountName');
-    $perun_entries_map{ $login } = $perun_entry;
+	my $login = $perun_entry->get_value('samAccountName');
+	$perun_entries_map{ $login } = $perun_entry;
 }
 
 # process data
@@ -111,50 +111,50 @@ $lock->unlock();
 #
 sub process_add() {
 
-    foreach my $perun_entry (@perun_entries) {
+	foreach my $perun_entry (@perun_entries) {
 
-        my $login = $perun_entry->get_value('samAccountName');
-        unless (exists $ad_entries_map{$login}) {
+		my $login = $perun_entry->get_value('samAccountName');
+		unless (exists $ad_entries_map{$login}) {
 
-            # CHECK IF NOT IN different OU: OU=New or OU=vsup
-            my $existing_entry = get_entry_by_login($login);
+			# CHECK IF NOT IN different OU: OU=New or OU=vsup
+			my $existing_entry = get_entry_by_login($login);
 
-            if (defined $existing_entry) {
+			if (defined $existing_entry) {
 
-                # Move entry to correct OU
-                move_entry($existing_entry, $login, $base_dn);
+				# Move entry to correct OU
+				move_entry($existing_entry, $login, $base_dn);
 
-                # put it between ad_entries so it got updated in a next step
-                $ad_entries_map{$login} = $existing_entry;
+				# put it between ad_entries so it got updated in a next step
+				$ad_entries_map{$login} = $existing_entry;
 
-            } else {
+			} else {
 
-                # create new entry with random password
+				# create new entry with random password
 
-                my $password = '"' . random_string("Cncc!ccnCn") . '"';
-                my $converted_pass = encode("UTF-16LE",'"'.$password.'"');
-                $perun_entry->add(
-                    unicodePwd => $converted_pass
-                );
+				my $password = '"' . random_string("Cncc!ccnCn") . '"';
+				my $converted_pass = encode("UTF-16LE",'"'.$password.'"');
+				$perun_entry->add(
+					unicodePwd => $converted_pass
+				);
 
-                # Add new entry to AD
-                my $response = $perun_entry->update($ldap);
-                unless ($response->is_error()) {
-                    # SUCCESS
-                    ldap_log($service_name, "Added: " . $perun_entry->dn());
-                    $counter_add++;
-                } else {
-                    # FAIL
-                    ldap_log($service_name, "NOT added: " . $perun_entry->dn() . " | " . $response->error());
-                    ldap_log($service_name, $perun_entry->ldif());
-                    $counter_fail++;
-                }
+				# Add new entry to AD
+				my $response = $perun_entry->update($ldap);
+				unless ($response->is_error()) {
+					# SUCCESS
+					ldap_log($service_name, "Added: " . $perun_entry->dn());
+					$counter_add++;
+				} else {
+					# FAIL
+					ldap_log($service_name, "NOT added: " . $perun_entry->dn() . " | " . $response->error());
+					ldap_log($service_name, $perun_entry->ldif());
+					$counter_fail++;
+				}
 
-            }
+			}
 
-        }
+		}
 
-    }
+	}
 
 }
 
@@ -163,68 +163,68 @@ sub process_add() {
 #
 sub process_update() {
 
-    foreach my $perun_entry (@perun_entries) {
+	foreach my $perun_entry (@perun_entries) {
 
-        my $login = $perun_entry->get_value('samAccountName');
+		my $login = $perun_entry->get_value('samAccountName');
 
-        if (exists $ad_entries_map{$login}) {
+		if (exists $ad_entries_map{$login}) {
 
-            my $ad_entry = $ad_entries_map{$login};
+			my $ad_entry = $ad_entries_map{$login};
 
-            # attrs without cn since it's part of DN to be updated
-            my @attrs = ('displayName','sn','givenName','mail','vsupPersonPersonalId','vsupPersonTitleHead','vsupPersonTitleTail','telephoneNumber','vsupPersonIdCardBarcode','vsupPersonIdCardChipNumber');
+			# attrs without cn since it's part of DN to be updated
+			my @attrs = ('displayName','sn','givenName','mail','vsupPersonPersonalId','vsupPersonTitleHead','vsupPersonTitleTail','telephoneNumber','vsupPersonIdCardBarcode','vsupPersonIdCardChipNumber');
 
-            # stored log messages to check if entry should be updated
-            my @entry_changed = ();
+			# stored log messages to check if entry should be updated
+			my @entry_changed = ();
 
-            # check each attribute
-            foreach my $attr (@attrs) {
-                if (compare_entry( $ad_entry, $perun_entry, $attr ) == 1) {
-                    # store value for log
-                    my @ad_val = $ad_entry->get_value( $attr );
-                    my @perun_val = $perun_entry->get_value( $attr );
-                    push( @entry_changed,
-                        "$attr | ".join( ", ", sort(@ad_val) )." => ".join( ", ", sort(@perun_val) ) );
-                    # replace value
-                    $ad_entry->replace(
-                        $attr => \@perun_val
-                    );
-                }
-            }
+			# check each attribute
+			foreach my $attr (@attrs) {
+				if (compare_entry( $ad_entry, $perun_entry, $attr ) == 1) {
+					# store value for log
+					my @ad_val = $ad_entry->get_value( $attr );
+					my @perun_val = $perun_entry->get_value( $attr );
+					push( @entry_changed,
+						"$attr | ".join( ", ", sort(@ad_val) )." => ".join( ", ", sort(@perun_val) ) );
+					# replace value
+					$ad_entry->replace(
+						$attr => \@perun_val
+					);
+				}
+			}
 
-            # check UAC
-            my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
+			# check UAC
+			my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
 
-            # if disabled -> enable it
-            unless (is_uac_enabled($ad_entry_uac) == 1) {
+			# if disabled -> enable it
+			unless (is_uac_enabled($ad_entry_uac) == 1) {
 
-                my $original_ad_entry_uac = $ad_entry_uac;
-                my $new_ad_entry_uac = enable_uac($ad_entry_uac);
-                push( @entry_changed, "userAccountControl | $original_ad_entry_uac => $new_ad_entry_uac" );
-                $ad_entry->replace(
-                    'userAccountControl' => $new_ad_entry_uac
-                );
+				my $original_ad_entry_uac = $ad_entry_uac;
+				my $new_ad_entry_uac = enable_uac($ad_entry_uac);
+				push( @entry_changed, "userAccountControl | $original_ad_entry_uac => $new_ad_entry_uac" );
+				$ad_entry->replace(
+					'userAccountControl' => $new_ad_entry_uac
+				);
 
-            }
+			}
 
-            if (@entry_changed) {
-                # Update entry in AD
-                my $response = $ad_entry->update( $ldap );
-                unless ($response->is_error()) {
-                    # SUCCESS
-                    foreach my $log_message (@entry_changed) {
-                        ldap_log( $service_name, "Updated: ".$ad_entry->dn()." | ".$log_message );
-                    }
-                    $counter_update++;
-                } else {
-                    # FAIL
-                    ldap_log( $service_name, "NOT updated: ".$ad_entry->dn()." | ".$response->error() );
-                    ldap_log( $service_name, $ad_entry->ldif() );
-                    $counter_fail++;
-                }
-            }
-        }
-    }
+			if (@entry_changed) {
+				# Update entry in AD
+				my $response = $ad_entry->update( $ldap );
+				unless ($response->is_error()) {
+					# SUCCESS
+					foreach my $log_message (@entry_changed) {
+						ldap_log( $service_name, "Updated: ".$ad_entry->dn()." | ".$log_message );
+					}
+					$counter_update++;
+				} else {
+					# FAIL
+					ldap_log( $service_name, "NOT updated: ".$ad_entry->dn()." | ".$response->error() );
+					ldap_log( $service_name, $ad_entry->ldif() );
+					$counter_fail++;
+				}
+			}
+		}
+	}
 }
 
 #
@@ -232,31 +232,31 @@ sub process_update() {
 #
 sub process_disable() {
 
-    foreach my $ad_entry (@ad_entries) {
-        my $login = $ad_entry->get_value('samAccountName');
-        unless (exists $perun_entries_map{$login}) {
+	foreach my $ad_entry (@ad_entries) {
+		my $login = $ad_entry->get_value('samAccountName');
+		unless (exists $perun_entries_map{$login}) {
 
-            my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
+			my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
 
-            # if enabled -> disable it
-            if (is_uac_enabled($ad_entry_uac) == 1) {
+			# if enabled -> disable it
+			if (is_uac_enabled($ad_entry_uac) == 1) {
 
-                # disable entry in AD
-                $ad_entry->replace( userAccountControl => disable_uac($ad_entry_uac) );
-                my $response = $ad_entry->update($ldap);
-                unless ($response->is_error()) {
-                    ldap_log($service_name, "Disabled entry: " . $ad_entry->dn());
-                    $counter_disable++;
-                } else {
-                    ldap_log($service_name, "NOT disabled: " . $ad_entry->dn() . " | " . $response->error());
-                    ldap_log($service_name, $ad_entry->ldif());
-                    $counter_fail++;
-                }
+				# disable entry in AD
+				$ad_entry->replace( userAccountControl => disable_uac($ad_entry_uac) );
+				my $response = $ad_entry->update($ldap);
+				unless ($response->is_error()) {
+					ldap_log($service_name, "Disabled entry: " . $ad_entry->dn());
+					$counter_disable++;
+				} else {
+					ldap_log($service_name, "NOT disabled: " . $ad_entry->dn() . " | " . $response->error());
+					ldap_log($service_name, $ad_entry->ldif());
+					$counter_fail++;
+				}
 
-            }
+			}
 
-        }
-    }
+		}
+	}
 
 }
 
@@ -265,33 +265,33 @@ sub process_disable() {
 #
 sub get_entry_by_login() {
 
-    my $login = shift;
-    my $filter = "(samAccountName=$login)";
+	my $login = shift;
+	my $filter = "(samAccountName=$login)";
 
-    # Get current entry from AD
-    my $response = $ldap->search( base => $top_dn ,
-        scope => 'sub' ,
-        filter => $filter ,
-        attrs => ['cn','displayName','sn','givenName','mail','vsupPersonPersonalId','vsupPersonTitleHead','vsupPersonTitleTail','telephoneNumber','vsupPersonIdCardBarcode','vsupPersonIdCardChipNumber','userAccountControl','samAccountName']
-    );
+	# Get current entry from AD
+	my $response = $ldap->search( base => $top_dn ,
+		scope => 'sub' ,
+		filter => $filter ,
+		attrs => ['cn','displayName','sn','givenName','mail','vsupPersonPersonalId','vsupPersonTitleHead','vsupPersonTitleTail','telephoneNumber','vsupPersonIdCardBarcode','vsupPersonIdCardChipNumber','userAccountControl','samAccountName']
+	);
 
-    unless ($response->is_error()) {
+	unless ($response->is_error()) {
 
-        my @entries = $response->entries;
-        if (@entries != 1) {
-            ldap_log( $service_name, @entries . " entries found for samAccountName=$login in " . $top_dn );
-            return undef;
-        } else {
-            my $entry = pop(@entries);
-            return $entry;
-        }
+		my @entries = $response->entries;
+		if (@entries != 1) {
+			ldap_log( $service_name, @entries . " entries found for samAccountName=$login in " . $top_dn );
+			return undef;
+		} else {
+			my $entry = pop(@entries);
+			return $entry;
+		}
 
-    } else {
+	} else {
 
-        ldap_log( $service_name, "samAccountName=$login NOT found in " . $top_dn . " " . $response->error() );
-        return undef;
+		ldap_log( $service_name, "samAccountName=$login NOT found in " . $top_dn . " " . $response->error() );
+		return undef;
 
-    }
+	}
 
 }
 
@@ -304,25 +304,25 @@ sub get_entry_by_login() {
 #
 sub move_entry() {
 
-    my $ad_entry = shift;
-    my $perun_cn = shift;
-    my $branch = shift;
+	my $ad_entry = shift;
+	my $perun_cn = shift;
+	my $branch = shift;
 
-    # If CN changed update DN of entry (move it)
-    my $ad_cn = $ad_entry->get_value('cn');
-    if ($ad_cn eq $perun_cn) {
-        my $ad_dn = $ad_entry->dn();
-        my $response = $ldap->moddn($ad_entry, newrdn => "CN=" . $perun_cn , deleteoldrdn => 1, newsuperior => $branch);
-        unless ($response->is_error()) {
-            # SUCCESS
-            ldap_log( $service_name, "Renamed: " . $ad_dn . " => " . "CN=" . $perun_cn . "," . $branch);
-            $counter_move++;
-        } else {
-            # FAIL
-            ldap_log( $service_name, "NOT renamed: " . $ad_dn . " | " . $response->error());
-            ldap_log( $service_name, $ad_entry->ldif());
-            $counter_fail++;
-        }
-    }
+	# If CN changed update DN of entry (move it)
+	my $ad_cn = $ad_entry->get_value('cn');
+	if ($ad_cn eq $perun_cn) {
+		my $ad_dn = $ad_entry->dn();
+		my $response = $ldap->moddn($ad_entry, newrdn => "CN=" . $perun_cn , deleteoldrdn => 1, newsuperior => $branch);
+		unless ($response->is_error()) {
+			# SUCCESS
+			ldap_log( $service_name, "Renamed: " . $ad_dn . " => " . "CN=" . $perun_cn . "," . $branch);
+			$counter_move++;
+		} else {
+			# FAIL
+			ldap_log( $service_name, "NOT renamed: " . $ad_dn . " | " . $response->error());
+			ldap_log( $service_name, $ad_entry->ldif());
+			$counter_fail++;
+		}
+	}
 
 }
