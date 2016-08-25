@@ -66,7 +66,7 @@ ldap_bind($ldap, $conf[1], $conf[2]);
 
 # load all data
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
-my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn','displayName','sn','givenName','mail','vsupPersonPersonalId','userAccountControl','samAccountName']);
+my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn','displayName','sn','givenName','mail','vsupPersonPersonalId','vsupPersonTitleHead','vsupPersonTitleTail','telephoneNumber','vsupPersonIdCardBarcode','vsupPersonIdCardChipNumber','userAccountControl','samAccountName']);
 
 # put it in a mep to speed processing
 my %ad_entries_map = ();
@@ -172,7 +172,7 @@ sub process_update() {
             my $ad_entry = $ad_entries_map{$login};
 
             # attrs without cn since it's part of DN to be updated
-            my @attrs = ('displayName', 'sn', 'givenName', 'mail', 'vsupPersonPersonalId');
+            my @attrs = ('displayName','sn','givenName','mail','vsupPersonPersonalId','vsupPersonTitleHead','vsupPersonTitleTail','telephoneNumber','vsupPersonIdCardBarcode','vsupPersonIdCardChipNumber');
 
             # stored log messages to check if entry should be updated
             my @entry_changed = ();
@@ -274,7 +274,7 @@ sub get_entry_by_login() {
     my $response = $ldap->search( base => $top_dn ,
         scope => 'sub' ,
         filter => $filter ,
-        attrs => ['cn','displayName','sn','givenName','mail','vsupPersonPersonalId','userAccountControl','samAccountName']
+        attrs => ['cn','displayName','sn','givenName','mail','vsupPersonPersonalId','vsupPersonTitleHead','vsupPersonTitleTail','telephoneNumber','vsupPersonIdCardBarcode','vsupPersonIdCardChipNumber','userAccountControl','samAccountName']
     );
 
     unless ($response->is_error()) {

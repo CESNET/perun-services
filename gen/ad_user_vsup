@@ -6,8 +6,8 @@ use perunServicesInit;
 use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_user_vsup";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+local $::PROTOCOL_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -27,6 +27,11 @@ our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:disp
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
 our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
+our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
+our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phone';
+our $A_CARD_BARCODES;  *A_CARD_BARCODES = \'urn:perun:user:attribute-def:def:cardBarCodes';
+our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:cardCodes';
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -81,6 +86,11 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
         $users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
         $users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
 		$users->{$login}->{$A_UCO} = $uAttributes{$A_UCO};
+		$users->{$login}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE};
+		$users->{$login}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER};
+		$users->{$login}->{$A_PHONE} = $uAttributes{$A_PHONE};
+		$users->{$login}->{$A_CARD_BARCODES} = $uAttributes{$A_CARD_BARCODES};
+		$users->{$login}->{$A_CARD_CHIP_NUMBERS} = $uAttributes{$A_CARD_CHIP_NUMBERS};
 
     }
 
@@ -110,6 +120,11 @@ for my $login (@logins) {
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
 	my $displayName = $users->{$login}->{$A_DISPLAY_NAME};
 	my $uco = $users->{$login}->{$A_UCO};
+	my $titleBefore = $users->{$login}->{$A_TITLE_BEFORE};
+	my $titleAfter = $users->{$login}->{$A_TITLE_AFTER};
+	my $phone = $users->{$login}->{$A_PHONE};
+	my $barcodes = $users->{$login}->{$A_CARD_BARCODES};
+	my $chipNumers = $users->{$login}->{$A_CARD_CHIP_NUMBERS};
 
 	if (defined $displayName and length $displayName) {
 		print FILE "displayName: " . $displayName . "\n";
@@ -125,6 +140,26 @@ for my $login (@logins) {
 
 	if (defined $uco and length $uco) {
 		print FILE "vsupPersonPersonalId: " . $uco . "\n";
+	}
+
+	if (defined $titleBefore and length $titleBefore) {
+		print FILE "vsupPersonTitleHead: " . $titleBefore . "\n";
+	}
+
+	if (defined $titleAfter and length $titleAfter) {
+		print FILE "vsupPersonTitleTail: " . $titleAfter . "\n";
+	}
+
+	if (defined $phone and length $phone) {
+		print FILE "telephoneNumber: " . $phone . "\n";
+	}
+
+	foreach my $val (@$barcodes) {
+		print FILE "vsupPersonIdCardBarcode: " . $val . "\n";
+	}
+
+	foreach my $val (@$chipNumers) {
+		print FILE "vsupPersonIdCardChipNumber: " . $val . "\n";
 	}
 
 	# print classes
