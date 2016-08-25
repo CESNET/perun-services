@@ -9,7 +9,7 @@ use Net::LDAP::LDIF;
 
 # Import shared AD library
 use ADConnector;
-use SendUtils;
+use ScriptLock;
 
 sub process_add;
 sub process_remove;

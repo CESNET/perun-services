@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use File::Copy;
-use SendUtils;
+use ScriptLock;
 
 sub diffCSV;
 sub logCRM;

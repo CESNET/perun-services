@@ -11,7 +11,7 @@ use Encode;
 
 # Import shared AD library
 use ADConnector;
-use SendUtils;
+use ScriptLock;
 
 sub process_add;
 sub process_update;

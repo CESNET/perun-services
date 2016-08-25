@@ -15,7 +15,7 @@ no if $] >= 5.018, warnings => "smartmatch";
 
 # Import shared AD library
 use ADConnector;
-use SendUtils;
+use ScriptLock;
 
 sub process_add;
 sub process_update;
