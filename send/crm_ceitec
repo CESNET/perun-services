@@ -31,7 +31,7 @@ foreach my $line (@diff) {
 	my $command = "php $service_name.php";
 
 	if (scalar(@array) < 4) {
-        # Entry is probably missing login/firstName/lastName/email
+		# Entry is probably missing login/firstName/lastName/email
 		$error = 1;
 		# log to stderr which is read by engine and stored in task result
 		print STDERR "Not enough parameters.\n";
@@ -39,13 +39,13 @@ foreach my $line (@diff) {
 	}
 
 	if (scalar(@array) == 4) {
-        $command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"\" --universityId \"\" --eppn \"\"";
+		$command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"\" --universityId \"\" --eppn \"\"";
 	} elsif (scalar(@array) == 5) {
-        $command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"$array[4]\" --universityId \"\" --eppn \"\"";
+		$command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"$array[4]\" --universityId \"\" --eppn \"\"";
 	} elsif (scalar(@array) == 6) {
-        $command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"$array[4]\" --universityId \"$array[5]\" --eppn \"\"";
+		$command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"$array[4]\" --universityId \"$array[5]\" --eppn \"\"";
 	} elsif (scalar(@array) == 7) {
-        $command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"$array[4]\" --universityId \"$array[5]\" --eppn \"$array[6]\"";
+		$command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"$array[4]\" --universityId \"$array[5]\" --eppn \"$array[6]\"";
 	}
 
 	my $result = `$command`;
