@@ -136,7 +136,7 @@ for my $login (@logins) {
 	my $userPrincipalName = "$login\@ceitec.local";
 	my $samAccountName = $login;
 	my $displayName = "$users->{$login}->{$A_LAST_NAME} $users->{$login}->{$A_FIRST_NAME}";
-	
+
 	# print attributes, which are never empty
 	print FILE "dn: cn=" . $cn . "," . $baseDNUsers . "\n";
 	print FILE "cn: " . $cn . "\n";
