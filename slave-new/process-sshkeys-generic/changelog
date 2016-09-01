@@ -1,0 +1,5 @@
+perun-slave-process-sshkeys-generic (3.1.0) stable; urgency=low
+
+  * Beta version of sshkeys_generic service
+
+ -- Slavek Licehammer <slavek@ics.muni.cz>  Thu, 01 Sep 2016 15:58:00 +0200

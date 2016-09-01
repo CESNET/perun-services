@@ -1,0 +1,53 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+
+local $::SERVICE_NAME = basename($0);
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $data = perunServicesInit::getHierarchicalData;
+my $agent = perunServicesInit::getAgent;
+my $DIRECTORY = perunServicesInit::getDirectory;
+
+
+our $A_SSHKEYS;                       *A_SSHKEYS =                          \'urn:perun:user:attribute-def:def:sshPublicKey';
+our $A_USER_STATUS;                   *A_USER_STATUS =                      \'urn:perun:member:attribute-def:core:status';
+our $A_RESOURCE_SSHKEYS_TARGET_USER;  *A_RESOURCE_SSHKEYS_TARGET_USER =     \'urn:perun:resource:attribute-def:def:sshkeysTargetUser';
+
+my $sshkeysDirectory = "$DIRECTORY/$::SERVICE_NAME";
+mkdir $sshkeysDirectory or die "$sshkeysDirectory directory can't be created: $!";
+
+my @resourcesData = $data->getChildElements;
+my $fileStructureWithData;
+foreach my $resourceData (@resourcesData) {
+	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
+	#get information about name of target user (file name for data)
+	my $fileName = $resourceAttributes{$A_RESOURCE_SSHKEYS_TARGET_USER};
+	foreach my $memberData ($resourceData->getChildElements) {
+		my %memberAttributes = attributesToHash $memberData->getAttributes;
+		#if member is not valid, skip him
+		next if $memberAttributes{$A_USER_STATUS} ne 'VALID';
+		next unless $memberAttributes{$A_SSHKEYS};
+
+		@{$fileStructureWithData->{$fileName}}{@{$memberAttributes{$A_SSHKEYS}}} = (1) x @{$memberAttributes{$A_SSHKEYS}};
+	}
+
+}
+
+#generate file for all keys in data structure
+foreach my $file (keys %$fileStructureWithData) {
+	my $serviceFileName = "$sshkeysDirectory/$file";
+	open SERVICE_FILE,">$serviceFileName" or die "Cannot open $serviceFileName: $! \n";
+
+	print SERVICE_FILE join "\n", keys %{$fileStructureWithData->{$file}};
+
+	close SERVICE_FILE or die "Cannot close $serviceFileName: $! \n";
+}
+
+perunServicesInit::finalize;
