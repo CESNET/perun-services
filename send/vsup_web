@@ -27,7 +27,7 @@ chomp($destination);
 
 # create service lock
 my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $destination);
-$lock->lock();
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
 
 # parse destination
 my ($db_machine,$db_port,$db_name) = split(/:/, $destination);

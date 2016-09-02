@@ -53,7 +53,7 @@ chomp($namespace);
 
 # create service lock
 my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespace);
-$lock->lock();
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
 
 # init configuration
 my @conf = init_config($namespace);

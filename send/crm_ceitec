@@ -16,7 +16,7 @@ chomp($facility_name);
 
 # create service lock
 my $lock = ScriptLock->new($facility_name . "_" . $service_name);
-$lock->lock();
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
 
 my @diff = diffCSV();
 
