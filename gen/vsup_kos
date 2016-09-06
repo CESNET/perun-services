@@ -50,20 +50,31 @@ foreach my $rData ($data->getChildElements) {
 
 		my %gAttributes = attributesToHash $group->getAttributes;
 
-		if (($gAttributes{$A_GROUP_NAME} eq "Studenti") or ($gAttributes{$A_GROUP_NAME} eq "Zamestnanci:Pedagog")) {
+		if (($gAttributes{$A_GROUP_NAME} eq "Studenti") or
+			($gAttributes{$A_GROUP_NAME} eq "Absolventi") or
+			($gAttributes{$A_GROUP_NAME} eq "Zamestnanci:Pedagog") or
+			($gAttributes{$A_GROUP_NAME} eq "Externiste:Pedagogicti")
+		) {
 
 			my @membersData = ($group->getChildElements)[1]->getChildElements;
 			foreach my $member (@membersData) {
 
 				my %uAttributes = attributesToHash $member->getAttributes;
 
-				my $key = $uAttributes{$A_UCO} . ":" . (($gAttributes{$A_GROUP_NAME} eq "Studenti") ? "S" : "P");
+				## determine entry type
+				my $zazn;
+				if (($gAttributes{$A_GROUP_NAME} eq "Studenti") or ($gAttributes{$A_GROUP_NAME} eq "Absolventi")) {
+					$zazn = "S";
+				} elsif (($gAttributes{$A_GROUP_NAME} eq "Zamestnanci:Pedagog") or ($gAttributes{$A_GROUP_NAME} eq "Externiste:Pedagogicti")) {
+					$zazn = "P";
+				}
+
+				my $key = $uAttributes{$A_UCO} . ":" . $zazn;
 				$users->{$key}->{$A_UCO} = $uAttributes{$A_UCO};
 				$users->{$key}->{$A_OSB_ID_KOS} = (defined $uAttributes{$A_OSB_ID_KOS} ? $uAttributes{$A_OSB_ID_KOS} : '');
 				$users->{$key}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
 				$users->{$key}->{'EMAIL'} = $uAttributes{$A_LOGIN}.'@vsup.cz';
-				$users->{$key}->{'TYP_ZAZN'} = (($gAttributes{$A_GROUP_NAME} eq "Studenti") ? "S" : "P");
-
+				$users->{$key}->{'TYP_ZAZN'} = $zazn;
 				$users->{$key}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE} ? $uAttributes{$A_TITLE_BEFORE} : '');
 				$users->{$key}->{$A_FIRST_NAME} = (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : '');
 				$users->{$key}->{$A_LAST_NAME} = (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : '');
