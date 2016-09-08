@@ -62,19 +62,19 @@ foreach my $rData (@resourcesData) {
 		my %mAttributes = attributesToHash $mData->getAttributes;
 		my $login = $mAttributes{$A_LOGIN};
 
-        # allow only UČO, 9UČO and s-[smth] logins
+		# allow only UČO, 9UČO and s-[smth] logins
 
 		if ($login =~ /^9[0-9]{6}$/ or $login =~ /^[0-9]{1,6}$/) {
 
-            # store UČO and 9UČO users
-            $usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDN} = 1
+			# store UČO and 9UČO users
+			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDN} = 1
 
 		} elsif ($login =~ /^s-/) {
 
-            # store "s-[something]" users - hack to be compatible with existing accounts
-            $usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDNforSpecial} = 1
+			# store "s-[something]" users - hack to be compatible with existing accounts
+			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDNforSpecial} = 1
 
-        }
+		}
 
 
 	}

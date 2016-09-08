@@ -9,6 +9,7 @@ use Net::LDAP::LDIF;
 
 # Import shared AD library
 use ADConnector;
+use ScriptLock;
 
 sub process_update;
 
@@ -34,6 +35,10 @@ close $file;
 # propagation destination
 my $namespace = $ARGV[1];
 chomp($namespace);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespace);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
 
 # init configuration
 my @conf = init_config($namespace);
@@ -62,6 +67,8 @@ ldap_unbind($ldap);
 # log results
 ldap_log($service_name, "Updated: " . $counter_update. " entries.");
 ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
+
+$lock->unlock();
 
 # END of main script
 

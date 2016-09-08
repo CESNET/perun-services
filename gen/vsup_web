@@ -1,0 +1,80 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+local $::SERVICE_NAME = "vsup_web";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
+my $data = perunServicesInit::getFlatData;
+
+#Constants
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
+our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phone';
+our $A_MOBILE;  *A_MOBILE = \'urn:perun:user:attribute-def:opt:mobilePhone';
+our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMail';
+our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
+
+# GATHER USERS
+my $users;  # $users->{$uco}->{ATTR} = $attrValue;
+
+#
+# AGGREGATE DATA
+#
+# FOR EACH USER
+foreach my $user (($data->getChildElements)[1]->getChildElements) {
+
+	my %uAttributes = attributesToHash $user->getAttributes;
+
+	my $uco = $uAttributes{$A_UCO};
+	$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
+	$users->{$uco}->{'EMAIL'} = $uAttributes{$A_LOGIN} . '@vsup.cz';
+
+	# personal
+
+	$users->{$uco}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE} ? $uAttributes{$A_TITLE_BEFORE} : '');
+	$users->{$uco}->{$A_FIRST_NAME} = (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : '');
+	$users->{$uco}->{$A_LAST_NAME} = (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : '');
+	$users->{$uco}->{$A_TITLE_AFTER} = (defined $uAttributes{$A_TITLE_AFTER} ? $uAttributes{$A_TITLE_AFTER} : '');
+
+	# work contacts
+	$users->{$uco}->{$A_PHONE} = (defined $uAttributes{$A_PHONE} ? $uAttributes{$A_PHONE} : '');
+	$users->{$uco}->{$A_MOBILE} = (defined $uAttributes{$A_MOBILE} ? $uAttributes{$A_MOBILE} : '');
+	$users->{$uco}->{$A_EMAIL_PRIV} = (defined $uAttributes{$A_EMAIL_PRIV} ? $uAttributes{$A_EMAIL_PRIV} : '');
+	$users->{$uco}->{$A_PHONE_PRIV} = (defined $uAttributes{$A_PHONE_PRIV} ? $uAttributes{$A_PHONE_PRIV} : '');
+
+}
+
+#
+# PRINT user data LDIF
+#
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+# FOR EACH USER ON FACILITY
+my @keys = sort keys %{$users};
+for my $uco (@keys) {
+
+	# print attributes, which are never empty
+	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{'EMAIL'} . "\t" .
+			$users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_FIRST_NAME} . "\t" .
+			$users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_AFTER} . "\t" .
+			$users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_MOBILE} . "\t" .
+			$users->{$uco}->{$A_EMAIL_PRIV} . "\t" . $users->{$uco}->{$A_PHONE_PRIV} . "\n";
+
+}
+
+close(FILE);
+
+perunServicesInit::finalize;

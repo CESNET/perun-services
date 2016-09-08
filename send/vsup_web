@@ -1,0 +1,200 @@
+#!/usr/bin/perl
+use strict;
+use warnings FATAL => 'all';
+use DBI;
+use Getopt::Long qw(:config no_ignore_case);
+use Data::Dumper;
+use Encode qw(encode);
+use ScriptLock;
+
+my $username;
+my $password;
+my $tableName = 'IDM2WEB_OSOBY';
+
+# define service
+my $service_name = "vsup_web";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+my $service_file = "$service_files_dir/$service_name.csv";
+
+# propagation destination
+my $destination = $ARGV[1];
+chomp($destination);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $destination);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# parse destination
+my ($db_machine,$db_port,$db_name) = split(/:/, $destination);
+
+# load authz
+my $configPath = "/etc/perun/services/$service_name/$db_name";
+open FILE, $configPath or die "Could not open config file $configPath: $!";
+while(my $line = <FILE>) {
+	if($line =~ /^username: .*/) {
+		$username = ($line =~ m/^username: (.*)$/)[0];
+	} elsif($line =~ /^password: .*/) {
+		$password = ($line =~ m/^password: (.*)$/)[0];
+	}
+}
+
+if(!defined($password) || !defined($username) || !defined($tableName)) {
+	print "Can't get config data from config file.\n";
+	exit 14;
+}
+
+#Main Structure
+my $dataByUco = {};
+
+open FILE, $service_file or die "Could not open $service_file: $!";
+while(my $line = <FILE>) {
+	my @parts = split /\t/, $line;
+	$dataByUco->{$parts[0]}->{'LOGIN'} = $parts[1];
+	$dataByUco->{$parts[0]}->{'EMAIL'} = $parts[2];
+	$dataByUco->{$parts[0]}->{'TITLE_BEFORE'} = (($parts[3] ne '') ? $parts[3] : undef);
+	$dataByUco->{$parts[0]}->{'FIRST_NAME'} = (($parts[4] ne '') ? $parts[4] : undef);
+	$dataByUco->{$parts[0]}->{'LAST_NAME'} = (($parts[5] ne '') ? $parts[5] : undef);
+	$dataByUco->{$parts[0]}->{'TITLE_AFTER'} = (($parts[6] ne '') ? $parts[6] : undef);
+	$dataByUco->{$parts[0]}->{'PHONE'} = (($parts[7] ne '') ? $parts[7] : undef);
+	$dataByUco->{$parts[0]}->{'MOBILE'} = (($parts[8] ne '') ? $parts[8] : undef);
+	$dataByUco->{$parts[0]}->{'EMAIL_PRIV'} = (($parts[9] ne '') ? $parts[9] : undef);
+	$dataByUco->{$parts[0]}->{'PHONE_PRIV'} = (($parts[10] ne '') ? $parts[10] : undef);
+}
+close FILE;
+
+my $dbh = DBI->connect("dbi:mysql:$db_name:$db_machine:$db_port", $username, $password,{ RaiseError=>1, AutoCommit=>0, mysql_enable_utf8 => 1}) or die "Connect to database $db_name Error!\n";
+
+my $DEBUG=0;
+#statistic and information variables
+my $foundAndSkipped = 0;
+my $foundAndUpdated = 0;
+my $inserted = 0;
+
+#update and insert new
+foreach my $uco (sort keys $dataByUco) {
+
+	my $LOGIN = $dataByUco->{$uco}->{'LOGIN'};
+	my $EMAIL = $dataByUco->{$uco}->{'EMAIL'};
+	my $TITLE_BEFORE = $dataByUco->{$uco}->{'TITLE_BEFORE'};
+	my $FIRST_NAME = $dataByUco->{$uco}->{'FIRST_NAME'};
+	my $LAST_NAME = $dataByUco->{$uco}->{'LAST_NAME'};
+	my $TITLE_AFTER = $dataByUco->{$uco}->{'TITLE_AFTER'};
+	my $PHONE = $dataByUco->{$uco}->{'PHONE'};
+	my $MOBILE = $dataByUco->{$uco}->{'MOBILE'};
+	my $EMAIL_PRIV = $dataByUco->{$uco}->{'EMAIL_PRIV'};
+	my $PHONE_PRIV = $dataByUco->{$uco}->{'PHONE_PRIV'};
+
+	# There is
+	my $personExists = $dbh->prepare(qq{select 1 from $tableName where UCO=?});
+	$personExists->execute($uco);
+
+	if($personExists->fetch) {
+		if($DEBUG == 1) { print "FIND: $uco\n"; }
+
+		# generate proper select on NULLs
+		my $select = "SELECT 1 from $tableName where UCO=? and LOGIN=? and EMAIL_SKOLNI=? and TITUL_PRED";
+		my @params = ($uco, $LOGIN, $EMAIL);
+		if ($TITLE_BEFORE) {
+			$select = $select . "=?";
+			push(@params, $TITLE_BEFORE);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and JMENO";
+		if ($FIRST_NAME) {
+			$select = $select . "=?";
+			push(@params, $FIRST_NAME);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and PRIJMENI";
+		if ($LAST_NAME) {
+			$select = $select . "=?";
+			push(@params, $LAST_NAME);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and TITUL_ZA";
+		if ($TITLE_AFTER) {
+			$select = $select . "=?";
+			push(@params, $TITLE_AFTER);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and TEL_PRAC_LINKA";
+		if ($PHONE) {
+			$select = $select . "=?";
+			push(@params, $PHONE);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and TEL_PRAC_MOB";
+		if ($MOBILE) {
+			$select = $select . "=?";
+			push(@params, $MOBILE);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and EMAIL_SOUKR";
+		if ($EMAIL_PRIV) {
+			$select = $select . "=?";
+			push(@params, $EMAIL_PRIV);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and TEL_SOUKR";
+		if ($PHONE_PRIV) {
+			$select = $select . "=?";
+			push(@params, $PHONE_PRIV);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . ";";
+
+		#we need to know if these two records are without changes, if yes, skip them
+		my $recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
+
+		if(!$recordAreEquals->fetch) {
+
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET LOGIN=? , EMAIL_SKOLNI=? , TITUL_PRED=? , JMENO=? , PRIJMENI=? , TITUL_ZA=? , TEL_PRAC_LINKA=? , TEL_PRAC_MOB=? , EMAIL_SOUKR=? , TEL_SOUKR=? , ZMENENO_KDY=NOW() WHERE UCO=?});
+			$updatePerson->execute($LOGIN, $EMAIL, $TITLE_BEFORE, $FIRST_NAME, $LAST_NAME, $TITLE_AFTER, $PHONE, $MOBILE, $EMAIL_PRIV, $PHONE_PRIV, $uco);
+			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $uco\n"; }
+			$foundAndUpdated++;
+
+		} else {
+
+			if($DEBUG == 1) { print "SKIP RECORD: $uco\n"; }
+			$foundAndSkipped++;
+
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW RECORD: $uco\n"; }
+		$inserted++;
+		# we will do insert
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, EMAIL_SKOLNI, TITUL_PRED, JMENO, PRIJMENI, TITUL_ZA, TEL_PRAC_LINKA, TEL_PRAC_MOB, EMAIL_SOUKR, TEL_SOUKR, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW())});
+		$insertPerson->execute($uco, $LOGIN, $EMAIL, $TITLE_BEFORE, $FIRST_NAME, $LAST_NAME, $TITLE_AFTER, $PHONE, $MOBILE, $EMAIL_PRIV, $PHONE_PRIV);
+
+	}
+}
+
+commit $dbh;
+$dbh->disconnect();
+
+#Info about operations
+print "=======================================\n";
+print "Newly inserted:   \t$inserted\n";
+print "Found and skiped: \t$foundAndSkipped\n";
+print "Found and updated:\t$foundAndUpdated\n";
+print "=======================================\n";
+
+$lock->unlock();
+
+exit 0;

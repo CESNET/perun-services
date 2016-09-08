@@ -9,6 +9,7 @@ use Net::LDAP::LDIF;
 
 # Import shared AD library
 use ADConnector;
+use ScriptLock;
 
 sub process_add;
 sub process_remove;
@@ -39,6 +40,10 @@ close $file;
 my $namespace = $ARGV[1];
 chomp($namespace);
 
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespace);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
 # init configuration
 my @conf = init_config($namespace);
 my $ldap_location = resolve_pdc($conf[0]);
@@ -56,12 +61,12 @@ my %ad_entries_map = ();
 my %perun_entries_map = ();
 
 foreach my $ad_entry (@ad_entries) {
-    my $cn = $ad_entry->get_value('cn');
-    $ad_entries_map{ $cn } = $ad_entry;
+	my $cn = $ad_entry->get_value('cn');
+	$ad_entries_map{ $cn } = $ad_entry;
 }
 foreach my $perun_entry (@perun_entries) {
-    my $cn = $perun_entry->get_value('cn');
-    $perun_entries_map{ $cn } = $perun_entry;
+	my $cn = $perun_entry->get_value('cn');
+	$perun_entries_map{ $cn } = $perun_entry;
 }
 
 # process data
@@ -78,6 +83,8 @@ ldap_log($service_name, "Removed: " . $counter_remove . " entries.");
 ldap_log($service_name, "Updated: " . $counter_update. " entries.");
 ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
 
+$lock->unlock();
+
 # END of main script
 
 ###########################################
@@ -91,26 +98,26 @@ ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
 #
 sub process_add() {
 
-    foreach my $perun_entry (@perun_entries) {
+	foreach my $perun_entry (@perun_entries) {
 
-        my $cn = $perun_entry->get_value('cn');
-        unless (exists $ad_entries_map{$cn}) {
+		my $cn = $perun_entry->get_value('cn');
+		unless (exists $ad_entries_map{$cn}) {
 
-            # Add new entry to AD
-            my $response = $perun_entry->update($ldap);
-            unless ($response->is_error()) {
-                # SUCCESS
-                ldap_log($service_name, "Added: " . $perun_entry->dn());
-                $counter_add++;
-            } else {
-                # FAIL
-                ldap_log($service_name, "NOT added: " . $perun_entry->dn() . " | " . $response->error());
-                ldap_log($service_name, $perun_entry->ldif());
-                $counter_fail++;
-            }
+			# Add new entry to AD
+			my $response = $perun_entry->update($ldap);
+			unless ($response->is_error()) {
+				# SUCCESS
+				ldap_log($service_name, "Added: " . $perun_entry->dn());
+				$counter_add++;
+			} else {
+				# FAIL
+				ldap_log($service_name, "NOT added: " . $perun_entry->dn() . " | " . $response->error());
+				ldap_log($service_name, $perun_entry->ldif());
+				$counter_fail++;
+			}
 
-        }
-    }
+		}
+	}
 
 }
 
@@ -119,22 +126,22 @@ sub process_add() {
 #
 sub process_remove() {
 
-    foreach my $ad_entry (@ad_entries) {
-        my $cn = $ad_entry->get_value('cn');
-        unless (exists $perun_entries_map{$cn}) {
+	foreach my $ad_entry (@ad_entries) {
+		my $cn = $ad_entry->get_value('cn');
+		unless (exists $perun_entries_map{$cn}) {
 
-            my $response = $ldap->delete($ad_entry);
-            unless ($response->is_error()) {
-                ldap_log($service_name, "Deleted entry: " . $ad_entry->dn());
-                $counter_remove++;
-            } else {
-                ldap_log($service_name, "NOT deleted: " . $ad_entry->dn() . " | " . $response->error());
-                ldap_log($service_name, $ad_entry->ldif());
-                $counter_fail++;
-            }
+			my $response = $ldap->delete($ad_entry);
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Deleted entry: " . $ad_entry->dn());
+				$counter_remove++;
+			} else {
+				ldap_log($service_name, "NOT deleted: " . $ad_entry->dn() . " | " . $response->error());
+				ldap_log($service_name, $ad_entry->ldif());
+				$counter_fail++;
+			}
 
-        }
-    }
+		}
+	}
 
 }
 
