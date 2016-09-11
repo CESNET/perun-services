@@ -1,0 +1,49 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Perun::Agent;
+use JSON::XS;
+
+our $SERVICE_NAME = "crocs_user_export";
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_USER_FIRSTNAME;            *A_USER_FIRSTNAME =        \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LASTNAME;             *A_USER_LASTNAME =         \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_LOGIN;                *A_USER_LOGIN=             \'urn:perun:user:attribute-def:def:login-namespace:mu';
+
+my %attributesByLogin;
+
+my @resourcesData = $data->getChildElements;
+foreach my $rData (@resourcesData) {
+	my @membersData = $rData->getChildElements;
+	foreach my $mData (@membersData) {
+		my %memberAttributes = attributesToHash $mData->getAttributes;
+		$attributesByLogin{$memberAttributes{$A_USER_LOGIN}} = \%memberAttributes;
+	}
+}
+
+
+my @users;
+for my $login (sort keys %attributesByLogin) {
+	my $values = $attributesByLogin{$login};
+	my $user = {};
+	$user->{"firstname"} = $values->{$A_USER_FIRSTNAME};
+	$user->{"lastname"}  = $values->{$A_USER_LASTNAME};
+	$user->{"UCO"}       = $values->{$A_USER_LOGIN};
+	push @users, $user;
+}
+
+my $fileName = "$DIRECTORY/$SERVICE_NAME";
+open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
+print FILE JSON::XS->new->utf8->pretty->encode(\@users);
+close FILE or die "Cannot close $fileName: $! \n";
+
+perunServicesInit::finalize;
