@@ -93,10 +93,10 @@ foreach my $login (sort keys %$usersByLogin) {
 	print FILE "objectclass: ysquser", "\n";
 	print FILE "username: ", $login, "\n";
 	print FILE "ldapauthdn: cn=", $login, ", ou=users, ou=mu, dc=ucn, dc=muni, dc=cz", "\n";
-	print FILE "firstname: ", checkAttributeValue($attributes->{$A_USER_FIRST_NAME}), "\n";
-	print FILE "lastname: ", checkAttributeValue($attributes->{$A_USER_LAST_NAME}), "\n";
+	if(defined($attributes->{$A_USER_FIRST_NAME}) { print FILE "firstname: ", checkAttributeValue($attributes->{$A_USER_FIRST_NAME}), "\n"; }
+	if(defined($attributes->{$A_USER_LAST_NAME}) { print FILE "lastname: ", checkAttributeValue($attributes->{$A_USER_LAST_NAME}), "\n"; }
 	print FILE "costcenter: costcenterno=", $attributes->{$A_USER_WORKPLACE_ID} || 100, ", ou=costcenters, o=ysoftsafeq", "\n";
-	print FILE "email: ", checkAttributeValue($attributes->{$A_USER_MAIL}), "\n";
+	if(defined($attributes->{$A_USER_MAIL}) { print FILE "email: ", checkAttributeValue($attributes->{$A_USER_MAIL}), "\n"; }
 	print FILE "homedir:: ", encode_base64('\\\\nfs' . ($attributes->{$A_USER_LOGIN} % 7 + 1) . '.ucn.muni.cz\\profiles\\' . $attributes->{$A_USER_LOGIN});
 
 	foreach my $chipNumber (@{$attributes->{$A_USER_CHIP_NUM}}) {

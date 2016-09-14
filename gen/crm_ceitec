@@ -45,8 +45,8 @@ foreach my $rData (@resourcesData) {
 		my $login = $mAttributes{$A_LOGIN};
 
 		# store standard attrs
-		$users->{$login}->{$A_FIRST_NAME} = $mAttributes{$A_FIRST_NAME};
-		$users->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME};
+		$users->{$login}->{$A_FIRST_NAME} = defined($mAttributes{$A_FIRST_NAME}) ? $mAttributes{$A_FIRST_NAME} : 'null';
+		$users->{$login}->{$A_LAST_NAME} = defined($mAttributes{$A_LAST_NAME}) ? $mAttributes{$A_LAST_NAME} : 'null';
 		$users->{$login}->{$A_MAIL} = $mAttributes{$A_MAIL};
 		$users->{$login}->{$A_O} = $mAttributes{$A_O};
 		$users->{$login}->{$A_EPPNS} = $mAttributes{$A_EPPNS};

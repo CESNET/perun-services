@@ -95,13 +95,13 @@ sub processGroupData {
 			$members->{$login}->{'groups'}->{$groupName} = 1;
 		} else {
 			my $member = {
-			              first_name   => $memberAttributes{$A_FIRST_NAME} eq 'null' ? '' : $memberAttributes{$A_FIRST_NAME},
-			              middle_name  => $memberAttributes{$A_MIDDLE_NAME} eq 'null' ? '' : $memberAttributes{$A_MIDDLE_NAME},
-			              last_name    => $memberAttributes{$A_LAST_NAME} eq 'null' ? '' : $memberAttributes{$A_LAST_NAME},
-			              title_before => $memberAttributes{$A_TITLE_BEFORE} eq 'null' ? '' : $memberAttributes{$A_TITLE_BEFORE},
-			              title_after  => $memberAttributes{$A_TITLE_AFTER} eq 'null' ? '' : $memberAttributes{$A_TITLE_AFTER},
-                    user_login   => $login eq 'null' ? '' : $login,
-			              mail         => $memberAttributes{$A_USER_EMAIL} eq 'null' ? '' : $memberAttributes{$A_USER_EMAIL},
+			              first_name   => defined($memberAttributes{$A_FIRST_NAME}) ? $memberAttributes{$A_FIRST_NAME} : '',
+			              middle_name  => defined($memberAttributes{$A_MIDDLE_NAME}) ? $memberAttributes{$A_MIDDLE_NAME} : '',
+			              last_name    => defined($memberAttributes{$A_LAST_NAME}) ? $memberAttributes{$A_LAST_NAME} : '',
+			              title_before => defined($memberAttributes{$A_TITLE_BEFORE}) ? $memberAttributes{$A_TITLE_BEFORE} : '',
+			              title_after  => defined($memberAttributes{$A_TITLE_AFTER}) ? $memberAttributes{$A_TITLE_AFTER} : '',
+                    user_login   => defined($login) ? $login : '',
+			              mail         => defined($memberAttributes{$A_USER_EMAIL}) ? $memberAttributes{$A_USER_EMAIL} : '',
 			              groups       => { $groupName => 1 }
 			};
 			$members->{$login} = $member;
