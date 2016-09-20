@@ -133,6 +133,8 @@ sub quotaToKb($) {
 		when("e") { $quota *= 1024**5 }
 		default { die "Unknown units in quota. Units= $units"; }
 	}
+
+	$quota =~ s/[.].*$//;
 	return $quota;
 }
 
