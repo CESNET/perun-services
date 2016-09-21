@@ -1,5 +1,9 @@
 perun-slave-process-o365 (3.1.1) stable; urgency=low
 
   * New package version for perun-slave-process-o365
+  *
+  * IMPORTANT: this Perun service is only prototype for common behavior
+  * of pushing authorization data for o365 service
+
 
  -- Sona Mastrakova <sona.mastrakova@gmail.com>  Fri, 30 Sep 2016 13:30:00 +0200

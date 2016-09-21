@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#IMPORTANT: this Perun service is only prototype for common behavior
+#           of pushing authorization data for o365 service
+
 PROTOCOL_VERSION='3.0.0'
 
 function process {

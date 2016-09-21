@@ -1,6 +1,9 @@
 #!/usr/bin/perl
 
 # Generates members of o365 service in JSON format
+#
+#IMPORTANT: this Perun service is only prototype for common behavior
+#           of pushing authorization data for o365 service
 
 use strict;
 use warnings;
@@ -21,7 +24,7 @@ my $data = perunServicesInit::getHierarchicalData;
 our $A_USER_FIRST_NAME;           *A_USER_FIRST_NAME =           \'urn:perun:user:attribute-def:core:firstName';
 our $A_USER_LAST_NAME;            *A_USER_LAST_NAME =            \'urn:perun:user:attribute-def:core:lastName';
 our $A_USER_DISPLAY_NAME;         *A_USER_DISPLAY_NAME =         \'urn:perun:user:attribute-def:core:displayName';
-our $A_USER_PHOTOS;               *A_USER_PHOTOS =               \'urn:perun:user:attribute-def:def:photos';
+our $A_USER_PHOTO;                *A_USER_PHOTO =                \'urn:perun:user:attribute-def:def:o365-userPhoto';
 our $A_USER_FACILITY_LOGIN;       *A_USER_FACILITY_LOGIN =       \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_FACILITY_USAGE_LOCATION;   *A_FACILITY_USAGE_LOCATION =   \'urn:perun:facility:attribute-def:def:o365-usageLocation';
 our $A_FACILITY_DOMAIN_NAME;      *A_FACILITY_DOMAIN_NAME =      \'urn:perun:facility:attribute-def:def:o365-domainName';
@@ -105,20 +108,11 @@ sub processMembers {
 				surname => $memberData->{$A_USER_LAST_NAME},
 				usageLocation => $usageLocation,
 				userPrincipalName => $mail,
-				userType => $USER_TYPE
+				userType => $USER_TYPE,
+				photo => $memberData->{$A_USER_PHOTO}
 			};
 
 			$members->{$mail} = $member;
-
-			my $photos = $memberData->{$A_USER_PHOTOS};
-			# if user has any photo
-			if ($photos) {
-				my @keys = sort keys %$photos;
-				my $key = $keys[0];
-				# use first photo
-				my $photo = $photos->{$keys[0]};
-				$members->{$mail}->{'photo'} = $photo;
-			}
 		}
 	}
 }
