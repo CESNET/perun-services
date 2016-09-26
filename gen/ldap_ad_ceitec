@@ -135,7 +135,8 @@ for my $login (@logins) {
 	# Localy defined attributes
 	my $userPrincipalName = "$login\@ceitec.local";
 	my $samAccountName = $login;
-	my $displayName = "$users->{$login}->{$A_LAST_NAME} $users->{$login}->{$A_FIRST_NAME}";
+	my $firstName = defined($users->{$login}->{$A_FIRST_NAME}) ? $users->{$login}->{$A_FIRST_NAME} : '';
+	my $lastName = defined($users->{$login}->{$A_LAST_NAME}) ? $users->{$login}->{$A_LAST_NAME} : '';
 
 	# print attributes, which are never empty
 	print FILE "dn: cn=" . $cn . "," . $baseDNUsers . "\n";
@@ -148,7 +149,10 @@ for my $login (@logins) {
 	my $eppns = $users->{$login}->{$A_EPPNS};
 	my $o = $users->{$login}->{$A_O};
 
-	if (defined $displayName and length $displayName) {
+	if (length $firstName or length $lastName) {
+		my $displayName = $firstName . ' ' . $lastName;
+		$displayName =~ s/^\s+//;
+		$displayName =~ s/\s+$//;
 		print FILE "displayName: " . $displayName . "\n";
 	}
 	if (defined $sn and length $sn) {

@@ -212,6 +212,7 @@ for my $voShortName (sort keys %$usersByVo) {
 		print FILE "dn: uid=" . $login . ",ou=".$voShortName."," . $facilityAttributes{$A_F_BASE_DN} . "\n";
 		print FILE "uid: " . $login . "\n";
 		print FILE "cn: " . $voUsers->{$login}->{$A_DISPLAY_NAME} . "\n";
+		# Display name is mandatory so if it is null, then script has to failed
 		print FILE "sn: " . $voUsers->{$login}->{$A_LAST_NAME} . "\n";
 
 		# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, ORGANIZATION, EMAIL)
