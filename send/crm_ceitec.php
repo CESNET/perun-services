@@ -15,11 +15,12 @@ $longopts  = array(
 	"orgUnit:",
 	"universityId:",
 	"eppn:",
+	"rgs:",
 );
 
 $params = getopt("", $longopts);
 
-# public string[] CreateUser ( string userName, string firstName, string lastName, string email, string orgUnit, string universityId, string eppn )
+# public string[] CreateUser ( string userName, string firstName, string lastName, string email, string orgUnit, string universityId, string eppn , string rgs )
 $response = $client->__soapCall("CreateUser", array($params));
 
 # for debug

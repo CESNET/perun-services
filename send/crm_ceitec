@@ -9,7 +9,7 @@ sub logCRM;
 
 my $service_name = "crm_ceitec";
 my $protocol_version = "3.0.0";
-my $script_version = "3.0.1";
+my $script_version = "3.0.2";
 
 my $facility_name = $ARGV[0];
 chomp($facility_name);
@@ -34,18 +34,36 @@ foreach my $line (@diff) {
 		# Entry is probably missing login/firstName/lastName/email
 		$error = 1;
 		# log to stderr which is read by engine and stored in task result
-		print STDERR "Not enough parameters.\n";
-		logCRM("ERROR: Not enough parameters.");
+		print STDERR "Not enough parameters: @array \n";
+		logCRM("ERROR: Not enough parameters: @array");
+		$lock->unlock();
+		exit 1;
 	}
 
-	if (scalar(@array) == 4) {
-		$command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"\" --universityId \"\" --eppn \"\"";
-	} elsif (scalar(@array) == 5) {
-		$command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"$array[4]\" --universityId \"\" --eppn \"\"";
-	} elsif (scalar(@array) == 6) {
-		$command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"$array[4]\" --universityId \"$array[5]\" --eppn \"\"";
-	} elsif (scalar(@array) == 7) {
-		$command = $command . " --userName \"$array[0]\" --firstName \"$array[1]\" --lastName \"$array[2]\" --email \"$array[3]\" --orgUnit \"$array[4]\" --universityId \"$array[5]\" --eppn \"$array[6]\"";
+	$command = $command . " --userName \"$array[0]\" --lastName \"$array[2]\" --firstName \"$array[1]\" --email \"$array[3]\"";
+
+	if ($array[4]) {
+		$command = $command . " --orgUnit \"$array[4]\"";
+	} else {
+		$command = $command . " --orgUnit \"\"";
+	}
+
+	if ($array[5]) {
+		$command = $command . " --universityId \"$array[5]\"";
+	} else {
+		$command = $command . " --universityId \"\"";
+	}
+
+	if ($array[6]) {
+		$command = $command . " --eppn \"$array[6]\"";
+	} else {
+		$command = $command . " --eppn \"\"";
+	}
+
+	if ($array[7]) {
+		$command = $command . " --rgs \"$array[7]\"";
+	} else {
+		$command = $command . " --rgs \"\"";
 	}
 
 	my $result = `$command`;

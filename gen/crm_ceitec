@@ -8,13 +8,13 @@ use Unicode::Normalize;
 
 local $::SERVICE_NAME = "crm_ceitec";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getDataWithGroups;
 
 # User attributes
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
@@ -23,6 +23,7 @@ our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_EPPNS; *A_EPPNS = \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 our $A_O; *A_O = \'urn:perun:member:attribute-def:def:organization';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
+our $A_G_NAME; *A_G_NAME = \'urn:perun:group:attribute-def:core:name';
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
@@ -30,26 +31,37 @@ my $users;  # $users->{$login}->{ATTR} = $attrValue;
 #
 # AGGREGATE DATA
 #
-my @resourcesData = $data->getChildElements;
-
 # FOR EACH RESOURCE
-foreach my $rData (@resourcesData) {
+foreach my $rData ($data->getChildElements) {
 
-	# process members
-	my @membersData = $rData->getChildElements;
+	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
 
-	# FOR EACH MEMBER ON RESOURCE
-	foreach my $mData (@membersData) {
+	foreach my $group (@groupsData) {
 
-		my %mAttributes = attributesToHash $mData->getAttributes;
-		my $login = $mAttributes{$A_LOGIN};
+		my %gAttributes = attributesToHash $group->getAttributes;
 
-		# store standard attrs
-		$users->{$login}->{$A_FIRST_NAME} = $mAttributes{$A_FIRST_NAME};
-		$users->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME};
-		$users->{$login}->{$A_MAIL} = $mAttributes{$A_MAIL};
-		$users->{$login}->{$A_O} = $mAttributes{$A_O};
-		$users->{$login}->{$A_EPPNS} = $mAttributes{$A_EPPNS};
+		my @membersData = ($group->getChildElements)[1]->getChildElements;
+		foreach my $member (@membersData) {
+			my %uAttributes = attributesToHash $member->getAttributes;
+
+			my $login = $uAttributes{$A_LOGIN};
+
+			# store standard attrs
+			$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
+			$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
+			$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
+			$users->{$login}->{$A_O} = $uAttributes{$A_O};
+			$users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
+
+			if (exists $users->{$login}->{"GROUPS"}) {
+				# append
+				$users->{$login}->{"GROUPS"} = $users->{$login}->{"GROUPS"} . "#" . $gAttributes{$A_G_NAME};
+			} else {
+				# add new
+				$users->{$login}->{"GROUPS"} = $gAttributes{$A_G_NAME};
+			}
+
+		}
 
 	}
 }
@@ -69,6 +81,7 @@ for my $login (@logins) {
 	my $mail = $users->{$login}->{$A_MAIL};
 	my $o = $users->{$login}->{$A_O};
 	my $eppns = $users->{$login}->{$A_EPPNS};
+	my $groups = $users->{$login}->{"GROUPS"};
 
 	if (defined $o and length $o) {
 
@@ -102,12 +115,12 @@ for my $login (@logins) {
 			print FILE ";"
 		}
 
-		print FILE "\n";
-
 	} else {
 		# No organization provided, no orgId and eppns will be set either
-		print FILE 'CEITEC\\' . "$login;" . "$firstName;" . "$lastName;" . "$mail;" . ";;" . "\n";
+		print FILE 'CEITEC\\' . "$login;" . "$firstName;" . "$lastName;" . "$mail;" . ";;";
 	}
+
+	print FILE ";" . $groups . "\n";
 
 }
 
