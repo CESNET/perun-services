@@ -17,7 +17,7 @@ my $data = perunServicesInit::getHierarchicalData;
 #Constants
 our $A_FACILITY_MIN_UID;                *A_FACILITY_MIN_UID =                      \'urn:perun:facility:attribute-def:virt:minUID';
 our $A_FACILITY_MAX_UID;                *A_FACILITY_MAX_UID =                      \'urn:perun:facility:attribute-def:virt:maxUID';
-our $A_MEMBER_KERBEROS_LOGINS;          *A_MEMBER_KERBEROS_LOGINS =                \'urn:perun:user:attribute-def:def:kerberosLogins';
+our $A_MEMBER_KERBEROS_LOGINS;          *A_MEMBER_KERBEROS_LOGINS =                \'urn:perun:user:attribute-def:virt:kerberosLogins';
 our $A_MEMBER_UID;                      *A_MEMBER_UID =                            \'urn:perun:user_facility:attribute-def:virt:UID';
 our $A_MEMBER_GID;                      *A_MEMBER_GID =                            \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
 our $A_MEMBER_STATUS;                   *A_MEMBER_STATUS =                         \'urn:perun:member:attribute-def:core:status';
