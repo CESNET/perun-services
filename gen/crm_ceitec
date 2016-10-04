@@ -27,6 +27,8 @@ our $A_G_NAME; *A_G_NAME = \'urn:perun:group:attribute-def:core:name';
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
+# Unique users groups
+my $userGroups; # $userGroups->{$login}->{$groupName} = 1;
 
 #
 # AGGREGATE DATA
@@ -52,14 +54,7 @@ foreach my $rData ($data->getChildElements) {
 			$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
 			$users->{$login}->{$A_O} = $uAttributes{$A_O};
 			$users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
-
-			if (exists $users->{$login}->{"GROUPS"}) {
-				# append
-				$users->{$login}->{"GROUPS"} = $users->{$login}->{"GROUPS"} . "#" . $gAttributes{$A_G_NAME};
-			} else {
-				# add new
-				$users->{$login}->{"GROUPS"} = $gAttributes{$A_G_NAME};
-			}
+			$userGroups->{$login}->{$gAttributes{$A_G_NAME}} = 1;
 
 		}
 
@@ -81,7 +76,7 @@ for my $login (@logins) {
 	my $mail = $users->{$login}->{$A_MAIL};
 	my $o = $users->{$login}->{$A_O};
 	my $eppns = $users->{$login}->{$A_EPPNS};
-	my $groups = $users->{$login}->{"GROUPS"};
+	my $groups = join('#' , sort keys $userGroups->{$login});
 
 	if (defined $o and length $o) {
 
