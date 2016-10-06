@@ -92,7 +92,7 @@ for my $login (@logins) {
 				if (("Masarykova univerzita" eq $o) && ($val =~ /\@muni.cz$/)) {
 					print FILE "$val";
 					last;
-				} elsif (("Vysoke uceni technicke v Brne" eq $str) && ($val =~ /\@vutbr.cz$/)) {
+				} elsif ((("Vysoke uceni technicke v Brne" eq $str) or ("Brno University of Technology" eq $str)) && ($val =~ /\@vutbr.cz$/)) {
 					my $index = index($val, '@');
 					print FILE substr($val, 0, $index);
 					last;
