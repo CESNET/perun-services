@@ -11,10 +11,13 @@ function process {
 	E_HOME_DIR_NOT_EXISTS=(51 'Home for ${DST_HOME_DIR} not found.')
 	E_PARSING_GID=(52 'Cannot get GID for user ${USER_NAME}')
 	E_FINISHED_WITH_ERRORS=(53 'Slave script finished with errors!')
+	E_CHANGE_OWNER=(54 'Change owner on $DST_FILE failed.')
+	E_PERMISSIONS=(55 'Set permissions on $DST_FILE failed.')
+	E_COPY=(56 'Cannot copy $FROM_PERUN_FILE to $DST_FILE')
 
 	TMP_ERROR_FILE="${WORK_DIR}/error.tmp"
 	FROM_PERUN_DIR="${WORK_DIR}/k5login/"
-	PASSWD="/etc/passwd"	
+	PASSWD="/etc/passwd"
 
 	ERROR=0
 	
@@ -44,18 +47,33 @@ function process {
 		DST_FILE="$DST_HOME_DIR/.k5login"
 		if [ ! -f "$DST_FILE" ]; then
 			cp "$FROM_PERUN_FILE" "$DST_FILE"
-			
+			if [ $? -ne 0 ]; then
+				log_msg_without_exit E_COPY
+				ERROR=1
+				continue
+			fi
+
 			#separate GID for user from passwd file (4th column)
 			GID=`id -g $USER_NAME`
 			if [ $? -ne 0 ]; then
 				log_msg_without_exit E_PARSING_GID
 				ERROR=1
-				continue	
+				continue
 			fi
-			
-			#set permissions	
+
+			#set permissions
 			chown $USER_NAME:$GID $DST_FILE
+			if [ $? -ne 0 ]; then
+				log_msg_without_exit E_CHANGE_OWNER
+				ERROR=1
+				continue
+			fi
 			chmod 644 $DST_FILE
+			if [ $? -ne 0 ]; then
+				log_msg_without_exit E_PERMISSIONS
+				ERROR=1
+				continue
+			fi
 		else
 			diff_mv_sync "${FROM_PERUN_FILE}" "${DST_FILE}"
 			# If diff is ok, than set also permissions 
@@ -65,14 +83,24 @@ function process {
 				if [ $? -ne 0 ]; then
 					log_msg_without_exit E_PARSING_GID
 					ERROR=1
-	        			continue
+					continue
 				fi
 
 				#set permissions
 				chown $USER_NAME:$GID $DST_FILE
+				if [ $? -ne 0 ]; then
+					log_msg_without_exit E_CHANGE_OWNER
+					ERROR=1
+					continue
+				fi
 				chmod 644 $DST_FILE
+				if [ $? -ne 0 ]; then
+					log_msg_without_exit E_PERMISSIONS
+					ERROR=1
+					continue
+				fi
 			fi
-		fi	
+		fi
 	done
 
 	if [ $ERROR -ne 0 ]; then
