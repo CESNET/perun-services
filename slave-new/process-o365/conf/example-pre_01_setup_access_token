@@ -1,0 +1,3 @@
+#!/bin/bash
+
+ACCESS_TOKEN=`cat /tmp/o365-access-token`
