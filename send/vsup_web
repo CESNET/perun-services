@@ -10,6 +10,8 @@ use ScriptLock;
 my $username;
 my $password;
 my $tableName = 'IDM2WEB_OSOBY';
+my $tableName_cao = 'IDM2WEB_CAO';
+my $tableName_ext = 'IDM2WEB_EXT';
 
 # define service
 my $service_name = "vsup_web";
@@ -20,6 +22,8 @@ chomp($facility_name);
 my $service_files_base_dir="../gen/spool";
 my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
 my $service_file = "$service_files_dir/$service_name.csv";
+my $service_file_cao = "$service_files_dir/$service_name" . "_cao.csv";
+my $service_file_ext = "$service_files_dir/$service_name" . "_ext.csv";
 
 # propagation destination
 my $destination = $ARGV[1];
@@ -185,14 +189,193 @@ foreach my $uco (sort keys $dataByUco) {
 	}
 }
 
+##########################
+#
+# CAO handling
+#
+##########################
+
+my $cao;
+my $insertedCao = 0;
+my $foundAndSkippedCao = 0;
+my $deletedCao = 0;
+my $deletedCao2 = 0;
+my $deletedCao3 = 0;
+
+open FILE, $service_file_cao or die "Could not open $service_file_cao: $!";
+while(my $line = <FILE>) {
+
+	my @parts = split /\t/, $line;
+
+	my $UCO = (($parts[0] ne '') ? $parts[0] : undef);
+	my $CAO_ORGAN = (($parts[1] ne '') ? $parts[1] : undef);
+	my $CAO_FUNKCE = (($parts[2] ne '') ? $parts[2] : undef);
+	my $CAO_FUNKCE_ID = (($parts[3] ne '') ? $parts[3] : undef);
+
+	# fill existing CAO relations for UCO
+	$cao->{$UCO}->{$CAO_FUNKCE_ID} = 1;
+
+	# There is a CAO function
+	my $caoExist = $dbh->prepare(qq{select 1 from $tableName_cao where UCO=? and VZTAH_TYP=? and CAO_FUNKCE_ID=?});
+	$caoExist->execute($UCO, 'CAO', $CAO_FUNKCE_ID);
+
+	if($caoExist->fetch) {
+		if($DEBUG == 1) { print "FIND: $UCO\n"; }
+
+			if($DEBUG == 1) { print "SKIP RECORD: $UCO\n"; }
+			$foundAndSkippedCao++;
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW RECORD: $UCO\n"; }
+		$insertedCao++;
+		# we will do insert
+		my $insertCao = $dbh->prepare(qq{INSERT INTO $tableName_cao (UCO, VZTAH_TYP, CAO_ORGAN, CAO_FUNKCE_NAZEV, CAO_FUNKCE_ID, ZMENENO_KDY) VALUES (?,?,?,?,?,NOW())});
+		$insertCao->execute($UCO, 'CAO', $CAO_ORGAN, $CAO_FUNKCE, $CAO_FUNKCE_ID);
+
+	}
+
+}
+close FILE;
+
+#####
+# Delete removed CAOs
+#####
+
+# delete completly removed people from CAO
+my @keptUcos = sort keys %{$cao};
+my $elements = join(',',@keptUcos);
+if($DEBUG == 1) { print "DELETED NOT IN ($elements)\n"; }
+$deletedCao += $dbh->do("DELETE FROM $tableName_cao WHERE VZTAH_TYP='CAO' and UCO not in ($elements)");
+
+# delete invalid CAO relations for kept people
+
+for my $UCO (sort keys %{$cao}) {
+	my @keptCaos = sort keys $cao->{$UCO};
+	my $kept = join('","',@keptCaos);
+	$kept = '"'.$kept.'"';
+	if($DEBUG == 1) { print "DELETED FOR $UCO NOT IN ($kept)\n"; }
+	$deletedCao2++;
+	$deletedCao3 += $dbh->do("DELETE FROM $tableName_cao WHERE VZTAH_TYP='CAO' and UCO='$UCO' and CAO_FUNKCE_ID not in ($kept)");
+}
+
+
+
+##########################
+#
+# EXT handling
+#
+##########################
+
+my $ext;
+my $insertedExt = 0;
+my $foundAndUpdatedExt = 0;
+my $foundAndSkippedExt = 0;
+my $deletedExt = 0;
+
+open FILE, $service_file_ext or die "Could not open $service_file_ext: $!";
+while(my $line = <FILE>) {
+
+	my @parts = split /\t/, $line;
+
+	my $UCO = (($parts[0] ne '') ? $parts[0] : undef);
+	my $VZTAH_ID = (($parts[1] ne '') ? $parts[1] : undef);
+	my $VZTAH_TYP = (($parts[2] ne '') ? $parts[2] : undef);
+	my $ZAM_FCE_NAZ = (($parts[3] ne '') ? $parts[3] : undef);
+	my $ZAM_FCE_CIS = (($parts[4] ne '') ? $parts[4] : undef);
+	my $NS = (($parts[5] ne '') ? $parts[5] : undef);
+
+	# fill existing CAO relations for UCO
+	$ext->{$UCO} = 1;
+
+	# There is a EXT
+	my $extExist = $dbh->prepare(qq{select 1 from $tableName_ext where UCO=? and VZTAH_ID=?});
+	$extExist->execute($UCO, $VZTAH_ID);
+
+	if($extExist->fetch) {
+		if($DEBUG == 1) { print "FIND: $UCO\n"; }
+
+		my $select = "SELECT 1 from $tableName_ext where UCO=? and VZTAH_ID=? and VZTAH_TYP=? and ZAM_FUNKCE_NAZEV";
+		my @params = ($UCO, $VZTAH_ID, $VZTAH_TYP);
+		if ($ZAM_FCE_NAZ) {
+			$select = $select . "=?";
+			push(@params, $ZAM_FCE_NAZ);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and ZAM_FUNKCE_CISLO";
+		if ($ZAM_FCE_CIS) {
+			$select = $select . "=?";
+			push(@params, $ZAM_FCE_CIS);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and NS";
+		if ($NS) {
+			$select = $select . "=?";
+			push(@params, $NS);
+		} else {
+			$select = $select . " is NULL";
+		}
+
+		my $recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
+
+		if(!$recordAreEquals->fetch) {
+
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName_ext SET VZTAH_TYP=? , ZAM_FUNKCE_NAZEV=? , ZAM_FUNKCE_CISLO=? , NS=? , ZMENENO_KDY=NOW() WHERE UCO=? and VZTAH_ID=?});
+			$updatePerson->execute($VZTAH_TYP, $ZAM_FCE_NAZ, $ZAM_FCE_CIS, $NS, $UCO, $VZTAH_ID);
+			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $UCO\n"; }
+			$foundAndUpdatedExt++;
+
+		} else {
+
+			if($DEBUG == 1) { print "SKIP RECORD: $UCO\n"; }
+			$foundAndSkippedExt++;
+
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW RECORD: $UCO\n"; }
+		$insertedExt++;
+		# we will do insert
+		my $insertExt = $dbh->prepare(qq{INSERT INTO $tableName_ext (UCO, VZTAH_ID, VZTAH_TYP, ZAM_FUNKCE_CISLO, ZAM_FUNKCE_NAZEV, NS, ZMENENO_KDY) VALUES (?,?,?,?,?,?,NOW())});
+		$insertExt->execute($UCO, $VZTAH_ID, $VZTAH_TYP, $ZAM_FCE_CIS, $ZAM_FCE_NAZ, $NS);
+
+	}
+
+}
+close FILE;
+
+#####
+# Delete removed EXTs
+#####
+
+# delete completly removed people from EXT
+my @keptExtUcos = sort keys %{$ext};
+my $elementsExt = join(',',@keptExtUcos);
+if($DEBUG == 1) { print "DELETED NOT IN ($elementsExt)\n"; }
+$deletedExt += $dbh->do("DELETE FROM $tableName_ext WHERE UCO not in ($elementsExt)");
+
 commit $dbh;
 $dbh->disconnect();
 
-#Info about operations
+# print info about operations
 print "=======================================\n";
 print "Newly inserted:   \t$inserted\n";
 print "Found and skiped: \t$foundAndSkipped\n";
 print "Found and updated:\t$foundAndUpdated\n";
+print "---------------------------------------\n";
+print "Newly inserted CAO:    \t$insertedCao\n";
+print "Found and skipped CAO: \t$foundAndSkippedCao\n";
+print "Deleted CAO completely:\t$deletedCao (rows)\n";
+print "Deleted CAO partialy:  \t$deletedCao2 processed people ($deletedCao3 deleted rows)\n";
+print "---------------------------------------\n";
+print "Newly inserted EXT:    \t$insertedExt\n";
+print "Found and updated EXT: \t$foundAndUpdatedExt\n";
+print "Found and skipped EXT: \t$foundAndSkippedExt\n";
+print "Deleted EXT completely:\t$deletedExt (rows)\n";
 print "=======================================\n";
 
 $lock->unlock();

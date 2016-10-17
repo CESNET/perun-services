@@ -31,6 +31,7 @@ our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePh
 our $A_JOB;  *A_JOB = \'urn:perun:user:attribute-def:def:job';
 our $A_JOB_ID;  *A_JOB_ID = \'urn:perun:user:attribute-def:def:jobId';
 our $A_NS;  *A_NS = \'urn:perun:user:attribute-def:def:ns';
+our $A_USER_ID;  *A_USER_ID = \'urn:perun:user:attribute-def:core:id';
 
 our $A_G_NAME;  *A_G_NAME = \'urn:perun:group:attribute-def:core:name';
 our $A_G_CAO_ORGAN;  *A_G_CAO_ORGAN = \'urn:perun:group:attribute-def:def:caoOrgan';
@@ -88,11 +89,13 @@ foreach my $rData ($data->getChildElements) {
 				$ext->{$uco}->{$A_JOB} = (defined $uAttributes{$A_JOB} ? $uAttributes{$A_JOB} : '');
 				$ext->{$uco}->{$A_JOB_ID} = (defined $uAttributes{$A_JOB_ID} ? $uAttributes{$A_JOB_ID} : '');
 				$ext->{$uco}->{$A_NS} = (defined $uAttributes{$A_NS} ? $uAttributes{$A_NS} : '');
+				$ext->{$uco}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
 			} elsif ("Externiste:Ostatni" eq $gAttributes{$A_G_NAME}) {
 				$ext->{$uco}->{"TYPE"} = "EXN";
 				$ext->{$uco}->{$A_JOB} = (defined $uAttributes{$A_JOB} ? $uAttributes{$A_JOB} : '');
 				$ext->{$uco}->{$A_JOB_ID} = (defined $uAttributes{$A_JOB_ID} ? $uAttributes{$A_JOB_ID} : '');
 				$ext->{$uco}->{$A_NS} = (defined $uAttributes{$A_NS} ? $uAttributes{$A_NS} : '');
+				$ext->{$uco}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
 			}
 
 		}
@@ -153,7 +156,8 @@ my @ext_keys = sort keys %{$ext};
 for my $uco (@ext_keys) {
 
 	# print attributes, which are never empty
-	print FILE $uco . "\t" . $ext->{$uco}->{"TYPE"} . "\t" . $ext->{$uco}->{$A_JOB} . "\t" . $ext->{$uco}->{$A_JOB_ID} . "\t" . $ext->{$uco}->{$A_NS}  . "\n";
+	print FILE $uco . "\t" . $ext->{$uco}->{$A_USER_ID} . "\t" . $ext->{$uco}->{"TYPE"} . "\t" .
+			$ext->{$uco}->{$A_JOB} . "\t" . $ext->{$uco}->{$A_JOB_ID} . "\t" . $ext->{$uco}->{$A_NS}  . "\n";
 
 }
 
