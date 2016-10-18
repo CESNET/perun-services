@@ -109,6 +109,15 @@ ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
 ldap_log($service_name, "Group updated: " . $counter_group_updated . " entries.");
 ldap_log($service_name, "Group failed: " . $counter_group_failed . " entries.");
 
+# print results
+print "Added: " . $counter_add . " entries.\n";
+print "Updated: " . $counter_updated . " entries.\n";
+print "Disabled: " . $counter_disabled . " entries.\n";
+print "Renamed: " . $counter_renamed . " entries.\n";
+print "Failed: " . $counter_fail. " entries.\n";
+print "Group updated: " . $counter_group_updated . " entries.\n";
+print "Group failed: " . $counter_group_failed . " entries.\n";
+
 $lock->unlock();
 
 # END of main script
