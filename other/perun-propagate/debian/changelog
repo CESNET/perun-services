@@ -1,3 +1,13 @@
+perun-propagate (3.0.2) stable; urgency=medium
+
+  * Add better timeout and test all hosts for perun_propagate
+  * timeout doesn't end propagation, propagation will continue in background,
+    only perun_propagation ends with info about it
+  * script tries call remctl for every uniqe host in ktutils because of more 
+    hosts for one physical address
+
+ -- Michal Stava <stavamichal@gmail.com>  Tue, 18 Oct 2016 16:00:00 +0100
+
 perun-propagate (3.0.1) stable; urgency=low
 
   * Separated perun_propagate init.d script from package perun-slave-meta.
