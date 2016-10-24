@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="group_mu"
+
+. generic_send
