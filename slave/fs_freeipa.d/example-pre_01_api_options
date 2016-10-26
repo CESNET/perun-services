@@ -1,0 +1,9 @@
+#!/bin/sh
+# FreeIPA host
+#IPA_HOST="localhost"
+
+# User to authenticate in JSON API
+#USER="admin"
+
+# API user's password
+#PASSWORD="password"
