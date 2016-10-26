@@ -7,7 +7,7 @@
 # Should-Start:      $syslog
 # Should-Stop:       $syslog
 # Default-Start:     2 3 4 5
-# Default-Stop:      
+# Default-Stop:
 # Short-Description: Perun propagate
 # Description:       Start the perun propagate process
 ### END INIT INFO
@@ -50,20 +50,20 @@ check() {
 # for purpose of evaluating all on_exit items
 function on_exit()
 {
-    for i in "${on_exit_items[@]}"
-    do
-        eval $i
-    done
+	for i in "${on_exit_items[@]}"
+	do
+		eval $i
+	done
 }
 
 # add new on_exit item
 function add_on_exit()
 {
-    local n=${#on_exit_items[*]}
-    on_exit_items[$n]="$*"
-    if [[ $n -eq 0 ]]; then
-        trap on_exit EXIT
-    fi
+	local n=${#on_exit_items[*]}
+	on_exit_items[$n]="$*"
+	if [[ $n -eq 0 ]]; then
+		trap on_exit EXIT
+	fi
 }
 
 #----------------------------- MAIN FUNTION -----------------
@@ -92,7 +92,7 @@ perun_propagate_start() {
 		add_on_exit "kdestroy -c ${KRB5CCNAME}"
 		if [ "${KERBEROS_TYPE}" = "heimdal" ]; then
 			kinit -k -t "${KEYTAB}" "${LINE}"
-		else	
+		else
 			kinit --no-afslog --keytab="${KEYTAB}" "${LINE}"
 		fi
 		TMP_ERROR=`mktemp --tmpdir=/tmp/ perun-propagate.XXXXXXXXX`
@@ -177,8 +177,8 @@ case "$1" in
 	start|restart)
 		# Check if krb5.keytab exists
 		test ! -f "${KEYTAB}" && log_failure_msg "keytab missing" && exit 0 # Quit silently
-		
 		log_daemon_msg "Starting $DESC" "$NAME"
+
 		check && perun_propagate_start
 		log_end_msg $?
 		;;
