@@ -18,7 +18,6 @@ This repository contains all scripts, which are used by [Perun](https://perun.ce
 * **other/perun-slave-metacentrum/** - Meta package to install all perun services used by MetaCentrum.
 * **scripts/** - Server side of perun-propagate service located on Perun instance.
 * **slave/** and **slave-meta/** - Deprecated old version of slave scripts packaging, will be removed.
-* **perun-propagate/** - Deprecated old version of perun-propagate package will be removed.
 
 Gen and send scripts are located on your Perun instance and are used by _perun-engine_ component. Slave scripts are then located on destination machines.
 
