@@ -91,9 +91,9 @@ perun_propagate_start() {
 		export KRB5CCNAME="FILE:${CC_FILE}"
 		add_on_exit "kdestroy -c ${KRB5CCNAME}"
 		if [ "${KERBEROS_TYPE}" = "heimdal" ]; then
-			kinit -k -t "${KEYTAB}" "${LINE}"
-		else
 			kinit --no-afslog --keytab="${KEYTAB}" "${LINE}"
+		else
+			kinit -k -t "${KEYTAB}" "${LINE}"
 		fi
 		TMP_ERROR=`mktemp --tmpdir=/tmp/ perun-propagate.XXXXXXXXX`
 		add_on_exit "rm -f ${TMP_ERROR}"

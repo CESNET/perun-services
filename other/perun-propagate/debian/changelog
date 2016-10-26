@@ -1,3 +1,9 @@
+perun-propagate (3.0.3) stable; urgency=high
+
+  * kinit command for MIT and heimdal kerberos was interchaged by mistake
+
+ -- Slavek Licehammer <slavek@ics.muni.cz>  Wed, 26 Oct 2016 15:42:29 +0200
+
 perun-propagate (3.0.2) stable; urgency=medium
 
   * Add better timeout and test all hosts for perun_propagate
