@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_user_vsup";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -23,7 +23,8 @@ our $A_F_DOMAIN;  *A_F_DOMAIN = \'urn:perun:facility:attribute-def:def:adDomain'
 our $A_F_UAC;  *A_F_UAC = \'urn:perun:facility:attribute-def:def:adUAC';
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
-our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
+our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
+our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
 our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
@@ -82,9 +83,8 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 
 		$users->{$login}->{"DN"} = "CN=".$uAttributes{$A_LOGIN}.",".$baseDN;
 		# store standard attrs
-		$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
-		$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
-		$users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
+		$users->{$login}->{$A_FIRST_NAME} = (defined $uAttributes{$A_ARTISTIC_FIRST_NAME} ? $uAttributes{$A_ARTISTIC_FIRST_NAME} : (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : undef));
+		$users->{$login}->{$A_LAST_NAME} = (defined $uAttributes{$A_ARTISTIC_LAST_NAME} ? $uAttributes{$A_ARTISTIC_LAST_NAME} : (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : undef));
 		$users->{$login}->{$A_UCO} = $uAttributes{$A_UCO};
 		$users->{$login}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE};
 		$users->{$login}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER};
@@ -118,7 +118,6 @@ for my $login (@logins) {
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME,...)
 	my $sn = $users->{$login}->{$A_LAST_NAME};
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
-	my $displayName = $users->{$login}->{$A_DISPLAY_NAME};
 	my $uco = $users->{$login}->{$A_UCO};
 	my $titleBefore = $users->{$login}->{$A_TITLE_BEFORE};
 	my $titleAfter = $users->{$login}->{$A_TITLE_AFTER};
@@ -126,9 +125,19 @@ for my $login (@logins) {
 	my $barcodes = $users->{$login}->{$A_CARD_BARCODES};
 	my $chipNumers = $users->{$login}->{$A_CARD_CHIP_NUMBERS};
 
-	if (defined $displayName and length $displayName) {
-		print FILE "displayName: " . $displayName . "\n";
+	# print display name from firstName/lastName only
+	my $printedDisplayName = undef;
+	if (defined $givenName and length $givenName and defined $sn and length $sn) {
+		$printedDisplayName = $givenName . " " . $sn;
+	} elsif (defined $givenName and length $givenName and !(defined $sn and length $sn)) {
+		$printedDisplayName = $givenName;
+	} elsif (!(defined $givenName and length $givenName) and defined $sn and length $sn) {
+		$printedDisplayName = $sn;
 	}
+	if (defined $printedDisplayName and length $printedDisplayName) {
+		print FILE "displayName: " . $printedDisplayName . "\n";
+	}
+
 	if (defined $sn and length $sn) {
 		print FILE "sn: " . $sn . "\n";
 	}
