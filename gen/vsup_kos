@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_kos";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -23,6 +23,9 @@ our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titl
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
+
+our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
+our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
 
 our $A_BIRTH_LAST_NAME;  *A_BIRTH_LAST_NAME = \'urn:perun:user:attribute-def:def:birthLastName';
 our $A_BIRTH_NUMBER;  *A_BIRTH_NUMBER = \'urn:perun:user:attribute-def:def:birthNumber';
@@ -76,8 +79,8 @@ foreach my $rData ($data->getChildElements) {
 				$users->{$key}->{'EMAIL'} = $uAttributes{$A_LOGIN}.'@vsup.cz';
 				$users->{$key}->{'TYP_ZAZN'} = $zazn;
 				$users->{$key}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE} ? $uAttributes{$A_TITLE_BEFORE} : '');
-				$users->{$key}->{$A_FIRST_NAME} = (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : '');
-				$users->{$key}->{$A_LAST_NAME} = (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : '');
+				$users->{$key}->{$A_FIRST_NAME} = (defined $uAttributes{$A_ARTISTIC_FIRST_NAME} ? $uAttributes{$A_ARTISTIC_FIRST_NAME} : (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : ''));
+				$users->{$key}->{$A_LAST_NAME} = (defined $uAttributes{$A_ARTISTIC_LAST_NAME} ? $uAttributes{$A_ARTISTIC_LAST_NAME} : (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : ''));
 				$users->{$key}->{$A_TITLE_AFTER} = (defined $uAttributes{$A_TITLE_AFTER} ? $uAttributes{$A_TITLE_AFTER} : '');
 
 				$users->{$key}->{$A_BIRTH_LAST_NAME} = (defined $uAttributes{$A_BIRTH_LAST_NAME} ? $uAttributes{$A_BIRTH_LAST_NAME} : '');
