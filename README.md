@@ -13,12 +13,10 @@ This repository contains all scripts, which are used by [Perun](https://perun.ce
 
 * **gen/** - These perl scripts fetch data from Perun and generate new configuration files for each service and destination.
 * **send/** - Scripts ensures transfer of configuration files to destination using SSH.
-* **slave-new/** - These (mainly bash) scripts process new files on destination machine and perform change itself.
+* **slave/** - These (mainly bash) scripts process new files on destination machine and perform change itself.
 * **other/perun-propagate/** - New packaging of perun-propagate to force service propagation from client side.
 * **other/perun-slave-metacentrum/** - Meta package to install all perun services used by MetaCentrum.
 * **scripts/** - Server side of perun-propagate service located on Perun instance.
-* **slave/** and **slave-meta/** - Deprecated old version of slave scripts packaging, will be removed.
-* **perun-propagate/** - Deprecated old version of perun-propagate package will be removed.
 
 Gen and send scripts are located on your Perun instance and are used by _perun-engine_ component. Slave scripts are then located on destination machines.
 
