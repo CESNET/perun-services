@@ -1,4 +1,0 @@
-#!/bin/sh
-
-# Set the name of the PBS/Torque server
-PBS_SERVER=arien
