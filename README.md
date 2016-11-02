@@ -28,7 +28,7 @@ Gen and send scripts are located on your Perun instance and are used by _perun-e
 apt-get install dh-make rpm equivs devscripts
 ```
 
-* Go to _slave-new/_ folder and run:
+* Go to _slave/_ folder and run:
 
 ```
 make all
@@ -57,7 +57,7 @@ FACILITY_WHITELIST=()
 
 You can also configure each service on destination machine using _pre_ and _post_ scripts. Simply create folder ``/etc/perun/[service_name.d]/`` (if not exists yet) and put your scripts into it. Name of the scripts are expected to be ``[pre/post]_[number]_filename``. Scripts are processed in an alphabetical order.
 
-Pre scripts are processed before slave script and post scripts are processed after. Pre scripts are usually used to configure the service. You can check example pre script for ldap service in ``slave-new/process-ldap/conf/`` folder.
+Pre scripts are processed before slave script and post scripts are processed after. Pre scripts are usually used to configure the service. You can check example pre script for ldap service in ``slave/process-ldap/conf/`` folder.
 
 ### Contributing ###
 
