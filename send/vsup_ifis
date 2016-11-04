@@ -1,0 +1,152 @@
+#!/usr/bin/perl
+use strict;
+use warnings FATAL => 'all';
+use DBI;
+use Getopt::Long qw(:config no_ignore_case);
+use Data::Dumper;
+use ScriptLock;
+
+my $username;
+my $password;
+my $tableName = 'ELA_OSB';
+my $tableNameSpj = 'ELA_SPJ';
+my $tableNameUpdate = 'ELA_AKT';
+#my $encoding = 'cp1250'; # for Oracle EE8MSWIN1250
+
+# define service
+my $service_name = "vsup_ifis";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+my $service_file = "$service_files_dir/$service_name.csv";
+
+# propagation destination
+my $destination = $ARGV[1];
+chomp($destination);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $destination);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# parse destination
+my ($db_machine,$db_port,$db_name) = split(/:/, $destination);
+
+# load authz
+my $configPath = "/etc/perun/services/$service_name/$db_name";
+open FILE, $configPath or die "Could not open config file $configPath: $!";
+while(my $line = <FILE>) {
+	if($line =~ /^username: .*/) {
+		$username = ($line =~ m/^username: (.*)$/)[0];
+	} elsif($line =~ /^password: .*/) {
+		$password = ($line =~ m/^password: (.*)$/)[0];
+	}
+}
+
+if(!defined($password) || !defined($username) || !defined($tableName)) {
+	print "Can't get config data from config file.\n";
+	exit 14;
+}
+
+#Main Structure
+my $dataByKey = {};
+
+open FILE, $service_file or die "Could not open $service_file: $!";
+while(my $line = <FILE>) {
+	my @parts = split /\t/, $line;
+	my $uco = $parts[0]; # UČO
+	$dataByKey->{$uco}->{'OS_CISLO'} = $uco;
+	$dataByKey->{$uco}->{'LOGIN'} = $parts[1];
+	$dataByKey->{$uco}->{'TYP_VZTAHU'} = $parts[2]; # STU/ZAM
+	$dataByKey->{$uco}->{'EMAIL'} = (($parts[3] ne '') ? $parts[3] : undef);
+	$dataByKey->{$uco}->{'TITUL'} = (($parts[4] ne '') ? $parts[4] : undef);
+	$dataByKey->{$uco}->{'JMENO'} = (($parts[5] ne '') ? $parts[5] : undef);
+	$dataByKey->{$uco}->{'PRIJMENI'} = (($parts[6] ne '') ? $parts[6] : undef);
+	$dataByKey->{$uco}->{'TITUL2'} = (($parts[7] ne '') ? $parts[7] : undef);
+	$dataByKey->{$uco}->{'ROD_CISLO'} = $parts[8];
+	$dataByKey->{$uco}->{'POHLAVI'} = $parts[9];
+	$dataByKey->{$uco}->{'FUNKCE'} = (($parts[10] ne '') ? $parts[10] : undef);
+	$dataByKey->{$uco}->{'TELEFON'} = (($parts[11] ne '') ? $parts[11] : undef);
+	$dataByKey->{$uco}->{'BANK_UCET'} = (($parts[12] ne '') ? $parts[12] : undef)
+
+}
+close FILE;
+
+my $dbh = DBI->connect("dbi:Oracle://$db_machine:$db_port/$db_name", $username, $password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65530, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+
+my $DEBUG=0;
+#statistic and information variables
+my $foundAndSkipped = 0;
+my $foundAndUpdated = 0;
+my $inserted = 0;
+
+#update and insert new
+foreach my $uco (sort keys $dataByKey) {
+
+	my $OS_CISLO = $dataByKey->{$uco}->{'OS_CISLO'};
+	my $LOGIN = $dataByKey->{$uco}->{'LOGIN'};
+	my $TYP_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
+	my $EMAIL = $dataByKey->{$uco}->{'EMAIL'};
+	my $TITUL = $dataByKey->{$uco}->{'TITUL'};
+	my $JMENO = $dataByKey->{$uco}->{'JMENO'};
+	my $PRIJMENI = $dataByKey->{$uco}->{'PRIJMENI'};
+	my $TITUL2 = $dataByKey->{$uco}->{'TITUL2'};
+	my $RODCISLO = $dataByKey->{$uco}->{'ROD_CISLO'};
+	my $RODCISLO_OLD = $dataByKey->{$uco}->{'ROD_CISLO'};
+	my $POHLAVI = $dataByKey->{$uco}->{'POHLAVI'};
+	my $FUNKCE = $dataByKey->{$uco}->{'FUNKCE'};
+	my $TELEFON = $dataByKey->{$uco}->{'TELEFON'};
+	my $BANK_UCET = $dataByKey->{$uco}->{'BANK_UCET'};
+
+	# There is
+	my $personExists = $dbh->prepare(qq{select 1 from $tableName where OSB_ID=?});
+	$personExists->execute($uco);
+
+	if($personExists->fetch) {
+
+		#if($DEBUG == 1) { print "FIND: $uco\n"; }
+
+		#we need to know if these two records are without changes, if yes, skip them
+		#my $recordAreEquals = $dbh->prepare(qq{SELECT 1 from $tableName where OSB_ID=? and UCO=? and USERNAME=? and EMAIL_SKOLNI=?});
+		#$recordAreEquals->execute($uco, $UCO, $LOGIN, $EMAIL);
+
+		#if(!$recordAreEquals->fetch) {
+
+		#	my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET UCO=? , USERNAME=? , EMAIL_SKOLNI=? , ZMENENO_KDY=sysdate WHERE OSB_ID=?});
+		#	$updatePerson->execute($UCO, $LOGIN, $EMAIL, $uco);
+		#	if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $uco\n"; }
+		#	$foundAndUpdated++;
+
+		#} else {
+
+		#	if($DEBUG == 1) { print "SKIP RECORD: $uco\n"; }
+		#	$foundAndSkipped++;
+
+		#}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW RECORD: $uco\n"; }
+		$inserted++;
+		# we will do insert
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (OSB_ID, PRIJMENI, POHLAVI, TITUL, JMENO, TITUL2, FUNKCE, TYP_VZTAHU, OS_CISLO, ROD_CISLO, ROD_CISLO_OLD, DEL) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)});
+		$insertPerson->execute($uco, $PRIJMENI, $POHLAVI, $TITUL, $JMENO, $TITUL2, $FUNKCE, $TYP_VZTAHU, $OS_CISLO, $RODCISLO, $RODCISLO_OLD, "-");
+
+	}
+}
+
+commit $dbh;
+$dbh->disconnect();
+
+#Info about operations
+print "=======================================\n";
+print "Newly inserted:   \t$inserted\n";
+print "Found and skiped: \t$foundAndSkipped\n";
+print "Found and updated:\t$foundAndUpdated\n";
+print "=======================================\n";
+
+$lock->unlock();
+
+exit 0;
