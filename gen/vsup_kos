@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
+sub begins_with;
 
 local $::SERVICE_NAME = "vsup_kos";
 local $::PROTOCOL_VERSION = "3.0.0";
@@ -53,7 +54,7 @@ foreach my $rData ($data->getChildElements) {
 
 		my %gAttributes = attributesToHash $group->getAttributes;
 
-		if (($gAttributes{$A_GROUP_NAME} eq "Studenti") or
+		if ((begins_with($gAttributes{$A_GROUP_NAME},"Studenti:")) or
 			($gAttributes{$A_GROUP_NAME} eq "Absolventi") or
 			($gAttributes{$A_GROUP_NAME} eq "Zamestnanci:Pedagog") or
 			($gAttributes{$A_GROUP_NAME} eq "Externiste:Pedagogicti")
@@ -66,9 +67,12 @@ foreach my $rData ($data->getChildElements) {
 
 				## determine entry type
 				my $zazn;
-				if (($gAttributes{$A_GROUP_NAME} eq "Studenti") or ($gAttributes{$A_GROUP_NAME} eq "Absolventi")) {
+				if (($gAttributes{$A_GROUP_NAME} eq "Studenti:Aktivni") or ($gAttributes{$A_GROUP_NAME} eq "Studenti:Cekatele") or
+					($gAttributes{$A_GROUP_NAME} eq "Studenti:Cizi") or ($gAttributes{$A_GROUP_NAME} eq "Studenti:Preruseni") or
+					($gAttributes{$A_GROUP_NAME} eq "Absolventi")) {
 					$zazn = "S";
-				} elsif (($gAttributes{$A_GROUP_NAME} eq "Zamestnanci:Pedagog") or ($gAttributes{$A_GROUP_NAME} eq "Externiste:Pedagogicti")) {
+				} elsif (($gAttributes{$A_GROUP_NAME} eq "Zamestnanci:Pedagog") or ($gAttributes{$A_GROUP_NAME} eq "Externiste:Pedagogicti") or
+					($gAttributes{$A_GROUP_NAME} eq "Studenti:Doktorandi")) {
 					$zazn = "P";
 				}
 
@@ -127,3 +131,7 @@ for my $key (@keys) {
 close(FILE);
 
 perunServicesInit::finalize;
+
+sub begins_with {
+	return substr($_[0], 0, length($_[1])) eq $_[1];
+}
