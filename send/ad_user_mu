@@ -215,7 +215,7 @@ sub ping_password_setter() {
 			$password = ($line =~ m/^password: (.*)$/)[0];
 		} elsif($line =~ /^tablename: .*/) {
 			$table_name = ($line =~ m/^tablename: (.*)$/)[0];
-		} elsif($line =~ /^tablename: .*/) {
+		} elsif($line =~ /^dbname: .*/) {
 			$db_name = ($line =~ m/^dbname: (.*)$/)[0];
 		}
 	}
