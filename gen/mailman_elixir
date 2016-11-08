@@ -48,6 +48,9 @@ foreach my $rData (@resourcesData) {
     # Store the admin's mail
     $mailinglistAdminMailStruc->{$listName} = $adminMail;
 
+    # Init mailinglistStruct with the listName
+    $mailinglistStruc->{$listName} = {};
+
     foreach my $memberAttributes (dataToAttributesHashes @membersData) {
         #list only VALID members except if allowNonvalidUsers is true
         next unless($memberAttributes->{$A_USER_STATUS} eq "VALID");
@@ -62,13 +65,20 @@ for my $listName (keys %$mailinglistStruc) {
     open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
     binmode FILE, ":utf8";
 
-    # As a first line, print header
-    # ELIXIR mailman doesn't support import of manager's email yet
-    #print FILE "#MANAGERS_MAIL=", $mailinglistAdminMailStruc->{$listName},"\n";
+    # Check if the list is empty, if yes, don't print anything
+    my $count = keys %{$mailinglistStruc->{$listName}};
+    if ($count > 0) {
+       # As a first line, print header
+       print FILE "#MANAGERS_MAIL=";
+       if ($mailinglistAdminMailStruc->{$listName}) {
+          print FILE $mailinglistAdminMailStruc->{$listName};
+       }
+       print FILE "\n";
 
-    for my $mail (keys %{$mailinglistStruc->{$listName}}) {
-      print FILE '"', unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME});
-      print FILE '" <', $mail, ">\n";
+       for my $mail (keys %{$mailinglistStruc->{$listName}}) {
+         print FILE '"', unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME});
+         print FILE '" <', $mail, ">\n";
+       }
     }
 
     close FILE or die $!;
