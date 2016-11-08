@@ -15,7 +15,7 @@ perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $data = perunServicesInit::getHierarchicalData;
 
-our $A_KERBEROS_LOGINS;       *A_KERBEROS_LOGINS =      \'urn:perun:user:attribute-def:virt:kerberosLogins';
+our $A_KERBEROS_LOGINS;       *A_KERBEROS_LOGINS =      \'urn:perun:user:attribute-def:def:kerberosLogins';
 our $A_USER_LOGIN;            *A_USER_LOGIN =           \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_HOME_MOUNTPOINT;       *A_HOME_MOUNTPOINT =      \'urn:perun:resource:attribute-def:def:fsHomeMountPoint';
 
