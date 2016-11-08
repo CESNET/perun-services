@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Text::Unidecode;
+
+local $::SERVICE_NAME = "cloudidp";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_USER_LOGIN; *A_USER_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:einfra';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';           
+our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
+our $A_ORGANIZATION;  *A_ORGANIZATION = \'urn:perun:user:attribute-def:def:organization';
+our $A_PREFERRED_MAIL;  *A_PREFERRED_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+
+
+my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+
+my @membersAttributes;
+my @resourcesData = $data->getChildElements;
+foreach my $rData (@resourcesData) {
+    my @membersData = $rData->getChildElements;
+    push @membersAttributes, dataToAttributesHashes @membersData;
+}
+
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+
+foreach my $memberAttributes (@membersAttributes) {
+    # TODO create an attribute for resorce with the rest of dn
+    print "dn: uid=" . $memberAttributes->{$A_USER_LOGIN} . ",ou=people,dc=perun,dc=garr,dc=it\n";
+    print "cn: " . $memberAttributes->{$A_DISPLAY_NAME} . "\n";
+    print "givenName: " . $memberAttributes->{$A_FIRST_NAME} . "\n";
+    print "sn: " . $memberAttributes->{$A_LAST_NAME} . "\n";
+    print "o: " . $memberAttributes->{$A_ORGANIZATION} . "\n";
+    print "mail: " . $memberAttributes->{$A_PREFERRED_MAIL}  . "\n";
+    print "uid: " . $memberAttributes->{$A_USER_LOGIN} . "\n";
+    # TODO scope edupersonprincpal name should be in some attribute too
+    print "eduPersonPrincipalName: " . $memberAttributes->{$A_USER_LOGIN} . "\@perun.garr.it\n";
+    print "eduPersonAffiliation: member\n";
+    print "eduPersonOrgDN: o=" . $memberAttributes->{$A_ORGANIZATION} . ",dc=perun,dc=garr,dc=it\n";
+    print "objectclass: top\n";
+    print "objectclass: inetOrgPerson\n";
+    print "objectclass: eduPerson\n\n";
+
+    #print FILE "\"" . $$entry[0] . "\" " . $$entry[1] . "\n";
+
+}
+close (FILE);
+
+perunServicesInit::finalize;
