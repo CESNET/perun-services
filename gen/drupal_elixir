@@ -6,8 +6,7 @@ use perunServicesInit;
 use perunServicesUtils;
 use Perun::Agent;
 use Perun::GroupsAgent;
-#use open qw/:std :utf8/;
-use Data::Dumper;
+use open qw/:std :utf8/;
 
 local $::SERVICE_NAME = "drupal_elixir";
 local $::PROTOCOL_VERSION = "3.0.0";
