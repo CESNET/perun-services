@@ -6,6 +6,7 @@ use Net::LDAPS;
 use Net::LDAP::Entry;
 use Net::LDAP::Message;
 use Net::LDAP::LDIF;
+use DBI;
 
 # Import shared AD library
 use ADConnector;
