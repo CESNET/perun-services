@@ -7,9 +7,7 @@ use perunServicesUtils;
 use Perun::Agent;
 use Perun::GroupsAgent;
 use open qw/:std :utf8/;
-use Data::Dumper;
 use JSON::XS;
-use Tie::IxHash;
 use utf8;
 
 local $::SERVICE_NAME = "kypo_portal";
@@ -33,7 +31,7 @@ our $A_USER_EPPNS;                *A_USER_EPPNS =            \'urn:perun:user:at
 our $A_USER_D_NAME;               *A_USER_D_NAME =           \'urn:perun:user:attribute-def:core:displayName';
 our $A_GROUP_ID;                  *A_GROUP_ID =              \'urn:perun:group:attribute-def:core:id';
 our $A_GROUP_NAME;                *A_GROUP_NAME =            \'urn:perun:group:attribute-def:core:name';
-our $A_GROUP_PARR_ID;		  *A_GROUP_PARR_ID = 	     \'urn:perun:group:attribute-def:core:parrentGroupId';
+our $A_GROUP_PAR_ID;              *A_GROUP_PAR_ID =          \'urn:perun:group:attribute-def:core:parentGroupId';
 
 our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
 our $STATUS_EXPIRED;              *STATUS_EXPIRED =          \'EXPIRED';
@@ -47,12 +45,12 @@ our $u_eppn = {};
 
 our $groupStruc = {};
 our $g_name = {};
-our $g_parr_id = {};
+our $g_par_id = {};
 
 our $membershipStruc = {};
 
-my $fileUsers = $DIRECTORY . "users.scim";
-my $fileGroups = $DIRECTORY . "groups.scim";
+my $fileUsers = $DIRECTORY . "/users.scim";
+my $fileGroups = $DIRECTORY . "/groups.scim";
 
 my $agent = perunServicesInit->getAgent;
 
@@ -87,7 +85,7 @@ foreach my $gid (sort keys %$groupStruc) {
 	my $group = {};
 	$group->{"id"} = $gid;
 	$group->{"name"} = $groupStruc->{$gid}->{$g_name};
-	$group->{"parrentGroupId"} = $groupStruc->{$gid}->{$g_parr_id};
+	$group->{"parentGroupId"} = $groupStruc->{$gid}->{$g_par_id};
 
 	my @members;
 	foreach my $uid (sort keys %{$membershipStruc->{$gid}}){
@@ -157,12 +155,12 @@ sub processGroups {
 	if($groupAttributes{$A_GROUP_NAME}) {
 		my $groupName = $groupAttributes{$A_GROUP_NAME};
 		my $gid = $groupAttributes{$A_GROUP_ID};
-		my $groupParrId = $groupAttributes{$A_GROUP_PARR_ID};
+		my $groupParId = $groupAttributes{$A_GROUP_PAR_ID};
 		
 		unless(exists $groupStruc->{$gid}) {
 			$groupStruc->{$gid}->{$g_name} = $groupName;
-			$groupStruc->{$gid}->{$g_parr_id} = $groupParrId;
-		}		
+			$groupStruc->{$gid}->{$g_par_id} = $groupParId;
+		}
 
 		foreach my $memberData ($membersElement->getChildElements) {
 			processUsers $gid, $memberData;
