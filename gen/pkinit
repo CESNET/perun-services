@@ -15,7 +15,7 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $data = perunServicesInit::getHierarchicalData;
 
 #Constants
-our $A_USER_KERBEROS_LOGINS;     *A_USER_KERBEROS_LOGINS =       \'urn:perun:user:attribute-def:virt:kerberosLogins';
+our $A_USER_KERBEROS_LOGINS;     *A_USER_KERBEROS_LOGINS =       \'urn:perun:user:attribute-def:def:kerberosLogins';
 our $A_USER_CERT_DNS;   *A_USER_CERT_DNS =     \'urn:perun:user:attribute-def:virt:userCertDNs';
 
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
