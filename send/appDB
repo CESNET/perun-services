@@ -1,0 +1,44 @@
+#!/bin/bash
+SERVICE_NAME="appDB"
+
+FACILITY_NAME=$1
+DESTINATION=$2
+DESTINATION_TYPE=$3
+
+if [ "$FACILITY_NAME" != "appDB.egi.eu" ]; then
+	echo "This service currently works only for appDB.egi.eu facility"  >&2;
+	exit 1;
+fi
+
+if [ "$DESTINATION" != "perun.metacentrum.cz" ]; then
+	echo "This service currently works only for perun.metacentrum.cz destination"  >&2;
+	exit 1;
+fi
+
+
+#if there is no destination type, use default 'host'
+if [ -z "$DESTINATION_TYPE" ]; then
+	DESTINATION_TYPE="host"
+fi
+
+if [ "$DESTINATION_TYPE" != "host" ]; then
+	echo "This service currently works only for destination type 'host'"  >&2;
+	exit 1;
+fi
+
+
+SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
+SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
+
+
+#Just safety check. This should not happen.
+if [ ! -d "$SERVICE_FILES_DIR" ]; then echo '$SERVICE_FILES_DIR: '$SERVICE_FILES_DIR' is not a directory' >&2 ; exit 1; fi
+
+
+cp "$SERVICE_FILES_DIR"/vos "$SERVICE_FILES_DIR"/users /var/www/external/appdb/
+
+ERR_CODE=$?
+
+echo "Slave script ends with return code: $ERR_CODE" >&2
+
+exit $ERR_CODE
