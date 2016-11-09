@@ -65,6 +65,9 @@ foreach my $rData (@resourcesData) {
 			}
 			for my $login (keys %logins) {
 				my $passwdLine = $login . ":x:" . $memberAttributes{$A_MEMBER_UID} . ":" . $memberAttributes{$A_MEMBER_GID};
+				if(defined($memberAttributes{$A_USER_OPTIONAL_LOGIN})) {
+					$passwdLine .= ":" . $memberAttributes{$A_USER_OPTIONAL_LOGIN};
+				}
 				$lines{$passwdLine} = 1;
 			}
 		}
