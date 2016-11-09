@@ -64,11 +64,11 @@ foreach my $resourceData ($data->getChildElements) {
 my @users;
 foreach my $uid (sort keys %$userStruc) {
 	my $user = {};
-	$user->{"id"} = $uid; 
+	$user->{"id"} = $uid;
 	$user->{"displayName"} = $userStruc->{$uid}->{$u_name};
 	$user->{"status"} = $userStruc->{$uid}->{$u_status};
 	$user->{"mail"} = $userStruc->{$uid}->{$u_email};
-	$user->{"identities"} = $userStruc->{$uid}->{$u_eppn}; 
+	$user->{"identities"} = $userStruc->{$uid}->{$u_eppn};
 
 	push @users, $user;
 }
@@ -93,10 +93,10 @@ foreach my $gid (sort keys %$groupStruc) {
 		$struct->{"userId"} = $uid;
 		push @members, $struct;
 	}
-	
+
 	$group->{"members"} = \@members;
 	push @groups, $group;
-}	
+}
 
 # PRINT GROUPS TO JSON
 open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
@@ -112,7 +112,7 @@ perunServicesInit::finalize;
 ## creates structure for users.csv file
 sub processUsers {
 	my ($gid, $memberData) = @_;
-	
+
 	my %memberAttributes = attributesToHash $memberData->getAttributes;
 	my $uid = $memberAttributes{$A_USER_ID};
 	my $status = $memberAttributes{$A_USER_STATUS};
@@ -126,7 +126,7 @@ sub processUsers {
 		my $memberStatus = $userStruc->{$uid}->{$u_status};
 
 		if ($memberStatus eq $STATUS_EXPIRED && $status eq $STATUS_VALID){
-			# change from EXPIRED to VALID  
+			# change from EXPIRED to VALID
 			$userStruc->{$uid}->{$u_status} = $status;
 		} elsif ($memberStatus eq $STATUS_SUSPENDED && $status eq $STATUS_VALID){
 			# change from SUSPENDED to VALID
@@ -156,7 +156,7 @@ sub processGroups {
 		my $groupName = $groupAttributes{$A_GROUP_NAME};
 		my $gid = $groupAttributes{$A_GROUP_ID};
 		my $groupParId = $groupAttributes{$A_GROUP_PAR_ID};
-		
+
 		unless(exists $groupStruc->{$gid}) {
 			$groupStruc->{$gid}->{$g_name} = $groupName;
 			$groupStruc->{$gid}->{$g_par_id} = $groupParId;
