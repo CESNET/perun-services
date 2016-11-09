@@ -1,140 +1,44 @@
-#!/usr/bin/perl
+#!/bin/bash
+SERVICE_NAME="appDB"
 
-use strict;
-use warnings;
-use perunServicesInit;
-use perunServicesUtils;
-use Text::Unidecode;
-use XML::Simple;
+FACILITY_NAME=$1
+DESTINATION=$2
+DESTINATION_TYPE=$3
 
-local $::SERVICE_NAME = "appDB";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+if [ "$FACILITY_NAME" != "appDB.egi.eu" ]; then
+	echo "This service currently works only for appDB.egi.eu facility"  >&2;
+	exit 1;
+fi
 
-perunServicesInit::init;
-my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithVos;
-
-#Constants
-our $A_VO_SHORT_NAME;        *A_VO_SHORT_NAME =          \'urn:perun:vo:attribute-def:core:shortName';
-our $A_VO_APPLICATION_URL;   *A_VO_APPLICATION_URL =     \'urn:perun:vo:attribute-def:def:applicationURL';
-our $A_VO_CREATED_AT;        *A_VO_CREATED_AT =          \'urn:perun:vo:attribute-def:core:createdAt';
-our $A_VO_DASHBOARD_LINK;    *A_VO_DASHBOARD_LINK =      \'urn:perun:vo:attribute-def:def:dashboardLink';
-our $A_VO_DESCRIPTION;       *A_VO_DESCRIPTION =         \'urn:perun:vo:attribute-def:def:description';
-our $A_USER_MAIL;            *A_USER_MAIL =              \'urn:perun:user:attribute-def:def:preferredMail';
-our $A_USER_CERT_DNS;        *A_USER_CERT_DNS =          \'urn:perun:user:attribute-def:virt:userCertDNs';
-our $A_USER_EPPNS;           *A_USER_EPPNS =             \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
-our $A_USER_STATUS;          *A_USER_STATUS =            \'urn:perun:member:attribute-def:core:status';
-our $A_USER_FIRST_NAME;      *A_USER_FIRST_NAME =        \'urn:perun:user:attribute-def:core:firstName';
-our $A_USER_LAST_NAME;       *A_USER_LAST_NAME =         \'urn:perun:user:attribute-def:core:lastName';
-our $A_USER_ID;              *A_USER_ID =                \'urn:perun:user:attribute-def:core:id';
-our $A_R_APPDB_CONTACT_ROLE; *A_R_APPDB_CONTACT_ROLE =   \'urn:perun:resource:attribute-def:def:appDBContactRole';
+if [ "$DESTINATION" != "perun.metacentrum.cz" ]; then
+	echo "This service currently works only for perun.metacentrum.cz destination"  >&2;
+	exit 1;
+fi
 
 
-our $STATUS_VALID;      *STATUS_VALID =        \'VALID';
+#if there is no destination type, use default 'host'
+if [ -z "$DESTINATION_TYPE" ]; then
+	DESTINATION_TYPE="host"
+fi
 
-my $usersXml = {};
-my $vosStruc = {};
-my $userVoMap = {};
-my $voContacts = {};
-
-
-my @membersAttributes;
-my @vosData = $data->getChildElements;
-for my $voData (@vosData) {
-	my %vosAttributes = attributesToHash $voData->getAttributes;
-	my $voShortName = $vosAttributes{$A_VO_SHORT_NAME};
-
-	unless(defined $vosStruc->{$voShortName}) {
-		$vosStruc->{$voShortName} = {
-			name => $voShortName,
-			status => "Production",
-			alias => $voShortName,
-			enrollmentUrl => [ $vosAttributes{$A_VO_APPLICATION_URL} ],
-			homepageUrl => [ $vosAttributes{$A_VO_DASHBOARD_LINK} ],
-			description => [ $vosAttributes{$A_VO_DESCRIPTION} ],
-			validationDate => { timezone => "UTC+1",
-			                    content  => $vosAttributes{$A_VO_CREATED_AT},
-			                  },
-		}
-	}
-
-	for my $rData ($voData->getChildElements) {
-		my %resourcesAttributes = attributesToHash $rData->getAttributes;
+if [ "$DESTINATION_TYPE" != "host" ]; then
+	echo "This service currently works only for destination type 'host'"  >&2;
+	exit 1;
+fi
 
 
-
-		for my $mData (($rData->getChildElements)[1]->getChildElements) {
-			my %memberAttributes = attributesToHash $mData->getAttributes;
-
-			next unless $memberAttributes{$A_USER_STATUS} eq $STATUS_VALID;
-
-			# prepare DNs
-			my @dn = ();
-			foreach my $subjectDN (keys %{$memberAttributes{$A_USER_CERT_DNS}}) {
-				my $subjectDNWithoutPrefix = $subjectDN;
-				$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
-				push @dn, { "content" => $subjectDNWithoutPrefix,
-				            "ca" => $memberAttributes{$A_USER_CERT_DNS}->{$subjectDN},
-				          };
-			}
-
-			# add user to contact role  (for VOs xml)
-			if(defined $resourcesAttributes{$A_R_APPDB_CONTACT_ROLE}) {
-				$voContacts->{$voShortName}->{$resourcesAttributes{$A_R_APPDB_CONTACT_ROLE} . "-" . $memberAttributes{$A_USER_ID}} = {
-						"name" => [ $memberAttributes{$A_USER_FIRST_NAME} . " " . $memberAttributes{$A_USER_LAST_NAME} ],
-						"role" => [ $resourcesAttributes{$A_R_APPDB_CONTACT_ROLE} ],
-						"email" => [ $memberAttributes{$A_USER_MAIL} ],
-						"sso" => [ {} ],
-						"eppn" => $memberAttributes{$A_USER_EPPNS},
-						"dn" => \@dn,
-				}
-			}
-
-			#skip user if he was already processed for this VO
-			next if $userVoMap->{$memberAttributes{$A_USER_ID}}->{$vosAttributes{$A_VO_SHORT_NAME}}++;
-
-			#prepare user record  (for users xml)
-			my @row = {
-									"uservo" => [ $memberAttributes{$A_USER_FIRST_NAME} . " " . $memberAttributes{$A_USER_LAST_NAME} ],
-									"vo" => [ $vosAttributes{$A_VO_SHORT_NAME} ],
-									"email" => [ $memberAttributes{$A_USER_MAIL} ],
-									"sso" => [ {} ],
-									"last_update" => [ "" ],
-									"first_update" => [ "" ],
-									"eppn" => $memberAttributes{$A_USER_EPPNS},
-									"dn" => \@dn,
-			          };
+SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
+SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
 
 
-			#add user to global structure
-			push @{$usersXml->{"result"}}, { "row" => \@row };
-
-		}
-	}
-}
-
-#prepare VOs xml from $vosStruc
-for my $shortName (keys %$vosStruc) {
-	$vosStruc->{$shortName}->{"contacts"}->{"individuals"}->{"contact"} = [ values %{$voContacts->{$shortName}} ];
-}
-
-my $vosXml = {};
-push @{$vosXml->{"IDCard"}}, values %$vosStruc;
+#Just safety check. This should not happen.
+if [ ! -d "$SERVICE_FILES_DIR" ]; then echo '$SERVICE_FILES_DIR: '$SERVICE_FILES_DIR' is not a directory' >&2 ; exit 1; fi
 
 
-#print users xml
-my $fileName = "$DIRECTORY/users";
-open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
-binmode FILE, ":utf8";
-print FILE XMLout($usersXml, KeepRoot => 1);
-close FILE or die "Cannot close $fileName: $! \n";
+cp "$SERVICE_FILES_DIR"/vos "$SERVICE_FILES_DIR"/users /var/www/external/appdb/
 
-#print VOs xml
-$fileName = "$DIRECTORY/vos";
-open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
-binmode FILE, ":utf8";
-print FILE XMLout($vosXml, KeepRoot => 1);
-close FILE or die "Cannot close $fileName: $! \n";
+ERR_CODE=$?
 
-perunServicesInit::finalize;
+echo "Slave script ends with return code: $ERR_CODE" >&2
+
+exit $ERR_CODE
