@@ -41,6 +41,7 @@ close MAX_UID;
 
 ####### passswd file ######################
 my %lines;
+my %nfsLines;
 
 my @resourcesData = $data->getChildElements;
 foreach my $rData (@resourcesData) {
@@ -51,20 +52,25 @@ foreach my $rData (@resourcesData) {
 
 		if($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID){
 			my %logins = ();
+			my %nfsLogins = ();
 			# login can have 2 possible variant "login" and "nfs/login"
 			# we don't want to have duplicits and for every login without 'nfs/' have a variant with 'nfs/'
 			foreach my $kerberosLogin (@{$memberAttributes{$A_MEMBER_KERBEROS_LOGINS}}) {
 				if($kerberosLogin =~ /^nfs\//) {
-					$logins{$kerberosLogin} = 1;
+					$nfsLogins{$kerberosLogin} = 1;
 				} else {
 					$logins{$kerberosLogin} = 1;
 					my $nfsKerberosLogin = "nfs/" . $kerberosLogin;
-					$logins{$nfsKerberosLogin} = 1;
+					$nfsLogins{$nfsKerberosLogin} = 1;
 				}
 			}
 			for my $login (keys %logins) {
 				my $passwdLine = $login . ":x:" . $memberAttributes{$A_MEMBER_UID} . ":" . $memberAttributes{$A_MEMBER_GID};
 				$lines{$passwdLine} = 1;
+			}
+			for my $nfsLogin (keys %nfsLogins) {
+				my $passwdLine = $nfsLogin . ":x:" . $memberAttributes{$A_MEMBER_UID} . ":" . $memberAttributes{$A_MEMBER_GID};
+				$nfsLines{$passwdLine} = 1;
 			}
 		}
 	}
@@ -73,6 +79,9 @@ foreach my $rData (@resourcesData) {
 open PASSWD,">$passwd_file_name" or die "Cannot open $passwd_file_name: $! \n";
 for my $passwdLine (keys %lines) {
 	print PASSWD $passwdLine, "\n";
+}
+for my $nfsLine (keys %nfsLines) {
+	print PASSWD $nfsLine, "\n";
 }
 close(PASSWD);
 
