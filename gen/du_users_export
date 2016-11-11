@@ -126,8 +126,8 @@ foreach my $rData (@resourcesData) {
 					push @associatedUsers, 
 										{
 											"PerunUserID" => $richUser->{'_id'},
-											"FirstName" => $richUser->{'_firstName'},
-											"LastName" => $richUser->{'_lastName'},
+											"FirstName" => $richUser->{'_firstName'} || "",
+											"LastName" => $richUser->{'_lastName'} || "",
 											"PreferredMail" => $assocUserAttrs->{$A_USER_MAIL},
 											"LoginInEINFRA" => $assocUserAttrs->{$A_USER_LOGIN_EINFRA} ? $assocUserAttrs->{$A_USER_LOGIN_EINFRA}  : "",
 											"KerberosPrincipals" => \@assocUserKerberosLogins,
@@ -146,8 +146,8 @@ foreach my $rData (@resourcesData) {
 									"Kerberos"        => \@kerberosLogins,
 									"Shibboleth"      => \@shibbolethLogins,
 									"PerunUserID"     => $memberAttributes{$A_USER_ID},
-									"FirstName"       => $memberAttributes{$A_USER_FIRSTNAME},
-									"LastName"        => $memberAttributes{$A_USER_LASTNAME},
+									"FirstName"       => $memberAttributes{$A_USER_FIRSTNAME} || "",
+									"LastName"        => $memberAttributes{$A_USER_LASTNAME} || "",
 									"ResearchGroup"   => defined $memberAttributes{$A_U_RESEARCH_GROUP} ? $memberAttributes{$A_U_RESEARCH_GROUP} : "",
 									"Organization"    => defined $memberAttributes{$A_U_ORGANIZATION} ? $memberAttributes{$A_U_ORGANIZATION} : "",
 								};
@@ -266,8 +266,8 @@ for my $vo (keys %attributesByVo) {
 			push @voAdmins, 
 					{
 						"PerunUserID" => $richAdmin->{'_id'},
-						"FirstName" => $richAdmin->{'_firstName'},
-						"LastName" => $richAdmin->{'_lastName'},
+						"FirstName" => $richAdmin->{'_firstName'} || "",
+						"LastName" => $richAdmin->{'_lastName'} || "",
 						"PreferredMail" => $adminAttributes->{$A_USER_MAIL},
 						"LoginInEINFRA" => $adminAttributes->{$A_USER_LOGIN_EINFRA} ? $adminAttributes->{$A_USER_LOGIN_EINFRA}  : "",
 						"KerberosPrincipals" => \@kerberosLogins,

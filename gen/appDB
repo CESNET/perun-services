@@ -79,10 +79,18 @@ for my $voData (@vosData) {
 				          };
 			}
 
+			my $userName = "";
+			if($memberAttributes{$A_USER_FIRST_NAME}) {
+				$userName = $memberAttributes{$A_USER_FIRST_NAME};
+				$userName.= " " . $memberAttributes{$A_USER_LAST_NAME} if $memberAttributes{$A_USER_LAST_NAME};
+			} else {
+				$userName.= $memberAttributes{$A_USER_LAST_NAME} if $memberAttributes{$A_USER_LAST_NAME};
+			}
+	
 			# add user to contact role  (for VOs xml)
 			if(defined $resourcesAttributes{$A_R_APPDB_CONTACT_ROLE}) {
 				$voContacts->{$voShortName}->{$resourcesAttributes{$A_R_APPDB_CONTACT_ROLE} . "-" . $memberAttributes{$A_USER_ID}} = {
-						"name" => [ $memberAttributes{$A_USER_FIRST_NAME} . " " . $memberAttributes{$A_USER_LAST_NAME} ],
+						"name" => [ $userName ],
 						"role" => [ $resourcesAttributes{$A_R_APPDB_CONTACT_ROLE} ],
 						"email" => [ $memberAttributes{$A_USER_MAIL} ],
 						"sso" => [ {} ],
@@ -96,7 +104,7 @@ for my $voData (@vosData) {
 
 			#prepare user record  (for users xml)
 			my @row = {
-									"uservo" => [ $memberAttributes{$A_USER_FIRST_NAME} . " " . $memberAttributes{$A_USER_LAST_NAME} ],
+									"uservo" => [ $userName ],
 									"vo" => [ $vosAttributes{$A_VO_SHORT_NAME} ],
 									"email" => [ $memberAttributes{$A_USER_MAIL} ],
 									"sso" => [ {} ],

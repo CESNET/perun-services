@@ -83,8 +83,8 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 
 		$users->{$login}->{"DN"} = "CN=".$uAttributes{$A_LOGIN}.",".$baseDN;
 		# store standard attrs
-		$users->{$login}->{$A_FIRST_NAME} = (defined $uAttributes{$A_ARTISTIC_FIRST_NAME} ? $uAttributes{$A_ARTISTIC_FIRST_NAME} : (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : undef));
-		$users->{$login}->{$A_LAST_NAME} = (defined $uAttributes{$A_ARTISTIC_LAST_NAME} ? $uAttributes{$A_ARTISTIC_LAST_NAME} : (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : undef));
+		$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_ARTISTIC_FIRST_NAME} || $uAttributes{$A_FIRST_NAME};
+		$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_ARTISTIC_LAST_NAME} || $uAttributes{$A_LAST_NAME};
 		$users->{$login}->{$A_UCO} = $uAttributes{$A_UCO};
 		$users->{$login}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE};
 		$users->{$login}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER};

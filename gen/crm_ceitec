@@ -71,8 +71,8 @@ open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
 my @logins = sort keys %{$users};
 for my $login (@logins) {
 
-	my $lastName = $users->{$login}->{$A_LAST_NAME};
-	my $firstName = $users->{$login}->{$A_FIRST_NAME};
+	my $lastName = $users->{$login}->{$A_LAST_NAME} || "";
+	my $firstName = $users->{$login}->{$A_FIRST_NAME} || "";
 	my $mail = $users->{$login}->{$A_MAIL};
 	my $o = $users->{$login}->{$A_O};
 	my $eppns = $users->{$login}->{$A_EPPNS};

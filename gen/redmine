@@ -111,8 +111,8 @@ sub processUsers {
 
 	my %memberAttributes = attributesToHash $memberData->getAttributes;
 
-	my $firstName =        $memberAttributes{$A_USER_FIRSTNAME};
-	my $lastName =         $memberAttributes{$A_USER_LASTNAME};
+	my $firstName =        $memberAttributes{$A_USER_FIRSTNAME} || "";
+	my $lastName =         $memberAttributes{$A_USER_LASTNAME} || "";
 	my $login =            $memberAttributes{$A_USER_LOGIN};
 	my $email =            $memberAttributes{$A_USER_EMAIL};
 	my @eppns =            @{$memberAttributes{$A_USER_EPPNS}};
