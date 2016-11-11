@@ -1,9 +1,10 @@
 #!/usr/bin/perl
+
 #
 # Script for ceitec_protemics service used at IDM MU.
 #
 # Generates 3 files:
-# - groups.csv contains list of all groups (including their subgroups) assigned to resource
+# - groups.csv contains list of all groups assigned to resource
 # - users.csv contains list of all users from assigned groups
 # - memberships.csv contains list of pairs user-group and member status of the user in the group
 
@@ -12,11 +13,10 @@ use warnings;
 use Text::Unidecode;
 use perunServicesInit;
 use perunServicesUtils;
-use Perun::GroupsAgent;
-use Perun::Agent;
+use Data::Dumper;
 local $::SERVICE_NAME = "ceitec_proteomics";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -25,7 +25,6 @@ my $data = perunServicesInit::getDataWithGroups;
 #forward declaration
 sub processUsers;
 sub processGroups;
-sub processSubGroups;
 sub processMemberships;
 
 #Constants
@@ -51,21 +50,20 @@ our $g_name = {};
 
 our $membershipStruc = {};
 
-my $groupAgent = perunServicesInit->getAgent->getGroupsAgent;
-
 my $fileUsers = $DIRECTORY . "users.csv";
 my $fileGroups = $DIRECTORY . "groups.csv";
 my $fileMemberships = $DIRECTORY . "memberships.csv";
 
 foreach my $resourceData ($data->getChildElements) {
 	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		processGroups $groupData;
+		my $groupMembersLogins = processGroups $groupData;
 	}
 }
 
 # USERS: user_id name surname e-mail eppns
 open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
 binmode FILE_USERS, ":utf8";
+
 foreach my $uid (sort keys %$userStruc) {
 	print FILE_USERS "\"$uid\",\"$userStruc->{$uid}->{$u_name}\",\"$userStruc->{$uid}->{$u_surname}\",\"$userStruc->{$uid}->{$u_email}\",\"", join(",", @{$userStruc->{$uid}->{$u_eppns}}), "\"\n";
 }
@@ -74,6 +72,7 @@ close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
 # GROUPS: group_id group_name
 open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
 binmode FILE_GROUPS, ":utf8";
+
 foreach my $gid (sort keys %$groupStruc) {
 	print FILE_GROUPS "\"$gid\",\"$groupStruc->{$gid}->{$g_name}\"", "\n";
 }
@@ -126,33 +125,9 @@ sub processGroups {
 			$groupStruc->{$gid}->{$g_name} = $groupAttributes{$A_GROUP_NAME};
 		}
 
-		foreach my $subGroup ($groupAgent->getSubGroups(parentGroup => $gid)) {
-			processSubGroups $subGroup;
-		}
-
-		foreach my $memberData ($membersElement->getChildElements) {
+		foreach my $memberData($membersElement->getChildElements) {
 			processUsers $gid, $memberData;
 		}
-	}
-}
-
-## searches subgroups of assigned groups
-sub processSubGroups {
-	my $subGroup = shift;
-	my $subGroupId = $subGroup->getId;
-	my $subGroupName = $subGroup->getName;
-
-	unless(exists $groupStruc->{$subGroupId}) {
-		$groupStruc->{$subGroupId}->{$g_name} = $subGroupName;
-	}
-
-	my @subGroups = $groupAgent->getSubGroups(parentGroup => $subGroupId);
-	foreach my $itemSubgroup (@subGroups) {
-		processSubGroups $itemSubgroup;
-	}
-
-	foreach my $subGroupMember($groupAgent->getGroupMembers(group => $subGroupId)) {
-		processMemberships $subGroupId, $subGroupMember->getUserId;
 	}
 }
 
