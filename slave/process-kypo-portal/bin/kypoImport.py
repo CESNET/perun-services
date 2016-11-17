@@ -8,7 +8,7 @@ date:    2016-05-02
 version: 1.0.0
 
 2016-05-13: In getting data from DB added code to ignore testing DB entries with no external_id
-
+2016-11-17: Correct typo in code, parrent -> parent
 '''
 
 import sys
@@ -54,7 +54,7 @@ class Group(object):
 	def __init__(self):
 		self.name = ""
 		self.perun_id = 0
-		self.parrent_group_id = 0
+		self.parent_group_id = 0
 
 	def __eq__(self,other):
 		return self.name == other.name and self.external_id == other.external_id
@@ -137,10 +137,10 @@ for item in groups_data:
 	tmpGroup.name = (item['name']).encode('utf-8')
 	tmpGroup.external_id = int(item['id'])
 	
-	if item['parrentGroupId'] is None:
-		tmpGroup.parrent_group_id = 'default'
+	if item['parentGroupId'] is None:
+		tmpGroup.parent_group_id = 'default'
 	else:
-		tmpGroup.parrent_group_id = int(item['parrentGroupId'])
+		tmpGroup.parent_group_id = int(item['parentGroupId'])
 
 	groups_list.append(tmpGroup)
 	
@@ -226,7 +226,7 @@ for row in cur:
 	tmpGroup = Group()
 	tmpGroup.name = row[2]
 	tmpGroup.external_id = row[1]
-	tmpGroup.parrentGroupId = row[3]
+	tmpGroup.parentGroupId = row[3]
 	groupsDB.append(tmpGroup)
 
 ''' GETTING GROUPS THAT HAVE BEEN CHANGED TO LIST'''
@@ -243,7 +243,7 @@ for item in groups_list:
 	if int(item.external_id) not in groupDB_ids:
 		try:
 			cur.execute('INSERT INTO {0} (id, name, external_id, parent_group_id) VALUES (default, '"'{1}'"', '"'{2}'"', {3});'
-				.format(GROUP_TABLE, item.name, item.external_id, item.parrent_group_id))
+				.format(GROUP_TABLE, item.name, item.external_id, item.parent_group_id))
 		except psycopg2.Error as e:
 			print('DB Error {0}').format(e)
 			cur.close()
@@ -254,7 +254,7 @@ for item in groups_list:
 	if int(item.external_id) in groupIdsToUpd:	
 		try:
 			cur.execute('UPDATE {0} SET name = '"'{1}'"', parent_group_id = {2}  WHERE external_id = '"'{3}'"';'
-				.format(GROUP_TABLE, item.name, item.parrent_group_id, item.external_id))
+				.format(GROUP_TABLE, item.name, item.parent_group_id, item.external_id))
 		except psycopg2.Error as e:
 			print('DB Error {0}').format(e)
 			cur.close()
