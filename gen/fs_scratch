@@ -2,10 +2,10 @@
  
 use strict;
 use warnings;
-use experimental 'smartmatch';
 use perunServicesInit;
 use perunServicesUtils;
 use File::Basename;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.4.0";

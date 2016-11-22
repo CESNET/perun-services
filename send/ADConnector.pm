@@ -5,7 +5,7 @@ use Exporter 'import';
 
 use strict;
 use warnings;
-no if $] >= 5.018, warnings => "smartmatch";
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 =pod
 

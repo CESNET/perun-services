@@ -11,7 +11,7 @@ use Encode;
 use Net::LDAP::Control::Paged;
 use Net::LDAP::Constant qw( LDAP_CONTROL_PAGED );
 use String::Random qw( random_string );
-no if $] >= 5.018, warnings => "smartmatch";
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 # Import shared AD library
 use ADConnector;
