@@ -22,7 +22,7 @@ our $A_USER_ORG;            *A_USER_ORG =            \'urn:perun:user:attribute-
 our $A_USER_LOGIN;          *A_USER_LOGIN =          \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_PUBLICATIONS;   *A_USER_PUBLICATIONS =   \'urn:perun:user:attribute-def:def:publications';
 our $A_USER_STATUS;         *A_USER_STATUS =         \'urn:perun:member:attribute-def:core:status';
-our $A_USER_LANG;           *A_USER_LANG =           \'urn:perun:member:attribute-def:def:preferredLanguage';
+our $A_USER_LANG;           *A_USER_LANG =           \'urn:perun:user:attribute-def:def:preferredLanguage';
 our $A_USER_EXPIRES;        *A_USER_EXPIRES =        \'urn:perun:member:attribute-def:def:membershipExpiration';
 our $A_USER_RESEARCH_GROUP; *A_USER_RESEARCH_GROUP = \'urn:perun:user:attribute-def:opt:researchGroup';
 our $A_USER_LOA;            *A_USER_LOA =            \'urn:perun:member:attribute-def:virt:loa';
@@ -42,7 +42,7 @@ foreach my $rData (@resourcesData) {
 my @users;
 for my $login (sort keys %attributesByLogin) {
 	my $values = $attributesByLogin{$login};
-	push @users, { 
+	push @users, {
 									"logname"      => $values->{$A_USER_LOGIN},
 									"name"         => $values->{$A_USER_NAME},
 									"org"          => $values->{$A_USER_ORG},
@@ -61,7 +61,7 @@ $struc->{"users"} = \@users;
 
 my $fileName = "$DIRECTORY/$SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
-print FILE JSON::XS->new->utf8->pretty->encode($struc);
+print FILE JSON::XS->new->utf8->pretty->canonical->encode($struc);
 close FILE;
 
 perunServicesInit::finalize;
