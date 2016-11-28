@@ -72,7 +72,7 @@ my @facilitesAndAttrbutes;
 foreach my $facility (@facilities) {
 	if($facility->getName eq $pbsmonServer) { next; } # don't watng generate data for pbsmonServer itself
 	my $data = $servicesAgent->getHierarchicalData(service => $service->getId, facility => $facility->getId);
-	
+
 	#genereate all vo_shortNames
 	my %facilityVosShortNames = ();
 	my @resourcesData = $data->getChildElements;
@@ -96,7 +96,7 @@ foreach my $facility (@facilities) {
 for my $item (sort { $b->{"attributes"}->{$A_FACILITY_LISTING_PRIORITY} <=> $a->{"attributes"}->{$A_FACILITY_LISTING_PRIORITY} } @facilitesAndAttrbutes) {
 	my $facility = $item->{"facility"};
 	my $facilityAttributes = $item->{"attributes"};
-	my @voShortNames = keys %{$item->{"shortNames"}};
+	my @voShortNames = sort keys %{$item->{"shortNames"}};
 	my @owners = $facilitiesAgent->getOwners(facility => $facility->getId);
 
 	my %facilityStruc;
@@ -169,7 +169,7 @@ for my $key (sort keys %$physicalMachinesStruc) {
 
 my $fileName = "$DIRECTORY/$SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
-print FILE JSON::XS->new->utf8->pretty->encode($struc);
+print FILE JSON::XS->new->utf8->pretty->canonical->encode($struc);
 close FILE;
 
 perunServicesInit::finalize;
