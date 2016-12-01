@@ -36,6 +36,12 @@ my $base_dn = <$file>;
 chomp($base_dn);
 close $file;
 
+# MANAGE OPT ATTRIBUTES
+open $file, '<', "$service_files_dir/optAttributes";
+my @opt_attrs = <$file>;
+chomp(@opt_attrs);
+close $file;
+
 # propagation destination
 my $namespace = $ARGV[1];
 chomp($namespace);
@@ -55,7 +61,7 @@ ldap_bind($ldap, $conf[1], $conf[2]);
 
 # load all data
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
-my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn','displayName','sn','givenName','mail','userAccountControl','samAccountName','Department','departmentNumber']);
+my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn','displayName','sn','givenName','mail','userAccountControl','samAccountName','Department','departmentNumber', @opt_attrs]);
 
 my %ad_entries_map = ();
 
@@ -139,7 +145,7 @@ sub process_update() {
 			my $ad_entry = $ad_entries_map{$perun_entry->get_value('samAccountName')};
 
 			# attrs without cn since it's part of DN to be updated
-			my @attrs = ('displayName','sn','givenName','mail','Department','departmentNumber');
+			my @attrs = ('displayName','sn','givenName','mail','Department','departmentNumber', @opt_attrs);
 
 			# stored log messages to check if entry should be updated
 			my @entry_changed = ();
