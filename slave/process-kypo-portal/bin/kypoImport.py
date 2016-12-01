@@ -10,6 +10,7 @@ version: 1.0.0
 2016-05-13: In getting data from DB added code to ignore testing DB entries with no external_id
 2016-11-17: Correct typo in code, parrent -> parent
 2016-11-30: Fixed errors with parent groups, error messages
+2016-12-01: Subgroups are stored in DB without prefix of parent group
 '''
 
 import sys
@@ -142,6 +143,9 @@ for item in groups_data:
 		tmpGroup.parent_group_id = None
 	else:
 		tmpGroup.parent_group_id = int(item['parentGroupId'])
+		#This removes prefix of parent group exported from perun, that is not suitable
+		tmpGroup.name = tmpGroup.name.split(':')[-1]
+
 
 	groups_list.append(tmpGroup)
 	
