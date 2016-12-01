@@ -6,13 +6,14 @@ use perunServicesInit;
 use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_user_mu";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+local $::PROTOCOL_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
+my $optAttrsFileName = "$DIRECTORY/optAttributes";
 
 my $data = perunServicesInit::getFlatData;
 
@@ -20,6 +21,7 @@ my $data = perunServicesInit::getFlatData;
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
 our $A_F_DOMAIN;  *A_F_DOMAIN = \'urn:perun:facility:attribute-def:def:adDomain';
 our $A_F_UAC;  *A_F_UAC = \'urn:perun:facility:attribute-def:def:adUAC';
+our $A_F_AZURE_DOMAIN;  *A_F_AZURE_DOMAIN = \'urn:perun:facility:attribute-def:def:adAzureDomain';
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
@@ -43,6 +45,7 @@ if (!defined($facilityAttributes{$A_F_UAC})) {
 my $baseDN = $facilityAttributes{$A_F_BASE_DN};
 my $domain = $facilityAttributes{$A_F_DOMAIN};
 my $uac = $facilityAttributes{$A_F_UAC};
+my $azureDomain = $facilityAttributes{$A_F_AZURE_DOMAIN};
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
@@ -52,6 +55,13 @@ my $users;  # $users->{$login}->{ATTR} = $attrValue;
 #
 open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
 print FILE $baseDN;
+close(FILE);
+
+#
+# PRINT OPT_ATTRS FILE
+#
+open FILE,">:encoding(UTF-8)","$optAttrsFileName" or die "Cannot open $optAttrsFileName: $! \n";
+if (defined $azureDomain) { print FILE "msDS-cloudExtensionAttribute1"; }
 close(FILE);
 
 #
@@ -128,6 +138,13 @@ for my $login (@logins) {
 	}
 	if (defined $workplaceId and length $workplaceId) {
 		print FILE "departmentNumber: " . $workplaceId . "\n";
+	}
+
+	# OPT ATTRIBUTES
+
+	if (defined $azureDomain) {
+		# manage mapping to Azure AD if present in AD config
+		print FILE "msDS-cloudExtensionAttribute1:" . $login . "@" . $azureDomain . "\n";
 	}
 
 	# print classes
