@@ -9,6 +9,7 @@ version: 1.0.0
 
 2016-05-13: In getting data from DB added code to ignore testing DB entries with no external_id
 2016-11-17: Correct typo in code, parrent -> parent
+2016-11-30: Fixed errors with parent groups, error messages
 '''
 
 import sys
@@ -53,7 +54,7 @@ class User(object):
 class Group(object):
 	def __init__(self):
 		self.name = ""
-		self.perun_id = 0
+		self.external_id = 0
 		self.parent_group_id = 0
 
 	def __eq__(self,other):
@@ -138,7 +139,7 @@ for item in groups_data:
 	tmpGroup.external_id = int(item['id'])
 	
 	if item['parentGroupId'] is None:
-		tmpGroup.parent_group_id = 'default'
+		tmpGroup.parent_group_id = None
 	else:
 		tmpGroup.parent_group_id = int(item['parentGroupId'])
 
@@ -155,9 +156,10 @@ cur = conn.cursor()
 
 ''' GETTING ACTUAL USERS FROM DB '''
 try:
-	cur.execute('SELECT * FROM {0};'.format(USER_TABLE));
+	cur.execute('SELECT * FROM {0};'
+		.format(USER_TABLE));
 except psycopg2.Error as e:
-	print('DB Error {0}').format(e)
+	print('Getting users: DB Error {0}').format(e)
 	cur.close()
 	conn.close()
 	sys.exit(1)
@@ -191,7 +193,7 @@ for item in users_list:
 			cur.execute('INSERT INTO {0} (id, display_name, mail, status, external_id) VALUES (default, '"'{1}'"', '"'{2}'"', '"'{3}'"', '"'{4}'"');'
 				.format(USER_TABLE, item.displayName, item.mail, item.status, item.external_id))
 		except psycopg2.Error as e:
-			print('DB Error {0}').format(e)
+			print('Inserting user with ext_id:{0} DB Error {1}').format(item.external_id, e)
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -202,7 +204,7 @@ for item in users_list:
 			cur.execute('UPDATE {0} SET display_name = '"'{1}'"', mail = '"'{2}'"', status = '"'{3}'"' WHERE external_id = '"'{4}'"';'
 				.format(USER_TABLE, item.displayName, item.mail, item.status, item.external_id))
 		except psycopg2.Error as e:
-			print('DB Error {0}').format(e)
+			print('Updating user with ext_id:{0} DB Error {1}').format(item.external_id, e)
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -210,9 +212,10 @@ for item in users_list:
 
 ''' GETTING ACTUAL GROUPS FROM DB '''
 try:
-	cur.execute('SELECT * FROM {0};'.format(GROUP_TABLE))
+	cur.execute('SELECT * FROM {0};'
+		.format(GROUP_TABLE))
 except psycopg2.Error as e:
-	print('DB Error {0}').format(e)
+	print('Getting groups: DB Error {0}').format(e)
 	cur.close()
 	conn.close()
 	sys.exit(1)
@@ -226,7 +229,7 @@ for row in cur:
 	tmpGroup = Group()
 	tmpGroup.name = row[2]
 	tmpGroup.external_id = row[1]
-	tmpGroup.parentGroupId = row[3]
+	tmpGroup.parent_group_id = row[3]
 	groupsDB.append(tmpGroup)
 
 ''' GETTING GROUPS THAT HAVE BEEN CHANGED TO LIST'''
@@ -242,10 +245,19 @@ groupIdsToDel = list(set(groupDB_ids) - set(groupJSON_ids))
 for item in groups_list:	
 	if int(item.external_id) not in groupDB_ids:
 		try:
-			cur.execute('INSERT INTO {0} (id, name, external_id, parent_group_id) VALUES (default, '"'{1}'"', '"'{2}'"', {3});'
-				.format(GROUP_TABLE, item.name, item.external_id, item.parent_group_id))
+			if item.parent_group_id is not None:
+				cur.execute('SELECT id FROM {0} WHERE external_id = '"'{1}'"';'
+					.format(GROUP_TABLE, item.parent_group_id))
+                        	id = cur.fetchone()[0]
+
+				cur.execute('INSERT INTO {0} (id, name, external_id, parent_group_id) VALUES (default, '"'{1}'"', '"'{2}'"', {3});'
+					.format(GROUP_TABLE, item.name, item.external_id, id))
+			else:
+				cur.execute('INSERT INTO {0} (id, name, external_id) VALUES (default, '"'{1}'"', '"'{2}'"');'
+					.format(GROUP_TABLE, item.name, item.external_id))
+
 		except psycopg2.Error as e:
-			print('DB Error {0}').format(e)
+			print('Inserting group with ext_id:{0} DB Error {1}').format(item.external_id, e)
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -253,10 +265,19 @@ for item in groups_list:
 
 	if int(item.external_id) in groupIdsToUpd:	
 		try:
-			cur.execute('UPDATE {0} SET name = '"'{1}'"', parent_group_id = {2}  WHERE external_id = '"'{3}'"';'
-				.format(GROUP_TABLE, item.name, item.parent_group_id, item.external_id))
+			
+			if item.parent_group_id is not None:
+				cur.execute('SELECT id FROM {0} WHERE external_id = '"'{1}'"';'
+					.format(GROUP_TABLE, item.parent_group_id))
+                       		id = cur.fetchone()[0]
+		
+				cur.execute('UPDATE {0} SET name = '"'{1}'"', parent_group_id = {2}  WHERE external_id = '"'{3}'"';'
+					.format(GROUP_TABLE, item.name, id, item.external_id))
+			else:
+				cur.execute('UPDATE {0} SET name = '"'{1}'"'  WHERE external_id = '"'{2}'"';'
+					.format(GROUP_TABLE, item.name, item.external_id))
 		except psycopg2.Error as e:
-			print('DB Error {0}').format(e)
+			print('Updating group with ext_id:{0} DB Error {1}').format(item.external_id, e)
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -264,9 +285,10 @@ for item in groups_list:
 
 ''' GETTING ACTUAL IDENTITES FROM DB '''
 try:
-	cur.execute('SELECT id, external_id, login FROM {0}, {1} WHERE id = user_id;'.format(USER_TABLE, IDENTITY_TABLE))
+	cur.execute('SELECT id, external_id, login FROM {0}, {1} WHERE id = user_id;'
+		.format(USER_TABLE, IDENTITY_TABLE))
 except psycopg2.Error as e:
-	print('DB Error {0}').format(e)
+	print('Getting identities: DB Error {0}').format(e)
 	cur.close()
 	conn.close()
 	sys.exit(1)
@@ -285,11 +307,13 @@ identitiesToDel = list(set(identitiesDB) - set(identities_json))
 for item in identities_list:
 	if item.login not in identitiesDB:
 		try:
-			cur.execute('SELECT id FROM {0} WHERE external_id = {1};'.format(USER_TABLE, item.external_id))
+			cur.execute('SELECT id FROM {0} WHERE external_id = {1};'
+				.format(USER_TABLE, item.external_id))
 			id = cur.fetchone()[0]
-			cur.execute('INSERT INTO {0} (user_id, login) VALUES ('"'{1}'"', '"'{2}'"');'.format(IDENTITY_TABLE, id, item.login))
+			cur.execute('INSERT INTO {0} (user_id, login) VALUES ('"'{1}'"', '"'{2}'"');'
+				.format(IDENTITY_TABLE, id, item.login))
 		except psycopg2.Error as e:
-			print('DB Error {0}').format(e)
+			print('Inserting identity with_login:{0} DB Error {1}')	.format(item.login, e)
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -300,7 +324,7 @@ try:
 	cur.execute('SELECT {1}.id, {0}.id, {1}.external_id, {0}.external_id FROM {0}, {1}, {2} WHERE {0}.id = {2}.user_id and {1}.id = {2}.idm_group_id;'
 		.format(USER_TABLE, GROUP_TABLE, USERINGROUP_TABLE))
 except psycopg2.Error as e:
-	print('DB Error {0}').format(e)
+	print('Getting memberships: DB Error {0}').format(e)
 	cur.close()
 	conn.close()
 	sys.exit(1)
@@ -321,13 +345,16 @@ for row in cur:
 for item in usersInGroups_list:
 	if item not in userInGroupDB:
 		try:
-			cur.execute('SELECT id FROM {0} WHERE external_id = {1};'.format(USER_TABLE, item.user_external_id))
+			cur.execute('SELECT id FROM {0} WHERE external_id = {1};'
+				.format(USER_TABLE, item.user_external_id))
 			user_id = cur.fetchone()[0]
-			cur.execute('SELECT id FROM {0} WHERE external_id = {1};'.format(GROUP_TABLE, item.group_external_id))
+			cur.execute('SELECT id FROM {0} WHERE external_id = {1};'
+				.format(GROUP_TABLE, item.group_external_id))
 			group_id = cur.fetchone()[0]
-			cur.execute('INSERT INTO {0} (user_id, idm_group_id) VALUES('"'{1}'"', '"'{2}'"');'.format(USERINGROUP_TABLE, user_id, group_id))
+			cur.execute('INSERT INTO {0} (user_id, idm_group_id) VALUES('"'{1}'"', '"'{2}'"');'
+				.format(USERINGROUP_TABLE, user_id, group_id))
 		except psycopg2.Error as e:
-			print('DB Error {0}').format(e)
+			print('Inserting membership with user.ext_id:{0} and group.ext_id:{1} DB Error {2}').format(item.user_external_id, item.group_external_id, e)
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -339,9 +366,10 @@ userInGroupToDel = [item for item in userInGroupDB if item not in usersInGroups_
 ''' DELETING MEMBERSHIPS FROM DB '''
 for item in userInGroupToDel:
 	try:
-		cur.execute('DELETE FROM {0} WHERE user_id = '"'{1}'"' and idm_group_id = '"'{2}'"';'.format(USERINGROUP_TABLE, item.user_id, item.group_id))
+		cur.execute('DELETE FROM {0} WHERE user_id = '"'{1}'"' and idm_group_id = '"'{2}'"';'
+			.format(USERINGROUP_TABLE, item.user_id, item.group_id))
 	except psycopg2.Error as e:
-		print('DB Error {0}').format(e)
+		print('Deleting membership with user.id:{0} and group._id:{1} DB Error {0}').format(item.user_id, item.group_id, e)
 		cur.close()
 		conn.close()
 		sys.exit(1)
@@ -350,9 +378,10 @@ for item in userInGroupToDel:
 ''' DELETING IDENTITIES FROM DB '''
 for item in identitiesToDel:
 	try:
-		cur.execute('DELETE FROM {0} WHERE login = '"'{1}'"';'.format(IDENTITY_TABLE, item))
+		cur.execute('DELETE FROM {0} WHERE login = '"'{1}'"';'
+			.format(IDENTITY_TABLE, item))
 	except psycopg2.Error as e:
-		print('DB Error {0}').format(e)
+		print('Deleting identity with login:{0} DB Error {1}').format(item, e)
 		cur.close()
 		conn.close()
 		sys.exit(1)
@@ -361,9 +390,10 @@ for item in identitiesToDel:
 ''' USERS NOT IN JSON ARE SETTED TO DISABLE'''
 for item in userIdsToDis:
 	try:
-		cur.execute ('UPDATE {0} SET status  = '"'disabled'"' WHERE external_id = '"'{1}'"';'.format(USER_TABLE, item))
+		cur.execute ('UPDATE {0} SET status  = '"'disabled'"' WHERE external_id = '"'{1}'"';'
+			.format(USER_TABLE, item))
 	except psycopg2.Error as e:
-		print('DB Error {0}').format(e)
+		print('Disabling users: DB Error {0}').format(e)
 		cur.close()
 		conn.close()
 		sys.exit(1)
@@ -372,11 +402,13 @@ for item in userIdsToDis:
 ''' FROM GROUPS NOT IN JSON ARE DELETED ALL USERS ''' 
 for item in groupIdsToDel:
 	try:
-		cur.execute('SELECT id FROM {0} WHERE external_id = '"'{1}'"';'.format(GROUP_TABLE, item))
+		cur.execute('SELECT id FROM {0} WHERE external_id = '"'{1}'"';'
+			.format(GROUP_TABLE, item))
 		group_id = cur.fetchone()[0]
-		cur.execute('DELETE FROM {0} WHERE group_id = '"'{1}'"';'.format(USERINGROUP_TABLE, group_id))
+		cur.execute('DELETE FROM {0} WHERE group_id = '"'{1}'"';'
+			.format(USERINGROUP_TABLE, group_id))
 	except psycopg2.Error as e:
-		print('DB Error {0}').format(e)
+		print('Deleting users from group: DB Error {0}').format(e)
 		cur.close()
 		conn.close()
 		sys.exit(1)
