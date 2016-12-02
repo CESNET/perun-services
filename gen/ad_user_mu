@@ -61,7 +61,9 @@ close(FILE);
 # PRINT OPT_ATTRS FILE
 #
 open FILE,">:encoding(UTF-8)","$optAttrsFileName" or die "Cannot open $optAttrsFileName: $! \n";
+print FILE ""; # always have an empty file
 if (defined $azureDomain) { print FILE "msDS-cloudExtensionAttribute1"; }
+# append newline in case of adding another attribute !
 close(FILE);
 
 #
