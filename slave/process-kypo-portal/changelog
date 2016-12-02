@@ -1,3 +1,10 @@
+perun-slave-process-kypo-portal (3.0.3) stable; urgency=medium
+
+  * Fixed working with groups and subgroups, names of subgroups are imported
+    into DB without prefix of parent groups
+
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Fri, 02 Dec 2016 09:20:00 +0200
+
 perun-slave-process-kypo-portal (3.0.2) stable; urgency=medium
 
   * Fixed typo in processing parent groups (parrent->parent).
