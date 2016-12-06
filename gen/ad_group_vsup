@@ -42,7 +42,7 @@ print FILE $baseGroupDN;
 close(FILE);
 
 my @resourcesData = $data->getChildElements;
-my @groups = ();
+my $groups = {};
 my $usersByResource = {};
 
 # FOR EACH RESOURCE
@@ -50,7 +50,7 @@ foreach my $rData (@resourcesData) {
 
 	my %rAttributes = attributesToHash $rData->getAttributes;
 	my $group = $rAttributes{$A_R_GROUP_NAME};
-	push(@groups, $group);
+	$groups->{$group} = 1;
 
 	# process members
 	my @membersData = $rData->getChildElements;
@@ -78,7 +78,7 @@ foreach my $rData (@resourcesData) {
 #
 open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
 
-for my $group (sort @groups) {
+for my $group (sort keys %$groups) {
 
 	print FILE "dn: CN=" . $group . "," . $baseGroupDN . "\n";
 	print FILE "cn: " . $group . "\n";
