@@ -209,7 +209,7 @@ sub ldap_log($$) {
 	my $service = shift;
 	my $message = shift;
 
-	open(LOGFILE, ">>./" . $service . ".log");
+	open(LOGFILE, ">>./logs/" . $service . ".log");
 	print LOGFILE (localtime(time) . ": " . $message . "\n");
 	close(LOGFILE);
 

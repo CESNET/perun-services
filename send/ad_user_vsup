@@ -124,8 +124,8 @@ sub process_add() {
 				# Move entry to correct OU
 				move_entry($existing_entry, $login, $base_dn);
 
-				# put it between ad_entries so it got updated in a next step
-				$ad_entries_map{$login} = $existing_entry;
+				# get moved entry again from AD and put it between ad_entries so it got updated in a next step
+				$ad_entries_map{$login} = get_entry_by_login($login);
 
 			} else {
 

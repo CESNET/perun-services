@@ -134,7 +134,7 @@ sub diffCSV() {
 #
 sub logCRM() {
 	my $message = shift;
-	open(LOGFILE, ">>./crm_ceitec.log");
+	open(LOGFILE, ">>./logs/crm_ceitec.log");
 	print LOGFILE (localtime(time) . ": " . $message . "\n");
 	close(LOGFILE);
 }
