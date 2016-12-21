@@ -55,7 +55,8 @@ my $service = $servicesAgent->getServiceByName(name => $SERVICE_NAME);
 
 my $pbsmonServer = $agent->getAttributesAgent->getAttribute(attributeName => $A_FACILITY_PBSMON_SERVER, facility => perunServicesInit::getFacility->getId)->getValue;
 unless($pbsmonServer) { die "pbsmonServer not specified for facility ".(perunServicesInit::getFacility->getId()); }
-if($pbsmonServer eq 'metavo.metacentrum.cz') { $pbsmonServer = 'segin.ics.muni.cz'; }  #FIXME
+
+if($pbsmonServer eq 'metavo.metacentrum.cz') { $pbsmonServer = 'documents.metacentrum.cz'; }  #FIXME
 
 if($pbsmonServer ne perunServicesInit::getFacility->getName) {
 	my $pbsmonServerFacility;
@@ -70,7 +71,7 @@ my @facilities = $facilitiesAgent->getAssignedFacilities(service => $service->ge
 
 my @facilitesAndAttrbutes;
 foreach my $facility (@facilities) {
-	if($facility->getName eq $pbsmonServer) { next; } # don't watng generate data for pbsmonServer itself
+	if($facility->getName eq $pbsmonServer) { next; } # don't want generate data for pbsmonServer itself
 	my $data = $servicesAgent->getHierarchicalData(service => $service->getId, facility => $facility->getId);
 
 	#genereate all vo_shortNames
