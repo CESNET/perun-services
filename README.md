@@ -74,7 +74,7 @@ Pre scripts are processed before slave script and post scripts are processed aft
 
 > Our work is FreeBSD license, yet we sometimes use components under different licenses (e.g. Apache, GNU, CC).
 
-&copy; 2010-2016 [CESNET](https://www.cesnet.cz/?lang=en) and [CERIT-SC](https://www.cerit-sc.cz/en/index.html), all rights reserved.
+&copy; 2010-2017 [CESNET](https://www.cesnet.cz/?lang=en) and [CERIT-SC](https://www.cerit-sc.cz/en/index.html), all rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
