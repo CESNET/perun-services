@@ -1,0 +1,110 @@
+#!/usr/bin/perl
+use strict;
+use warnings FATAL => 'all';
+use DBI;
+use Getopt::Long qw(:config no_ignore_case);
+use Data::Dumper;
+use Encode qw(encode);
+use ScriptLock;
+
+my $username;
+my $password;
+my $tableName = 'idm2rav_osoby';
+
+# define service
+my $service_name = "vsup_rav";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+my $service_file = "$service_files_dir/$service_name.csv";
+
+# propagation destination
+my $destination = $ARGV[1];
+chomp($destination);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $destination);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# parse destination
+my ($db_machine,$db_port,$db_name) = split(/:/, $destination);
+
+# load authz
+my $configPath = "/etc/perun/services/$service_name/$db_name";
+open FILE, $configPath or die "Could not open config file $configPath: $!";
+while(my $line = <FILE>) {
+	if($line =~ /^username: .*/) {
+		$username = ($line =~ m/^username: (.*)$/)[0];
+	} elsif($line =~ /^password: .*/) {
+		$password = ($line =~ m/^password: (.*)$/)[0];
+	}
+}
+
+if(!defined($password) || !defined($username) || !defined($tableName)) {
+	print "Can't get config data from config file.\n";
+	exit 14;
+}
+
+#Main Structure
+my $dataByUco = {};
+
+open FILE, $service_file or die "Could not open $service_file: $!";
+while(my $line = <FILE>) {
+	my @parts = split /\t/, $line;
+	$dataByUco->{$parts[0]}->{'LOGIN'} = $parts[1];
+	$dataByUco->{$parts[0]}->{'EMAIL'} = $parts[2];
+	$dataByUco->{$parts[0]}->{'FIRST_NAME'} = (($parts[3] ne '') ? $parts[3] : undef);
+	$dataByUco->{$parts[0]}->{'LAST_NAME'} = (($parts[4] ne '') ? $parts[4] : undef);
+	$dataByUco->{$parts[0]}->{'TITLE_BEFORE'} = (($parts[5] ne '') ? $parts[5] : undef);
+	$dataByUco->{$parts[0]}->{'TITLE_AFTER'} = (($parts[6] ne '') ? $parts[6] : undef);
+	$dataByUco->{$parts[0]}->{'PHONE'} = (($parts[7] ne '') ? $parts[7] : undef);
+	$dataByUco->{$parts[0]}->{'CARD_BARCODE'} = (($parts[8] ne '') ? $parts[8] : undef);
+        $dataByUco->{$parts[0]}->{'CARD_CHIP_NUMBER'} = (($parts[9] ne '') ? $parts[9] : undef);
+}
+close FILE;
+
+my $dbh = DBI->connect("dbi:mysql:$db_name:$db_machine:$db_port", $username, $password,{ RaiseError=>1, AutoCommit=>0, mysql_enable_utf8 => 1}) or die "Connect to database $db_name Error!\n";
+
+my $DEBUG=0;
+
+#statistic and information variables
+my $inserted = 0;
+my $deleted = 0;
+
+$deleted += $dbh->do("DELETE FROM $tableName");
+
+#update and insert new
+foreach my $uco (sort keys $dataByUco) {
+
+	my $LOGIN = $dataByUco->{$uco}->{'LOGIN'};
+	my $EMAIL = $dataByUco->{$uco}->{'EMAIL'};
+	my $TITLE_BEFORE = $dataByUco->{$uco}->{'TITLE_BEFORE'};
+	my $FIRST_NAME = $dataByUco->{$uco}->{'FIRST_NAME'};
+	my $LAST_NAME = $dataByUco->{$uco}->{'LAST_NAME'};
+	my $TITLE_AFTER = $dataByUco->{$uco}->{'TITLE_AFTER'};
+	my $PHONE = $dataByUco->{$uco}->{'PHONE'};
+	my $CARD_BARCODE = $dataByUco->{$uco}->{'CARD_BARCODE'};
+        my $CARD_CHIP_NUMBER = $dataByUco->{$uco}->{'CARD_CHIP_NUMBER'};
+
+	if($DEBUG == 1) { print "INSERT NEW RECORD: $uco\n"; }
+        $inserted++;
+        # we will do insert
+        my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, JMENO, PRIJMENI, TITUL_PRED, TITUL_ZA, EMAIL, TELEFON, IDCARD_CHIP, IDCARD_BARCODE, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,NOW())});
+        $insertPerson->execute($uco, $LOGIN, $FIRST_NAME, $LAST_NAME, $TITLE_BEFORE, $TITLE_AFTER, $EMAIL, $PHONE, $CARD_CHIP_NUMBER, $CARD_BARCODE);
+}
+
+commit $dbh;
+$dbh->disconnect();
+
+# print info about operations
+print "=======================================\n";
+print "Inserted:\t$inserted\n";
+print "Deleted:\t$deleted (old rows)\n";
+print "=======================================\n";
+
+$lock->unlock();
+
+exit 0;
