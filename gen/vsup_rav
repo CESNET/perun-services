@@ -1,0 +1,82 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+local $::SERVICE_NAME = "vsup_rav";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
+my $data = perunServicesInit::getFlatData;
+
+#Constants
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
+our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
+our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
+our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:virt:preferredPhone';
+our $A_CARD_BARCODES;  *A_CARD_BARCODES = \'urn:perun:user:attribute-def:def:cardBarCodes';
+our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:cardCodes';
+our $A_VSUP_MAIL; *A_VSUP_MAIL = \'urn:perun:user:attribute-def:def:vsupMail';
+
+# GATHER USERS
+my $users;  # $users->{$uco}->{ATTR} = $attrValue;
+
+#
+# AGGREGATE DATA
+#
+# FOR EACH USER
+foreach my $user (($data->getChildElements)[1]->getChildElements) {
+
+	my %uAttributes = attributesToHash $user->getAttributes;
+
+	my $uco = $uAttributes{$A_UCO};
+	$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
+	$users->{$uco}->{$A_VSUP_MAIL} = $uAttributes{$A_VSUP_MAIL};
+	$users->{$uco}->{$A_FIRST_NAME} = (defined $uAttributes{$A_ARTISTIC_FIRST_NAME} ? $uAttributes{$A_ARTISTIC_FIRST_NAME} : (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : ''));
+	$users->{$uco}->{$A_LAST_NAME} = (defined $uAttributes{$A_ARTISTIC_LAST_NAME} ? $uAttributes{$A_ARTISTIC_LAST_NAME} : (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : ''));
+	$users->{$uco}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE} ? $uAttributes{$A_TITLE_BEFORE} : '');
+	$users->{$uco}->{$A_TITLE_AFTER} = (defined $uAttributes{$A_TITLE_AFTER} ? $uAttributes{$A_TITLE_AFTER} : '');
+	$users->{$uco}->{$A_PHONE} = (defined $uAttributes{$A_PHONE} ? $uAttributes{$A_PHONE} : '');
+
+	# if multiple, send only first one
+	if (defined $uAttributes{$A_CARD_BARCODES}) {
+		$users->{$uco}->{$A_CARD_BARCODES} = $uAttributes{$A_CARD_BARCODES}->[0];
+	} else {
+		$users->{$uco}->{$A_CARD_BARCODES} = '';
+	}
+	if (defined $uAttributes{$A_CARD_CHIP_NUMBERS}) {
+		$users->{$uco}->{$A_CARD_CHIP_NUMBERS} = $uAttributes{$A_CARD_CHIP_NUMBERS}->[0];
+	} else {
+		$users->{$uco}->{$A_CARD_CHIP_NUMBERS} = '';
+	}
+}
+
+#
+# PRINT user data LDIF
+#
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+# FOR EACH USER ON FACILITY
+my @keys = sort keys %{$users};
+for my $uco (@keys) {
+
+	# print attributes, which are never empty
+	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{$A_VSUP_MAIL} . "\t" . $users->{$uco}->{$A_FIRST_NAME}
+			. "\t" . $users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_TITLE_AFTER}
+			. "\t" . $users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_CARD_BARCODES} . "\t" . $users->{$uco}->{$A_CARD_CHIP_NUMBERS} . "\n";
+}
+
+close(FILE);
+
+perunServicesInit::finalize;
