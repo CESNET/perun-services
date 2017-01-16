@@ -18,7 +18,9 @@ my $data = perunServicesInit::getHierarchicalData;
 
 #Constants
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
+our $A_F_SERV_BASE_DN;  *A_F_SERV_BASE_DN = \'urn:perun:facility:attribute-def:def:adServiceBaseDN';
 our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
 our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName';
 
@@ -30,9 +32,13 @@ if (!defined($facilityAttributes{$A_F_GROUP_BASE_DN})) {
 if (!defined($facilityAttributes{$A_F_BASE_DN})) {
 	exit 1;
 }
+if (!defined($facilityAttributes{$A_F_SERV_BASE_DN})) {
+	exit 1;
+}
 
 my $baseGroupDN = $facilityAttributes{$A_F_GROUP_BASE_DN};
 my $baseDN = $facilityAttributes{$A_F_BASE_DN};
+my $baseServiceDN = $facilityAttributes{$A_F_BASE_DN};
 
 #
 # PRINT BASE_DN FILE
@@ -66,8 +72,14 @@ foreach my $rData (@resourcesData) {
 			next;
 		}
 
-		# store which users (their DN) are on this resource
-		$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDN} = 1
+		if (defined $mAttributes{$A_IS_SERVICE} and ($mAttributes{$A_IS_SERVICE} == 1)) {
+			# store which service users (their DN) are on this resource
+			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseServiceDN} = 1
+		} else {
+			# store which normal users (their DN) are on this resource
+			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDN} = 1
+		}
+
 
 	}
 

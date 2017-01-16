@@ -1,0 +1,80 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+local $::SERVICE_NAME = "vsup_rav_ns";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
+my $data = perunServicesInit::getDataWithGroups;
+
+#Constants
+our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
+our $A_G_NS_NAME;  *A_G_NS_NAME = \'urn:perun:group:attribute-def:def:nsName';
+our $A_G_NS_ID;  *A_G_NS_ID = \'urn:perun:group:attribute-def:def:nsId';
+
+# GATHER NS GROUPS and their members
+# groups->{$nsId}->{"NAME"} = $nsName
+# groups->{$nsId}->{"USERS"}->{$uco} = 1;
+my $groups;
+
+#
+# AGGREGATE DATA
+#
+# FOR EACH NS GROUP AND ITS MEMBERS
+#
+foreach my $rData ($data->getChildElements) {
+
+	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
+
+	foreach my $group (@groupsData) {
+
+		my %gAttributes = attributesToHash $group->getAttributes;
+
+		if (defined $gAttributes{$A_G_NS_ID} and defined $gAttributes{$A_G_NS_NAME}) {
+
+			$groups->{$gAttributes{$A_G_NS_ID}}->{"NAME"} = $gAttributes{$A_G_NS_NAME};
+
+			my @membersData = ($group->getChildElements)[1]->getChildElements;
+			foreach my $member (@membersData) {
+
+				my %uAttributes = attributesToHash $member->getAttributes;
+				my $uco = $uAttributes{$A_UCO};
+
+				# fill person to NS
+				$groups->{$gAttributes{$A_G_NS_ID}}->{"USERS"}->{$uco} = 1;
+
+			}
+
+		}
+
+		# SKIP NON-NS GROUPS
+
+	}
+}
+
+#
+# PRINT user data LDIF
+#
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+# FOR EACH NS GROUP
+my @keys = sort keys %{$groups};
+for my $key (@keys) {
+	my $name = $groups->{$key}->{"NAME"};
+	my @ucos = sort keys %{$groups->{$key}->{"USERS"}};
+	for my $uco (@ucos) {
+		print FILE $key . "\t" . $name . "\t" . $uco . "\n";
+	}
+}
+
+close(FILE);
+
+perunServicesInit::finalize;
