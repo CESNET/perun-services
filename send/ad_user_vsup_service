@@ -282,6 +282,7 @@ sub get_entry_by_login() {
 		my @entries = $response->entries;
 		if (@entries != 1) {
 			ldap_log( $service_name, @entries . " entries found for samAccountName=$login in " . $top_dn );
+			return undef;
 		} else {
 			my $entry = pop(@entries);
 			return $entry;
