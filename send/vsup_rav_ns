@@ -1,0 +1,100 @@
+#!/usr/bin/perl
+use strict;
+use warnings FATAL => 'all';
+use DBI;
+use Getopt::Long qw(:config no_ignore_case);
+use Data::Dumper;
+use Encode qw(encode);
+use ScriptLock;
+
+my $username;
+my $password;
+my $tableName = 'idm2rav_ns';
+
+# define service
+my $service_name = "vsup_rav_ns";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+my $service_file = "$service_files_dir/$service_name.csv";
+
+# propagation destination
+my $destination = $ARGV[1];
+chomp($destination);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $destination);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# parse destination
+my ($db_machine,$db_port,$db_name) = split(/:/, $destination);
+
+# load authz
+my $configPath = "/etc/perun/services/$service_name/$db_name";
+open FILE, $configPath or die "Could not open config file $configPath: $!";
+while(my $line = <FILE>) {
+	if($line =~ /^username: .*/) {
+		$username = ($line =~ m/^username: (.*)$/)[0];
+	} elsif($line =~ /^password: .*/) {
+		$password = ($line =~ m/^password: (.*)$/)[0];
+	}
+}
+
+if(!defined($password) || !defined($username) || !defined($tableName)) {
+	print "Can't get config data from config file.\n";
+	exit 14;
+}
+
+#Main Structure
+my $dataByNs = {};
+
+open FILE, $service_file or die "Could not open $service_file: $!";
+while(my $line = <FILE>) {
+	my @parts = split /\t/, $line;
+	$dataByNs->{$parts[0]}->{'NAME'} = $parts[1];
+	$dataByNs->{$parts[0]}->{'USERS'}->{$parts[2]} = 1
+}
+close FILE;
+
+my $dbh = DBI->connect("dbi:mysql:$db_name:$db_machine:$db_port", $username, $password,{ RaiseError=>1, AutoCommit=>0, mysql_enable_utf8 => 1}) or die "Connect to database $db_name Error!\n";
+
+my $DEBUG=0;
+
+#statistic and information variables
+my $inserted = 0;
+my $deleted = 0;
+
+$deleted += $dbh->do("DELETE FROM $tableName");
+
+#update and insert new
+foreach my $NS_KOD (sort keys $dataByNs) {
+
+	my $NS_NAZEV = $dataByNs->{$NS_KOD}->{'NAME'};
+
+	foreach my $UCO (sort keys $dataByNs->{$NS_KOD}->{'USERS'}) {
+
+		if($DEBUG == 1) { print "INSERT NEW RECORD: ".$NS_KOD." ".$NS_NAZEV." ".$UCO."\n"; }
+		$inserted++;
+		# we will do insert
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (NS_KOD, NS_NAZEV, UCO) VALUES (?,?,?)});
+		$insertPerson->execute($NS_KOD, $NS_NAZEV, $UCO);
+
+	}
+
+}
+
+commit $dbh;
+$dbh->disconnect();
+
+# print info about operations
+print "=======================================\n";
+print "Inserted:\t$inserted\n";
+print "Deleted:\t$deleted (old rows)\n";
+print "=======================================\n";
+
+$lock->unlock();
+
+exit 0;
