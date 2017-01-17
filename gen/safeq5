@@ -51,7 +51,7 @@ open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
 foreach my $login (sort keys %usersByLogin) {
 	my $attributes = $usersByLogin{$login};
 
-	print FILE_USERS "100;add;" . $login . ";" . $usersByLogin{$login}->{$A_USER_FIRST_NAME} . ";" . $attributes->{$A_USER_LAST_NAME} . ";" . shift(@{$attributes->{$A_USER_CHIP_NUM}}) . ";" . $attributes->{$A_USER_WORKPLACE_ID} . ";" . $attributes->{$A_USER_MAIL} . ";\n";
+	print FILE_USERS "100;add;" . $login . ";" . ($usersByLogin{$login}->{$A_USER_FIRST_NAME} || '(N/A)') . ";" . ($attributes->{$A_USER_LAST_NAME} || '(N/A)') . ";" . shift(@{$attributes->{$A_USER_CHIP_NUM}}) . ";" . $attributes->{$A_USER_WORKPLACE_ID} . ";" . $attributes->{$A_USER_MAIL} . ";\n";
 }
 
 close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";

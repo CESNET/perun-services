@@ -35,8 +35,8 @@ my @users;
 for my $login (sort keys %attributesByLogin) {
 	my $values = $attributesByLogin{$login};
 	my $user = {};
-	$user->{"firstname"} = $values->{$A_USER_FIRSTNAME};
-	$user->{"lastname"}  = $values->{$A_USER_LASTNAME};
+	$user->{"firstname"} = $values->{$A_USER_FIRSTNAME} || "";
+	$user->{"lastname"}  = $values->{$A_USER_LASTNAME} || "";
 	$user->{"UCO"}       = $values->{$A_USER_LOGIN};
 	push @users, $user;
 }
