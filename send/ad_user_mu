@@ -86,7 +86,14 @@ ldap_log($service_name, "Added: " . $counter_add . " entries.");
 ldap_log($service_name, "Updated: " . $counter_update. " entries.");
 ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
 
+# print results for TaskResults in GUI
+print "Added: " . $counter_add . " entries.\n";
+print "Updated: " . $counter_update. " entries.\n";
+print "Failed: " . $counter_fail. " entries.\n";
+
 $lock->unlock();
+
+if ($counter_fail > 0) { die "Failed to process: " . $counter_fail . " entries.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
 
 # END of main script
 
