@@ -38,7 +38,7 @@ if (!defined($facilityAttributes{$A_F_SERV_BASE_DN})) {
 
 my $baseGroupDN = $facilityAttributes{$A_F_GROUP_BASE_DN};
 my $baseDN = $facilityAttributes{$A_F_BASE_DN};
-my $baseServiceDN = $facilityAttributes{$A_F_BASE_DN};
+my $baseServiceDN = $facilityAttributes{$A_F_SERV_BASE_DN};
 
 #
 # PRINT BASE_DN FILE
