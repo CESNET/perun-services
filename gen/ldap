@@ -85,9 +85,10 @@ foreach my $rData (@resourcesData) {
 		}
 
 		# Store same member in flat structure (use USER attributes)
-		$users->{$login}->{$A_DISPLAY_NAME} = $mAttributes{$A_DISPLAY_NAME};
+		# FirstName can be undefined, display_name and last_name not (so set them to string null) to avoid it
+		$users->{$login}->{$A_DISPLAY_NAME} = (defined $mAttributes{$A_DISPLAY_NAME} and length $mAttributes{$A_DISPLAY_NAME}) ? $mAttributes{$A_DISPLAY_NAME} : "null";
 		$users->{$login}->{$A_FIRST_NAME} = $mAttributes{$A_FIRST_NAME};
-		$users->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME};
+		$users->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME} || "null";
 		$users->{$login}->{$A_ORGANIZATION} = $mAttributes{$A_ORGANIZATION};
 		$users->{$login}->{$A_MAIL} = $mAttributes{$A_MAIL};
 

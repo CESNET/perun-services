@@ -103,8 +103,8 @@ sub processUsers {
 	my $uid = $memberAttributes{$A_USER_ID};
 
 	unless(exists $userStruc->{$uid}) {
-		$userStruc->{$uid}->{$u_name} = $memberAttributes{$A_USER_NAME};
-		$userStruc->{$uid}->{$u_surname} = $memberAttributes{$A_USER_SURNAME};
+		$userStruc->{$uid}->{$u_name} = $memberAttributes{$A_USER_NAME} || "";
+		$userStruc->{$uid}->{$u_surname} = $memberAttributes{$A_USER_SURNAME} || "";
 		$userStruc->{$uid}->{$u_email} = $memberAttributes{$A_USER_EMAIL};
 		$userStruc->{$uid}->{$u_eppns} = $memberAttributes{$A_USER_EPPN};
 	}
