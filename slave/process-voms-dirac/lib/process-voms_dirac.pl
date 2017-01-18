@@ -143,6 +143,16 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	}
 	chomp(@cas);
 
+        my @attributeClasses_current=`voms-admin --vo ${name} list-attribute-classes`;
+        if ( $? != 0 ) {
+                syslog LOG_ERR, "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+                print STDERR "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
+                $retval = 1;
+                next;
+        }
+	s/\s.*$// for @attributeClasses_current;
+        chomp(@attributeClasses_current);
+
 	#Collect current Group Membership and Role assignment
 	my %groupRoles_current;		# Current assignment of users to (per group) roles
 	my %groupMembers_current;	# Current membership in groups (pure, disregarding roles)
@@ -160,11 +170,18 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	# Produce comparable data structure from input data
 	my %groupRoles_toBe;		# Desired assignment of users to (per group) roles
 	my %groupMembers_toBe;		# Desired membership in groups (pure, disregarding roles)
+	my @attributeClasses_toBe;	# Desired attribute classes
+	my %attributes_toBe;		# List off al users with attributes
 	my @groups_toBe = ( "/$name" );	# Desired list of groups
 	my @roles_toBe = ( "VO-Admin" );# Desired list of roles, plus the default VO-Admin role
+	my @attributeClasses_toBe = ( "nickname" ); # Desired list of attribute classes
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
 		next unless knownCA($user->{'CA'});
 		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
+		if($user->{'nickname'}) {
+			my %userAttributes = ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'attributes' => { 'name' => 'nickname', 'value' => "$user->{'nickname'}" } );
+			push(@attributes_toBe, \%userAttributes);
+			}
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
 		foreach $group (@{$user->{'groups'}->{'group'}}){
 			push(@groups_toBe, "/$name/$group->{'name'}") unless grep{$_ eq "/$name/$group->{'name'}"} @groups_toBe;
@@ -188,6 +205,9 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @rolesToDelete = array_minus( @roles_current, @roles_toBe );
 	my @rolesToCreate = array_minus( @roles_toBe, @roles_current );
 
+	my @attributeClassesToDelete = array_minus( @attributeClasses_current, @attributeClasses_toBe );
+	my @attributeClassesToCreate = array_minus( @attributeClasses_toBe, @attributeClasses_current );
+
 	my %membersToAdd;
 	my %membersToAdd;
 	my %rolesToAssign;
@@ -204,6 +224,8 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 		}
         }
 
+	# At the moment there are no comparisons for attributes since there no fast way to read current values.
+	my @attributesToSet = @attributes_toBe;
 
 	# Effect changes
 	# 1. create / delete groups
@@ -224,6 +246,17 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	foreach $role (@rolesToCreate) {
 		effectCall "voms-admin --vo $name create-role \"$role\"",
 		"creating Role \"$role\" in VO \"$name\".";
+	}
+
+	# 2.5. create / delete attribute classes
+	foreach $attributeClass (@attributeClassesToDelete) {
+		effectCall "voms-admin --vo $name delete-attribute-class \"$attributeClass\"",
+		"deleting Attribute Class \"$attributeClass\" from VO \"$name\".";
+	}
+
+	foreach $attributeClass (@attributeClassesToCreate) {
+		effectCall "voms-admin --vo $name create-attribute-class \"$attributeClass\" \"$attributeClass\" false",
+		"creating Attribute Class \"$attributeClass\" in VO \"$name\".";
 	}
 
 	# 3. add members to/remove members from groups
@@ -261,6 +294,14 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 				effectCall "voms-admin --nousercert --vo $name assign-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
 				"assigning Role \"$role\" to user \"$user->{'DN'}\" for Group \"$group\" in VO \"$name\"";
 			}
+		}
+	}
+
+	# 5. Set attribute values
+	foreach $user (@attributesToSet) {
+		foreach $attribute ($user->{'attributes'}) {
+			effectCall "voms-admin --nousercert --vo $name set-user-attribute \"$user->{'DN'}\" \"$user->{'CA'}\" \"$attribute->{'name'}\" \"$attribute->{'value'}\"",
+			"setting Attribute \"$attribute->{'name'}\" to value \"$attribute->{'value'}\" for user \"$user->{'DN'}\" in VO \"$name\"";
 		}
 	}
 }
