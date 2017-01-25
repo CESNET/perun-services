@@ -7,13 +7,16 @@ use Perun::Agent;
 use JSON::XS;
 use Tie::IxHash;
 
+#forward declaration
+sub processGroupData;
+
 our $SERVICE_NAME = "pbsmon_users";
-our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+our $PROTOCOL_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getDataWithGroups;
 
 #Constants
 our $A_USER_NAME;           *A_USER_NAME =           \'urn:perun:user:attribute-def:core:displayName';
@@ -26,34 +29,24 @@ our $A_USER_LANG;           *A_USER_LANG =           \'urn:perun:user:attribute-
 our $A_USER_EXPIRES;        *A_USER_EXPIRES =        \'urn:perun:member:attribute-def:def:membershipExpiration';
 our $A_USER_RESEARCH_GROUP; *A_USER_RESEARCH_GROUP = \'urn:perun:user:attribute-def:opt:researchGroup';
 our $A_USER_LOA;            *A_USER_LOA =            \'urn:perun:member:attribute-def:virt:loa';
+our $A_GROUP_NAME;          *A_GROUP_NAME =          \'urn:perun:group:attribute-def:core:name';
+our $A_GROUP_STATISTIC;     *A_GROUP_STATISTIC =     \'urn:perun:group:attribute-def:def:statisticGroup';
 
-my %attributesByLogin;
+my $attributesByLogin = {};
 
 my @resourcesData = $data->getChildElements;
 foreach my $rData (@resourcesData) {
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-		$attributesByLogin{$memberAttributes{$A_USER_LOGIN}} = \%memberAttributes;
+
+	foreach my $groupData (($rData->getChildElements)[0]->getChildElements) {
+		processGroupData $groupData, $attributesByLogin;
 	}
 }
 
 
 my @users;
-for my $login (sort keys %attributesByLogin) {
-	my $values = $attributesByLogin{$login};
-	push @users, {
-									"logname"      => $values->{$A_USER_LOGIN},
-									"name"         => $values->{$A_USER_NAME},
-									"org"          => $values->{$A_USER_ORG},
-									"mail"         => $values->{$A_USER_MAIL},
-									"publications" => $values->{$A_USER_PUBLICATIONS},
-									"lang"         => $values->{$A_USER_LANG},
-									"expires"      => $values->{$A_USER_EXPIRES},
-									"status"       => $values->{$A_USER_STATUS},
-									"loa"          => $values->{$A_USER_LOA},
-									"researchGroup" => $values->{$A_USER_RESEARCH_GROUP},
-								};
+for my $login (sort keys %$attributesByLogin) {
+	my $values = $attributesByLogin->{$login};
+	push @users, \%$values;
 }
 
 my $struc = {};
@@ -65,3 +58,45 @@ print FILE JSON::XS->new->utf8->pretty->canonical->encode($struc);
 close FILE;
 
 perunServicesInit::finalize;
+
+############
+### SUBS ###
+############
+
+sub processGroupData {
+	my ($groupData, $attributesByLogin) = @_;
+
+	my $subGroupsElement = ($groupData->getChildElements)[0];
+	my $membersElement = ($groupData->getChildElements)[1];
+	my %groupAttributes = attributesToHash $groupData->getAttributes;
+	
+	for my $memberData ($membersElement->getChildElements) {
+		my %memberAttributes = attributesToHash $memberData->getAttributes;
+		
+		unless($attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}) {
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"logname"} = $memberAttributes{$A_USER_LOGIN};
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"name"} = $memberAttributes{$A_USER_NAME};
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"org"} = $memberAttributes{$A_USER_ORG};
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"mail"} = $memberAttributes{$A_USER_MAIL};
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"publications"} = $memberAttributes{$A_USER_PUBLICATIONS};
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"lang"} = $memberAttributes{$A_USER_LANG};
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"expires"} = $memberAttributes{$A_USER_EXPIRES};
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"status"} = $memberAttributes{$A_USER_STATUS};
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"loa"} = $memberAttributes{$A_USER_LOA};
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"researchGroup"} = $memberAttributes{$A_USER_RESEARCH_GROUP};
+		}
+
+		#membership in groups
+		unless($attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"groups"}) {
+			my @groups = ( $groupAttributes{$A_GROUP_NAME} );
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"groups"} = \@groups;
+		} else {
+			my @groups = uniqList( @{$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"groups"}}, $groupAttributes{$A_GROUP_NAME} );
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"groups"} = \@groups;
+		}
+
+		if($groupAttributes{$A_GROUP_STATISTIC}) {
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"statistic_groups"}->{$groupAttributes{$A_GROUP_NAME}} = 1;
+		}
+	}
+}
