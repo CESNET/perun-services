@@ -1,0 +1,6 @@
+perun-slave-process-voms-dirac (1.0.0) stable; urgency=medium
+
+  * New slave forked from process-voms, enhanced with "nickname" attribute handling
+
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Wed, 25 Jan 2017 12:06:19 +0100
+
