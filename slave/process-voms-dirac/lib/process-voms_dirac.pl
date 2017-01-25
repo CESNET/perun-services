@@ -293,7 +293,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 				"creating user \"$user->{'DN'}\" in VO \"$name\".";
 			}
 			else {
-				effectCall "voms-admin --nousercert --vo \Q$name\E add-member \Q$group\E \Q$user->{'DN'}\" \Q$user->{'CA'}\E",
+				effectCall "voms-admin --nousercert --vo \Q$name\E add-member \Q$group\E \Q$user->{'DN'}\E \Q$user->{'CA'}\E",
 				"adding user \"$user->{'DN'}\" to Group \"$group\" in VO \"$name\".";
 			}
 		}
