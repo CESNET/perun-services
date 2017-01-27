@@ -246,7 +246,13 @@ close FILE;
 my @keptUcos = sort keys %{$cao};
 my $elements = join(',',@keptUcos);
 if($DEBUG == 1) { print "DELETED NOT IN ($elements)\n"; }
-$deletedCao += $dbh->do("DELETE FROM $tableName_cao WHERE VZTAH_TYP='CAO' and UCO not in ($elements)");
+if (length $elements) {
+	# delete some
+	$deletedCao += $dbh->do("DELETE FROM $tableName_cao WHERE VZTAH_TYP='CAO' and UCO not in ($elements)");
+} else {
+	# delete all
+	$deletedCao += $dbh->do("DELETE FROM $tableName_cao WHERE VZTAH_TYP='CAO'");
+}
 
 # delete invalid CAO relations for kept people
 
@@ -356,7 +362,13 @@ close FILE;
 my @keptExtUcos = sort keys %{$ext};
 my $elementsExt = join(',',@keptExtUcos);
 if($DEBUG == 1) { print "DELETED NOT IN ($elementsExt)\n"; }
-$deletedExt += $dbh->do("DELETE FROM $tableName_ext WHERE UCO not in ($elementsExt)");
+if (length $elementsExt) {
+	# delete some
+	$deletedExt += $dbh->do("DELETE FROM $tableName_ext WHERE UCO not in ($elementsExt)");
+} else {
+	# delete all
+	$deletedExt += $dbh->do("DELETE FROM $tableName_ext");
+}
 
 commit $dbh;
 $dbh->disconnect();

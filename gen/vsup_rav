@@ -42,11 +42,11 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 	my $uco = $uAttributes{$A_UCO};
 	$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
 	$users->{$uco}->{$A_VSUP_MAIL} = $uAttributes{$A_VSUP_MAIL};
-	$users->{$uco}->{$A_FIRST_NAME} = (defined $uAttributes{$A_ARTISTIC_FIRST_NAME} ? $uAttributes{$A_ARTISTIC_FIRST_NAME} : (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : ''));
-	$users->{$uco}->{$A_LAST_NAME} = (defined $uAttributes{$A_ARTISTIC_LAST_NAME} ? $uAttributes{$A_ARTISTIC_LAST_NAME} : (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : ''));
-	$users->{$uco}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE} ? $uAttributes{$A_TITLE_BEFORE} : '');
-	$users->{$uco}->{$A_TITLE_AFTER} = (defined $uAttributes{$A_TITLE_AFTER} ? $uAttributes{$A_TITLE_AFTER} : '');
-	$users->{$uco}->{$A_PHONE} = (defined $uAttributes{$A_PHONE} ? $uAttributes{$A_PHONE} : '');
+	$users->{$uco}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE} || '';
+	$users->{$uco}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
+	$users->{$uco}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+	$users->{$uco}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER} || '';
+	$users->{$uco}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
 
 	# if multiple, send only first one
 	if (defined $uAttributes{$A_CARD_BARCODES}) {
