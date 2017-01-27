@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_web";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -41,6 +41,8 @@ our $A_G_CAO_ORGAN;  *A_G_CAO_ORGAN = \'urn:perun:group:attribute-def:def:caoOrg
 our $A_G_CAO_FUNKCE;  *A_G_CAO_FUNKCE = \'urn:perun:group:attribute-def:def:caoFunkce';
 our $A_G_CAO_FUNKCE_ID;  *A_G_CAO_FUNKCE_ID = \'urn:perun:group:attribute-def:def:caoFunkceId';
 
+our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
+
 # GATHER USERS
 my $users;  # $users->{$uco}->{ATTR} = $attrValue;
 # Gather CAO membership
@@ -53,6 +55,9 @@ my $ext;   #  $ext->{$uco}->{ATTR} = $attrValue;
 #
 # FOR EACH USER
 foreach my $rData ($data->getChildElements) {
+
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my $relationType = $resourceAttributes{$A_R_RELATION_TYPE};
 
 	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
 
@@ -86,17 +91,12 @@ foreach my $rData ($data->getChildElements) {
 				$cao->{$gAttributes{$A_G_CAO_ORGAN}}->{$gAttributes{$A_G_CAO_FUNKCE}.":".$gAttributes{$A_G_CAO_FUNKCE_ID}}->{$uco} = 1;
 			}
 
-			if ("Externiste:Pedagogicti" eq $gAttributes{$A_G_NAME}) {
-				$ext->{$uco}->{"TYPE"} = "EXP";
-				$ext->{$uco}->{$A_JOB} = (defined $uAttributes{$A_JOB} ? $uAttributes{$A_JOB} : '');
-				$ext->{$uco}->{$A_JOB_ID} = (defined $uAttributes{$A_JOB_ID} ? $uAttributes{$A_JOB_ID} : '');
-				$ext->{$uco}->{$A_NS} = (defined $uAttributes{$A_NS} ? $uAttributes{$A_NS} : '');
-				$ext->{$uco}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
-			} elsif ("Externiste:Ostatni" eq $gAttributes{$A_G_NAME}) {
-				$ext->{$uco}->{"TYPE"} = "EXN";
-				$ext->{$uco}->{$A_JOB} = (defined $uAttributes{$A_JOB} ? $uAttributes{$A_JOB} : '');
-				$ext->{$uco}->{$A_JOB_ID} = (defined $uAttributes{$A_JOB_ID} ? $uAttributes{$A_JOB_ID} : '');
-				$ext->{$uco}->{$A_NS} = (defined $uAttributes{$A_NS} ? $uAttributes{$A_NS} : '');
+			# external workers
+			if (defined $relationType) {
+				$ext->{$uco}->{"TYPE"} = $relationType;
+				$ext->{$uco}->{$A_JOB} = $uAttributes{$A_JOB} || '';
+				$ext->{$uco}->{$A_JOB_ID} = $uAttributes{$A_JOB_ID} || '';
+				$ext->{$uco}->{$A_NS} = $uAttributes{$A_NS} || '';
 				$ext->{$uco}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
 			}
 
@@ -116,10 +116,10 @@ for my $uco (@keys) {
 
 	# print attributes, which are never empty
 	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{'EMAIL'} . "\t" .
-			$users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_FIRST_NAME} . "\t" .
-			$users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_AFTER} . "\t" .
-			$users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_MOBILE} . "\t" .
-			$users->{$uco}->{$A_EMAIL_PRIV} . "\t" . $users->{$uco}->{$A_PHONE_PRIV} . "\n";
+		$users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_FIRST_NAME} . "\t" .
+		$users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_AFTER} . "\t" .
+		$users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_MOBILE} . "\t" .
+		$users->{$uco}->{$A_EMAIL_PRIV} . "\t" . $users->{$uco}->{$A_PHONE_PRIV} . "\n";
 
 }
 
@@ -159,7 +159,7 @@ for my $uco (@ext_keys) {
 
 	# print attributes, which are never empty
 	print FILE $uco . "\t" . $ext->{$uco}->{$A_USER_ID} . "\t" . $ext->{$uco}->{"TYPE"} . "\t" .
-			$ext->{$uco}->{$A_JOB} . "\t" . $ext->{$uco}->{$A_JOB_ID} . "\t" . $ext->{$uco}->{$A_NS}  . "\n";
+		$ext->{$uco}->{$A_JOB} . "\t" . $ext->{$uco}->{$A_JOB_ID} . "\t" . $ext->{$uco}->{$A_NS}  . "\n";
 
 }
 

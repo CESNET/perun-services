@@ -53,13 +53,13 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 	my $uco = $uAttributes{$A_UCO};
 	$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
 	$users->{$uco}->{$A_VSUP_MAIL} = $uAttributes{$A_VSUP_MAIL};
-	$users->{$uco}->{$A_FIRST_NAME} = (defined $uAttributes{$A_ARTISTIC_FIRST_NAME} ? $uAttributes{$A_ARTISTIC_FIRST_NAME} : (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : ''));
-	$users->{$uco}->{$A_LAST_NAME} = (defined $uAttributes{$A_ARTISTIC_LAST_NAME} ? $uAttributes{$A_ARTISTIC_LAST_NAME} : (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : ''));
-	$users->{$uco}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE} ? $uAttributes{$A_TITLE_BEFORE} : '');
-	$users->{$uco}->{$A_TITLE_AFTER} = (defined $uAttributes{$A_TITLE_AFTER} ? $uAttributes{$A_TITLE_AFTER} : '');
-	$users->{$uco}->{$A_PHONE} = (defined $uAttributes{$A_PHONE} ? $uAttributes{$A_PHONE} : '');
-	$users->{$uco}->{$A_GENDER} = (defined $uAttributes{$A_GENDER} ? $uAttributes{$A_GENDER} : '');
-	$users->{$uco}->{$A_BIRTH_NUMBER} = (defined $uAttributes{$A_BIRTH_NUMBER} ? $uAttributes{$A_BIRTH_NUMBER} : '');
+	$users->{$uco}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE} || '';
+	$users->{$uco}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
+	$users->{$uco}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+	$users->{$uco}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER} || '';
+	$users->{$uco}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
+	$users->{$uco}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
+	$users->{$uco}->{$A_BIRTH_NUMBER} = $uAttributes{$A_BIRTH_NUMBER} || '';
 
 	# if multiple, send only first one
 	if (defined $uAttributes{$A_CARD_BARCODES}) {
@@ -75,16 +75,16 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 
 	if (defined $uAttributes{$A_ADDRESS_STREET_DC2}) {
 		# has address from DC2
-		$users->{$uco}->{'STREET'} = (defined $uAttributes{$A_ADDRESS_STREET_DC2} ? $uAttributes{$A_ADDRESS_STREET_DC2} : '');
-		$users->{$uco}->{'HOUSE_NUMBER'} = (defined $uAttributes{$A_ADDRESS_HOUSE_NUMBER_DC2} ? $uAttributes{$A_ADDRESS_HOUSE_NUMBER_DC2} : '');
-		$users->{$uco}->{'TOWN'} = (defined $uAttributes{$A_ADDRESS_TOWN_DC2} ? $uAttributes{$A_ADDRESS_TOWN_DC2} : '');
-		$users->{$uco}->{'POSTAL_CODE'} = (defined $uAttributes{$A_ADDRESS_POSTAL_CODE_DC2} ? $uAttributes{$A_ADDRESS_POSTAL_CODE_DC2} : '');
+		$users->{$uco}->{'STREET'} = $uAttributes{$A_ADDRESS_STREET_DC2};
+		$users->{$uco}->{'HOUSE_NUMBER'} = $uAttributes{$A_ADDRESS_HOUSE_NUMBER_DC2} ? $uAttributes{$A_ADDRESS_HOUSE_NUMBER_DC2} : '';
+		$users->{$uco}->{'TOWN'} = $uAttributes{$A_ADDRESS_TOWN_DC2} || '';
+		$users->{$uco}->{'POSTAL_CODE'} = $uAttributes{$A_ADDRESS_POSTAL_CODE_DC2} || '';
 	} elsif (defined $uAttributes{$A_ADDRESS_STREET_KOS}) {
 		# has address from KOS
-		$users->{$uco}->{'STREET'} = (defined $uAttributes{$A_ADDRESS_STREET_KOS} ? $uAttributes{$A_ADDRESS_STREET_KOS} : '');
-		$users->{$uco}->{'HOUSE_NUMBER'} = (defined $uAttributes{$A_ADDRESS_HOUSE_NUMBER_KOS} ? $uAttributes{$A_ADDRESS_HOUSE_NUMBER_KOS} : '');
-		$users->{$uco}->{'TOWN'} = (defined $uAttributes{$A_ADDRESS_TOWN_KOS} ? $uAttributes{$A_ADDRESS_TOWN_KOS} : '');
-		$users->{$uco}->{'POSTAL_CODE'} = (defined $uAttributes{$A_ADDRESS_POSTAL_CODE_KOS} ? $uAttributes{$A_ADDRESS_POSTAL_CODE_KOS} : '');
+		$users->{$uco}->{'STREET'} = $uAttributes{$A_ADDRESS_STREET_KOS};
+		$users->{$uco}->{'HOUSE_NUMBER'} = $uAttributes{$A_ADDRESS_HOUSE_NUMBER_KOS} || '';
+		$users->{$uco}->{'TOWN'} = $uAttributes{$A_ADDRESS_TOWN_KOS} || '';
+		$users->{$uco}->{'POSTAL_CODE'} = $uAttributes{$A_ADDRESS_POSTAL_CODE_KOS} || '';
 	} else {
 		# don't have address
 		$users->{$uco}->{'STREET'} = '';
