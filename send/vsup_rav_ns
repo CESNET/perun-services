@@ -96,5 +96,3 @@ print "Deleted:\t$deleted (old rows)\n";
 print "=======================================\n";
 
 $lock->unlock();
-
-exit 0;

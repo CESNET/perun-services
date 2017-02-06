@@ -391,5 +391,3 @@ print "Deleted EXT completely:\t$deletedExt (rows)\n";
 print "=======================================\n";
 
 $lock->unlock();
-
-exit 0;

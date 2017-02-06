@@ -6,12 +6,14 @@ use Getopt::Long qw(:config no_ignore_case);
 use Data::Dumper;
 use ScriptLock;
 
+binmode STDOUT, ":utf8";
+
 my $username;
 my $password;
 my $tableName = 'ELA_OSB';
+my $tableNameAdr = 'ELA_ADR';
 my $tableNameSpj = 'ELA_SPJ';
 my $tableNameUpdate = 'ELA_AKT';
-#my $encoding = 'cp1250'; # for Oracle EE8MSWIN1250
 
 # define service
 my $service_name = "vsup_ifis";
@@ -54,22 +56,25 @@ if(!defined($password) || !defined($username) || !defined($tableName)) {
 my $dataByKey = {};
 
 open FILE, $service_file or die "Could not open $service_file: $!";
+binmode FILE, ":utf8";
 while(my $line = <FILE>) {
 	my @parts = split /\t/, $line;
+	chomp(@parts);
 	my $uco = $parts[0]; # UČO
 	$dataByKey->{$uco}->{'OS_CISLO'} = $uco;
-	$dataByKey->{$uco}->{'LOGIN'} = $parts[1];
-	$dataByKey->{$uco}->{'TYP_VZTAHU'} = $parts[2]; # STU/ZAM
-	$dataByKey->{$uco}->{'EMAIL'} = (($parts[3] ne '') ? $parts[3] : undef);
-	$dataByKey->{$uco}->{'TITUL'} = (($parts[4] ne '') ? $parts[4] : undef);
-	$dataByKey->{$uco}->{'JMENO'} = (($parts[5] ne '') ? $parts[5] : undef);
-	$dataByKey->{$uco}->{'PRIJMENI'} = (($parts[6] ne '') ? $parts[6] : undef);
-	$dataByKey->{$uco}->{'TITUL2'} = (($parts[7] ne '') ? $parts[7] : undef);
-	$dataByKey->{$uco}->{'ROD_CISLO'} = $parts[8];
-	$dataByKey->{$uco}->{'POHLAVI'} = $parts[9];
-	$dataByKey->{$uco}->{'FUNKCE'} = (($parts[10] ne '') ? $parts[10] : undef);
-	$dataByKey->{$uco}->{'TELEFON'} = (($parts[11] ne '') ? $parts[11] : undef);
-	$dataByKey->{$uco}->{'BANK_UCET'} = (($parts[12] ne '') ? $parts[12] : undef)
+	$dataByKey->{$uco}->{'TYP_VZTAHU'} = $parts[1]; # STU/ZAM
+	$dataByKey->{$uco}->{'TITUL'} = (($parts[2] ne '') ? $parts[2] : undef);
+	$dataByKey->{$uco}->{'JMENO'} = (($parts[3] ne '') ? $parts[3] : undef);
+	$dataByKey->{$uco}->{'PRIJMENI'} = (($parts[4] ne '') ? $parts[4] : undef);
+	$dataByKey->{$uco}->{'TITUL2'} = (($parts[5] ne '') ? $parts[5] : undef);
+	$dataByKey->{$uco}->{'ROD_CISLO'} = $parts[6];
+	$dataByKey->{$uco}->{'POHLAVI'} = $parts[7];
+	$dataByKey->{$uco}->{'FUNKCE'} = (($parts[8] ne '') ? $parts[8] : undef);
+	$dataByKey->{$uco}->{'ULICE'} = (($parts[9] ne '') ? $parts[9] : undef);
+	$dataByKey->{$uco}->{'MST_NAZEV'} = (($parts[10] ne '') ? $parts[10] : undef);
+	$dataByKey->{$uco}->{'PSC'} = (($parts[11] ne '') ? $parts[11] : undef);
+	$dataByKey->{$uco}->{'COUNTRY_CODE'} = (($parts[12] ne '') ? $parts[12] : undef);
+	$dataByKey->{$uco}->{'ADR_TYPE'} = (($parts[13] ne '') ? $parts[13] : undef);
 
 }
 close FILE;
@@ -81,24 +86,33 @@ my $DEBUG=0;
 my $foundAndSkipped = 0;
 my $foundAndUpdated = 0;
 my $inserted = 0;
+my $deleted = 0;
+my $insertedAdr = 0;
 
 #update and insert new
 foreach my $uco (sort keys $dataByKey) {
 
 	my $OS_CISLO = $dataByKey->{$uco}->{'OS_CISLO'};
-	my $LOGIN = $dataByKey->{$uco}->{'LOGIN'};
 	my $TYP_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
-	my $EMAIL = $dataByKey->{$uco}->{'EMAIL'};
 	my $TITUL = $dataByKey->{$uco}->{'TITUL'};
 	my $JMENO = $dataByKey->{$uco}->{'JMENO'};
 	my $PRIJMENI = $dataByKey->{$uco}->{'PRIJMENI'};
 	my $TITUL2 = $dataByKey->{$uco}->{'TITUL2'};
 	my $RODCISLO = $dataByKey->{$uco}->{'ROD_CISLO'};
-	my $RODCISLO_OLD = $dataByKey->{$uco}->{'ROD_CISLO'};
 	my $POHLAVI = $dataByKey->{$uco}->{'POHLAVI'};
 	my $FUNKCE = $dataByKey->{$uco}->{'FUNKCE'};
-	my $TELEFON = $dataByKey->{$uco}->{'TELEFON'};
-	my $BANK_UCET = $dataByKey->{$uco}->{'BANK_UCET'};
+
+	# Use max. 20 bytes for TITUL
+	if ($TITUL) {
+		$TITUL = substr($TITUL, -20);
+	}
+	if ($TITUL2) {
+		$TITUL2 = substr($TITUL2, -20);
+	}
+	# Use max. 40 chars for FUNKCE
+	if ($FUNKCE) {
+		$FUNKCE = substr($FUNKCE, 0, ((length $FUNKCE >= 40) ? 40 : (length $FUNKCE)) );
+	}
 
 	# There is
 	my $personExists = $dbh->prepare(qq{select 1 from $tableName where OSB_ID=?});
@@ -106,34 +120,126 @@ foreach my $uco (sort keys $dataByKey) {
 
 	if($personExists->fetch) {
 
-		#if($DEBUG == 1) { print "FIND: $uco\n"; }
+		if($DEBUG == 1) { print "FIND: $uco\n"; }
 
 		#we need to know if these two records are without changes, if yes, skip them
-		#my $recordAreEquals = $dbh->prepare(qq{SELECT 1 from $tableName where OSB_ID=? and UCO=? and USERNAME=? and EMAIL_SKOLNI=?});
-		#$recordAreEquals->execute($uco, $UCO, $LOGIN, $EMAIL);
+		my $select = "SELECT 1 from $tableName where OSB_ID=? and OS_CISLO=?";
+		my @params = ($uco, $OS_CISLO);
 
-		#if(!$recordAreEquals->fetch) {
+		if ($JMENO) {
+			$select = $select . " and JMENO=?";
+			push(@params, $JMENO);
+		} else {
+			$select = $select . " and JMENO is NULL";
+		}
+		if ($PRIJMENI) {
+			$select = $select . " and PRIJMENI=?";
+			push(@params, $PRIJMENI);
+		} else {
+			$select = $select . " and PRIJMENI is NULL";
+		}
+		if ($TITUL) {
+			$select = $select . " and TITUL=?";
+			push(@params, $TITUL);
+		} else {
+			$select = $select . " and TITUL is NULL";
+		}
+		if ($TITUL2) {
+			$select = $select . " and TITUL2=?";
+			push(@params, $TITUL2);
+		} else {
+			$select = $select . " and TITUL2 is NULL";
+		}
+		if ($RODCISLO) {
+			$select = $select . " and ROD_CISLO=?";
+			push(@params, $RODCISLO);
+		} else {
+			$select = $select . " and ROD_CISLO is NULL";
+		}
+		if ($FUNKCE) {
+			$select = $select . " and FUNKCE=?";
+			push(@params, $FUNKCE);
+		} else {
+			$select = $select . " and FUNKCE is NULL";
+		}
+		if ($POHLAVI) {
+			$select = $select . " and POHLAVI=?";
+			push(@params, $POHLAVI);
+		} else {
+			$select = $select . " and POHLAVI is NULL";
+		}
+		if ($TYP_VZTAHU) {
+			$select = $select . " and TYP_VZTAHU=?";
+			push(@params, $TYP_VZTAHU);
+		} else {
+			$select = $select . " and TYP_VZTAHU is NULL";
+		}
 
-		#	my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET UCO=? , USERNAME=? , EMAIL_SKOLNI=? , ZMENENO_KDY=sysdate WHERE OSB_ID=?});
-		#	$updatePerson->execute($UCO, $LOGIN, $EMAIL, $uco);
-		#	if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $uco\n"; }
-		#	$foundAndUpdated++;
+		my $recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
 
-		#} else {
+		if(!$recordAreEquals->fetch) {
 
-		#	if($DEBUG == 1) { print "SKIP RECORD: $uco\n"; }
-		#	$foundAndSkipped++;
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET PRIJMENI=? , POHLAVI=? , TITUL=? , JMENO=? , TITUL2=? , FUNKCE=? , TYP_VZTAHU=? , OS_CISLO=? , ROD_CISLO=? WHERE OSB_ID=?});
+			$updatePerson->execute($PRIJMENI, $POHLAVI, $TITUL, $JMENO, $TITUL2, $FUNKCE, $TYP_VZTAHU , $OS_CISLO, $RODCISLO, $uco);
+			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $uco\n"; }
+			$foundAndUpdated++;
 
-		#}
+		} else {
+
+			if($DEBUG == 1) { print "SKIP RECORD: $uco\n"; }
+			$foundAndSkipped++;
+
+		}
 
 	} else {
 
 		if($DEBUG == 1) { print "INSERT NEW RECORD: $uco\n"; }
 		$inserted++;
 		# we will do insert
-		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (OSB_ID, PRIJMENI, POHLAVI, TITUL, JMENO, TITUL2, FUNKCE, TYP_VZTAHU, OS_CISLO, ROD_CISLO, ROD_CISLO_OLD, DEL) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)});
-		$insertPerson->execute($uco, $PRIJMENI, $POHLAVI, $TITUL, $JMENO, $TITUL2, $FUNKCE, $TYP_VZTAHU, $OS_CISLO, $RODCISLO, $RODCISLO_OLD, "-");
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (OSB_ID, PRIJMENI, POHLAVI, TITUL, JMENO, TITUL2, FUNKCE, TYP_VZTAHU, OS_CISLO, ROD_CISLO) VALUES (?,?,?,?,?,?,?,?,?,?)});
+		$insertPerson->execute($uco, $PRIJMENI, $POHLAVI, $TITUL, $JMENO, $TITUL2, $FUNKCE, $TYP_VZTAHU, $OS_CISLO, $RODCISLO);
 
+	}
+}
+
+# delete unwanted persons
+my $ary_ref = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableName where OSB_ID is not null});
+my @ucos = @$ary_ref;
+my $deletePerson = $dbh->prepare(qq{DELETE FROM $tableName where OSB_ID=?});
+foreach my $existing (@ucos) {
+	unless (exists $dataByKey->{$existing}) {
+		if($DEBUG == 1) { print "DELETE RECORD: $existing\n"; }
+		$deletePerson->execute($existing);
+		$deleted++;
+	}
+}
+
+#
+# HANDLE ADDRESSES
+#
+
+# prepared statements
+my $addressExists = $dbh->prepare(qq{select 1 from $tableNameAdr where OSB_ID=?});
+my $insertAdr = $dbh->prepare(qq{INSERT INTO $tableNameAdr (OSB_ID, ULICE, MST_NAZEV, PSC, ZME_ID, VAD_TYP_OSB) VALUES (?,?,?,?,?,?)});
+
+foreach my $uco (sort keys $dataByKey) {
+
+	my $ULICE = $dataByKey->{$uco}->{'ULICE'};
+	my $MST_NAZEV = $dataByKey->{$uco}->{'MST_NAZEV'};
+	my $PSC = $dataByKey->{$uco}->{'PSC'};
+	my $COUNTRY_CODE = $dataByKey->{$uco}->{'COUNTRY_CODE'};
+	my $ADR_TYPE = $dataByKey->{$uco}->{'ADR_TYPE'};
+
+	$addressExists->execute($uco);
+
+	if ($addressExists->fetch) {
+		# TODO
+	} else {
+		if($DEBUG == 1) { print "INSERT NEW ADR: $uco\n"; }
+		$insertedAdr++;
+		# we will do insert
+		$insertAdr->execute($uco, $ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE);
 	}
 }
 
@@ -145,8 +251,9 @@ print "=======================================\n";
 print "Newly inserted:   \t$inserted\n";
 print "Found and skiped: \t$foundAndSkipped\n";
 print "Found and updated:\t$foundAndUpdated\n";
+print "Deleted:          \t$deleted\n";
+print "---------------------------------------\n";
+print "Address inserted: \t$insertedAdr\n";
 print "=======================================\n";
 
 $lock->unlock();
-
-exit 0;
