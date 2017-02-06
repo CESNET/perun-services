@@ -10,7 +10,7 @@ function process {
 
 	create_lock
 
-	FROM_PERUN="${WORK_DIR}/voms"
+	FROM_PERUN="${WORK_DIR}/voms_dirac"
 
 	perl $EXECSCRIPT < $FROM_PERUN
 
