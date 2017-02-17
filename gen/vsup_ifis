@@ -134,7 +134,7 @@ for my $key (@keys) {
 		$users->{$key}->{$A_TITLE_AFTER} . "\t" . $users->{$key}->{$A_BIRTH_NUMBER} . "\t" .
 		$users->{$key}->{$A_GENDER} . "\t" . $users->{$key}->{$A_JOB} . "\t" .
 		$users->{$key}->{'STREET'} . ' ' . $users->{$key}->{'HOUSE_NUMBER'} . "\t" .
-		$users->{$key}->{'TOWN'} . "\t" . $users->{$key}->{'POSTAL_CODE'} .
+		$users->{$key}->{'TOWN'} . "\t" . $users->{$key}->{'POSTAL_CODE'} . "\t" .
 		$users->{$key}->{'COUNTRY_CODE'} . "\t" . $users->{$key}->{'ADR_TYPE'} . "\n";
 
 }
