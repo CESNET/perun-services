@@ -1,0 +1,179 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Perun::Agent;
+use Perun::GroupsAgent;
+use open qw/:std :utf8/;
+use Data::Dumper;
+use JSON::XS;
+use Tie::IxHash;
+use utf8;
+
+local $::SERVICE_NAME = "bbmri_collections";
+local $::PROTOCOL_VERSION = "1.0.0";
+my $SCRIPT_VERSION = "1.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getDataWithGroups;
+
+#forward declaration
+sub processUsers;
+sub processGroups;
+sub processMemberships;
+
+#Constants
+our $A_USER_ID;                   *A_USER_ID =               \'urn:perun:user:attribute-def:core:id';
+our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:attribute-def:core:status';
+our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_EPPNS;                *A_USER_EPPNS =            \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
+our $A_USER_D_NAME;               *A_USER_D_NAME =           \'urn:perun:user:attribute-def:core:displayName';
+our $A_GROUP_ID;                  *A_GROUP_ID =              \'urn:perun:group:attribute-def:core:id';
+our $A_GROUP_NAME;                *A_GROUP_NAME =            \'urn:perun:group:attribute-def:core:name';
+our $A_COLLECTION_ID;             *A_COLLECTION_ID =         \'urn:perun:group:attribute-def:def:collectionID';
+
+our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
+our $STATUS_EXPIRED;              *STATUS_EXPIRED =          \'EXPIRED';
+our $STATUS_SUSPENDED;            *STATUS_SUSPENDED =        \'SUSPENDED';
+
+our $userStruc = {};
+our $u_status = {};
+our $u_email = {};
+our $u_name = {};
+our $u_eppn = {};
+
+our $groupStruc = {};
+our $g_name = {};
+our $g_collection_id = {};
+
+our $membershipStruc = {};
+
+my $fileUsers = $DIRECTORY . "users.scim";
+my $fileGroups = $DIRECTORY . "groups.scim";
+
+my $agent = perunServicesInit->getAgent;
+
+foreach my $resourceData ($data->getChildElements) {
+	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
+		my $groupMembersLogins = processGroups $groupData;
+	}
+}
+
+# PREPARE USERSDATA TO JSON
+my @users;
+foreach my $uid (sort keys %$userStruc) {
+	my $user = {};
+	$user->{"id"} = $uid; 
+	$user->{"displayName"} = $userStruc->{$uid}->{$u_name};
+	$user->{"status"} = $userStruc->{$uid}->{$u_status};
+	$user->{"mail"} = $userStruc->{$uid}->{$u_email};
+	$user->{"identities"} = $userStruc->{$uid}->{$u_eppn}; 
+
+	push @users, $user;
+}
+
+# PRINT USERS TO JSON
+open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
+binmode(FILE_USERS);
+print FILE_USERS JSON::XS->new->utf8->pretty->encode(\@users);
+close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
+
+# PREPARE GROUPSDATA TO JSON
+my @groups;
+foreach my $gid (sort keys %$groupStruc) {
+	my $group = {};
+	my $collectionID = $groupStruc->{$gid}->{$g_collection_id};
+	$group->{"id"} = $gid;
+	$group->{"name"} = $collectionID;
+
+	my @members;
+	foreach my $uid (sort keys %{$membershipStruc->{$gid}}){
+		my $struct = {};
+		$struct->{"userId"} = $uid;
+		push @members, $struct;
+	}
+	
+	$group->{"members"} = \@members;
+	push @groups, $group;
+}	
+
+# PRINT GROUPS TO JSON
+open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
+binmode(FILE_GROUPS);
+print FILE_GROUPS JSON::XS->new->utf8->pretty->encode(\@groups);
+close (FILE_GROUPS) or die "Cannot close $fileGroups: $! \n";
+
+perunServicesInit::finalize;
+
+
+##############################################################################
+#   Only subs definitions down there
+##############################################################################
+## creates structure for users.csv file
+sub processUsers {
+	my ($gid, $memberData) = @_;
+	
+	my %memberAttributes = attributesToHash $memberData->getAttributes;
+	my $uid = $memberAttributes{$A_USER_ID};
+	my $status = $memberAttributes{$A_USER_STATUS};
+	my $email = $memberAttributes{$A_USER_EMAIL};
+	my $d_name = $memberAttributes{$A_USER_D_NAME};
+
+	# Select right eppn from the list of eppns, TEMPORARLY get google one, then we will use elixir
+	my @eppns = @{$memberAttributes{$A_USER_EPPNS}};
+
+	if(exists $userStruc->{$uid}) {
+		my $memberStatus = $userStruc->{$uid}->{$u_status};
+
+		if ($memberStatus eq $STATUS_EXPIRED && $status eq $STATUS_VALID){
+			# change from EXPIRED to VALID  
+			$userStruc->{$uid}->{$u_status} = $status;
+		} elsif ($memberStatus eq $STATUS_SUSPENDED && $status eq $STATUS_VALID){
+			# change from SUSPENDED to VALID
+			$userStruc->{$uid}->{$u_status} = $status;
+		} elsif ($memberStatus eq $STATUS_SUSPENDED && $status eq $STATUS_EXPIRED){
+			# change from SUSPENDED to EXPIRED
+			$userStruc->{$uid}->{$u_status} = $status;
+		}
+	}
+	else{
+		$userStruc->{$uid}->{$u_status} = $status;
+		$userStruc->{$uid}->{$u_email} = $email;
+		$userStruc->{$uid}->{$u_name} = $d_name;
+		$userStruc->{$uid}->{$u_eppn} = \@eppns;
+	}
+
+	processMemberships $gid, $uid;
+}
+
+## creates structure for groups.csv file
+sub processGroups {
+	my $group = shift;
+	my %groupAttributes = attributesToHash $group->getAttributes;
+	my $membersElement = ($group->getChildElements)[1];
+
+	if($groupAttributes{$A_COLLECTION_ID}) {
+		my $collectionID = $groupAttributes{$A_COLLECTION_ID};
+		my $gid = $groupAttributes{$A_GROUP_ID};
+		
+		unless(exists $groupStruc->{$gid}) {
+			$groupStruc->{$gid}->{$g_collection_id} = $collectionID;
+		}		
+
+		foreach my $memberData ($membersElement->getChildElements) {
+			processUsers $gid, $memberData;
+		}
+	}
+}
+
+## creates structure for memberships.csv file
+sub processMemberships {
+	my ($gid, $uid) = @_;
+
+	unless(exists $membershipStruc->{$gid}->{$uid}) {
+		$membershipStruc->{$gid}->{$uid} = {};
+	}
+}
