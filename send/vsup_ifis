@@ -8,12 +8,13 @@ use ScriptLock;
 
 binmode STDOUT, ":utf8";
 
+sub handleContact;
+
 my $username;
 my $password;
 my $tableName = 'ELA_OSB';
 my $tableNameAdr = 'ELA_ADR';
 my $tableNameSpj = 'ELA_SPJ';
-my $tableNameUpdate = 'ELA_AKT';
 
 # define service
 my $service_name = "vsup_ifis";
@@ -75,6 +76,9 @@ while(my $line = <FILE>) {
 	$dataByKey->{$uco}->{'PSC'} = (($parts[11] ne '') ? $parts[11] : undef);
 	$dataByKey->{$uco}->{'COUNTRY_CODE'} = (($parts[12] ne '') ? $parts[12] : undef);
 	$dataByKey->{$uco}->{'ADR_TYPE'} = (($parts[13] ne '') ? $parts[13] : undef);
+	$dataByKey->{$uco}->{'EMAIL'} = (($parts[14] ne '') ? $parts[14] : undef);
+	$dataByKey->{$uco}->{'BANK_ACCOUNT'} = (($parts[15] ne '') ? $parts[15] : undef);
+	$dataByKey->{$uco}->{'PHONE'} = (($parts[16] ne '') ? $parts[16] : undef);
 
 }
 close FILE;
@@ -88,6 +92,13 @@ my $foundAndUpdated = 0;
 my $inserted = 0;
 my $deleted = 0;
 my $insertedAdr = 0;
+my $deletedAdr = 0;
+my $foundAndSkippedAdr = 0;
+my $foundAndUpdatedAdr = 0;
+my $insertedSpj = 0;
+my $deletedSpj = 0;
+my $foundAndSkippedSpj = 0;
+my $foundAndUpdatedSpj = 0;
 
 #update and insert new
 foreach my $uco (sort keys $dataByKey) {
@@ -222,6 +233,9 @@ foreach my $existing (@ucos) {
 # prepared statements
 my $addressExists = $dbh->prepare(qq{select 1 from $tableNameAdr where OSB_ID=?});
 my $insertAdr = $dbh->prepare(qq{INSERT INTO $tableNameAdr (OSB_ID, ULICE, MST_NAZEV, PSC, ZME_ID, VAD_TYP_OSB) VALUES (?,?,?,?,?,?)});
+my $addressAreEquals = $dbh->prepare(qq{SELECT 1 FROM $tableNameAdr WHERE ULICE=? and MST_NAZEV=? and PSC=? and ZME_ID=? and VAD_TYP_OSB=? and OSB_ID=?});
+my $updateAdr = $dbh->prepare(qq{UPDATE $tableNameAdr SET ULICE=?, MST_NAZEV=?, PSC=?, ZME_ID=?, VAD_TYP_OSB=? WHERE OSB_ID=?});
+my $deleteAdr = $dbh->prepare(qq{DELETE FROM $tableNameAdr where OSB_ID=?});
 
 foreach my $uco (sort keys $dataByKey) {
 
@@ -231,29 +245,172 @@ foreach my $uco (sort keys $dataByKey) {
 	my $COUNTRY_CODE = $dataByKey->{$uco}->{'COUNTRY_CODE'};
 	my $ADR_TYPE = $dataByKey->{$uco}->{'ADR_TYPE'};
 
-	$addressExists->execute($uco);
+	if ($ULICE and $MST_NAZEV and $PSC and $COUNTRY_CODE and $ADR_TYPE) {
+		# user has address
 
-	if ($addressExists->fetch) {
-		# TODO
+		$addressExists->execute($uco);
+
+		if ($addressExists->fetch) {
+
+			$addressAreEquals->execute($ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE, $uco);
+
+			if(!$addressAreEquals->fetch) {
+				$updateAdr->execute($ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE, $uco);
+				if($DEBUG == 1) { print "UPDATING EXISTING ADR RECORD: $uco\n"; }
+				$foundAndUpdatedAdr++;
+			} else {
+				if($DEBUG == 1) { print "SKIP ADR RECORD: $uco\n"; }
+				$foundAndSkippedAdr++;
+			}
+
+		} else {
+			if($DEBUG == 1) { print "INSERT NEW ADR: $uco\n"; }
+			$insertedAdr++;
+			# we will do insert
+			$insertAdr->execute($uco, $ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE);
+		}
+
 	} else {
-		if($DEBUG == 1) { print "INSERT NEW ADR: $uco\n"; }
-		$insertedAdr++;
-		# we will do insert
-		$insertAdr->execute($uco, $ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE);
+		$addressExists->execute($uco);
+		if ($addressExists->fetch) {
+			# user don't have an address - remove any existing address
+			if($DEBUG == 1) { print "DELETE ADR: $uco\n"; }
+			$deleteAdr->execute($uco);
+			$deleteAdr++;
+		}
+	}
+
+}
+
+# delete addresses of unwanted persons
+my $ary_ref_adr = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameAdr where OSB_ID is not null});
+my @ucos_adr = @$ary_ref_adr;
+my $deletePerson_adr = $dbh->prepare(qq{DELETE FROM $tableNameAdr where OSB_ID=?});
+foreach my $existing (@ucos_adr) {
+	unless (exists $dataByKey->{$existing}) {
+		if($DEBUG == 1) { print "DELETE ADR RECORD: $existing\n"; }
+		$deletePerson_adr->execute($existing);
+		$deletedAdr++;
 	}
 }
+
+#
+# HANDLE CONTACTS
+#
+
+# prepared statements
+my $contactExists = $dbh->prepare(qq{select 1 from $tableNameSpj where SPJ_TYP=? and OSB_ID=? });
+my $insertContact = $dbh->prepare(qq{INSERT INTO $tableNameSpj (OSB_ID, SPJ_TYP, SPJ_CISLO) VALUES (?,?,?)});
+my $contactsAreEquals = $dbh->prepare(qq{SELECT 1 FROM $tableNameSpj WHERE SPJ_TYP=? and SPJ_CISLO=? and OSB_ID=?});
+my $updateContact = $dbh->prepare(qq{UPDATE $tableNameSpj SET SPJ_CISLO=? WHERE SPJ_TYP=? and OSB_ID=?});
+my $deleteContact = $dbh->prepare(qq{DELETE FROM $tableNameSpj where SPJ_TYP=? and OSB_ID=?});
+
+foreach my $uco (sort keys $dataByKey) {
+
+	my $EMAIL = $dataByKey->{$uco}->{'EMAIL'};
+	my $BANK_ACCOUNT = $dataByKey->{$uco}->{'BANK_ACCOUNT'};
+	my $PHONE = $dataByKey->{$uco}->{'PHONE'};
+
+	handleContact($uco, 'MAIL', $EMAIL);
+	handleContact($uco, 'UCET', $BANK_ACCOUNT);
+	handleContact($uco, 'TLF', $PHONE);
+
+}
+
+# delete all contacts of unwanted persons
+my $ary_ref_spj = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameSpj where OSB_ID is not null});
+my @ucos_spj = @$ary_ref_spj;
+my $deletePerson_spj = $dbh->prepare(qq{DELETE FROM $tableNameSpj where OSB_ID=?});
+foreach my $existing (@ucos_spj) {
+	unless (exists $dataByKey->{$existing}) {
+		if($DEBUG == 1) { print "DELETE SPJ RECORD: $existing\n"; }
+		$deletePerson_spj->execute($existing);
+		$deletedSpj++;
+	}
+}
+
+# close handlers which fetches but are not used to manipulate data
+$addressAreEquals->finish();
+$addressExists->finish();
+$contactExists->finish();
+$contactsAreEquals->finish();
 
 commit $dbh;
 $dbh->disconnect();
 
 #Info about operations
 print "=======================================\n";
-print "Newly inserted:   \t$inserted\n";
-print "Found and skiped: \t$foundAndSkipped\n";
-print "Found and updated:\t$foundAndUpdated\n";
-print "Deleted:          \t$deleted\n";
+print "User inserted:    \t$inserted\n";
+print "User skiped:      \t$foundAndSkipped\n";
+print "User updated:	 \t$foundAndUpdated\n";
+print "User deleted:     \t$deleted\n";
 print "---------------------------------------\n";
 print "Address inserted: \t$insertedAdr\n";
+print "Address skiped:   \t$foundAndSkippedAdr\n";
+print "Address updated:  \t$foundAndUpdatedAdr\n";
+print "Address deleted:  \t$deletedAdr\n";
+print "---------------------------------------\n";
+print "Contact inserted: \t$insertedSpj\n";
+print "Contact skiped:   \t$foundAndSkippedSpj\n";
+print "Contact updated:  \t$foundAndUpdatedSpj\n";
+print "Contact deleted:  \t$deletedSpj\n";
 print "=======================================\n";
 
 $lock->unlock();
+
+#
+# Handles DB change for specified contact (mail, bank account, phone)
+#
+# param 1: $uco (VŠUP UCO),
+# param 2: $SPJ_TYP (TLF|MAIL|MOB|UCET)
+# param 3: $SPJ_CISLO (contact value itself)
+#
+sub handleContact() {
+
+	my $uco = shift;
+	my $SPJ_TYP = shift;
+	my $SPJ_CISLO = shift;
+
+	if ($uco and $SPJ_TYP) {
+
+		$contactExists->execute($SPJ_TYP, $uco);
+
+		if ($contactExists->fetch) {
+
+			if ($SPJ_CISLO) {
+				# user has address
+				$contactsAreEquals->execute($SPJ_TYP, $SPJ_CISLO, $uco);
+
+				if(!$contactsAreEquals->fetch) {
+					$updateContact->execute($SPJ_CISLO, $SPJ_TYP, $uco);
+					if($DEBUG == 1) { print "UPDATING EXISTING SPJ RECORD: $uco\n"; }
+					$foundAndUpdatedSpj++;
+				} else {
+					if($DEBUG == 1) { print "SKIP SPJ RECORD: $uco\n"; }
+					$foundAndSkippedSpj++;
+				}
+
+			} else {
+				# user had addres, now will be removed
+				# user don't have an address - remove any existing address
+				if($DEBUG == 1) { print "DELETE SPJ: $uco\n"; }
+				$deleteContact->execute($SPJ_TYP, $uco);
+				$deletedSpj++;
+			}
+
+		} else {
+
+			if ($SPJ_CISLO) {
+				if($DEBUG == 1) { print "INSERT NEW SPJ: $uco\n"; }
+				$insertedSpj++;
+				# we will do insert
+				$insertContact->execute($uco, $SPJ_TYP, $SPJ_CISLO);
+			}
+
+		}
+
+	} else {
+		print "Wrong usage of handleContact()."
+	}
+
+}
