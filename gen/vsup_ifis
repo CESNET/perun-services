@@ -46,6 +46,11 @@ our $A_ADDRESS_COUNTRY_CODE_DC2; *A_ADDRESS_COUNTRY_CODE_DC2 = \'urn:perun:user:
 our $A_ADDRESS_TYPE_KOS; *A_ADDRESS_TYPE_KOS = \'urn:perun:user:attribute-def:def:addressTypeKos';
 our $A_ADDRESS_TYPE_DC2; *A_ADDRESS_TYPE_DC2 = \'urn:perun:user:attribute-def:def:addressTypeDc2';
 
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:vsup';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:virt:preferredPhone';
+our $A_BANK_ACCOUNT_DC2; *A_BANK_ACCOUNT_DC2 = \'urn:perun:user:attribute-def:def:bankAccount';
+our $A_BANK_ACCOUNT_KOS; *A_BANK_ACCOUNT_KOS = \'urn:perun:user:attribute-def:def:bankAccountKos';
+
 # GATHER USERS
 my $users;  # $users->{$uco}->{ATTR} = $attrValue;
 
@@ -79,6 +84,9 @@ foreach my $rData ($data->getChildElements) {
 		$users->{$key}->{$A_BIRTH_NUMBER} = $uAttributes{$A_BIRTH_NUMBER} || '';
 		$users->{$key}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
 		$users->{$key}->{$A_JOB} = $uAttributes{$A_JOB} || '';
+
+		$users->{$key}->{'EMAIL'} = $uAttributes{$A_LOGIN} . '@vsup.cz';
+		$users->{$key}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
 
 		if ($relationType eq "ZAM") {
 			$users->{$key}->{'TYP_VTAHU'} = $relationType;
@@ -114,6 +122,14 @@ foreach my $rData ($data->getChildElements) {
 			$users->{$key}->{'ADR_TYPE'} = '';
 		}
 
+		if ($uAttributes{$A_BANK_ACCOUNT_DC2}) {
+			$users->{$key}->{'BANK_ACCOUNT'} = $uAttributes{$A_BANK_ACCOUNT_DC2};
+		} elsif ($uAttributes{$A_BANK_ACCOUNT_KOS}) {
+			$users->{$key}->{'BANK_ACCOUNT'} = $uAttributes{$A_BANK_ACCOUNT_KOS};
+		} else {
+			$users->{$key}->{'BANK_ACCOUNT'} = '';
+		}
+
 	}
 
 }
@@ -135,7 +151,8 @@ for my $key (@keys) {
 		$users->{$key}->{$A_GENDER} . "\t" . $users->{$key}->{$A_JOB} . "\t" .
 		$users->{$key}->{'STREET'} . ' ' . $users->{$key}->{'HOUSE_NUMBER'} . "\t" .
 		$users->{$key}->{'TOWN'} . "\t" . $users->{$key}->{'POSTAL_CODE'} . "\t" .
-		$users->{$key}->{'COUNTRY_CODE'} . "\t" . $users->{$key}->{'ADR_TYPE'} . "\n";
+		$users->{$key}->{'COUNTRY_CODE'} . "\t" . $users->{$key}->{'ADR_TYPE'} . "\t" .
+		$users->{$key}->{'EMAIL'} . "\t" . $users->{$key}->{'BANK_ACCOUNT'}  . "\t" . $users->{$key}->{$A_PHONE}. "\n";
 
 }
 
