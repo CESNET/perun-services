@@ -1,3 +1,11 @@
+perun-slave-process-kypo-portal (3.0.4) stable; urgency=medium
+
+  * Fixed kypoImport.py script to avoid errors in db schema
+    changes - column order, fixed path to kypoImport.py
+    in process-process-kypo_portal.sh
+
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Thu, 23 Feb 2017 18:00:00 +0200
+
 perun-slave-process-kypo-portal (3.0.3) stable; urgency=medium
 
   * Fixed working with groups and subgroups, names of subgroups are imported
