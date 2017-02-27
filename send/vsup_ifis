@@ -9,12 +9,16 @@ use ScriptLock;
 binmode STDOUT, ":utf8";
 
 sub handleContact;
+sub handleAkt;
 
 my $username;
 my $password;
 my $tableName = 'ELA_OSB';
 my $tableNameAdr = 'ELA_ADR';
 my $tableNameSpj = 'ELA_SPJ';
+my $tableNameVzt = 'ELA_VZTAHY';
+my $tableNameAkt = 'ELA_AKT';
+my $tableNameCas = 'ELA_CAS';
 
 # define service
 my $service_name = "vsup_ifis";
@@ -63,7 +67,7 @@ while(my $line = <FILE>) {
 	chomp(@parts);
 	my $uco = $parts[0]; # UČO
 	$dataByKey->{$uco}->{'OS_CISLO'} = $uco;
-	$dataByKey->{$uco}->{'TYP_VZTAHU'} = $parts[1]; # STU/ZAM
+	$dataByKey->{$uco}->{'TYP_VZTAHU'} = $parts[1]; # STU/ZAM/Externista - pedagog
 	$dataByKey->{$uco}->{'TITUL'} = (($parts[2] ne '') ? $parts[2] : undef);
 	$dataByKey->{$uco}->{'JMENO'} = (($parts[3] ne '') ? $parts[3] : undef);
 	$dataByKey->{$uco}->{'PRIJMENI'} = (($parts[4] ne '') ? $parts[4] : undef);
@@ -79,6 +83,7 @@ while(my $line = <FILE>) {
 	$dataByKey->{$uco}->{'EMAIL'} = (($parts[14] ne '') ? $parts[14] : undef);
 	$dataByKey->{$uco}->{'BANK_ACCOUNT'} = (($parts[15] ne '') ? $parts[15] : undef);
 	$dataByKey->{$uco}->{'PHONE'} = (($parts[16] ne '') ? $parts[16] : undef);
+	$dataByKey->{$uco}->{'USER_ID'} = (($parts[17] ne '') ? $parts[17] : undef);
 
 }
 close FILE;
@@ -99,8 +104,30 @@ my $insertedSpj = 0;
 my $deletedSpj = 0;
 my $foundAndSkippedSpj = 0;
 my $foundAndUpdatedSpj = 0;
+my $insertedVzt = 0;
+my $deletedVzt = 0;
+my $foundAndSkippedVzt = 0;
+my $foundAndUpdatedVzt = 0;
 
-#update and insert new
+# tell IFIS, that IDM source updated it's state
+my $casExists = $dbh->prepare(qq{select 1 from $tableNameCas where PRIO=?});
+my $insertCas = $dbh->prepare(qq{insert into $tableNameCas (PRIO, CAS) values (?,sysdate)});
+my $updateCas = $dbh->prepare(qq{update $tableNameCas set CAS=sysdate where PRIO=?});
+
+$casExists->execute('IDM');
+if($casExists->fetch) {
+	$updateCas->execute('IDM');
+} else {
+	$insertCas->execute('IDM');
+}
+
+# Allow storing change info (AKT)
+my $insertAkt = $dbh->prepare(qq{INSERT INTO $tableNameAkt (OSB_ID, KDYZAP, OBJ, PRIO) VALUES (?,sysdate,?,?)});
+
+#
+# HANDLE PERSONS
+#
+
 foreach my $uco (sort keys $dataByKey) {
 
 	my $OS_CISLO = $dataByKey->{$uco}->{'OS_CISLO'};
@@ -112,6 +139,11 @@ foreach my $uco (sort keys $dataByKey) {
 	my $RODCISLO = $dataByKey->{$uco}->{'ROD_CISLO'};
 	my $POHLAVI = $dataByKey->{$uco}->{'POHLAVI'};
 	my $FUNKCE = $dataByKey->{$uco}->{'FUNKCE'};
+
+	# for the purpose of ELA_OSB table, "Externista - pedagog" = "ZAM"
+	if ($TYP_VZTAHU eq "Externista - pedagog") {
+		$TYP_VZTAHU = "ZAM";
+	}
 
 	# Use max. 20 bytes for TITUL
 	if ($TITUL) {
@@ -196,6 +228,8 @@ foreach my $uco (sort keys $dataByKey) {
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $uco\n"; }
 			$foundAndUpdated++;
 
+			handleAkt($uco, 'OSB');
+
 		} else {
 
 			if($DEBUG == 1) { print "SKIP RECORD: $uco\n"; }
@@ -211,6 +245,8 @@ foreach my $uco (sort keys $dataByKey) {
 		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (OSB_ID, PRIJMENI, POHLAVI, TITUL, JMENO, TITUL2, FUNKCE, TYP_VZTAHU, OS_CISLO, ROD_CISLO) VALUES (?,?,?,?,?,?,?,?,?,?)});
 		$insertPerson->execute($uco, $PRIJMENI, $POHLAVI, $TITUL, $JMENO, $TITUL2, $FUNKCE, $TYP_VZTAHU, $OS_CISLO, $RODCISLO);
 
+		handleAkt($uco, 'OSB');
+
 	}
 }
 
@@ -218,11 +254,12 @@ foreach my $uco (sort keys $dataByKey) {
 my $ary_ref = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableName where OSB_ID is not null});
 my @ucos = @$ary_ref;
 my $deletePerson = $dbh->prepare(qq{DELETE FROM $tableName where OSB_ID=?});
-foreach my $existing (@ucos) {
-	unless (exists $dataByKey->{$existing}) {
-		if($DEBUG == 1) { print "DELETE RECORD: $existing\n"; }
-		$deletePerson->execute($existing);
+foreach my $uco (@ucos) {
+	unless (exists $dataByKey->{$uco}) {
+		if($DEBUG == 1) { print "DELETE RECORD: $uco\n"; }
+		$deletePerson->execute($uco);
 		$deleted++;
+		handleAkt($uco, 'OSB');
 	}
 }
 
@@ -247,7 +284,6 @@ foreach my $uco (sort keys $dataByKey) {
 
 	if ($ULICE and $MST_NAZEV and $PSC and $COUNTRY_CODE and $ADR_TYPE) {
 		# user has address
-
 		$addressExists->execute($uco);
 
 		if ($addressExists->fetch) {
@@ -258,6 +294,7 @@ foreach my $uco (sort keys $dataByKey) {
 				$updateAdr->execute($ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE, $uco);
 				if($DEBUG == 1) { print "UPDATING EXISTING ADR RECORD: $uco\n"; }
 				$foundAndUpdatedAdr++;
+				handleAkt($uco, 'ADR');
 			} else {
 				if($DEBUG == 1) { print "SKIP ADR RECORD: $uco\n"; }
 				$foundAndSkippedAdr++;
@@ -268,6 +305,7 @@ foreach my $uco (sort keys $dataByKey) {
 			$insertedAdr++;
 			# we will do insert
 			$insertAdr->execute($uco, $ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE);
+			handleAkt($uco, 'ADR');
 		}
 
 	} else {
@@ -277,6 +315,7 @@ foreach my $uco (sort keys $dataByKey) {
 			if($DEBUG == 1) { print "DELETE ADR: $uco\n"; }
 			$deleteAdr->execute($uco);
 			$deleteAdr++;
+			handleAkt($uco, 'ADR');
 		}
 	}
 
@@ -286,11 +325,12 @@ foreach my $uco (sort keys $dataByKey) {
 my $ary_ref_adr = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameAdr where OSB_ID is not null});
 my @ucos_adr = @$ary_ref_adr;
 my $deletePerson_adr = $dbh->prepare(qq{DELETE FROM $tableNameAdr where OSB_ID=?});
-foreach my $existing (@ucos_adr) {
-	unless (exists $dataByKey->{$existing}) {
-		if($DEBUG == 1) { print "DELETE ADR RECORD: $existing\n"; }
-		$deletePerson_adr->execute($existing);
+foreach my $uco (@ucos_adr) {
+	unless (exists $dataByKey->{$uco}) {
+		if($DEBUG == 1) { print "DELETE ADR RECORD: $uco\n"; }
+		$deletePerson_adr->execute($uco);
 		$deletedAdr++;
+		handleAkt($uco, 'ADR');
 	}
 }
 
@@ -321,19 +361,96 @@ foreach my $uco (sort keys $dataByKey) {
 my $ary_ref_spj = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameSpj where OSB_ID is not null});
 my @ucos_spj = @$ary_ref_spj;
 my $deletePerson_spj = $dbh->prepare(qq{DELETE FROM $tableNameSpj where OSB_ID=?});
-foreach my $existing (@ucos_spj) {
-	unless (exists $dataByKey->{$existing}) {
-		if($DEBUG == 1) { print "DELETE SPJ RECORD: $existing\n"; }
-		$deletePerson_spj->execute($existing);
+foreach my $uco (@ucos_spj) {
+	unless (exists $dataByKey->{$uco}) {
+		if($DEBUG == 1) { print "DELETE SPJ RECORD: $uco\n"; }
+		$deletePerson_spj->execute($uco);
 		$deletedSpj++;
+		handleAkt($uco, 'SPJ');
 	}
 }
+
+
+#
+# HANDLE VZTAHY for EXT persons
+#
+
+# prepared statements
+my $vztahExists = $dbh->prepare(qq{select 1 from $tableNameVzt where OSB_ID=? and TYP_VZTAHU=? and DRUH_VZTAHU=?});
+my $insertVztah = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, TYP_VZTAHU, DRUH_VZTAHU, VZTAH_CISLO, KARTA_IDENT, EXT_ID) VALUES (?,?,?,?,?,?)});
+my $updateVztah = $dbh->prepare(qq{UPDATE $tableNameVzt SET KARTA_IDENT=? WHERE TYP_VZTAHU=? and DRUH_VZTAHU=? and OSB_ID=?});
+my $deleteVztah = $dbh->prepare(qq{DELETE FROM $tableNameVzt where TYP_VZTAHU=? and DRUH_VZTAHU=? and OSB_ID=?});
+
+foreach my $uco (sort keys $dataByKey) {
+
+	my $TYP_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
+	unless ($TYP_VZTAHU eq "Externista - pedagog") {
+		# process only external teachers
+		next;
+	}
+
+	# fix sent params (EXT vs. Externista - pedagog)
+	my $DRUH_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
+	$TYP_VZTAHU = "EXT";
+	my $USER_ID = $dataByKey->{$uco}->{'USER_ID'};
+	my $EXT_ID = $dataByKey->{$uco}->{'USER_ID'};
+
+	# FIXME - TODO - resolve ISIC/ITIC
+	my $KARTA_IDENT = undef;
+
+	$vztahExists->execute($uco, $TYP_VZTAHU, $DRUH_VZTAHU);
+	if ($vztahExists->fetch) {
+
+		my $vztahAreEqualsSelect = qq{SELECT 1 FROM $tableNameVzt WHERE TYP_VZTAHU=? and DRUH_VZTAHU=? and VZTAH_CISLO=? and OSB_ID=? and KARTA_IDENT};
+		if ($KARTA_IDENT) {
+			$vztahAreEqualsSelect = $vztahAreEqualsSelect . "=?"
+		} else {
+			$vztahAreEqualsSelect = $vztahAreEqualsSelect . " is NULL"
+		}
+
+		my $vztahAreEquals = $dbh->prepare($vztahAreEqualsSelect);
+		$vztahAreEquals->execute($TYP_VZTAHU, $DRUH_VZTAHU, $USER_ID, $uco, $KARTA_IDENT);
+
+		if(!$vztahAreEquals->fetch) {
+			$updateVztah->execute($KARTA_IDENT, $TYP_VZTAHU, $DRUH_VZTAHU, $uco);
+			if($DEBUG == 1) { print "UPDATING EXISTING VZTAH RECORD: $uco\n"; }
+			$foundAndUpdatedVzt++;
+			handleAkt($uco, 'VZTAHY');
+		} else {
+			if($DEBUG == 1) { print "SKIP VZTAH RECORD: $uco\n"; }
+			$foundAndSkippedVzt++;
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW VZTAH: $uco\n"; }
+		$insertedVzt++;
+		# we will do insert
+		$insertVztah->execute($uco, $TYP_VZTAHU, $DRUH_VZTAHU, $USER_ID, $KARTA_IDENT, $EXT_ID);
+		handleAkt($uco, 'VZTAHY');
+	}
+
+}
+
+# delete vztah of unwanted persons for external relations
+my $ary_ref_vzt = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameVzt where OSB_ID is not null and TYP_VZTAHU='EXT'});
+my @ucos_vzt = @$ary_ref_vzt;
+foreach my $uco (@ucos_vzt) {
+	unless (exists $dataByKey->{$uco}) {
+		if($DEBUG == 1) { print "DELETE VZTAH RECORD: $uco\n"; }
+		$deleteVztah->execute($uco);
+		$deletedVzt++;
+		handleAkt($uco, 'VZTAHY');
+	}
+}
+
 
 # close handlers which fetches but are not used to manipulate data
 $addressAreEquals->finish();
 $addressExists->finish();
 $contactExists->finish();
 $contactsAreEquals->finish();
+$vztahExists->finish();
 
 commit $dbh;
 $dbh->disconnect();
@@ -354,6 +471,11 @@ print "Contact inserted: \t$insertedSpj\n";
 print "Contact skiped:   \t$foundAndSkippedSpj\n";
 print "Contact updated:  \t$foundAndUpdatedSpj\n";
 print "Contact deleted:  \t$deletedSpj\n";
+print "---------------------------------------\n";
+print "Vztah (ext) inserted: \t$insertedVzt\n";
+print "Vztah (ext) skiped:   \t$foundAndSkippedVzt\n";
+print "Vztah (ext) updated:  \t$foundAndUpdatedVzt\n";
+print "Vztah (ext) deleted:  \t$deletedVzt\n";
 print "=======================================\n";
 
 $lock->unlock();
@@ -378,24 +500,25 @@ sub handleContact() {
 		if ($contactExists->fetch) {
 
 			if ($SPJ_CISLO) {
-				# user has address
+				# user has spj
 				$contactsAreEquals->execute($SPJ_TYP, $SPJ_CISLO, $uco);
 
 				if(!$contactsAreEquals->fetch) {
 					$updateContact->execute($SPJ_CISLO, $SPJ_TYP, $uco);
 					if($DEBUG == 1) { print "UPDATING EXISTING SPJ RECORD: $uco\n"; }
 					$foundAndUpdatedSpj++;
+					handleAkt($uco, 'SPJ');
 				} else {
 					if($DEBUG == 1) { print "SKIP SPJ RECORD: $uco\n"; }
 					$foundAndSkippedSpj++;
 				}
 
 			} else {
-				# user had addres, now will be removed
-				# user don't have an address - remove any existing address
+				# user had spj, now will be removed
 				if($DEBUG == 1) { print "DELETE SPJ: $uco\n"; }
 				$deleteContact->execute($SPJ_TYP, $uco);
 				$deletedSpj++;
+				handleAkt($uco, 'SPJ');
 			}
 
 		} else {
@@ -405,12 +528,34 @@ sub handleContact() {
 				$insertedSpj++;
 				# we will do insert
 				$insertContact->execute($uco, $SPJ_TYP, $SPJ_CISLO);
+				handleAkt($uco, 'SPJ');
 			}
 
 		}
 
 	} else {
 		print "Wrong usage of handleContact()."
+	}
+
+}
+
+#
+# Handle writing performed changes in ELA_AKT table
+#
+# param 1: $UCO (VŠUP UCO),
+# param 2: $CHANGE_TYPE (OSB,ADR,SPJ,VZTAHY)
+#
+sub handleAkt() {
+
+	my $UCO = shift;
+	my $CHANGE_TYPE = shift;
+
+	if ($UCO and $CHANGE_TYPE) {
+
+		$insertAkt->execute($UCO, $CHANGE_TYPE, 'IDM');
+
+	} else {
+		print "Wrong usage of handleAkt()."
 	}
 
 }

@@ -29,7 +29,7 @@ our $A_GENDER;  *A_GENDER = \'urn:perun:user:attribute-def:def:gender';
 our $A_JOB;  *A_JOB = \'urn:perun:user:attribute-def:def:job';
 our $A_BIRTH_NUMBER;  *A_BIRTH_NUMBER = \'urn:perun:user:attribute-def:def:birthNumber';
 
-# to define STUD | ZAM
+# to define STUD | ZAM | Externista - pedagog
 our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
 
 # address
@@ -50,6 +50,9 @@ our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:vsup
 our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:virt:preferredPhone';
 our $A_BANK_ACCOUNT_DC2; *A_BANK_ACCOUNT_DC2 = \'urn:perun:user:attribute-def:def:bankAccount';
 our $A_BANK_ACCOUNT_KOS; *A_BANK_ACCOUNT_KOS = \'urn:perun:user:attribute-def:def:bankAccountKos';
+
+# relation ID for "Externista - pedagog"
+our $A_USER_ID;  *A_USER_ID = \'urn:perun:user:attribute-def:core:id';
 
 # GATHER USERS
 my $users;  # $users->{$uco}->{ATTR} = $attrValue;
@@ -94,6 +97,10 @@ foreach my $rData ($data->getChildElements) {
 			unless ($users->{$key}->{'TYP_VTAHU'}) {
 				$users->{$key}->{'TYP_VTAHU'} = $relationType;
 			}
+		} elsif ($relationType eq "Externista - pedagog") {
+			unless ($users->{$key}->{'TYP_VTAHU'}) {
+				$users->{$key}->{'TYP_VTAHU'} = $relationType;
+			}
 		}
 
 		if (defined $uAttributes{$A_ADDRESS_STREET_DC2}) {
@@ -130,6 +137,8 @@ foreach my $rData ($data->getChildElements) {
 			$users->{$key}->{'BANK_ACCOUNT'} = '';
 		}
 
+		$users->{$key}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
+
 	}
 
 }
@@ -152,7 +161,8 @@ for my $key (@keys) {
 		$users->{$key}->{'STREET'} . ' ' . $users->{$key}->{'HOUSE_NUMBER'} . "\t" .
 		$users->{$key}->{'TOWN'} . "\t" . $users->{$key}->{'POSTAL_CODE'} . "\t" .
 		$users->{$key}->{'COUNTRY_CODE'} . "\t" . $users->{$key}->{'ADR_TYPE'} . "\t" .
-		$users->{$key}->{'EMAIL'} . "\t" . $users->{$key}->{'BANK_ACCOUNT'}  . "\t" . $users->{$key}->{$A_PHONE}. "\n";
+		$users->{$key}->{'EMAIL'} . "\t" . $users->{$key}->{'BANK_ACCOUNT'} . "\t" .
+		$users->{$key}->{$A_PHONE} . "\t" . $users->{$key}->{$A_USER_ID} . "\n";
 
 }
 
