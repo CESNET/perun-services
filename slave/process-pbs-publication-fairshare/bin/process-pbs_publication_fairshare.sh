@@ -4,7 +4,15 @@ PROTOCOL_VERSION='3.0.0'
 
 
 function process {
-	DST_FILE="/var/spool/torque/sched_priv/resource_group"
+	E_UNKNOWN_PBS=(51 'Unsupported PBS type')
+
+	if [ -d /var/spool/torque/ ]; then
+		DST_FILE="/var/spool/torque/sched_priv/resource_group"
+	elif [ -d /var/spool/pbs ]; then
+		DST_FILE="/var/spool/pbs/sched_priv/resource_group"
+	else
+		log_msg E_UNKNOWN_PBS
+	fi
 
 	### Status codes
 	I_CHANGED=(0 "${DST_FILE} updated")
