@@ -483,6 +483,15 @@ print "=======================================\n";
 
 $lock->unlock();
 
+my $ret_dc2 = system "/home/perun/perun-sync/dc2_to_ifis.pl";
+if ($ret_dc2 != 0) {
+	print "Updating IFIS from DC2 failed with return code: $ret_dc2\n";
+}
+my $ret_kos = system "/home/perun/perun-sync/kos_to_ifis.pl";
+if ($ret_kos != 0) {
+	print "Updating IFIS from KOS failed with return code: $ret_kos\n";
+}
+
 #
 # Handles DB change for specified contact (mail, bank account, phone)
 #
