@@ -379,7 +379,7 @@ foreach my $uco (@ucos_spj) {
 my $vztahExists = $dbh->prepare(qq{select 1 from $tableNameVzt where OSB_ID=? and TYP_VZTAHU=? and DRUH_VZTAHU=?});
 my $insertVztah = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, TYP_VZTAHU, DRUH_VZTAHU, VZTAH_CISLO, KARTA_IDENT, EXT_ID) VALUES (?,?,?,?,?,?)});
 my $updateVztah = $dbh->prepare(qq{UPDATE $tableNameVzt SET KARTA_IDENT=? WHERE TYP_VZTAHU=? and DRUH_VZTAHU=? and OSB_ID=?});
-my $deleteVztah = $dbh->prepare(qq{DELETE FROM $tableNameVzt where TYP_VZTAHU=? and DRUH_VZTAHU=? and OSB_ID=?});
+my $deleteVztah = $dbh->prepare(qq{DELETE FROM $tableNameVzt where OSB_ID=?});
 
 foreach my $uco (sort keys $dataByKey) {
 
@@ -401,15 +401,18 @@ foreach my $uco (sort keys $dataByKey) {
 	$vztahExists->execute($uco, $TYP_VZTAHU, $DRUH_VZTAHU);
 	if ($vztahExists->fetch) {
 
+		my @params = ($TYP_VZTAHU, $DRUH_VZTAHU, $USER_ID, $uco);
+
 		my $vztahAreEqualsSelect = qq{SELECT 1 FROM $tableNameVzt WHERE TYP_VZTAHU=? and DRUH_VZTAHU=? and VZTAH_CISLO=? and OSB_ID=? and KARTA_IDENT};
 		if ($KARTA_IDENT) {
-			$vztahAreEqualsSelect = $vztahAreEqualsSelect . "=?"
+			$vztahAreEqualsSelect = $vztahAreEqualsSelect . "=?";
+			push(@params, $KARTA_IDENT);
 		} else {
 			$vztahAreEqualsSelect = $vztahAreEqualsSelect . " is NULL"
 		}
 
 		my $vztahAreEquals = $dbh->prepare($vztahAreEqualsSelect);
-		$vztahAreEquals->execute($TYP_VZTAHU, $DRUH_VZTAHU, $USER_ID, $uco, $KARTA_IDENT);
+		$vztahAreEquals->execute(@params);
 
 		if(!$vztahAreEquals->fetch) {
 			$updateVztah->execute($KARTA_IDENT, $TYP_VZTAHU, $DRUH_VZTAHU, $uco);
