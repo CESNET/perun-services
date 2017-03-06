@@ -432,8 +432,8 @@ foreach my $uco (sort keys $dataByKey) {
 
 }
 
-# delete vztah of unwanted persons for external relations
-my $ary_ref_vzt = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameVzt where OSB_ID is not null and TYP_VZTAHU='EXT'});
+# delete vztah of unwanted persons (for simplicity of other scripts (KOS/DC2 to IFIS) we delete vztah of any type !!
+my $ary_ref_vzt = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null});
 my @ucos_vzt = @$ary_ref_vzt;
 foreach my $uco (@ucos_vzt) {
 	unless (exists $dataByKey->{$uco}) {
@@ -475,7 +475,7 @@ print "---------------------------------------\n";
 print "Vztah (ext) inserted: \t$insertedVzt\n";
 print "Vztah (ext) skiped:   \t$foundAndSkippedVzt\n";
 print "Vztah (ext) updated:  \t$foundAndUpdatedVzt\n";
-print "Vztah (ext) deleted:  \t$deletedVzt\n";
+print "Vztah (any) deleted:  \t$deletedVzt\n";
 print "=======================================\n";
 
 $lock->unlock();
