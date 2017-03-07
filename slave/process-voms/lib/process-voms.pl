@@ -114,7 +114,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 
 
 	#Collect lists from voms-admin
-	my @groups_current=`voms-admin --vo ${name} list-groups`;
+	my @groups_current=`voms-admin --vo \Q${name}\E list-groups`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing groups in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
 		print STDERR "Failed listing groups in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
@@ -124,7 +124,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	chomp(@groups_current);
 	s/^\s*// for @groups_current;
 
-	my @roles_current=`voms-admin --vo ${name} list-roles`;
+	my @roles_current=`voms-admin --vo \Q${name}\E list-roles`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
 		print STDERR "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
@@ -134,7 +134,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	chomp(@roles_current);
 	s/^\s*Role=// for @roles_current;
 
-	our @cas=`voms-admin --vo ${name} list-cas`;
+	our @cas=`voms-admin --vo \Q${name}\E list-cas`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
 		print STDERR "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
@@ -148,11 +148,11 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my %groupMembers_current;	# Current membership in groups (pure, disregarding roles)
 	foreach $group (@groups_current) {
 		#Store members
-		$groupMembers_current{"$group"}=listToHashes(`voms-admin --vo ${name} list-members "${group}"`);
+		$groupMembers_current{"$group"}=listToHashes(`voms-admin --vo \Q${name}\E list-members \Q${group}\E`);
 
 		#Role Membership
 		foreach $role (@roles_current) {
-			$groupRoles_current{"$group"}{"$role"}=listToHashes(`voms-admin --vo ${name} list-users-with-role "${group}" "${role}"`);
+			$groupRoles_current{"$group"}{"$role"}=listToHashes(`voms-admin --vo \Q${name}\E list-users-with-role \Q${group}\E \Q${role}\E`);
 	        }
 	}
 
@@ -208,21 +208,21 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	# Effect changes
 	# 1. create / delete groups
 	foreach $group (@groupsToDelete) {
-		effectCall "voms-admin --vo $name delete-group \"$group\"",
+		effectCall "voms-admin --vo \Q$name\E delete-group \Q$group\E",
 		"deleting Group \"$group\" from VO \"$name\"";
 	}
 	foreach $group (@groupsToCreate) {
-		effectCall "voms-admin --vo $name create-group \"$group\"",
+		effectCall "voms-admin --vo \Q$name\E create-group \Q$group\E",
 		"creating Group \"$group\" in VO \"$name\"";
 	}
 
 	# 2. create / delete roles
 	foreach $role (@rolesToDelete) {
-		effectCall "voms-admin --vo $name delete-role \"$role\"",
+		effectCall "voms-admin --vo \Q$name\E delete-role \Q$role\E",
 		"deleting Role \"$role\" from VO \"$name\".";
 	}
 	foreach $role (@rolesToCreate) {
-		effectCall "voms-admin --vo $name create-role \"$role\"",
+		effectCall "voms-admin --vo \Q$name\E create-role \Q$role\E",
 		"creating Role \"$role\" in VO \"$name\".";
 	}
 
@@ -230,21 +230,21 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	foreach $group (@groups_toBe) {
 		foreach $user (@{$membersToRemove{"$group"}}) {
 			if( "$group" eq "/$name" ) { # Root group?
-				effectCall "voms-admin --nousercert --vo $name delete-user \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				effectCall "voms-admin --nousercert --vo \Q$name\E delete-user \Q$user->{'DN'}\E \Q$user->{'CA'}\E",
 				"deleting user \"$user->{'DN'}\" from VO \"$name\".";
 			}
 			else {
-				effectCall "voms-admin --nousercert --vo $name remove-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				effectCall "voms-admin --nousercert --vo \Q$name\E remove-member \Q$group\E \Q$user->{'DN'}\E \Q$user->{'CA'}\E",
 				"removing user \"$user->{'DN'}\" from Group \"$group\" in VO \"$name\".";
 			}
 		}
 		foreach $user (@{$membersToAdd{"$group"}}) {
 			if( "$group" eq "/$name" ) { # Root group?
-				effectCall "voms-admin --nousercert --vo $name create-user \"$user->{'DN'}\" \"$user->{'CA'}\" \"$user->{'CN'}\" \"$user->{'email'}\"",
+				effectCall "voms-admin --nousercert --vo \Q$name\E create-user \Q$user->{'DN'}\E \Q$user->{'CA'}\E \Q$user->{'CN'}\E \Q$user->{'email'}\E",
 				"creating user \"$user->{'DN'}\" in VO \"$name\".";
 			}
 			else {
-				effectCall "voms-admin --nousercert --vo $name add-member \"$group\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				effectCall "voms-admin --nousercert --vo \Q$name\E add-member \Q$group\E \Q$user->{'DN'}\E \Q$user->{'CA'}\E",
 				"adding user \"$user->{'DN'}\" to Group \"$group\" in VO \"$name\".";
 			}
 		}
@@ -254,11 +254,11 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	foreach $group (@groups_toBe) {
 		foreach $role (@roles_toBe) {
 			foreach $user (@{$rolesToDismiss{"$group"}{"$role"}}) {
-				effectCall "voms-admin --nousercert --vo $name dismiss-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				effectCall "voms-admin --nousercert --vo \Q$name\E dismiss-role \Q$group\E \Q$role\E \Q$user->{'DN'}\E \Q$user->{'CA'}\E",
 				"stripping user \"$user->{'DN'}\" of Role \"$role\" for Group \"$group\" in VO \"$name\"";
 			}
 			foreach $user (@{$rolesToAssign{"$group"}{"$role"}}) {
-				effectCall "voms-admin --nousercert --vo $name assign-role \"$group\" \"$role\" \"$user->{'DN'}\" \"$user->{'CA'}\"",
+				effectCall "voms-admin --nousercert --vo \Q$name\E assign-role \Q$group\E \Q$role\E \Q$user->{'DN'}\E \Q$user->{'CA'}\E",
 				"assigning Role \"$role\" to user \"$user->{'DN'}\" for Group \"$group\" in VO \"$name\"";
 			}
 		}
