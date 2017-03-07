@@ -43,6 +43,7 @@ sub getCN {
 #	CN	VO Member CN, extracted from DN
 #	email	The email address of the user
 sub listToHashes {
+	my $cas_ref = shift;
 	my @hashes;
 	foreach $line (@_) {
 		chomp($line);
@@ -54,7 +55,7 @@ sub listToHashes {
 		}
 		else {
 			if ( scalar @components > 3 ) { # Using slower algorithm to match members with commas in their subjects
-				foreach $ca ( @cas ) {
+				foreach $ca ( @$cas_ref ) {
 					$pattern = qr/$ca/;
 					if ( $line =~ /^(.*),${pattern},([^,]*)$/ ) {
 						my %mbr= ( 'DN' => "$1",'CA' => "$ca", 'CN' => getCN($1), 'email' => "$2" );
@@ -90,11 +91,13 @@ sub effectCall {
 }
 
 ### knownCA indicates whether a given CA is known to the VOMS server. It accepts the user structure
-#	%user		The user whose CA should be checked (DN, CA, email)
+#	$cas_ref	Reference to an array of known CAs
+#	$CA		The CA that should be checked CA
 sub knownCA {
-	$ca = $_[0];
+	$cas_ref = $_[0];
+	$ca = $_[1];
 
-	if(grep {$_ eq "$ca"} @cas) {
+	if(grep {$_ eq "$ca"} @$cas_ref) {
 		return 1;
 	} else {
 		syslog LOG_ERR, "Unknown CA \"$user->{'CA'}\" requested with user \"$user->{'DN'}\"";
@@ -136,7 +139,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	chomp(@roles_current);
 	s/^\s*Role=// for @roles_current;
 
-	our @cas=`voms-admin --vo \Q${name}\E list-cas`;
+	my @cas=`voms-admin --vo \Q${name}\E list-cas`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
 		print STDERR "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
@@ -160,11 +163,11 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my %groupMembers_current;	# Current membership in groups (pure, disregarding roles)
 	foreach $group (@groups_current) {
 		#Store members
-		$groupMembers_current{"$group"}=listToHashes(`voms-admin --vo \Q${name}\E list-members \Q${group}\E`);
+		$groupMembers_current{"$group"}=listToHashes(\@cas, `voms-admin --vo \Q${name}\E list-members \Q${group}\E`);
 
 		#Role Membership
 		foreach $role (@roles_current) {
-			$groupRoles_current{"$group"}{"$role"}=listToHashes(`voms-admin --vo \Q${name}\E list-users-with-role \Q${group}\E \Q${role}\E`);
+			$groupRoles_current{"$group"}{"$role"}=listToHashes(\@cas, `voms-admin --vo \Q${name}\E list-users-with-role \Q${group}\E \Q${role}\E`);
 	        }
 	}
 
@@ -190,7 +193,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @groups_toBe = ( "/$name" );	# Desired list of groups
 	my @roles_toBe = ( "VO-Admin" );# Desired list of roles, plus the default VO-Admin role
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
-		next unless knownCA($user->{'CA'});
+		next unless knownCA(\@cas, $user->{'CA'});
 		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
 		if($user->{'nickname'}) {
 			my %userAttributes = ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'name' => 'nickname', 'value' => "$user->{'nickname'}" );
