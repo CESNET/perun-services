@@ -132,11 +132,13 @@ Perun slave scripts
 
 %install
 mkdir -p %{buildroot}/opt/perun/bin/
+mkdir -p %{buildroot}/var/lib/perun/${GENERATE_RPM_FOR_SERVICE}/
 cp -r bin/* %{buildroot}/opt/perun/bin/
 $CUSTOM_CONF
 
 %files
 /opt/perun/bin/*
+/var/lib/perun/${GENERATE_RPM_FOR_SERVICE}/
 $CUSTOM_FILE_DATA
 EOF
 
