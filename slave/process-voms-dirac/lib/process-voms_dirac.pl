@@ -15,7 +15,7 @@ my $vos = XMLin( '-',
 	KeyAttr => [] );
 my $csv = Text::CSV->new({ sep_char => ',' });
 
-$attributeStatusFilePrefix = "/var/lib/perun-services/process-voms-attributes-";
+$attributeStatusFilePrefix = "/var/lib/perun/process-voms-dirac/process-voms-attributes-";
 my $attributeStatusDir = dirname($attributeStatusFilePrefix);
 make_path($attributeStatusDir) unless (-e $attributeStatusDir);
 
