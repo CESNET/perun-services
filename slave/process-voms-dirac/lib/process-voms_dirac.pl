@@ -17,15 +17,15 @@ $attributeStatusFilePrefix = "/var/lib/perun-services/process-voms-attributes-";
 
 ### serialize is used to turn an array of hash references into a manageable structure
 sub serialize {
-    JSON::XS->new->relaxed(0)->ascii(1)->canonical(1)->encode($_[0]);
+	JSON::XS->new->relaxed(0)->ascii(1)->canonical(1)->encode($_[0]);
 }
 
 ### array_minus_deep is a replacement for array_minus that expands hash references
 sub array_minus_deep(\@\@) {
-    my ($array,$minus) = @_;
+	my ($array,$minus) = @_;
 
-    my %minus = map( ( serialize($_) => 1 ), @$minus );
-    grep !$minus{ serialize($_) }, @$array
+	my %minus = map( ( serialize($_) => 1 ), @$minus );
+	grep !$minus{ serialize($_) }, @$array
 }
 
 ### getCN extracts a CN from DN. It accepts one aregument:
@@ -40,7 +40,7 @@ sub getCN {
 ### listToHashes accepts a three-column CSV and produces an array of hashes with the following structure:
 #	DN	VO Member DN
 #	CA	Certificate Authority that vouches for the member
-#	CN	VO Member CD, extracted from DN
+#	CN	VO Member CN, extracted from DN
 #	email	The email address of the user
 sub listToHashes {
 	my @hashes;
@@ -145,15 +145,15 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	}
 	chomp(@cas);
 
-        my @attributeClasses_current=`voms-admin --vo \Q${name}\E list-attribute-classes`;
-        if ( $? != 0 ) {
-                syslog LOG_ERR, "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
-                print STDERR "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
-                $retval = 1;
-                next;
-        }
+	my @attributeClasses_current=`voms-admin --vo \Q${name}\E list-attribute-classes`;
+	if ( $? != 0 ) {
+		syslog LOG_ERR, "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
+		print STDERR "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
+		$retval = 1;
+		next;
+	}
 	s/\s.*$// for @attributeClasses_current;
-        chomp(@attributeClasses_current);
+	chomp(@attributeClasses_current);
 
 	#Collect current Group Membership and Role assignment
 	my %groupRoles_current;		# Current assignment of users to (per group) roles
@@ -168,7 +168,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	        }
 	}
 
-	$attributeStatusFile = "$attributeStatusFilePrefix$name.xml";
+	$attributeStatusFile = $attributeStatusFilePrefix.$name."xml";
 	my @attributes_current;
 	if ( -e $attributeStatusFile ) {
 		my $attributes_read = XMLin( "$attributeStatusFile", ForceArray => [ 'attribute' ], KeyAttr => [], KeepRoot => 0 );
@@ -186,7 +186,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my %groupRoles_toBe;		# Desired assignment of users to (per group) roles
 	my %groupMembers_toBe;		# Desired membership in groups (pure, disregarding roles)
 	my @attributeClasses_toBe;	# Desired attribute classes
-	my @attributes_toBe;		# List off al users with attributes
+	my @attributes_toBe;		# List of al users with attributes
 	my @groups_toBe = ( "/$name" );	# Desired list of groups
 	my @roles_toBe = ( "VO-Admin" );# Desired list of roles, plus the default VO-Admin role
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
@@ -196,7 +196,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 			my %userAttributes = ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'name' => 'nickname', 'value' => "$user->{'nickname'}" );
 			push(@attributes_toBe, \%userAttributes);
 			push(@attributeClasses_toBe, 'nickname') unless grep{$_ == 'nickname'} @attributeClasses_toBe;
-			}
+		}
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
 		foreach $group (@{$user->{'groups'}->{'group'}}){
 			push(@groups_toBe, "/$name/$group->{'name'}") unless grep{$_ eq "/$name/$group->{'name'}"} @groups_toBe;
@@ -230,7 +230,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my %membersToAdd;
 	my %rolesToAssign;
 	my %rolesToDismiss;
-        foreach $group (@groups_toBe) {
+	foreach $group (@groups_toBe) {
 		@{$membersToRemove{"$group"}} = array_minus_deep(@{$groupMembers_current{"$group"}}, @{$groupMembers_toBe{"$group"}});
 		@{$membersToRemove{"$group"}} = array_minus_deep(@{$membersToRemove{"$group"}}, @{$membersToRemove{"/$name"}}) unless( "$group" eq "/$name" ); # No need to remove user from groups if they are going to be fully removed
 		@{$membersToAdd{"$group"}} = array_minus_deep(@{$groupMembers_toBe{"$group"}}, @{$groupMembers_current{"$group"}});
@@ -240,7 +240,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$rolesToDismiss{"$group"}{"$role"}}, @{$membersToRemove{"/$name"}}); # No need to revoke roles if the user is going to be fully removed
 			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$rolesToDismiss{"$group"}{"$role"}}, @{$membersToRemove{"$group"}}); # No need to revoke roles if the user is going to be removed from the group
 		}
-        }
+	}
 
 
 	# Effect changes
