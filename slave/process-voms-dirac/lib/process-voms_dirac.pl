@@ -168,7 +168,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	        }
 	}
 
-	$attributeStatusFile = $attributeStatusFilePrefix.$name."xml";
+	$attributeStatusFile = $attributeStatusFilePrefix.$name.".xml";
 	my @attributes_current;
 	if ( -e $attributeStatusFile ) {
 		my $attributes_read = XMLin( "$attributeStatusFile", ForceArray => [ 'attribute' ], KeyAttr => [], KeepRoot => 0 );
