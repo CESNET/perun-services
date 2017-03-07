@@ -14,8 +14,8 @@ PROTOCOL_VERSION='1.0.0'
 function process {
 	DST_FILE_USERS="/tmp/users.scim"
 	DST_FILE_GROUPS="/tmp/groups.scim"
-	
-	DST_KYPO_IMPORT="/etc/perun/kypo-portal.d/kypoImport.py"
+
+	DST_KYPO_IMPORT="${LIB_DIR}/${SERVICE}/process-kypo_portal.py"
 
 	### Status codes
 	I_CHANGED=(0 "${DST_FILE_USERS} or ${DST_FILE_GROUPS} updated")
