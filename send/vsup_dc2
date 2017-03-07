@@ -122,5 +122,3 @@ print "Found and updated:\t$foundAndUpdated\n";
 print "=======================================\n";
 
 $lock->unlock();
-
-exit 0;
