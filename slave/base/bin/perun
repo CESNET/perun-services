@@ -2,6 +2,7 @@
 NAME='perunv3'
 SCRIPTS_DIR=`dirname $0`
 LIB_DIR='/opt/perun/lib/'
+CACHE_DIR='/var/lib/perun/'
 CUSTOM_SCRIPTS_DIR="/etc/perun/"
 OLD_CUSTOM_SCRIPTS_DIR="/opt/perun/bin/"
 LOCK_DIR=${LOCK_DIR:=/var/lock}
