@@ -7,6 +7,8 @@ use Text::CSV;
 use Data::Dumper;
 use Array::Utils qw(:all);
 use JSON::XS;
+use File::Basename;
+use File::Path qw/make_path/;
 my $vos = XMLin( '-',
 	ForceArray => [ 'role', 'group', 'user', 'vo' ],
 #	GroupTags => { role => 'roles', groups => 'group', users => 'user', vos => 'vo' },
@@ -14,6 +16,8 @@ my $vos = XMLin( '-',
 my $csv = Text::CSV->new({ sep_char => ',' });
 
 $attributeStatusFilePrefix = "/var/lib/perun-services/process-voms-attributes-";
+my $attributeStatusDir = dirname($attributeStatusFilePrefix);
+make_path($attributeStatusDir) unless (-e $attributeStatusDir);
 
 ### serialize is used to turn an array of hash references into a manageable structure
 sub serialize {
