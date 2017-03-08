@@ -1,3 +1,10 @@
+perun-slave-process-afs (3.1.3) stable; urgency=low
+
+  * Do not try to create AFS volume when corresponding afs attributes from Perun
+    are empty.
+
+ -- Michal Vocu <michal.vocu@gmail.com> Wed, 08 March 2017 14:53:10 +0200
+
 perun-slave-process-afs (3.1.2) stable; urgency=medium
 
   * Generate configuration directory /etc/perun/{service}.d automatically even
