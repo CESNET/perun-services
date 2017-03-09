@@ -408,7 +408,7 @@ for item in groupIdsToDel:
 		cur.execute('SELECT id FROM {0} WHERE external_id = '"'{1}'"';'
 			.format(GROUP_TABLE, item))
 		group_id = cur.fetchone()[0]
-		cur.execute('DELETE FROM {0} WHERE group_id = '"'{1}'"';'
+		cur.execute('DELETE FROM {0} WHERE idm_group_id = '"'{1}'"';'
 			.format(USERINGROUP_TABLE, group_id))
 	except psycopg2.Error as e:
 		print('Deleting users from group: DB Error {0}'.format(e))
