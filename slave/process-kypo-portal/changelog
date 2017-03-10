@@ -1,3 +1,10 @@
+perun-slave-process-kypo-portal (3.0.6) stable; urgency=medium
+
+  * Fixed wrong name of attribute in deleting members from group, that is not in
+    json
+
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Fri, 10 Mar 2017 11:00:00 +0200
+
 perun-slave-process-kypo-portal (3.0.5) stable; urgency=medium
 
   * Converted kypoImport.py script from python2 to python3,
