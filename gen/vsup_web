@@ -27,6 +27,7 @@ our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phone';
 our $A_MOBILE;  *A_MOBILE = \'urn:perun:user:attribute-def:opt:mobilePhone';
 our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMail';
 our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
+our $A_FOTO;  *A_FOTO = \'urn:perun:user:attribute-def:def:cardPhoto';
 
 our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
 our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
@@ -80,6 +81,8 @@ foreach my $rData ($data->getChildElements) {
 			$users->{$uco}->{$A_LAST_NAME} = (defined $uAttributes{$A_ARTISTIC_LAST_NAME} ? $uAttributes{$A_ARTISTIC_LAST_NAME} : (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : ''));
 			$users->{$uco}->{$A_TITLE_AFTER} = (defined $uAttributes{$A_TITLE_AFTER} ? $uAttributes{$A_TITLE_AFTER} : '');
 
+			$users->{$uco}->{$A_FOTO} = (defined $uAttributes{$A_FOTO} ? $uAttributes{$A_FOTO} : '');
+
 			# work contacts
 			$users->{$uco}->{$A_PHONE} = (defined $uAttributes{$A_PHONE} ? $uAttributes{$A_PHONE} : '');
 			$users->{$uco}->{$A_MOBILE} = (defined $uAttributes{$A_MOBILE} ? $uAttributes{$A_MOBILE} : '');
@@ -119,7 +122,8 @@ for my $uco (@keys) {
 		$users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_FIRST_NAME} . "\t" .
 		$users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_AFTER} . "\t" .
 		$users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_MOBILE} . "\t" .
-		$users->{$uco}->{$A_EMAIL_PRIV} . "\t" . $users->{$uco}->{$A_PHONE_PRIV} . "\n";
+		$users->{$uco}->{$A_EMAIL_PRIV} . "\t" . $users->{$uco}->{$A_PHONE_PRIV} . "\t" .
+		$users->{$uco}->{$A_FOTO} . "\n";
 
 }
 
