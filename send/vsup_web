@@ -6,6 +6,7 @@ use Getopt::Long qw(:config no_ignore_case);
 use Data::Dumper;
 use Encode qw(encode);
 use ScriptLock;
+binmode STDOUT, ":utf8";
 
 my $username;
 my $password;
@@ -56,8 +57,10 @@ if(!defined($password) || !defined($username) || !defined($tableName)) {
 my $dataByUco = {};
 
 open FILE, $service_file or die "Could not open $service_file: $!";
+binmode FILE, ":utf8";
 while(my $line = <FILE>) {
 	my @parts = split /\t/, $line;
+	chomp(@parts);
 	$dataByUco->{$parts[0]}->{'LOGIN'} = $parts[1];
 	$dataByUco->{$parts[0]}->{'EMAIL'} = $parts[2];
 	$dataByUco->{$parts[0]}->{'TITLE_BEFORE'} = (($parts[3] ne '') ? $parts[3] : undef);
