@@ -109,7 +109,7 @@ perunServicesInit::finalize;
 ##############################################################################
 #   Only subs definitions down there
 ##############################################################################
-## creates structure for users.csv file
+## creates structure for users.scim file
 sub processUsers {
 	my ($gid, $memberData) = @_;
 
@@ -146,7 +146,7 @@ sub processUsers {
 	processMemberships $gid, $uid;
 }
 
-## creates structure for groups.csv file
+## creates structure for groups.scim file
 sub processGroups {
 	my $group = shift;
 	my %groupAttributes = attributesToHash $group->getAttributes;
@@ -168,7 +168,7 @@ sub processGroups {
 	}
 }
 
-## creates structure for memberships.csv file
+## creates structure for memberships in groups.scim file
 sub processMemberships {
 	my ($gid, $uid) = @_;
 
