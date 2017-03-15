@@ -16,12 +16,20 @@ version: 1.0.0
 import sys
 import json
 import psycopg2
+import configparser
 
-'''Information to access DB'''
-DB_NAME = 'SET DB NAME HERE'
-DB_USER = 'SET DB USER HERE'
-DB_HOST = 'SET DB HOST HERE'
-DB_PSSWD = 'SET PASSWORD HERE'
+''' Loading connection information from db_settings.ini'''
+try:
+	config = configparser.ConfigParser()
+	config.read('db_settings.ini')
+	
+	DB_NAME = config.get('database', 'name')
+	DB_USER = config.get('database', 'user')
+	DB_HOST = config.get('database', 'host')
+	DB_PSSWD = config.get('database', 'password')
+except:
+	print("Failed reading from file with information to access DB")
+	sys.exit(1)
 
 CONN_STRING = "dbname='{0}' user='{1}' host='{2}' password='{3}'".format(DB_NAME, DB_USER, DB_HOST, DB_PSSWD)
 
