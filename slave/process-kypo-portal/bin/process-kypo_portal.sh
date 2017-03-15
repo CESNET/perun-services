@@ -34,6 +34,7 @@ function process {
 	if [ $user_diff -eq 0 ] || [ $group_diff -eq 0 ]; then
 		log_msg I_CHANGED
 		python3 $DST_KYPO_IMPORT
+		exit $?               
 	else
 		log_msg I_NOT_CHANGED
 	fi
