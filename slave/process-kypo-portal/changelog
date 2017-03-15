@@ -1,3 +1,11 @@
+perun-slave-process-kypo-portal (3.0.7) stable; urgency=medium
+
+  * Updated process-kypo_portal.py to load information to access DB from
+    external file, updated process-kypo_portal.sh to return return value
+    from process-kypo_portal.py
+ 
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Wed, 15 Mar 2017 14:00:00 +0200
+
 perun-slave-process-kypo-portal (3.0.6) stable; urgency=medium
 
   * Fixed wrong name of attribute in deleting members from group, that is not in
