@@ -12,8 +12,10 @@ FACILITY_NAME=$1
 DESTINATION=$2
 DESTINATION_TYPE=$3
 
-unset LC_TIME
-unset LANG
+#use standard time and language settings (ASCII)
+export LC_TIME="C"
+export LANG="C"
+
 TRANSPORT_COMMAND="ssh -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5  -i `echo ~`/.ssh/id_rsa"
 SLAVE_COMMAND="/opt/perun/bin/perun"
 SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
