@@ -13,15 +13,19 @@ version: 1.0.0
 2016-12-01: Subgroups are stored in DB without prefix of parent group
 '''
 
+import os
 import sys
 import json
 import psycopg2
 import configparser
 
+SETTINGS_DEST = os.environ["CUSTOM_SCRIPTS_DIR"] + '/' + os.environ["SERVICE"] + '/db_settings.ini'
+
+
 ''' Loading connection information from db_settings.ini'''
 try:
 	config = configparser.ConfigParser()
-	config.read('db_settings.ini')
+	config.read(SETTINGS_DEST)
 	
 	DB_NAME = config.get('database', 'name')
 	DB_USER = config.get('database', 'user')
