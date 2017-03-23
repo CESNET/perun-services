@@ -5,6 +5,7 @@ use DBI;
 use Getopt::Long qw(:config no_ignore_case);
 use Data::Dumper;
 use ScriptLock;
+binmode STDOUT, ":utf8";
 
 my $username;
 my $password;
@@ -51,24 +52,29 @@ if(!defined($password) || !defined($username) || !defined($tableName)) {
 my $dataByKeys = {};
 
 open FILE, $service_file or die "Could not open $service_file: $!";
+binmode FILE, ":utf8";
 while(my $line = <FILE>) {
 	my @parts = split /\t/, $line;
+	chomp(@parts);
 	$dataByKeys->{$parts[0]}->{'UCO'} = $parts[1];
-	$dataByKeys->{$parts[0]}->{'OSB_ID'} = $parts[2];
+	$dataByKeys->{$parts[0]}->{'OSB_ID'} = (($parts[2] ne '') ? $parts[2] : undef); # only students have KOS_ID
 	$dataByKeys->{$parts[0]}->{'LOGIN'} = $parts[3];
 	$dataByKeys->{$parts[0]}->{'EMAIL'} = $parts[4];
 	$dataByKeys->{$parts[0]}->{'TYP_ZAZN'} = $parts[5];
-	$dataByKeys->{$parts[0]}->{'TITLE_BEFORE'} = $parts[6];
-	$dataByKeys->{$parts[0]}->{'FIRST_NAME'} = $parts[7];
-	$dataByKeys->{$parts[0]}->{'LAST_NAME'} = $parts[8];
-	$dataByKeys->{$parts[0]}->{'TITLE_AFTER'} = $parts[9];
-	$dataByKeys->{$parts[0]}->{'BIRTH_LAST_NAME'} = $parts[10];
-	$dataByKeys->{$parts[0]}->{'BIRTH_NUMBER'} = $parts[11];
-	$dataByKeys->{$parts[0]}->{'GENDER'} = $parts[12];
-	$dataByKeys->{$parts[0]}->{'JOB'} = $parts[13];
-	$dataByKeys->{$parts[0]}->{'PHONE'} = $parts[14];
-	$dataByKeys->{$parts[0]}->{'EMAIL_PRIV'} = $parts[15];
-	$dataByKeys->{$parts[0]}->{'PHONE_PRIV'} = $parts[16];
+	$dataByKeys->{$parts[0]}->{'TITLE_BEFORE'} = (($parts[6] ne '') ? $parts[6] : undef);
+	$dataByKeys->{$parts[0]}->{'FIRST_NAME'} = (($parts[7] ne '') ? $parts[7] : undef);
+	$dataByKeys->{$parts[0]}->{'LAST_NAME'} = (($parts[8] ne '') ? $parts[8] : undef);
+	$dataByKeys->{$parts[0]}->{'TITLE_AFTER'} = (($parts[9] ne '') ? $parts[9] : undef);
+	$dataByKeys->{$parts[0]}->{'BIRTH_LAST_NAME'} = (($parts[10] ne '') ? $parts[10] : undef);
+	$dataByKeys->{$parts[0]}->{'BIRTH_NUMBER'} = (($parts[11] ne '') ? $parts[11] : undef);
+	$dataByKeys->{$parts[0]}->{'GENDER'} = (($parts[12] ne '') ? $parts[12] : undef);
+	$dataByKeys->{$parts[0]}->{'JOB'} = (($parts[13] ne '') ? $parts[13] : undef);
+	$dataByKeys->{$parts[0]}->{'PHONE'} = (($parts[14] ne '') ? $parts[14] : undef);
+	$dataByKeys->{$parts[0]}->{'EMAIL_PRIV'} = (($parts[15] ne '') ? $parts[15] : undef);
+	$dataByKeys->{$parts[0]}->{'PHONE_PRIV'} = (($parts[16] ne '') ? $parts[16] : undef);
+	$dataByKeys->{$parts[0]}->{'CARD_BAR_CODE'} = (($parts[17] ne '') ? $parts[17] : undef);
+	$dataByKeys->{$parts[0]}->{'CARD_CHIP_CODE'} = (($parts[18] ne '') ? $parts[18] : undef);
+	$dataByKeys->{$parts[0]}->{'CARD_PHOTO'} = (($parts[19] ne '') ? $parts[19] : undef);
 }
 close FILE;
 
@@ -103,6 +109,10 @@ foreach my $key (sort keys $dataByKeys) {
 	my $EMAIL_PRIV = $dataByKeys->{$key}->{'EMAIL_PRIV'};
 	my $PHONE_PRIV = $dataByKeys->{$key}->{'PHONE_PRIV'};
 
+	my $IDCARD_CHIP = $dataByKeys->{$key}->{'CARD_CHIP_CODE'};
+	my $IDCARD_BARCODE = $dataByKeys->{$key}->{'CARD_BAR_CODE'};
+	my $IDCARD_PHOTO = $dataByKeys->{$key}->{'CARD_PHOTO'};
+
 	# There is
 	my $personExists = $dbh->prepare(qq{select 1 from $tableName where UCO=? and TYP_ZAZN=?});
 	$personExists->execute($UCO, $TYP_ZAZN);
@@ -116,6 +126,27 @@ foreach my $key (sort keys $dataByKeys) {
 
 			my $select = "SELECT 1 from $tableName where UCO=? and USERNAME=? and EMAIL_SKOLNI=? and TYP_ZAZN=? and OSB_ID=?";
 			my @params = ($UCO, $LOGIN, $EMAIL, $TYP_ZAZN, $OSB_ID);
+
+			if ($IDCARD_CHIP) {
+				$select = $select . " and IDCARD_CHIP=?";
+				push(@params, $IDCARD_CHIP);
+			} else {
+				$select = $select . " and IDCARD_CHIP is NULL";
+			}
+
+			if ($IDCARD_BARCODE) {
+				$select = $select . " and IDCARD_BARCODE=?";
+				push(@params, $IDCARD_BARCODE);
+			} else {
+				$select = $select . " and IDCARD_BARCODE is NULL";
+			}
+
+			if ($IDCARD_PHOTO) {
+				$select = $select . " and FOTO=?";
+				push(@params, $IDCARD_PHOTO);
+			} else {
+				$select = $select . " and FOTO is NULL";
+			}
 
 			$recordAreEquals = $dbh->prepare($select);
 			$recordAreEquals->execute(@params);
@@ -202,10 +233,13 @@ foreach my $key (sort keys $dataByKeys) {
 			if ($TYP_ZAZN eq "S") {
 
 				# UPDATE STUDENT
-				my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET USERNAME=? , EMAIL_SKOLNI=? , ZMENENO_KDY=sysdate WHERE UCO=? and TYP_ZAZN=?});
+				my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET USERNAME=? , EMAIL_SKOLNI=? , IDCARD_CHIP=? , IDCARD_BARCODE=? , FOTO=? , ZMENENO_KDY=sysdate WHERE UCO=? and TYP_ZAZN=?});
 				$updatePerson->execute(
 					$LOGIN,
 					$EMAIL,
+					$IDCARD_CHIP,
+					$IDCARD_BARCODE,
+					$IDCARD_PHOTO,
 					$UCO,
 					$TYP_ZAZN);
 				if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
@@ -252,13 +286,16 @@ foreach my $key (sort keys $dataByKeys) {
 		if ($TYP_ZAZN eq "S") {
 
 			# INSERT STUDENT
-			my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (OSB_ID, UCO, TYP_ZAZN, USERNAME, EMAIL_SKOLNI, ZMENENO_KDY) VALUES (?,?,?,?,?,sysdate)});
+			my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (OSB_ID, UCO, TYP_ZAZN, USERNAME, EMAIL_SKOLNI, IDCARD_CHIP , IDCARD_BARCODE, FOTO , ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,sysdate)});
 			$insertPerson->execute(
 				$OSB_ID,
 				$UCO,
 				$TYP_ZAZN,
 				$LOGIN,
-				$EMAIL
+				$EMAIL,
+				$IDCARD_CHIP,
+				$IDCARD_BARCODE,
+				$IDCARD_PHOTO
 			);
 
 		} elsif ($TYP_ZAZN eq "P") {
