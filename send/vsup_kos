@@ -2,10 +2,13 @@
 use strict;
 use warnings FATAL => 'all';
 use DBI;
+use DBI qw(:sql_types);
 use Getopt::Long qw(:config no_ignore_case);
 use Data::Dumper;
 use ScriptLock;
 binmode STDOUT, ":utf8";
+
+sub solveClob;
 
 my $username;
 my $password;
@@ -78,7 +81,7 @@ while(my $line = <FILE>) {
 }
 close FILE;
 
-my $dbh = DBI->connect("dbi:Oracle://$db_machine:$db_port/$db_name", $username, $password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65530, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+my $dbh = DBI->connect("dbi:Oracle://$db_machine:$db_port/$db_name", $username, $password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
 
 my $DEBUG=0;
 #statistic and information variables
@@ -120,7 +123,7 @@ foreach my $key (sort keys $dataByKeys) {
 	if($personExists->fetch) {
 		if($DEBUG == 1) { print "FIND: $key\n"; }
 
-		#we need to know if these two records are without changes, if yes, skip them
+		# we need to know if these two records are without changes, if yes, skip them
 		my $recordAreEquals;
 		if ($TYP_ZAZN eq "S") {
 
@@ -141,12 +144,7 @@ foreach my $key (sort keys $dataByKeys) {
 				$select = $select . " and IDCARD_BARCODE is NULL";
 			}
 
-			if ($IDCARD_PHOTO) {
-				$select = $select . " and FOTO=?";
-				push(@params, $IDCARD_PHOTO);
-			} else {
-				$select = $select . " and FOTO is NULL";
-			}
+			# CARD PHOTO is not checked here, since we can't pass CLOB to WHERE clause.
 
 			$recordAreEquals = $dbh->prepare($select);
 			$recordAreEquals->execute(@params);
@@ -232,16 +230,18 @@ foreach my $key (sort keys $dataByKeys) {
 
 			if ($TYP_ZAZN eq "S") {
 
-				# UPDATE STUDENT
-				my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET USERNAME=? , EMAIL_SKOLNI=? , IDCARD_CHIP=? , IDCARD_BARCODE=? , FOTO=? , ZMENENO_KDY=sysdate WHERE UCO=? and TYP_ZAZN=?});
+				# UPDATE STUDENT (without photo - solved later)
+				my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET USERNAME=? , EMAIL_SKOLNI=? , IDCARD_CHIP=? , IDCARD_BARCODE=? , ZMENENO_KDY=sysdate WHERE UCO=? and TYP_ZAZN=?});
 				$updatePerson->execute(
 					$LOGIN,
 					$EMAIL,
 					$IDCARD_CHIP,
 					$IDCARD_BARCODE,
-					$IDCARD_PHOTO,
 					$UCO,
 					$TYP_ZAZN);
+
+				solveClob($UCO, $IDCARD_PHOTO);
+
 				if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
 				$foundAndUpdated++;
 
@@ -272,8 +272,25 @@ foreach my $key (sort keys $dataByKeys) {
 
 		} else {
 
-			if($DEBUG == 1) { print "SKIP RECORD: $key\n"; }
-			$foundAndSkipped++;
+			if ($TYP_ZAZN eq "S") {
+
+				# students no change -> check photo change
+				my $result = solveClob($UCO, $IDCARD_PHOTO);
+				if ($result == 1) {
+					if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
+					$foundAndUpdated++;
+				} else {
+					if($DEBUG == 1) { print "SKIP RECORD: $key\n"; }
+					$foundAndSkipped++;
+				}
+
+			} else {
+
+				# teachers - no change
+				if($DEBUG == 1) { print "SKIP RECORD: $key\n"; }
+				$foundAndSkipped++;
+
+			}
 
 		}
 
@@ -287,16 +304,15 @@ foreach my $key (sort keys $dataByKeys) {
 
 			# INSERT STUDENT
 			my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (OSB_ID, UCO, TYP_ZAZN, USERNAME, EMAIL_SKOLNI, IDCARD_CHIP , IDCARD_BARCODE, FOTO , ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,sysdate)});
-			$insertPerson->execute(
-				$OSB_ID,
-				$UCO,
-				$TYP_ZAZN,
-				$LOGIN,
-				$EMAIL,
-				$IDCARD_CHIP,
-				$IDCARD_BARCODE,
-				$IDCARD_PHOTO
-			);
+			$insertPerson->bind_param(1, $OSB_ID);
+			$insertPerson->bind_param(2, $UCO);
+			$insertPerson->bind_param(3, $TYP_ZAZN);
+			$insertPerson->bind_param(4, $LOGIN);
+			$insertPerson->bind_param(5, $EMAIL);
+			$insertPerson->bind_param(6, $IDCARD_CHIP);
+			$insertPerson->bind_param(7, $IDCARD_BARCODE);
+			$insertPerson->bind_param(8, $IDCARD_PHOTO, SQL_LONGVARCHAR);
+			$insertPerson->execute();
 
 		} elsif ($TYP_ZAZN eq "P") {
 
@@ -337,3 +353,45 @@ print "Found and updated:\t$foundAndUpdated\n";
 print "=======================================\n";
 
 $lock->unlock();
+
+#
+# Solve managing CLOB on students IDCARDS
+#
+# Params: $UCO, $IDCARD_PHOTO
+#
+sub solveClob() {
+
+	my $UCO = shift;
+	my $IDCARD_PHOTO = shift;
+
+	# Check CARD PHOTO -> CLOB data of Students
+	my $selectClob = $dbh->prepare(qq{SELECT FOTO from $tableName WHERE UCO=? and TYP_ZAZN='S'});
+	$selectClob->execute($UCO);
+	my $result = $selectClob->fetchrow_hashref;
+	my $clobData = $result->{"FOTO"};
+
+	if ((defined $clobData and defined $IDCARD_PHOTO)) {
+		# both defined - check
+		unless ($clobData eq $IDCARD_PHOTO) {
+			# photo changed - update
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET FOTO=? , ZMENENO_KDY=sysdate WHERE UCO=? and TYP_ZAZN='S'});
+			$updatePerson->bind_param( 1, $IDCARD_PHOTO, SQL_LONGVARCHAR);
+			$updatePerson->bind_param( 2, $UCO);
+			$updatePerson->execute();
+			return 1;
+		}
+	} elsif ((!defined $clobData) and (!defined $IDCARD_PHOTO)) {
+		# both undef - skip
+		return 0;
+	} else {
+		# one defined, other is not -> update
+		my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET FOTO=? , ZMENENO_KDY=sysdate WHERE UCO=? and TYP_ZAZN='S'});
+		$updatePerson->bind_param( 1, $IDCARD_PHOTO, SQL_LONGVARCHAR);
+		$updatePerson->bind_param( 2, $UCO);
+		$updatePerson->execute();
+		return 1;
+	}
+
+	return 0;
+
+}
