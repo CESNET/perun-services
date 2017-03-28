@@ -60,7 +60,7 @@ while(my $line = <FILE>) {
 }
 close FILE;
 
-my $dbh = DBI->connect("dbi:Oracle://$db_machine:$db_port/$db_name", $username, $password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65530, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+my $dbh = DBI->connect("dbi:Oracle://$db_machine:$db_port/$db_name", $username, $password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
 
 my $DEBUG=0;
 #statistic and information variables

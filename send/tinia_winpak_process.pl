@@ -83,7 +83,7 @@ while(my $line = <FILE>) {
 }
 close FILE;
 
-my $dbh = DBI->connect("dbi:Oracle:$dbname",$username, $password,{RaiseError=>1,AutoCommit=>0,LongReadLen=>65530, ora_charset => 'AL32UTF8'}) or die "Connect to database $dbname Error!\n";
+my $dbh = DBI->connect("dbi:Oracle:$dbname",$username, $password,{RaiseError=>1,AutoCommit=>0,LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $dbname Error!\n";
 
 ###TEMP DELETE ALL (clear DB)
 #my $deleteAllChips = $dbh->prepare(qq{DELETE from $tableName});
