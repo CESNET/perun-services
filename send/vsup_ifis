@@ -139,9 +139,9 @@ foreach my $uco (sort keys $dataByKey) {
 	my $POHLAVI = $dataByKey->{$uco}->{'POHLAVI'};
 	my $FUNKCE = $dataByKey->{$uco}->{'FUNKCE'};
 
-	# for the purpose of ELA_OSB table, "Externista - pedagog" = "ZAM"
+	# for the purpose of ELA_OSB table, "Externista - pedagog" = "EXT"
 	if ($TYP_VZTAHU eq "Externista - pedagog") {
-		$TYP_VZTAHU = "ZAM";
+		$TYP_VZTAHU = "EXT";
 	}
 
 	# Use max. 20 bytes for TITUL
