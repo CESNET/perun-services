@@ -8,7 +8,7 @@ use Text::Unidecode;
 use XML::Simple;
 
 local $::SERVICE_NAME = "voms";
-local $::PROTOCOL_VERSION = "3.1.0";
+local $::PROTOCOL_VERSION = "3.1.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -25,6 +25,7 @@ our $A_G_VOMS_ROLES;    *A_G_VOMS_ROLES =      \'urn:perun:group:attribute-def:d
 our $STATUS_VALID;      *STATUS_VALID =        \'VALID';
 
 my $struc = {};
+my $uniquenessMapping = {};
 
 #resource one by one
 foreach my $resourceData ($data->getChildElements) {
@@ -48,6 +49,7 @@ foreach my $resourceData ($data->getChildElements) {
 		#group members one by one
 		foreach my $memberData (($groupData->getChildElements)[1]->getChildElements) {
 			my %memberAttributes = attributesToHash $memberData->getAttributes;
+			my $memberUniqueIdentifier;
 			#skip member if his status is not valid
 			next unless $memberAttributes{$A_USER_STATUS} eq $STATUS_VALID;
 			#get mail
@@ -55,21 +57,37 @@ foreach my $resourceData ($data->getChildElements) {
 
 			#each DN of user is separate instance of user in voms
 			#skip users with no certificates
-			foreach my $subjectDN (keys %{$memberAttributes{$A_USER_CERT_DNS}}) {
+			foreach my $subjectDN (sort keys %{$memberAttributes{$A_USER_CERT_DNS}}) {
+				#set uniqueIdentifier for member (his first certificate DN+CA)
+				unless($memberUniqueIdentifier) { $memberUniqueIdentifier = $subjectDN . "---------------" .  $memberAttributes{$A_USER_CERT_DNS}{$subjectDN}; }
+
+				#unique user is defined by "'subjectDN+DNofCA'" without prefix, with simple white spaces, case-insensitive (lowercase there)
 				chomp $memberAttributes{$A_USER_CERT_DNS}{$subjectDN};
 				my $subjectDNWithoutPrefix = $subjectDN;
 				$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
 				my $CADN = $memberAttributes{$A_USER_CERT_DNS}{$subjectDN};
-				#unique user is defined by "'subjectDN'\t'DNofCA'"
 				my $uniqueVomsUser = $subjectDNWithoutPrefix . $CADN;
+				$uniqueVomsUser =~ s/\s+/ /g;
+				$uniqueVomsUser = lc($uniqueVomsUser);
+
+				#if this member is not unique (there are two different members with same uniqueVomsUser settings, give me info about that and continue
+				unless($uniquenessMapping->{$uniqueVomsUser}) {
+					$uniquenessMapping->{$uniqueVomsUser} = $memberUniqueIdentifier;
+				} else {
+					if($uniquenessMapping->{$uniqueVomsUser} ne $memberUniqueIdentifier) {
+						print "WARNING: There is more than one Perun Member with same (unified) certificate (DN+CA): '" . $memberUniqueIdentifier  . "' against '" . $uniquenessMapping->{$uniqueVomsUser} . "' !\n";
+					}
+				}
+
 				#create new member if not exists in VO yet
 				if(!defined($struc->{$voShortName}->{'users'}->{$uniqueVomsUser})) {
 					$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'email'} = $email;
-					$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'CA'} = $CADN;
-					$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'DN'} = $subjectDNWithoutPrefix;
 					$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'roles'} = {};	
 					$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'groups'} = {};
 				}
+				#use the last record of DN and CA we get (it is probably the newest one)
+				$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'CA'} = $CADN;
+				$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'DN'} = $subjectDNWithoutPrefix;
 				
 				#fill vo roles
 				foreach my $role (@rolesInVoForResource) {
