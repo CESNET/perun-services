@@ -1,0 +1,17 @@
+%post
+if [ $1 -eq 1 ] ; then
+        systemctl preset perun_propagate.service >/dev/null 2>&1 || :
+        systemctl start perun_propagate.service >/dev/null 2>&1 || :
+fi
+
+%preun
+if [ $1 -eq 0 ] ; then
+        systemctl --no-reload disable perun_propagate.service > /dev/null 2>&1 || :
+        systemctl stop perun_propagate.service > /dev/null 2>&1 || :
+fi
+
+%postun
+systemctl daemon-reload >/dev/null 2>&1 || :
+if [ $1 -ge 1 ] ; then
+        systemctl try-restart perun_propagate.service >/dev/null 2>&1 || :
+fi
