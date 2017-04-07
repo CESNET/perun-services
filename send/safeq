@@ -83,5 +83,8 @@ else
 	rm "$FINAL"
 	echo No changes
 fi
-mv "$OLD_FILE" "$DESTINATION_DIR/data-from-perun/safeq-content-$TIMESTAMP.ldif"
+
+OLD_TIMESTAMP=`date -r $OLD_FILE "+%F_%H.%M.%S"`
+
+mv "$OLD_FILE" "$DESTINATION_DIR/data-from-perun/safeq-content-$OLD_TIMESTAMP.ldif"
 cp "$INFILE" "$OLD_FILE"
