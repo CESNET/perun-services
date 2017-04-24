@@ -29,6 +29,7 @@ our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:
 our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_EPPNS;                *A_USER_EPPNS =            \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 our $A_USER_D_NAME;               *A_USER_D_NAME =           \'urn:perun:user:attribute-def:core:displayName';
+our $A_USER_LF_NAME;              *A_USER_LF_NAME =          \'urn:perun:user:attribute-def:def:login-namespace:mu';
 our $A_GROUP_ID;                  *A_GROUP_ID =              \'urn:perun:group:attribute-def:core:id';
 our $A_GROUP_NAME;                *A_GROUP_NAME =            \'urn:perun:group:attribute-def:core:name';
 our $A_GROUP_PAR_ID;              *A_GROUP_PAR_ID =          \'urn:perun:group:attribute-def:core:parentGroupId';
@@ -42,6 +43,7 @@ our $u_status = {};
 our $u_email = {};
 our $u_name = {};
 our $u_eppn = {};
+our $u_lf_name = {};
 
 our $groupStruc = {};
 our $g_name = {};
@@ -68,6 +70,7 @@ foreach my $uid (sort keys %$userStruc) {
 	$user->{"displayName"} = $userStruc->{$uid}->{$u_name};
 	$user->{"status"} = $userStruc->{$uid}->{$u_status};
 	$user->{"mail"} = $userStruc->{$uid}->{$u_email};
+	$user->{"liferayScreenName"} = $userStruc->{$uid}->{$u_lf_name};
 	$user->{"identities"} = $userStruc->{$uid}->{$u_eppn};
 
 	push @users, $user;
@@ -118,6 +121,7 @@ sub processUsers {
 	my $status = $memberAttributes{$A_USER_STATUS};
 	my $email = $memberAttributes{$A_USER_EMAIL};
 	my $d_name = $memberAttributes{$A_USER_D_NAME};
+	my $lf_name = $memberAttributes{$A_USER_LF_NAME};
 
 	# Select right eppn from the list of eppns, TEMPORARLY get google one, then we will use elixir
 	my @eppns = @{$memberAttributes{$A_USER_EPPNS}};
@@ -140,6 +144,7 @@ sub processUsers {
 		$userStruc->{$uid}->{$u_status} = $status;
 		$userStruc->{$uid}->{$u_email} = $email;
 		$userStruc->{$uid}->{$u_name} = $d_name;
+		$userStruc->{$uid}->{$u_lf_name} = $lf_name; 
 		$userStruc->{$uid}->{$u_eppn} = \@eppns;
 	}
 
