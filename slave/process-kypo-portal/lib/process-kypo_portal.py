@@ -21,7 +21,6 @@ import configparser
 
 SETTINGS_DEST = os.environ["CUSTOM_SCRIPTS_DIR"] + '/' + os.environ["SERVICE"] + '/db_settings.ini'
 
-
 ''' Loading connection information from db_settings.ini'''
 try:
 	config = configparser.ConfigParser()
@@ -59,10 +58,11 @@ class User(object):
 		self.displayName = ""
 		self.mail = ""
 		self.status = ""
+		self.liferayScreenName = "" 
 		self.external_id = 0
 
 	def __eq__(self,other):
-		return self.displayName == other.displayName and self.mail == other.mail and self.status == other.status and self.external_id == other.external_id  
+		return self.displayName == other.displayName and self.mail == other.mail and self.status == other.status and self.liferayScreenName == other.liferayScreenName and self.external_id == other.external_id  
 
 class Group(object):
 	def __init__(self):
@@ -134,6 +134,7 @@ for item in users_data:
 	tmpUser.displayName = (item['displayName'])
 	tmpUser.mail = (item['mail'])
 	tmpUser.status = (item['status'])
+	tmpUser.liferayScreenName = (item['liferayScreenName'])
 	tmpUser.external_id = int(item['id'])
 	users_list.append(tmpUser)
 
@@ -172,7 +173,7 @@ cur = conn.cursor()
 
 ''' GETTING ACTUAL USERS FROM DB '''
 try:
-	cur.execute('SELECT id,display_name,external_id,mail,status FROM {0};'
+	cur.execute('SELECT id,display_name,external_id,mail,status,liferay_sn FROM {0};'
 		.format(USER_TABLE));
 except psycopg2.Error as e:
 	print('Getting users: DB Error {0}'.format(e))
@@ -190,6 +191,7 @@ for row in cur:
 	tmpUser.displayName = row[1]
 	tmpUser.mail = row[3]
 	tmpUser.status = row[4]
+	tmpUser.liferayScreenName = row[5]
 	tmpUser.external_id = row[2]
 	usersDB.append(tmpUser)
 
@@ -206,8 +208,8 @@ userIdsToDis = list(set(userDB_ids) - set(userJSON_ids))
 for item in users_list:	
 	if int(item.external_id) not in userDB_ids:
 		try:
-			cur.execute('INSERT INTO {0} (id, display_name, mail, status, external_id) VALUES (default, '"'{1}'"', '"'{2}'"', '"'{3}'"', '"'{4}'"');'
-				.format(USER_TABLE, item.displayName, item.mail, item.status, item.external_id))
+			cur.execute('INSERT INTO {0} (id, display_name, mail, status, liferay_sn, external_id) VALUES (default, '"'{1}'"', '"'{2}'"', '"'{3}'"', '"'{4}'"', '"'{5}'"');'
+				.format(USER_TABLE, item.displayName, item.mail, item.status, item.liferayScreenName, item.external_id))
 		except psycopg2.Error as e:
 			print('Inserting user with ext_id:{0} DB Error {1}'.format(item.external_id, e))
 			cur.close()
@@ -217,8 +219,8 @@ for item in users_list:
 
 	if int(item.external_id) in userIdsToUpd:	
 		try:
-			cur.execute('UPDATE {0} SET display_name = '"'{1}'"', mail = '"'{2}'"', status = '"'{3}'"' WHERE external_id = '"'{4}'"';'
-				.format(USER_TABLE, item.displayName, item.mail, item.status, item.external_id))
+			cur.execute('UPDATE {0} SET display_name = '"'{1}'"', mail = '"'{2}'"', status = '"'{3}'"', liferay_sn = '"'{4}'"' WHERE external_id = '"'{5}'"';'
+				.format(USER_TABLE, item.displayName, item.mail, item.status, item.liferayScreenName, item.external_id))
 		except psycopg2.Error as e:
 			print('Updating user with ext_id:{0} DB Error {1}'.format(item.external_id, e))
 			cur.close()
