@@ -1,0 +1,133 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Perun::Agent;
+use JSON::XS;
+
+our $SERVICE_NAME = "opennebula_egi";
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+#forward declaration
+sub processResourceData;
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getDataWithGroups;
+
+#Constants
+our $A_USER_MAIL;                  *A_USER_MAIL =                 \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_DISPLAY_NAME;          *A_USER_DISPLAY_NAME =         \'urn:perun:user:attribute-def:core:displayName';
+our $A_USER_ON_SSH_KEYS;           *A_USER_ON_SSH_KEYS =          \'urn:perun:user:attribute-def:virt:openNebulaSSHAdminKeys';
+our $A_U_CERT_DNS;                 *A_U_CERT_DNS  =               \'urn:perun:user:attribute-def:virt:userCertDNs';
+our $A_U_KERBEROS_LOGINS;          *A_U_KERBEROS_LOGINS =         \'urn:perun:user:attribute-def:virt:kerberosLogins';
+our $A_M_STATUS;                   *A_M_STATUS =                  \'urn:perun:member:attribute-def:core:status';
+our $A_USER_LOGIN;                 *A_USER_LOGIN =                \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_U_F_BLACKLISTED;            *A_U_F_BLACKLISTED =           \'urn:perun:user_facility:attribute-def:virt:blacklisted';
+our $A_USER_FACILITY_UID;          *A_USER_FACILITY_UID =         \'urn:perun:user_facility:attribute-def:virt:UID';
+our $A_RESOURCE_ON_GROUP_NAME;     *A_RESOURCE_ON_GROUP_NAME =    \'urn:perun:resource:attribute-def:def:openNebulaGroupName';
+our $A_RESOURCE_ON_ROLES;          *A_RESOURCE_ON_ROLES =         \'urn:perun:resource:attribute-def:def:openNebulaRoles';
+our $A_GR_RESOURCE_ON_ROLES;       *A_GR_RESOURCE_ON_ROLES =      \'urn:perun:group_resource:attribute-def:def:openNebulaRoles';
+our $A_R_VO_SHORT_NAME;            *A_R_VO_SHORT_NAME =           \'urn:perun:resource:attribute-def:virt:voShortName';
+
+my $dataByUser = {};
+
+foreach my $resourceData ($data->getChildElements) {
+	processResourceData $resourceData;
+}
+
+my @users = values %$dataByUser;
+my %outStruc = ( "users" => \@users, );
+
+my $fileName = "$DIRECTORY/opennebula";
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+print FILE JSON::XS->new->utf8->pretty->canonical->encode(\%outStruc);
+close FILE or die "Cannot close $fileName: $! \n";
+
+perunServicesInit::finalize;
+
+###################################################################
+################################ SUBS #############################
+###################################################################
+
+sub processMemberData {
+	my $resourceData = shift;
+	my $groupData = shift;
+	my $memberData = shift;
+
+	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
+	my %groupAttributes = attributesToHash $groupData->getAttributes;
+	my %memberAttributes = attributesToHash $memberData->getAttributes;
+
+	my $groupName = $resourceAttrs{$A_RESOURCE_ON_GROUP_NAME};
+	my @resourceRoles = @{$resourceAttrs{$A_RESOURCE_ON_ROLES} || []};
+	my @groupRoles = @{$groupAttributes{$A_GR_RESOURCE_ON_ROLES} || []};
+
+	my $login = $memberAttributes{$A_USER_LOGIN};
+		
+	#these operations do just once for login
+	if(!defined($dataByUser->{$login})) {		
+		#basic attributes
+		$dataByUser->{$login}->{"email"} = $memberAttributes{$A_USER_MAIL};
+		$dataByUser->{$login}->{"display_name"} = $memberAttributes{$A_USER_DISPLAY_NAME};
+		$dataByUser->{$login}->{"banned"} = defined($memberAttributes{$A_U_F_BLACKLISTED}) ? 'true' : 'false';
+		#For egi this identifier is the new fedcloud unique person ID
+		#Empty groups
+		$dataByUser->{$login}->{"groups"} = {};
+		$dataByUser->{$login}->{"identifiers"}->{"global"} = $login;
+		#SSH Keys
+		$dataByUser->{$login}->{"credentials"}->{"vm"}->{"ssh_keys"} = $memberAttributes{$A_USER_ON_SSH_KEYS} || [];
+		#Kerberos principals
+		$dataByUser->{$login}->{"credentials"}->{"api"}->{"remote"} = $memberAttributes{$A_U_KERBEROS_LOGINS} || [];
+		#Cert DNs
+		$dataByUser->{$login}->{"credentials"}->{"api"}->{"x509"} = [ map { s/^[0-9]+[:]//; $_} keys %{$memberAttributes{$A_U_CERT_DNS}} ];
+	}
+	#For egi this identifier is old login defined for fedcloud (vo_short_name+uid in fedcloud namespace)
+	my $newLogin = $resourceAttrs{$A_R_VO_SHORT_NAME} . "_" . $memberAttributes{$A_USER_FACILITY_UID};
+	if($dataByUser->{$login}->{"identifiers"}->{"namespaced"}) {
+		$dataByUser->{$login}->{"identifiers"}->{"namespaced"} = uniqList( ( @{$dataByUser->{$login}->{"identifiers"}->{"namespaced"}}, $newLogin ) );
+	} else {
+		$dataByUser->{$login}->{"identifiers"}->{"namespaced"} = [ $newLogin ];
+	}
+
+	#set group specific settings (combination of roles on resource and roles on group)
+	#set validity in group (combination of specific statuses
+	my $newStatus = $memberAttributes{$A_M_STATUS};
+	if(!defined ($dataByUser->{$login}->{"groups"}->{$groupName})) {
+		#it does not exists, create it and add everything new
+		$dataByUser->{$login}->{"groups"}->{$groupName}->{"state"} = $memberAttributes{$A_M_STATUS};
+		my @roles = uniqList( ( @resourceRoles , @groupRoles ) );
+		$dataByUser->{$login}->{"groups"}->{$groupName}->{"roles"} = \@roles;
+	} else {
+		#it already exists, count status and roles
+		my @newRoles = uniqList( ( @resourceRoles , @groupRoles ) ) || [];
+		my @roles = uniqList( ( @{$dataByUser->{$login}->{"groups"}->{$groupName}->{"roles"}}, @newRoles ) );
+
+		my $oldStatus = $dataByUser->{$login}->{"groups"}->{$groupName}->{"state"};
+		if($newStatus eq 'VALID') {
+			$dataByUser->{$login}->{"groups"}->{$groupName}->{"state"} = $newStatus;
+		} elsif (($newStatus eq 'SUSPENDED') && ($oldStatus ne 'VALID')) {
+			$dataByUser->{$login}->{"groups"}->{$groupName}->{"state"} = $newStatus;
+		}
+	}
+}
+
+sub processGroupData {
+	my $resourceData = shift;
+	my $groupData = shift;
+
+	foreach my $memberData (($groupData->getChildElements)[1]->getChildElements) {
+		processMemberData $resourceData, $groupData, $memberData;
+	}
+}
+
+sub processResourceData {
+	my $resourceData = shift;
+	
+	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
+		processGroupData $resourceData, $groupData;
+	}
+}
