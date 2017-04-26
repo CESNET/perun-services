@@ -37,6 +37,11 @@ foreach my $resourceData ($data->getChildElements) {
 	processResourceData $resourceData;
 }
 
+#change structure of groups from hashes of hashes to array of hashes
+for my $userLogin (keys %$dataByUser) {
+	$dataByUser->{$userLogin}->{'groups'} = [ values %{$dataByUser->{$userLogin}->{'groups'}} ];
+}
+
 my @users = values %$dataByUser;
 my %outStruc = ( "users" => \@users, );
 
@@ -75,9 +80,9 @@ sub processMemberData {
 		#For egi this identifier is the new fedcloud unique person ID
 		#Empty groups
 		$dataByUser->{$login}->{"groups"} = {};
-		$dataByUser->{$login}->{"identifiers"}->{"global"} = $login;
+		$dataByUser->{$login}->{"identifiers"}->{"current"} = $login;
 		#For egi this identifier is old login defined for fedcloud (vo_short_name+uid in fedcloud namespace)
-		$dataByUser->{$login}->{"identifiers"}->{"namespaced"} = [];
+		$dataByUser->{$login}->{"identifiers"}->{"old"} = [];
 		#SSH Keys
 		$dataByUser->{$login}->{"credentials"}->{"vm"}->{"ssh_keys"} = $memberAttributes{$A_USER_ON_SSH_KEYS} || [];
 		#Kerberos principals
@@ -91,6 +96,7 @@ sub processMemberData {
 	my $newStatus = $memberAttributes{$A_M_STATUS};
 	if(!defined ($dataByUser->{$login}->{"groups"}->{$groupName})) {
 		#it does not exists, create it and add everything new
+		$dataByUser->{$login}->{"groups"}->{$groupName}->{"name"} = $groupName;
 		$dataByUser->{$login}->{"groups"}->{$groupName}->{"state"} = $memberAttributes{$A_M_STATUS};
 		my @roles = uniqList( ( @resourceRoles , @groupRoles ) );
 		$dataByUser->{$login}->{"groups"}->{$groupName}->{"roles"} = \@roles;
