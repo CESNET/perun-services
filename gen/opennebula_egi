@@ -78,7 +78,7 @@ sub processMemberData {
 		#basic attributes
 		$dataByUser->{$login}->{"email"} = $memberAttributes{$A_USER_MAIL};
 		$dataByUser->{$login}->{"display_name"} = $memberAttributes{$A_USER_DISPLAY_NAME};
-		$dataByUser->{$login}->{"banned"} = defined($memberAttributes{$A_U_F_BLACKLISTED}) ? 'true' : 'false';
+		$dataByUser->{$login}->{"banned"} = defined($memberAttributes{$A_U_F_BLACKLISTED}) ? \1 : \0;
 		#For egi this identifier is the new fedcloud unique person ID
 		#Empty groups
 		$dataByUser->{$login}->{"groups"} = {};
