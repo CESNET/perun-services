@@ -1,1 +1,1 @@
-bash, sed, grep, perl, remctl, openssh-server, krb5-workstation
+bash, sed, grep, perl, remctl, openssh-server, krb5-workstation, moreutils, logrotate
