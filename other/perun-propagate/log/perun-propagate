@@ -1,0 +1,8 @@
+/var/log/perun-propagate {
+  rotate 7
+  daily
+  missingok
+  notifempty
+  delaycompress
+  compress
+}

@@ -19,8 +19,9 @@ PERUN_SERVER='perun.ics.muni.cz'
 #Timeout in seconds
 TIMEOUT=120
 LOG=/var/log/$NAME
-#Remove content of old log file
-> "$LOG"
+
+#Log start of propagation process
+echo "perun-propagation started" | ts >> $LOG
 
 umask 077
 
@@ -97,7 +98,7 @@ perun_propagate_start() {
 		fi
 		TMP_ERROR=`mktemp --tmpdir=/tmp/ perun-propagate.XXXXXXXXX`
 		add_on_exit "rm -f ${TMP_ERROR}"
-		remctl "${PERUN_SERVER}" perun propagate 2>&1 | tee ${TMP_ERROR} | sed "s;^;$LINE:;" >> ${LOG} &
+		remctl "${PERUN_SERVER}" perun propagate 2>&1 | tee ${TMP_ERROR} | sed "s;^;$LINE:;" | ts >> ${LOG} &
 		PID=$!
 		PID_ARRAY[$ITERATOR]=$PID
 		TMP_ERROR_ARRAY[$ITERATOR]=$TMP_ERROR
@@ -166,7 +167,11 @@ perun_propagate_start() {
 		OUT="${OUT}No destination found for propagation!"
 	fi
 
-	echo -e "${OUT}" >> "${LOG}"
+	echo -e "${OUT}" | ts >> "${LOG}"
+
+	#Log end of propagation process
+	echo "perun-propagation ends" | ts >> $LOG
+
 	[ "${EXIT_CODE}" != "0" ] && echo "${OUT}" >&2
 	return ${EXIT_CODE}
 }
