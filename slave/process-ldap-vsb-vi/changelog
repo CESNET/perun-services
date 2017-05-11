@@ -1,3 +1,9 @@
+perun-slave-process-ldap-vsb-vi (3.1.4) stable; urgency=high
+
+  * Set correct path for lib dir (use '_' instead '-')
+
+ -- Michal Stava <stavamichal@gmail.com>  Thu, 11 May 2017 15:51:00 +0200
+
 perun-slave-process-ldap-vsb-vi (3.1.3) stable; urgency=medium
 
   * Change service name in /etc/perun/{service}.d/ to match real service
