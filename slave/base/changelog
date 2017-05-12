@@ -1,3 +1,10 @@
+perun-slave-base (3.1.6) stable; urgency=low
+
+  * Export perun variables with service name and path to directories (like
+    lib, config etc.)
+
+ -- Michal Stava <stavamichal@gmail.com>  Tue, 12 May 2017 14:00:00 +0200
+
 perun-slave-base (3.1.5) stable; urgency=low
 
   * Add variable with cache directory to perun base

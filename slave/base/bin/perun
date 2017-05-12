@@ -331,6 +331,11 @@ LOCK_FILE="${LOCK_DIR}/${NAME}-${SERVICE}.lock"
 LOCK_PIDFILE="$LOCK_FILE/pid"
 BACKUP_DIR="/var/tmp/perun/${SERVICE}/backup-state/"
 
+# export needed variables
+export PERUN_SERVICE=${SERVICE}
+export PERUN_LIB_DIR=${LIB_DIR}
+export PERUN_CUSTOM_SCRIPTS_DIR=${CUSTOM_SCRIPTS_DIR}
+
 # write to stderr if old path for scripts is still used
 WARN_USING_OLD_PATH_FOR_SCRIPTS="Warning: Old configuration dir ${OLD_CUSTOM_SCRIPTS_DIR}/${SERVICE}.d/ is still used."
 ls "${OLD_CUSTOM_SCRIPTS_DIR}/${SERVICE}.d/" 2>/dev/null | grep '^pre_\|^post_\|^mid_' 1>/dev/null && echo "${WARN_USING_OLD_PATH_FOR_SCRIPTS}" 1>&2
