@@ -1,3 +1,9 @@
+perun-slave-process-kypo-portal (3.0.9) stable; urgency=high
+
+  * Set correct path for lib dir (use '_' instead '-')
+
+ -- Michal Stava <stavamichal@gmail.com>  Thu, 11 May 2017 15:51:00 +0200
+
 perun-slave-process-kypo-portal (3.0.8) stable; urgency=medium
 
   * Updated process-kypo_portal.py to parse new attribute login-namespace:mu
