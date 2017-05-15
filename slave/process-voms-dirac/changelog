@@ -1,0 +1,26 @@
+perun-slave-process-voms (3.1.4) stable; urgency=medium
+
+  * Generate configuration directory /etc/perun/{service}.d automatically even
+    if there is no configuration file in it
+
+ -- Michal Stava <stavamichal@gmail.com>  Wed, 10 Aug 2016 14:05:57 +0200
+
+perun-slave-process-voms (3.1.3) stable; urgency=medium
+
+  * Fix return code of voms script
+  * Add some error messages to voms script
+
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Thu, 12 May 2016 11:00:00 +0100
+
+perun-slave-process-voms (3.1.2) stable; urgency=medium
+
+  * Overall reimplementation of the script
+  * Now supports also synchronization of VOMS Roles and Group membership
+
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Wed, 6 Apr 2016 16:01:02 +0200
+
+perun-slave-process-voms (3.1.1) stable; urgency=low
+
+  * New package version for perun-slave-process-voms
+
+ -- Michal Stava <stavamichal@gmail.com>  Mon, 16 Nov 2015 13:54:00 +0200
