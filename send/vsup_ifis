@@ -339,7 +339,7 @@ foreach my $uco (@ucos_adr) {
 
 # prepared statements
 my $contactExists = $dbh->prepare(qq{select 1 from $tableNameSpj where SPJ_TYP=? and OSB_ID=? });
-my $insertContact = $dbh->prepare(qq{INSERT INTO $tableNameSpj (OSB_ID, SPJ_TYP, SPJ_CISLO) VALUES (?,?,?)});
+my $insertContact = $dbh->prepare(qq{INSERT INTO $tableNameSpj (OSB_ID, SPJ_TYP, SPJ_CISLO, HLAVNI) VALUES (?,?,?,'+')});
 my $contactsAreEquals = $dbh->prepare(qq{SELECT 1 FROM $tableNameSpj WHERE SPJ_TYP=? and SPJ_CISLO=? and OSB_ID=?});
 my $updateContact = $dbh->prepare(qq{UPDATE $tableNameSpj SET SPJ_CISLO=? WHERE SPJ_TYP=? and OSB_ID=?});
 my $deleteContact = $dbh->prepare(qq{DELETE FROM $tableNameSpj where SPJ_TYP=? and OSB_ID=?});
