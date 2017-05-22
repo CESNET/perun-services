@@ -26,6 +26,7 @@ our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
 our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_BLACKLISTED;  *A_BLACKLISTED = \'urn:perun:user_facility:attribute-def:virt:blacklisted';
 our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
 our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
 our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
@@ -75,6 +76,11 @@ close(FILE);
 foreach my $user (($data->getChildElements)[1]->getChildElements) {
 
 	my %uAttributes = attributesToHash $user->getAttributes;
+
+	if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
+		# skip blacklisted users !security ban!
+		next;
+	}
 
 	# Print only service user accounts
 	if (defined $uAttributes{$A_IS_SERVICE} and ($uAttributes{$A_IS_SERVICE} == 1)) {
