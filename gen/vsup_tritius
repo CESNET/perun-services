@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_tritius";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -28,7 +28,8 @@ our $A_GENDER;  *A_GENDER = \'urn:perun:user:attribute-def:def:gender';
 our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:virt:preferredPhone';
 our $A_CARD_BARCODES;  *A_CARD_BARCODES = \'urn:perun:user:attribute-def:def:cardBarCodes';
 our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:cardCodes';
-our $A_VSUP_MAIL; *A_VSUP_MAIL = \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
 # address
 our $A_ADDRESS_STREET_KOS; *A_ADDRESS_STREET_KOS = \'urn:perun:user:attribute-def:def:addressStreetKos';
 our $A_ADDRESS_STREET_DC2; *A_ADDRESS_STREET_DC2 = \'urn:perun:user:attribute-def:def:addressStreetDc2';
@@ -52,7 +53,7 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 
 	my $uco = $uAttributes{$A_UCO};
 	$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
-	$users->{$uco}->{$A_VSUP_MAIL} = $uAttributes{$A_VSUP_MAIL};
+	$users->{$uco}->{$A_VSUP_MAIL} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
 	$users->{$uco}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE} || '';
 	$users->{$uco}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
 	$users->{$uco}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));

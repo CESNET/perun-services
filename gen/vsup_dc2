@@ -18,6 +18,8 @@ my $data = perunServicesInit::getFlatData;
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_OSB_ID_DC2; *A_OSB_ID_DC2 = \'urn:perun:user:attribute-def:def:osbIddc2';
 our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
+our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
 
 # GATHER USERS
 my $users;  # $users->{$osbIddc2}->{ATTR} = $attrValue;
@@ -33,7 +35,7 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 	my $osbIddc2 = $uAttributes{$A_OSB_ID_DC2};
 	$users->{$osbIddc2}->{$A_UCO} = $uAttributes{$A_UCO};
 	$users->{$osbIddc2}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
-	$users->{$osbIddc2}->{'EMAIL'} = $uAttributes{$A_LOGIN} . '@vsup.cz';
+	$users->{$osbIddc2}->{'EMAIL'} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
 
 }
 
