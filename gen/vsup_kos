@@ -42,6 +42,9 @@ our $A_CARD_PHOTO;  *A_CARD_PHOTO = \'urn:perun:user:attribute-def:def:cardPhoto
 our $A_CARD_BARCODES;  *A_CARD_BARCODES = \'urn:perun:user:attribute-def:def:cardBarCodes';
 our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:cardCodes';
 
+our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
+
 # GATHER USERS
 my $users;  # $users->{$osbIddc2}->{ATTR} = $attrValue;
 
@@ -63,7 +66,7 @@ foreach my $rData ($data->getChildElements) {
 		$users->{$key}->{$A_UCO} = $uAttributes{$A_UCO};
 		$users->{$key}->{$A_OSB_ID_KOS} = $uAttributes{$A_OSB_ID_KOS} || '';
 		$users->{$key}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
-		$users->{$key}->{'EMAIL'} = $uAttributes{$A_LOGIN}.'@vsup.cz';
+		$users->{$key}->{'EMAIL'} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
 		$users->{$key}->{'TYP_ZAZN'} = $relationType;
 		$users->{$key}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE} || '';
 		$users->{$key}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));

@@ -54,6 +54,10 @@ our $A_BANK_ACCOUNT_KOS; *A_BANK_ACCOUNT_KOS = \'urn:perun:user:attribute-def:de
 # relation ID for "Externista - pedagog"
 our $A_USER_ID;  *A_USER_ID = \'urn:perun:user:attribute-def:core:id';
 
+# users mail
+our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
+
 # GATHER USERS
 my $users;  # $users->{$uco}->{ATTR} = $attrValue;
 
@@ -88,7 +92,7 @@ foreach my $rData ($data->getChildElements) {
 		$users->{$key}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
 		$users->{$key}->{$A_JOB} = $uAttributes{$A_JOB} || '';
 
-		$users->{$key}->{'EMAIL'} = $uAttributes{$A_LOGIN} . '@vsup.cz';
+		$users->{$key}->{'EMAIL'} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
 		$users->{$key}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
 
 		if ($relationType eq "ZAM") {
