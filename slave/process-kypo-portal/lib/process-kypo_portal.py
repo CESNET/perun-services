@@ -19,7 +19,7 @@ import json
 import psycopg2
 import configparser
 
-SETTINGS_DEST = os.environ["CUSTOM_SCRIPTS_DIR"] + '/' + os.environ["SERVICE"] + '/db_settings.ini'
+SETTINGS_DEST = os.environ["PERUN_CUSTOM_SCRIPTS_DIR"] + '/' + os.environ["PERUN_SERVICE"] + '.d/db_settings.ini'
 
 ''' Loading connection information from db_settings.ini'''
 try:
@@ -29,12 +29,13 @@ try:
 	DB_NAME = config.get('database', 'name')
 	DB_USER = config.get('database', 'user')
 	DB_HOST = config.get('database', 'host')
+	DB_PORT = config.get('database', 'port')
 	DB_PSSWD = config.get('database', 'password')
-except:
-	print("Failed reading from file with information to access DB")
+except Exception as e:
+	sys.stderr.write("Failed reading from file with information to access DB: {0} \n".format(e))
 	sys.exit(1)
 
-CONN_STRING = "dbname='{0}' user='{1}' host='{2}' password='{3}'".format(DB_NAME, DB_USER, DB_HOST, DB_PSSWD)
+CONN_STRING = "dbname='{0}' user='{1}' host='{2}' password='{3}' port='{4}'".format(DB_NAME, DB_USER, DB_HOST, DB_PSSWD, DB_PORT)
 
 ''' Names of tables in DB'''
 USER_TABLE = 'users'
@@ -48,8 +49,8 @@ GROUPS_SRC = '/tmp/groups.scim'
 
 try:
 	conn = psycopg2.connect(CONN_STRING)
-except:
-	print("Unable to connect to DB")
+except Exception as e:
+	sys.stderr.write("Unable to connect to DB: {0} \n".format(e))
 	sys.exit(1)
 
 ''' DEFINING VARIABLES '''
@@ -176,7 +177,7 @@ try:
 	cur.execute('SELECT id,display_name,external_id,mail,status,liferay_sn FROM {0};'
 		.format(USER_TABLE));
 except psycopg2.Error as e:
-	print('Getting users: DB Error {0}'.format(e))
+	sys.stderr.write("Getting users: DB Error {0} \n".format(e))
 	cur.close()
 	conn.close()
 	sys.exit(1)
@@ -211,7 +212,7 @@ for item in users_list:
 			cur.execute('INSERT INTO {0} (id, display_name, mail, status, liferay_sn, external_id) VALUES (default, '"'{1}'"', '"'{2}'"', '"'{3}'"', '"'{4}'"', '"'{5}'"');'
 				.format(USER_TABLE, item.displayName, item.mail, item.status, item.liferayScreenName, item.external_id))
 		except psycopg2.Error as e:
-			print('Inserting user with ext_id:{0} DB Error {1}'.format(item.external_id, e))
+			sys.stderr.write("Inserting user with ext_id:{0} DB Error {1} \n".format(item.external_id, e))
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -222,7 +223,7 @@ for item in users_list:
 			cur.execute('UPDATE {0} SET display_name = '"'{1}'"', mail = '"'{2}'"', status = '"'{3}'"', liferay_sn = '"'{4}'"' WHERE external_id = '"'{5}'"';'
 				.format(USER_TABLE, item.displayName, item.mail, item.status, item.liferayScreenName, item.external_id))
 		except psycopg2.Error as e:
-			print('Updating user with ext_id:{0} DB Error {1}'.format(item.external_id, e))
+			sys.stderr.write("Updating user with ext_id:{0} DB Error {1} \n".format(item.external_id, e))
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -233,7 +234,7 @@ try:
 	cur.execute('SELECT id,external_id,name,parent_group_id FROM {0};'
 		.format(GROUP_TABLE))
 except psycopg2.Error as e:
-	print('Getting groups: DB Error {0}'.format(e))
+	sys.stderr.write("Getting groups: DB Error {0} \n".format(e))
 	cur.close()
 	conn.close()
 	sys.exit(1)
@@ -274,7 +275,7 @@ for item in groups_list:
 					.format(GROUP_TABLE, item.name, item.external_id))
 
 		except psycopg2.Error as e:
-			print('Inserting group with ext_id:{0} DB Error {1}'.format(item.external_id, e))
+			sys.stderr.write("Inserting group with ext_id:{0} DB Error {1} \n".format(item.external_id, e))
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -294,7 +295,7 @@ for item in groups_list:
 				cur.execute('UPDATE {0} SET name = '"'{1}'"'  WHERE external_id = '"'{2}'"';'
 					.format(GROUP_TABLE, item.name, item.external_id))
 		except psycopg2.Error as e:
-			print('Updating group with ext_id:{0} DB Error {1}'.format(item.external_id, e))
+			sys.stderr.write("Updating group with ext_id:{0} DB Error {1} \n".format(item.external_id, e))
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -305,7 +306,7 @@ try:
 	cur.execute('SELECT id, external_id, login FROM {0}, {1} WHERE id = user_id;'
 		.format(USER_TABLE, IDENTITY_TABLE))
 except psycopg2.Error as e:
-	print('Getting identities: DB Error {0}'.format(e))
+	print("Getting identities: DB Error {0} \n".format(e))
 	cur.close()
 	conn.close()
 	sys.exit(1)
@@ -330,7 +331,7 @@ for item in identities_list:
 			cur.execute('INSERT INTO {0} (user_id, login) VALUES ('"'{1}'"', '"'{2}'"');'
 				.format(IDENTITY_TABLE, id, item.login))
 		except psycopg2.Error as e:
-			print('Inserting identity with login:{0} DB Error {1}'.format(item.login, e))
+			sys.stderr.write("Inserting identity with login:{0} DB Error {1} \n".format(item.login, e))
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -341,7 +342,7 @@ try:
 	cur.execute('SELECT {1}.id, {0}.id, {1}.external_id, {0}.external_id FROM {0}, {1}, {2} WHERE {0}.id = {2}.user_id and {1}.id = {2}.idm_group_id;'
 		.format(USER_TABLE, GROUP_TABLE, USERINGROUP_TABLE))
 except psycopg2.Error as e:
-	print('Getting memberships: DB Error {0}'.format(e))
+	sys.stderr.write("Getting memberships: DB Error {0} \n".format(e))
 	cur.close()
 	conn.close()
 	sys.exit(1)
@@ -371,7 +372,7 @@ for item in usersInGroups_list:
 			cur.execute('INSERT INTO {0} (user_id, idm_group_id) VALUES('"'{1}'"', '"'{2}'"');'
 				.format(USERINGROUP_TABLE, user_id, group_id))
 		except psycopg2.Error as e:
-			print('Inserting membership with user.ext_id:{0} and group.ext_id:{1} DB Error {2}'.format(item.user_external_id, item.group_external_id, e))
+			sys.stderr.write("Inserting membership with user.ext_id:{0} and group.ext_id:{1} DB Error {2} \n".format(item.user_external_id, item.group_external_id, e))
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -386,7 +387,7 @@ for item in userInGroupToDel:
 		cur.execute('DELETE FROM {0} WHERE user_id = '"'{1}'"' and idm_group_id = '"'{2}'"';'
 			.format(USERINGROUP_TABLE, item.user_id, item.group_id))
 	except psycopg2.Error as e:
-		print('Deleting membership with user.id:{0} and group._id:{1} DB Error {0}'.format(item.user_id, item.group_id, e))
+		sys.stderr.write("Deleting membership with user.id:{0} and group._id:{1} DB Error {2} \n".format(item.user_id, item.group_id, e))
 		cur.close()
 		conn.close()
 		sys.exit(1)
@@ -398,7 +399,7 @@ for item in identitiesToDel:
 		cur.execute('DELETE FROM {0} WHERE login = '"'{1}'"';'
 			.format(IDENTITY_TABLE, item))
 	except psycopg2.Error as e:
-		print('Deleting identity with login:{0} DB Error {1}'.format(item, e))
+		sys.stderr.write("Deleting identity with login:{0} DB Error {1} \n".format(item, e))
 		cur.close()
 		conn.close()
 		sys.exit(1)
@@ -410,7 +411,7 @@ for item in userIdsToDis:
 		cur.execute ('UPDATE {0} SET status  = '"'disabled'"' WHERE external_id = '"'{1}'"';'
 			.format(USER_TABLE, item))
 	except psycopg2.Error as e:
-		print('Disabling users: DB Error {0}'.format(e))
+		sys.stderr.write("Disabling users: DB Error {0} \n".format(e))
 		cur.close()
 		conn.close()
 		sys.exit(1)
@@ -425,7 +426,7 @@ for item in groupIdsToDel:
 		cur.execute('DELETE FROM {0} WHERE idm_group_id = '"'{1}'"';'
 			.format(USERINGROUP_TABLE, group_id))
 	except psycopg2.Error as e:
-		print('Deleting users from group: DB Error {0}'.format(e))
+		sys.stderr.write("Deleting users from group: DB Error {0} \n".format(e))
 		cur.close()
 		conn.close()
 		sys.exit(1)

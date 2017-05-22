@@ -1,3 +1,9 @@
+perun-slave-process-kypo-portal (3.0.10) stable; urgency=medium
+
+  * Update of exception messages and names of perun variables in process-kypo_portal.py 
+ 
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Thu, 11 May 2017 19:00:00 +0200
+
 perun-slave-process-kypo-portal (3.0.9) stable; urgency=high
 
   * Set correct path for lib dir (use '_' instead '-')
