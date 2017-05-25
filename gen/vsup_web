@@ -23,9 +23,10 @@ our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titl
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
-our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phone';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phoneDc2';
 our $A_MOBILE;  *A_MOBILE = \'urn:perun:user:attribute-def:opt:mobilePhone';
 our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMail';
+our $A_EMAIL_PRIV_KOS;  *A_EMAIL_PRIV_KOS = \'urn:perun:user:attribute-def:opt:privateMailKos';
 our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
 our $A_FOTO;  *A_FOTO = \'urn:perun:user:attribute-def:def:cardPhoto';
 
@@ -89,7 +90,7 @@ foreach my $rData ($data->getChildElements) {
 			# work contacts
 			$users->{$uco}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
 			$users->{$uco}->{$A_MOBILE} = $uAttributes{$A_MOBILE} || '';
-			$users->{$uco}->{$A_EMAIL_PRIV} = $uAttributes{$A_EMAIL_PRIV} || '';
+			$users->{$uco}->{$A_EMAIL_PRIV} = $uAttributes{$A_EMAIL_PRIV} || ($uAttributes{$A_EMAIL_PRIV_KOS} || '');
 			$users->{$uco}->{$A_PHONE_PRIV} = $uAttributes{$A_PHONE_PRIV} || '';
 
 			# cao membership
