@@ -31,7 +31,7 @@ our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUs
 our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
 our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
 our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
-our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phone';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phoneDc2';
 our $A_CARD_BARCODES;  *A_CARD_BARCODES = \'urn:perun:user:attribute-def:def:cardBarCodes';
 our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:cardCodes';
 

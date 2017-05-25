@@ -32,8 +32,9 @@ our $A_BIRTH_NUMBER;  *A_BIRTH_NUMBER = \'urn:perun:user:attribute-def:def:birth
 our $A_GENDER;  *A_GENDER = \'urn:perun:user:attribute-def:def:gender';
 our $A_JOB;  *A_JOB = \'urn:perun:user:attribute-def:def:job';
 
-our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phone';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phoneDc2';
 our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMail';
+our $A_EMAIL_PRIV_KOS;  *A_EMAIL_PRIV_KOS = \'urn:perun:user:attribute-def:opt:privateMailKos';
 our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
 
 our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
@@ -79,7 +80,7 @@ foreach my $rData ($data->getChildElements) {
 		$users->{$key}->{$A_JOB} = $uAttributes{$A_JOB} || '';
 
 		$users->{$key}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
-		$users->{$key}->{$A_EMAIL_PRIV} = $uAttributes{$A_EMAIL_PRIV} || '';
+		$users->{$key}->{$A_EMAIL_PRIV} = $uAttributes{$A_EMAIL_PRIV} || ($uAttributes{$A_EMAIL_PRIV_KOS} || '');
 		$users->{$key}->{$A_PHONE_PRIV} = $uAttributes{$A_PHONE_PRIV} || '';
 
 		$users->{$key}->{$A_CARD_PHOTO} = $uAttributes{$A_CARD_PHOTO} || '';
