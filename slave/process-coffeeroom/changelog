@@ -1,0 +1,5 @@
+perun-slave-process-coffeeroom (1.0.0) stable; urgency=low
+
+  * Initial version of perun-slave-process-coffeeroom
+
+ -- Ivan Kuzmin <inkuzm@gmail.com>  Fri, 26 May 2017 17:25:00 +0300
