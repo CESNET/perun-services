@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="vsup_zimbra"
+
+. generic_send
