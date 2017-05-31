@@ -17,8 +17,10 @@ if [ -f "/etc/perun/services/${SERVICE_NAME}/${SERVICE_NAME}.conf" ]; then
 	. "/etc/perun/services/${SERVICE_NAME}/${SERVICE_NAME}.conf"
 fi
 
-unset LC_TIME
-unset LANG
+#use standard time and language settings (ASCII)
+export LC_TIME="C"
+export LANG="C"
+
 TRANSPORT_COMMAND="ssh -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5  -i '$KEY_PATH'"
 SLAVE_COMMAND="/opt/perun/bin/perun"
 SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
