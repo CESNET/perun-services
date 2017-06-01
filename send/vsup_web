@@ -6,6 +6,7 @@ use Getopt::Long qw(:config no_ignore_case);
 use Data::Dumper;
 use Encode qw(encode);
 use ScriptLock;
+binmode STDOUT, ":utf8";
 
 my $username;
 my $password;
@@ -56,8 +57,10 @@ if(!defined($password) || !defined($username) || !defined($tableName)) {
 my $dataByUco = {};
 
 open FILE, $service_file or die "Could not open $service_file: $!";
+binmode FILE, ":utf8";
 while(my $line = <FILE>) {
 	my @parts = split /\t/, $line;
+	chomp(@parts);
 	$dataByUco->{$parts[0]}->{'LOGIN'} = $parts[1];
 	$dataByUco->{$parts[0]}->{'EMAIL'} = $parts[2];
 	$dataByUco->{$parts[0]}->{'TITLE_BEFORE'} = (($parts[3] ne '') ? $parts[3] : undef);
@@ -68,6 +71,7 @@ while(my $line = <FILE>) {
 	$dataByUco->{$parts[0]}->{'MOBILE'} = (($parts[8] ne '') ? $parts[8] : undef);
 	$dataByUco->{$parts[0]}->{'EMAIL_PRIV'} = (($parts[9] ne '') ? $parts[9] : undef);
 	$dataByUco->{$parts[0]}->{'PHONE_PRIV'} = (($parts[10] ne '') ? $parts[10] : undef);
+	$dataByUco->{$parts[0]}->{'FOTO'} = (($parts[11] ne '') ? $parts[11] : undef);
 }
 close FILE;
 
@@ -92,6 +96,7 @@ foreach my $uco (sort keys $dataByUco) {
 	my $MOBILE = $dataByUco->{$uco}->{'MOBILE'};
 	my $EMAIL_PRIV = $dataByUco->{$uco}->{'EMAIL_PRIV'};
 	my $PHONE_PRIV = $dataByUco->{$uco}->{'PHONE_PRIV'};
+	my $FOTO = $dataByUco->{$uco}->{'FOTO'};
 
 	# There is
 	my $personExists = $dbh->prepare(qq{select 1 from $tableName where UCO=?});
@@ -158,6 +163,13 @@ foreach my $uco (sort keys $dataByUco) {
 		} else {
 			$select = $select . " is NULL";
 		}
+		$select = $select . " and FOTO";
+		if ($FOTO) {
+			$select = $select . "=?";
+			push(@params, $FOTO);
+		} else {
+			$select = $select . " is NULL";
+		}
 		$select = $select . ";";
 
 		#we need to know if these two records are without changes, if yes, skip them
@@ -166,8 +178,8 @@ foreach my $uco (sort keys $dataByUco) {
 
 		if(!$recordAreEquals->fetch) {
 
-			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET LOGIN=? , EMAIL_SKOLNI=? , TITUL_PRED=? , JMENO=? , PRIJMENI=? , TITUL_ZA=? , TEL_PRAC_LINKA=? , TEL_PRAC_MOB=? , EMAIL_SOUKR=? , TEL_SOUKR=? , ZMENENO_KDY=NOW() WHERE UCO=?});
-			$updatePerson->execute($LOGIN, $EMAIL, $TITLE_BEFORE, $FIRST_NAME, $LAST_NAME, $TITLE_AFTER, $PHONE, $MOBILE, $EMAIL_PRIV, $PHONE_PRIV, $uco);
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET LOGIN=? , EMAIL_SKOLNI=? , TITUL_PRED=? , JMENO=? , PRIJMENI=? , TITUL_ZA=? , TEL_PRAC_LINKA=? , TEL_PRAC_MOB=? , EMAIL_SOUKR=? , TEL_SOUKR=? , FOTO=? , ZMENENO_KDY=NOW() WHERE UCO=?});
+			$updatePerson->execute($LOGIN, $EMAIL, $TITLE_BEFORE, $FIRST_NAME, $LAST_NAME, $TITLE_AFTER, $PHONE, $MOBILE, $EMAIL_PRIV, $PHONE_PRIV, $FOTO, $uco);
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $uco\n"; }
 			$foundAndUpdated++;
 
@@ -183,8 +195,8 @@ foreach my $uco (sort keys $dataByUco) {
 		if($DEBUG == 1) { print "INSERT NEW RECORD: $uco\n"; }
 		$inserted++;
 		# we will do insert
-		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, EMAIL_SKOLNI, TITUL_PRED, JMENO, PRIJMENI, TITUL_ZA, TEL_PRAC_LINKA, TEL_PRAC_MOB, EMAIL_SOUKR, TEL_SOUKR, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,NOW())});
-		$insertPerson->execute($uco, $LOGIN, $EMAIL, $TITLE_BEFORE, $FIRST_NAME, $LAST_NAME, $TITLE_AFTER, $PHONE, $MOBILE, $EMAIL_PRIV, $PHONE_PRIV);
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, EMAIL_SKOLNI, TITUL_PRED, JMENO, PRIJMENI, TITUL_ZA, TEL_PRAC_LINKA, TEL_PRAC_MOB, EMAIL_SOUKR, TEL_SOUKR, FOTO, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())});
+		$insertPerson->execute($uco, $LOGIN, $EMAIL, $TITLE_BEFORE, $FIRST_NAME, $LAST_NAME, $TITLE_AFTER, $PHONE, $MOBILE, $EMAIL_PRIV, $PHONE_PRIV, $FOTO);
 
 	}
 }
@@ -246,7 +258,13 @@ close FILE;
 my @keptUcos = sort keys %{$cao};
 my $elements = join(',',@keptUcos);
 if($DEBUG == 1) { print "DELETED NOT IN ($elements)\n"; }
-$deletedCao += $dbh->do("DELETE FROM $tableName_cao WHERE VZTAH_TYP='CAO' and UCO not in ($elements)");
+if (length $elements) {
+	# delete some
+	$deletedCao += $dbh->do("DELETE FROM $tableName_cao WHERE VZTAH_TYP='CAO' and UCO not in ($elements)");
+} else {
+	# delete all
+	$deletedCao += $dbh->do("DELETE FROM $tableName_cao WHERE VZTAH_TYP='CAO'");
+}
 
 # delete invalid CAO relations for kept people
 
@@ -356,7 +374,13 @@ close FILE;
 my @keptExtUcos = sort keys %{$ext};
 my $elementsExt = join(',',@keptExtUcos);
 if($DEBUG == 1) { print "DELETED NOT IN ($elementsExt)\n"; }
-$deletedExt += $dbh->do("DELETE FROM $tableName_ext WHERE UCO not in ($elementsExt)");
+if (length $elementsExt) {
+	# delete some
+	$deletedExt += $dbh->do("DELETE FROM $tableName_ext WHERE UCO not in ($elementsExt)");
+} else {
+	# delete all
+	$deletedExt += $dbh->do("DELETE FROM $tableName_ext");
+}
 
 commit $dbh;
 $dbh->disconnect();
@@ -379,5 +403,3 @@ print "Deleted EXT completely:\t$deletedExt (rows)\n";
 print "=======================================\n";
 
 $lock->unlock();
-
-exit 0;

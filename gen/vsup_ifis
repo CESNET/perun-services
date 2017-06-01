@@ -1,0 +1,175 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+local $::SERVICE_NAME = "vsup_ifis";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_UCO; *A_UCO = \'urn:perun:user:attribute-def:def:ucoVsup';
+
+our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
+
+our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
+our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
+
+our $A_GENDER;  *A_GENDER = \'urn:perun:user:attribute-def:def:gender';
+our $A_JOB;  *A_JOB = \'urn:perun:user:attribute-def:def:job';
+our $A_BIRTH_NUMBER;  *A_BIRTH_NUMBER = \'urn:perun:user:attribute-def:def:birthNumber';
+
+# to define STUD | ZAM | Externista - pedagog
+our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
+
+# address
+our $A_ADDRESS_STREET_KOS; *A_ADDRESS_STREET_KOS = \'urn:perun:user:attribute-def:def:addressStreetKos';
+our $A_ADDRESS_STREET_DC2; *A_ADDRESS_STREET_DC2 = \'urn:perun:user:attribute-def:def:addressStreetDc2';
+our $A_ADDRESS_HOUSE_NUMBER_KOS; *A_ADDRESS_HOUSE_NUMBER_KOS = \'urn:perun:user:attribute-def:def:addressHouseNumberKos';
+our $A_ADDRESS_HOUSE_NUMBER_DC2; *A_ADDRESS_HOUSE_NUMBER_DC2 = \'urn:perun:user:attribute-def:def:addressHouseNumberDc2';
+our $A_ADDRESS_TOWN_KOS; *A_ADDRESS_TOWN_KOS = \'urn:perun:user:attribute-def:def:addressTownKos';
+our $A_ADDRESS_TOWN_DC2; *A_ADDRESS_TOWN_DC2 = \'urn:perun:user:attribute-def:def:addressTownDc2';
+our $A_ADDRESS_POSTAL_CODE_KOS; *A_ADDRESS_POSTAL_CODE_KOS = \'urn:perun:user:attribute-def:def:addressPostalCodeKos';
+our $A_ADDRESS_POSTAL_CODE_DC2; *A_ADDRESS_POSTAL_CODE_DC2 = \'urn:perun:user:attribute-def:def:addressPostalCodeDc2';
+our $A_ADDRESS_COUNTRY_CODE_KOS; *A_ADDRESS_COUNTRY_CODE_KOS = \'urn:perun:user:attribute-def:def:addressCountryCodeKos';
+our $A_ADDRESS_COUNTRY_CODE_DC2; *A_ADDRESS_COUNTRY_CODE_DC2 = \'urn:perun:user:attribute-def:def:addressCountryCodeDc2';
+our $A_ADDRESS_TYPE_KOS; *A_ADDRESS_TYPE_KOS = \'urn:perun:user:attribute-def:def:addressTypeKos';
+our $A_ADDRESS_TYPE_DC2; *A_ADDRESS_TYPE_DC2 = \'urn:perun:user:attribute-def:def:addressTypeDc2';
+
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:vsup';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:virt:preferredPhone';
+our $A_BANK_ACCOUNT_DC2; *A_BANK_ACCOUNT_DC2 = \'urn:perun:user:attribute-def:def:bankAccount';
+our $A_BANK_ACCOUNT_KOS; *A_BANK_ACCOUNT_KOS = \'urn:perun:user:attribute-def:def:bankAccountKos';
+
+# relation ID for "Externista - pedagog"
+our $A_USER_ID;  *A_USER_ID = \'urn:perun:user:attribute-def:core:id';
+
+# users mail
+our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
+
+# GATHER USERS
+my $users;  # $users->{$uco}->{ATTR} = $attrValue;
+
+#
+# AGGREGATE DATA
+#
+# FOR EACH USER
+foreach my $rData ($data->getChildElements) {
+
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my $relationType = $resourceAttributes{$A_R_RELATION_TYPE};
+
+	# Must be in a relation
+	unless ($relationType) {
+		next;
+	}
+
+	my @membersData = $rData->getChildElements;
+
+	foreach my $member (@membersData) {
+
+		my %uAttributes = attributesToHash $member->getAttributes;
+
+		my $key = $uAttributes{$A_UCO};
+
+		$users->{$key}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE} || '';
+		$users->{$key}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
+		$users->{$key}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+		$users->{$key}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER} || '';
+
+		$users->{$key}->{$A_BIRTH_NUMBER} = $uAttributes{$A_BIRTH_NUMBER} || '';
+		$users->{$key}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
+		$users->{$key}->{$A_JOB} = $uAttributes{$A_JOB} || '';
+
+		$users->{$key}->{'EMAIL'} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
+		$users->{$key}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
+
+		if ($relationType eq "ZAM") {
+			$users->{$key}->{'TYP_VTAHU'} = $relationType;
+		} elsif ($relationType eq "STU") {
+			unless ($users->{$key}->{'TYP_VTAHU'}) {
+				$users->{$key}->{'TYP_VTAHU'} = $relationType;
+			}
+		} elsif ($relationType eq "Externista - pedagog") {
+			unless ($users->{$key}->{'TYP_VTAHU'}) {
+				$users->{$key}->{'TYP_VTAHU'} = $relationType;
+			}
+		}
+
+		if (defined $uAttributes{$A_ADDRESS_STREET_DC2}) {
+			# has address from DC2
+			$users->{$key}->{'STREET'} = $uAttributes{$A_ADDRESS_STREET_DC2};
+			$users->{$key}->{'HOUSE_NUMBER'} = $uAttributes{$A_ADDRESS_HOUSE_NUMBER_DC2} || '';
+			$users->{$key}->{'TOWN'} = $uAttributes{$A_ADDRESS_TOWN_DC2} || '';
+			$users->{$key}->{'POSTAL_CODE'} = $uAttributes{$A_ADDRESS_POSTAL_CODE_DC2} || '';
+			$users->{$key}->{'COUNTRY_CODE'} = $uAttributes{$A_ADDRESS_COUNTRY_CODE_DC2} || '';
+			$users->{$key}->{'ADR_TYPE'} = $uAttributes{$A_ADDRESS_TYPE_DC2} || '';
+		} elsif (defined $uAttributes{$A_ADDRESS_STREET_KOS}) {
+			# has address from KOS
+			$users->{$key}->{'STREET'} = $uAttributes{$A_ADDRESS_STREET_KOS};
+			$users->{$key}->{'HOUSE_NUMBER'} = $uAttributes{$A_ADDRESS_HOUSE_NUMBER_KOS} || '';
+			$users->{$key}->{'TOWN'} = $uAttributes{$A_ADDRESS_TOWN_KOS} || '';
+			$users->{$key}->{'POSTAL_CODE'} = $uAttributes{$A_ADDRESS_POSTAL_CODE_KOS} || '';
+			$users->{$key}->{'COUNTRY_CODE'} = $uAttributes{$A_ADDRESS_COUNTRY_CODE_KOS} || '';
+			$users->{$key}->{'ADR_TYPE'} = $uAttributes{$A_ADDRESS_TYPE_KOS} || '';
+		} else {
+			# don't have address
+			$users->{$key}->{'STREET'} = '';
+			$users->{$key}->{'HOUSE_NUMBER'} = '';
+			$users->{$key}->{'TOWN'} = '';
+			$users->{$key}->{'POSTAL_CODE'} = '';
+			$users->{$key}->{'COUNTRY_CODE'} = '';
+			$users->{$key}->{'ADR_TYPE'} = '';
+		}
+
+		if ($uAttributes{$A_BANK_ACCOUNT_DC2}) {
+			$users->{$key}->{'BANK_ACCOUNT'} = $uAttributes{$A_BANK_ACCOUNT_DC2};
+		} elsif ($uAttributes{$A_BANK_ACCOUNT_KOS}) {
+			$users->{$key}->{'BANK_ACCOUNT'} = $uAttributes{$A_BANK_ACCOUNT_KOS};
+		} else {
+			$users->{$key}->{'BANK_ACCOUNT'} = '';
+		}
+
+		$users->{$key}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
+
+	}
+
+}
+
+#
+# PRINT user data LDIF
+#
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+# FOR EACH USER ON FACILITY
+my @keys = sort keys %{$users};
+for my $key (@keys) {
+
+	# print attributes, which are never empty
+	print FILE $key . "\t" . $users->{$key}->{'TYP_VTAHU'} . "\t" . $users->{$key}->{$A_TITLE_BEFORE} . "\t" .
+		$users->{$key}->{$A_FIRST_NAME} . "\t" . $users->{$key}->{$A_LAST_NAME} . "\t" .
+		$users->{$key}->{$A_TITLE_AFTER} . "\t" . $users->{$key}->{$A_BIRTH_NUMBER} . "\t" .
+		$users->{$key}->{$A_GENDER} . "\t" . $users->{$key}->{$A_JOB} . "\t" .
+		$users->{$key}->{'STREET'} . ' ' . $users->{$key}->{'HOUSE_NUMBER'} . "\t" .
+		$users->{$key}->{'TOWN'} . "\t" . $users->{$key}->{'POSTAL_CODE'} . "\t" .
+		$users->{$key}->{'COUNTRY_CODE'} . "\t" . $users->{$key}->{'ADR_TYPE'} . "\t" .
+		$users->{$key}->{'EMAIL'} . "\t" . $users->{$key}->{'BANK_ACCOUNT'} . "\t" .
+		$users->{$key}->{$A_PHONE} . "\t" . $users->{$key}->{$A_USER_ID} . "\n";
+
+}
+
+close(FILE);
+
+perunServicesInit::finalize;

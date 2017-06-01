@@ -23,7 +23,7 @@ sub process_disable;
 sub process_groups;
 
 # define service
-my $service_name = "ldap_ad_ceitec";
+my $service_name = "ad_ceitec";
 
 # GEN folder location
 my $facility_name = $ARGV[0];
@@ -36,6 +36,12 @@ open my $file, '<', "$service_files_dir/baseDN";
 my $base_dn = <$file>;
 chomp($base_dn);
 close $file;
+
+# BASE DN for Service accounts
+open my $file_s, '<', "$service_files_dir/baseDNService";
+my $base_dn_service = <$file_s>;
+chomp($base_dn_service);
+close $file_s;
 
 # BASE DN for Groups
 open my $file_g, '<', "$service_files_dir/baseDNGroups";
@@ -77,7 +83,13 @@ my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif
 my @perun_entries_groups = load_perun($service_files_dir . "/" . $service_name . "_groups.ldif");
 
 # previously take entries only with 'samAccountName' now if they have 'cn'
+
+# load normal user entries
 my @ad_entries = load_ad($ldap, $base_dn, $filter, ['displayName','cn','sn','givenName','mail','company','eduPersonPrincipalNames','samAccountName','userPrincipalName','userAccountControl']);
+# load service user entries
+my @ad_entries_service = load_ad($ldap, $base_dn_service, $filter, ['displayName','cn','sn','givenName','mail','company','eduPersonPrincipalNames','samAccountName','userPrincipalName','userAccountControl']);
+# group them together
+push (@ad_entries, @ad_entries_service);
 
 my %ad_entries_map = ();
 my %perun_entries_map = ();
@@ -176,7 +188,7 @@ sub process_update() {
 			my $ad_entry = $ad_entries_map{$perun_entry->get_value('samAccountName')};
 
 			# attrs without cn since it's part of DN to be updated
-			my @attrs = ('displayName','sn','givenName','mail','company','eduPersonPrincipalNames','userAccountControl');
+			my @attrs = ('displayName','sn','givenName','mail','company','eduPersonPrincipalNames');
 			# stored log messages to check if entry should be updated
 			my @entry_changed = ();
 
@@ -192,6 +204,21 @@ sub process_update() {
 						$attr => \@perun_val
 					);
 				}
+			}
+
+			# check UAC
+			my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
+
+			# if disabled -> enable it
+			unless (is_uac_enabled($ad_entry_uac) == 1) {
+
+				my $original_ad_entry_uac = $ad_entry_uac;
+				my $new_ad_entry_uac = enable_uac($ad_entry_uac);
+				push( @entry_changed, "userAccountControl | $original_ad_entry_uac => $new_ad_entry_uac" );
+				$ad_entry->replace(
+					'userAccountControl' => $new_ad_entry_uac
+				);
+
 			}
 
 			if (@entry_changed) {
@@ -236,16 +263,22 @@ sub process_update() {
 #
 # Disable entries in AD
 #
+#
+# Disable user entries in AD which are not present in Perun
+#
 sub process_disable() {
 
 	foreach my $ad_entry (@ad_entries) {
-
 		my $login = $ad_entry->get_value('samAccountName');
 		unless (exists $perun_entries_map{$login}) {
 
-			unless ($ad_entry->get_value('userAccountControl') == 66050) {
+			my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
+
+			# if enabled -> disable it
+			if (is_uac_enabled($ad_entry_uac) == 1) {
+
 				# disable entry in AD
-				$ad_entry->replace( userAccountControl => 66050 );
+				$ad_entry->replace( userAccountControl => disable_uac($ad_entry_uac) );
 				my $response = $ad_entry->update($ldap);
 				unless ($response->is_error()) {
 					ldap_log($service_name, "Disabled entry: " . $ad_entry->dn());
@@ -295,6 +328,7 @@ sub process_groups() {
 				$ad_entry->replace(
 					'member' => \@per_val
 				);
+
 				# Update entry in AD
 				my $response = $ad_entry->update($ldap);
 
@@ -310,7 +344,6 @@ sub process_groups() {
 						ldap_log($service_name, $ad_entry->ldif());
 					}
 				}
-
 			} else {
 				# FAIL (to get group from AD)
 				$counter_group_failed++;

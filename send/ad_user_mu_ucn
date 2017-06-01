@@ -71,7 +71,7 @@ foreach my $ad_entry (@ad_entries) {
 
 # process data
 process_add();
-#process_update();
+process_update();
 
 # disconnect
 ldap_unbind($ldap);
@@ -234,7 +234,7 @@ sub ping_password_setter() {
 		exit 14;
 	}
 
-	my $dbh = DBI->connect("dbi:Oracle:$db_name",$username, $password,{RaiseError=>1,AutoCommit=>0,LongReadLen=>65530, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+	my $dbh = DBI->connect("dbi:Oracle:$db_name",$username, $password,{RaiseError=>1,AutoCommit=>0,LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
 
 	my $changeExists = $dbh->prepare(qq{select 1 from $table_name where uin=?});
 	$changeExists->execute($login);

@@ -9,7 +9,7 @@ sub logCRM;
 
 my $service_name = "crm_ceitec";
 my $protocol_version = "3.0.0";
-my $script_version = "3.0.2";
+my $script_version = "3.0.3";
 
 my $facility_name = $ARGV[0];
 chomp($facility_name);
@@ -105,6 +105,7 @@ sub diffCSV() {
 	open my $gen_file, $gen_file_path or die "Could not open $gen_file_path: $!";
 
 	my %previous_state;
+	my %current_state;
 	my @diff;
 
 	while(<$storage_file>) {
@@ -118,11 +119,24 @@ sub diffCSV() {
 		chomp($_);
 		$_ =~ /^([^;]*);/;
 		my $login = $1;
+		$current_state{$login} = $_;
 		push @diff, $_ unless defined $previous_state{$login} && $previous_state{$login} eq $_;
 	}
 
 	close $storage_file;
 	close $gen_file;
+
+	# actually "to be removed"
+	for my $login (sort keys %previous_state) {
+		unless (defined $current_state{$login}) {
+			# clear groups (rgs) from previous entry -> remove from CRM
+			my $line = $previous_state{$login};
+			my @array = split(";",$line);
+			@array[7] = "";
+			$line = join(";",@array);
+			push(@diff, $line);
+		}
+	}
 
 	return @diff;
 

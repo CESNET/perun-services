@@ -14,8 +14,8 @@ PROTOCOL_VERSION='1.0.0'
 function process {
 	DST_FILE_USERS="/tmp/users.scim"
 	DST_FILE_GROUPS="/tmp/groups.scim"
-	
-	DST_KYPO_IMPORT="kypoImport.py"
+
+	DST_KYPO_IMPORT="${LIB_DIR}/${SERVICE}/process-kypo_portal.py"
 
 	### Status codes
 	I_CHANGED=(0 "${DST_FILE_USERS} or ${DST_FILE_GROUPS} updated")
@@ -33,7 +33,8 @@ function process {
 	
 	if [ $user_diff -eq 0 ] || [ $group_diff -eq 0 ]; then
 		log_msg I_CHANGED
-		python $DST_KYPO_IMPORT
+		python3 $DST_KYPO_IMPORT
+		exit $?               
 	else
 		log_msg I_NOT_CHANGED
 	fi

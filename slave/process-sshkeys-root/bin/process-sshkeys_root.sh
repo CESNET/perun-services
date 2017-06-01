@@ -4,7 +4,9 @@ PROTOCOL_VERSION='3.0.0'
 
 
 function process {
-	DST_FILE="/root/.ssh/authorized_keys"
+	if [ -z "$DST_FILE" ]; then
+		DST_FILE="/root/.ssh/authorized_keys"
+	fi
 
 	### Status codes
 	I_CHANGED=(0 "${DST_FILE} updated")

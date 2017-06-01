@@ -4,16 +4,15 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
-sub begins_with;
 
 local $::SERVICE_NAME = "vsup_kos";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHierarchicalData;
 
 # Constants
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
@@ -33,11 +32,19 @@ our $A_BIRTH_NUMBER;  *A_BIRTH_NUMBER = \'urn:perun:user:attribute-def:def:birth
 our $A_GENDER;  *A_GENDER = \'urn:perun:user:attribute-def:def:gender';
 our $A_JOB;  *A_JOB = \'urn:perun:user:attribute-def:def:job';
 
-our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phone';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phoneDc2';
 our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMail';
+our $A_EMAIL_PRIV_KOS;  *A_EMAIL_PRIV_KOS = \'urn:perun:user:attribute-def:opt:privateMailKos';
 our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
 
-our $A_GROUP_NAME; *A_GROUP_NAME = \'urn:perun:group:attribute-def:core:name';
+our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
+
+our $A_CARD_PHOTO;  *A_CARD_PHOTO = \'urn:perun:user:attribute-def:def:cardPhoto';
+our $A_CARD_BARCODES;  *A_CARD_BARCODES = \'urn:perun:user:attribute-def:def:cardBarCodes';
+our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:cardCodes';
+
+our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
 
 # GATHER USERS
 my $users;  # $users->{$osbIddc2}->{ATTR} = $attrValue;
@@ -48,58 +55,46 @@ my $users;  # $users->{$osbIddc2}->{ATTR} = $attrValue;
 # FOR EACH RESOURCE
 foreach my $rData ($data->getChildElements) {
 
-	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my $relationType = $resourceAttributes{$A_R_RELATION_TYPE};
+	my @membersData = $rData->getChildElements;
 
-	foreach my $group (@groupsData) {
+	foreach my $member (@membersData) {
 
-		my %gAttributes = attributesToHash $group->getAttributes;
+		my %uAttributes = attributesToHash $member->getAttributes;
 
-		if ((begins_with($gAttributes{$A_GROUP_NAME},"Studenti:")) or
-			($gAttributes{$A_GROUP_NAME} eq "Absolventi") or
-			($gAttributes{$A_GROUP_NAME} eq "Zamestnanci:Pedagog") or
-			($gAttributes{$A_GROUP_NAME} eq "Externiste:Pedagogicti")
-		) {
+		my $key = $uAttributes{$A_UCO} . ":" . $relationType;
+		$users->{$key}->{$A_UCO} = $uAttributes{$A_UCO};
+		$users->{$key}->{$A_OSB_ID_KOS} = $uAttributes{$A_OSB_ID_KOS} || '';
+		$users->{$key}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
+		$users->{$key}->{'EMAIL'} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
+		$users->{$key}->{'TYP_ZAZN'} = $relationType;
+		$users->{$key}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE} || '';
+		$users->{$key}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
+		$users->{$key}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+		$users->{$key}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER} || '';
 
-			my @membersData = ($group->getChildElements)[1]->getChildElements;
-			foreach my $member (@membersData) {
+		$users->{$key}->{$A_BIRTH_LAST_NAME} = $uAttributes{$A_BIRTH_LAST_NAME} || '';
+		$users->{$key}->{$A_BIRTH_NUMBER} = $uAttributes{$A_BIRTH_NUMBER} || '';
+		$users->{$key}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
+		$users->{$key}->{$A_JOB} = $uAttributes{$A_JOB} || '';
 
-				my %uAttributes = attributesToHash $member->getAttributes;
+		$users->{$key}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
+		$users->{$key}->{$A_EMAIL_PRIV} = $uAttributes{$A_EMAIL_PRIV} || ($uAttributes{$A_EMAIL_PRIV_KOS} || '');
+		$users->{$key}->{$A_PHONE_PRIV} = $uAttributes{$A_PHONE_PRIV} || '';
 
-				## determine entry type
-				my $zazn;
-				if (($gAttributes{$A_GROUP_NAME} eq "Studenti:Aktivni") or ($gAttributes{$A_GROUP_NAME} eq "Studenti:Cekatele") or
-					($gAttributes{$A_GROUP_NAME} eq "Studenti:Cizi") or ($gAttributes{$A_GROUP_NAME} eq "Studenti:Preruseni") or
-					($gAttributes{$A_GROUP_NAME} eq "Absolventi")) {
-					$zazn = "S";
-				} elsif (($gAttributes{$A_GROUP_NAME} eq "Zamestnanci:Pedagog") or ($gAttributes{$A_GROUP_NAME} eq "Externiste:Pedagogicti") or
-					($gAttributes{$A_GROUP_NAME} eq "Studenti:Doktorandi")) {
-					$zazn = "P";
-				}
+		$users->{$key}->{$A_CARD_PHOTO} = $uAttributes{$A_CARD_PHOTO} || '';
 
-				my $key = $uAttributes{$A_UCO} . ":" . $zazn;
-				$users->{$key}->{$A_UCO} = $uAttributes{$A_UCO};
-				$users->{$key}->{$A_OSB_ID_KOS} = (defined $uAttributes{$A_OSB_ID_KOS} ? $uAttributes{$A_OSB_ID_KOS} : '');
-				$users->{$key}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
-				$users->{$key}->{'EMAIL'} = $uAttributes{$A_LOGIN}.'@vsup.cz';
-				$users->{$key}->{'TYP_ZAZN'} = $zazn;
-				$users->{$key}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE} ? $uAttributes{$A_TITLE_BEFORE} : '');
-				$users->{$key}->{$A_FIRST_NAME} = (defined $uAttributes{$A_ARTISTIC_FIRST_NAME} ? $uAttributes{$A_ARTISTIC_FIRST_NAME} : (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : ''));
-				$users->{$key}->{$A_LAST_NAME} = (defined $uAttributes{$A_ARTISTIC_LAST_NAME} ? $uAttributes{$A_ARTISTIC_LAST_NAME} : (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : ''));
-				$users->{$key}->{$A_TITLE_AFTER} = (defined $uAttributes{$A_TITLE_AFTER} ? $uAttributes{$A_TITLE_AFTER} : '');
-
-				$users->{$key}->{$A_BIRTH_LAST_NAME} = (defined $uAttributes{$A_BIRTH_LAST_NAME} ? $uAttributes{$A_BIRTH_LAST_NAME} : '');
-				$users->{$key}->{$A_BIRTH_NUMBER} = (defined $uAttributes{$A_BIRTH_NUMBER} ? $uAttributes{$A_BIRTH_NUMBER} : '');
-				$users->{$key}->{$A_GENDER} = (defined $uAttributes{$A_GENDER} ? $uAttributes{$A_GENDER} : '');
-				$users->{$key}->{$A_JOB} = (defined $uAttributes{$A_JOB} ? $uAttributes{$A_JOB} : '');
-
-				$users->{$key}->{$A_PHONE} = (defined $uAttributes{$A_PHONE} ? $uAttributes{$A_PHONE} : '');
-				$users->{$key}->{$A_EMAIL_PRIV} = (defined $uAttributes{$A_EMAIL_PRIV} ? $uAttributes{$A_EMAIL_PRIV} : '');
-				$users->{$key}->{$A_PHONE_PRIV} = (defined $uAttributes{$A_PHONE_PRIV} ? $uAttributes{$A_PHONE_PRIV} : '');
-
-			}
-
+		# if multiple, send only first one
+		if (defined $uAttributes{$A_CARD_BARCODES}) {
+			$users->{$key}->{$A_CARD_BARCODES} = $uAttributes{$A_CARD_BARCODES}->[0];
 		} else {
-			next;
+			$users->{$key}->{$A_CARD_BARCODES} = '';
+		}
+		if (defined $uAttributes{$A_CARD_CHIP_NUMBERS}) {
+			$users->{$key}->{$A_CARD_CHIP_NUMBERS} = $uAttributes{$A_CARD_CHIP_NUMBERS}->[0];
+		} else {
+			$users->{$key}->{$A_CARD_CHIP_NUMBERS} = '';
 		}
 
 	}
@@ -118,20 +113,17 @@ for my $key (@keys) {
 
 	# print attributes, which are never empty
 	print FILE $key . "\t" . $users->{$key}->{$A_UCO}. "\t" . $users->{$key}->{$A_OSB_ID_KOS} . "\t" . $users->{$key}->{$A_LOGIN} . "\t" .
-			$users->{$key}->{'EMAIL'} . "\t" . $users->{$key}->{'TYP_ZAZN'} . "\t" .
-			$users->{$key}->{$A_TITLE_BEFORE} . "\t" . $users->{$key}->{$A_FIRST_NAME} . "\t" .
-			$users->{$key}->{$A_LAST_NAME} . "\t" . $users->{$key}->{$A_TITLE_AFTER} . "\t" .
-			$users->{$key}->{$A_BIRTH_LAST_NAME} . "\t" . $users->{$key}->{$A_BIRTH_NUMBER} . "\t" .
-			$users->{$key}->{$A_GENDER} . "\t" . $users->{$key}->{$A_JOB} . "\t" .
-			$users->{$key}->{$A_PHONE} . "\t" . $users->{$key}->{$A_EMAIL_PRIV} . "\t" .
-			$users->{$key}->{$A_PHONE_PRIV} . "\n";
+		$users->{$key}->{'EMAIL'} . "\t" . $users->{$key}->{'TYP_ZAZN'} . "\t" .
+		$users->{$key}->{$A_TITLE_BEFORE} . "\t" . $users->{$key}->{$A_FIRST_NAME} . "\t" .
+		$users->{$key}->{$A_LAST_NAME} . "\t" . $users->{$key}->{$A_TITLE_AFTER} . "\t" .
+		$users->{$key}->{$A_BIRTH_LAST_NAME} . "\t" . $users->{$key}->{$A_BIRTH_NUMBER} . "\t" .
+		$users->{$key}->{$A_GENDER} . "\t" . $users->{$key}->{$A_JOB} . "\t" .
+		$users->{$key}->{$A_PHONE} . "\t" . $users->{$key}->{$A_EMAIL_PRIV} . "\t" .
+		$users->{$key}->{$A_PHONE_PRIV} . "\t" . $users->{$key}->{$A_CARD_BARCODES} . "\t" .
+		$users->{$key}->{$A_CARD_CHIP_NUMBERS} . "\t" . $users->{$key}->{$A_CARD_PHOTO} . "\n";
 
 }
 
 close(FILE);
 
 perunServicesInit::finalize;
-
-sub begins_with {
-	return substr($_[0], 0, length($_[1])) eq $_[1];
-}

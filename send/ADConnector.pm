@@ -438,3 +438,5 @@ sub is_uac_enabled($) {
 	}
 
 }
+
+1;

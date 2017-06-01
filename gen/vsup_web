@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_web";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.4";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -23,10 +23,15 @@ our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titl
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
-our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phone';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phoneDc2';
 our $A_MOBILE;  *A_MOBILE = \'urn:perun:user:attribute-def:opt:mobilePhone';
 our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMail';
+our $A_EMAIL_PRIV_KOS;  *A_EMAIL_PRIV_KOS = \'urn:perun:user:attribute-def:opt:privateMailKos';
 our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
+our $A_FOTO;  *A_FOTO = \'urn:perun:user:attribute-def:def:cardPhoto';
+
+our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
 
 our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
 our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
@@ -41,6 +46,8 @@ our $A_G_CAO_ORGAN;  *A_G_CAO_ORGAN = \'urn:perun:group:attribute-def:def:caoOrg
 our $A_G_CAO_FUNKCE;  *A_G_CAO_FUNKCE = \'urn:perun:group:attribute-def:def:caoFunkce';
 our $A_G_CAO_FUNKCE_ID;  *A_G_CAO_FUNKCE_ID = \'urn:perun:group:attribute-def:def:caoFunkceId';
 
+our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
+
 # GATHER USERS
 my $users;  # $users->{$uco}->{ATTR} = $attrValue;
 # Gather CAO membership
@@ -53,6 +60,9 @@ my $ext;   #  $ext->{$uco}->{ATTR} = $attrValue;
 #
 # FOR EACH USER
 foreach my $rData ($data->getChildElements) {
+
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my $relationType = $resourceAttributes{$A_R_RELATION_TYPE};
 
 	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
 
@@ -67,36 +77,33 @@ foreach my $rData ($data->getChildElements) {
 
 			my $uco = $uAttributes{$A_UCO};
 			$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
-			$users->{$uco}->{'EMAIL'} = $uAttributes{$A_LOGIN}.'@vsup.cz';
+			$users->{$uco}->{'EMAIL'} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
 
 			# personal
-			$users->{$uco}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE} ? $uAttributes{$A_TITLE_BEFORE} : '');
-			$users->{$uco}->{$A_FIRST_NAME} = (defined $uAttributes{$A_ARTISTIC_FIRST_NAME} ? $uAttributes{$A_ARTISTIC_FIRST_NAME} : (defined $uAttributes{$A_FIRST_NAME} ? $uAttributes{$A_FIRST_NAME} : ''));
-			$users->{$uco}->{$A_LAST_NAME} = (defined $uAttributes{$A_ARTISTIC_LAST_NAME} ? $uAttributes{$A_ARTISTIC_LAST_NAME} : (defined $uAttributes{$A_LAST_NAME} ? $uAttributes{$A_LAST_NAME} : ''));
-			$users->{$uco}->{$A_TITLE_AFTER} = (defined $uAttributes{$A_TITLE_AFTER} ? $uAttributes{$A_TITLE_AFTER} : '');
+			$users->{$uco}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE} || '';
+			$users->{$uco}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
+			$users->{$uco}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+			$users->{$uco}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER} || '';
+
+			$users->{$uco}->{$A_FOTO} = $uAttributes{$A_FOTO} || '';
 
 			# work contacts
-			$users->{$uco}->{$A_PHONE} = (defined $uAttributes{$A_PHONE} ? $uAttributes{$A_PHONE} : '');
-			$users->{$uco}->{$A_MOBILE} = (defined $uAttributes{$A_MOBILE} ? $uAttributes{$A_MOBILE} : '');
-			$users->{$uco}->{$A_EMAIL_PRIV} = (defined $uAttributes{$A_EMAIL_PRIV} ? $uAttributes{$A_EMAIL_PRIV} : '');
-			$users->{$uco}->{$A_PHONE_PRIV} = (defined $uAttributes{$A_PHONE_PRIV} ? $uAttributes{$A_PHONE_PRIV} : '');
+			$users->{$uco}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
+			$users->{$uco}->{$A_MOBILE} = $uAttributes{$A_MOBILE} || '';
+			$users->{$uco}->{$A_EMAIL_PRIV} = $uAttributes{$A_EMAIL_PRIV} || ($uAttributes{$A_EMAIL_PRIV_KOS} || '');
+			$users->{$uco}->{$A_PHONE_PRIV} = $uAttributes{$A_PHONE_PRIV} || '';
 
 			# cao membership
 			if (defined $gAttributes{$A_G_CAO_ORGAN} and length $gAttributes{$A_G_CAO_ORGAN}) {
 				$cao->{$gAttributes{$A_G_CAO_ORGAN}}->{$gAttributes{$A_G_CAO_FUNKCE}.":".$gAttributes{$A_G_CAO_FUNKCE_ID}}->{$uco} = 1;
 			}
 
-			if ("Externiste:Pedagogicti" eq $gAttributes{$A_G_NAME}) {
-				$ext->{$uco}->{"TYPE"} = "EXP";
-				$ext->{$uco}->{$A_JOB} = (defined $uAttributes{$A_JOB} ? $uAttributes{$A_JOB} : '');
-				$ext->{$uco}->{$A_JOB_ID} = (defined $uAttributes{$A_JOB_ID} ? $uAttributes{$A_JOB_ID} : '');
-				$ext->{$uco}->{$A_NS} = (defined $uAttributes{$A_NS} ? $uAttributes{$A_NS} : '');
-				$ext->{$uco}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
-			} elsif ("Externiste:Ostatni" eq $gAttributes{$A_G_NAME}) {
-				$ext->{$uco}->{"TYPE"} = "EXN";
-				$ext->{$uco}->{$A_JOB} = (defined $uAttributes{$A_JOB} ? $uAttributes{$A_JOB} : '');
-				$ext->{$uco}->{$A_JOB_ID} = (defined $uAttributes{$A_JOB_ID} ? $uAttributes{$A_JOB_ID} : '');
-				$ext->{$uco}->{$A_NS} = (defined $uAttributes{$A_NS} ? $uAttributes{$A_NS} : '');
+			# external workers
+			if (defined $relationType) {
+				$ext->{$uco}->{"TYPE"} = $relationType;
+				$ext->{$uco}->{$A_JOB} = $uAttributes{$A_JOB} || '';
+				$ext->{$uco}->{$A_JOB_ID} = $uAttributes{$A_JOB_ID} || '';
+				$ext->{$uco}->{$A_NS} = $uAttributes{$A_NS} || '';
 				$ext->{$uco}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
 			}
 
@@ -116,10 +123,11 @@ for my $uco (@keys) {
 
 	# print attributes, which are never empty
 	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{'EMAIL'} . "\t" .
-			$users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_FIRST_NAME} . "\t" .
-			$users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_AFTER} . "\t" .
-			$users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_MOBILE} . "\t" .
-			$users->{$uco}->{$A_EMAIL_PRIV} . "\t" . $users->{$uco}->{$A_PHONE_PRIV} . "\n";
+		$users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_FIRST_NAME} . "\t" .
+		$users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_AFTER} . "\t" .
+		$users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_MOBILE} . "\t" .
+		$users->{$uco}->{$A_EMAIL_PRIV} . "\t" . $users->{$uco}->{$A_PHONE_PRIV} . "\t" .
+		$users->{$uco}->{$A_FOTO} . "\n";
 
 }
 
@@ -159,7 +167,7 @@ for my $uco (@ext_keys) {
 
 	# print attributes, which are never empty
 	print FILE $uco . "\t" . $ext->{$uco}->{$A_USER_ID} . "\t" . $ext->{$uco}->{"TYPE"} . "\t" .
-			$ext->{$uco}->{$A_JOB} . "\t" . $ext->{$uco}->{$A_JOB_ID} . "\t" . $ext->{$uco}->{$A_NS}  . "\n";
+		$ext->{$uco}->{$A_JOB} . "\t" . $ext->{$uco}->{$A_JOB_ID} . "\t" . $ext->{$uco}->{$A_NS}  . "\n";
 
 }
 

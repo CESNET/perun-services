@@ -1,3 +1,16 @@
+perun-slave-base (3.1.6) stable; urgency=low
+
+  * Export perun variables with service name and path to directories (like
+    lib, config etc.)
+
+ -- Michal Stava <stavamichal@gmail.com>  Tue, 12 May 2017 14:00:00 +0200
+
+perun-slave-base (3.1.5) stable; urgency=low
+
+  * Add variable with cache directory to perun base
+
+ -- Michal Stava <stavamichal@gmail.com>  Tue, 07 Mar 2017 11:13:00 +0100
+
 perun-slave-base (3.1.4) stable; urgency=low
 
   * New function diff_mv_sync using sync before and after diff_mv itself, it

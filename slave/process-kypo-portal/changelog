@@ -1,3 +1,51 @@
+perun-slave-process-kypo-portal (3.0.10) stable; urgency=medium
+
+  * Update of exception messages and names of perun variables in process-kypo_portal.py 
+ 
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Thu, 11 May 2017 19:00:00 +0200
+
+perun-slave-process-kypo-portal (3.0.9) stable; urgency=high
+
+  * Set correct path for lib dir (use '_' instead '-')
+
+ -- Michal Stava <stavamichal@gmail.com>  Thu, 11 May 2017 15:51:00 +0200
+
+perun-slave-process-kypo-portal (3.0.8) stable; urgency=medium
+
+  * Updated process-kypo_portal.py to parse new attribute login-namespace:mu
+ 
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Mon, 24 Apr 2017 16:00:00 +0200
+
+perun-slave-process-kypo-portal (3.0.7) stable; urgency=medium
+
+  * Updated process-kypo_portal.py to load information to access DB from
+    external file, updated process-kypo_portal.sh to return return value
+    from process-kypo_portal.py
+ 
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Wed, 15 Mar 2017 14:00:00 +0200
+
+perun-slave-process-kypo-portal (3.0.6) stable; urgency=medium
+
+  * Fixed wrong name of attribute in deleting members from group, that is not in
+    json
+
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Fri, 10 Mar 2017 11:00:00 +0200
+
+perun-slave-process-kypo-portal (3.0.5) stable; urgency=medium
+
+  * Converted kypoImport.py script from python2 to python3,
+    fixed starting of kypoImport.py in process-process-kypo_portal.sh
+
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Mon, 06 Mar 2017 12:00:00 +0200
+
+perun-slave-process-kypo-portal (3.0.4) stable; urgency=medium
+
+  * Fixed kypoImport.py script to avoid errors in db schema
+    changes - column order, fixed path to kypoImport.py
+    in process-process-kypo_portal.sh
+
+ -- Frantisek Hrdina <franta.hrdina@gmail.com>  Thu, 23 Feb 2017 18:00:00 +0200
+
 perun-slave-process-kypo-portal (3.0.3) stable; urgency=medium
 
   * Fixed working with groups and subgroups, names of subgroups are imported

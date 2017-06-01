@@ -2,6 +2,7 @@
 NAME='perunv3'
 SCRIPTS_DIR=`dirname $0`
 LIB_DIR='/opt/perun/lib/'
+CACHE_DIR='/var/lib/perun/'
 CUSTOM_SCRIPTS_DIR="/etc/perun/"
 OLD_CUSTOM_SCRIPTS_DIR="/opt/perun/bin/"
 LOCK_DIR=${LOCK_DIR:=/var/lock}
@@ -329,6 +330,11 @@ FACILITY=`head -n 1 "${WORK_DIR}/FACILITY"`
 LOCK_FILE="${LOCK_DIR}/${NAME}-${SERVICE}.lock"
 LOCK_PIDFILE="$LOCK_FILE/pid"
 BACKUP_DIR="/var/tmp/perun/${SERVICE}/backup-state/"
+
+# export needed variables
+export PERUN_SERVICE=${SERVICE}
+export PERUN_LIB_DIR=${LIB_DIR}
+export PERUN_CUSTOM_SCRIPTS_DIR=${CUSTOM_SCRIPTS_DIR}
 
 # write to stderr if old path for scripts is still used
 WARN_USING_OLD_PATH_FOR_SCRIPTS="Warning: Old configuration dir ${OLD_CUSTOM_SCRIPTS_DIR}/${SERVICE}.d/ is still used."

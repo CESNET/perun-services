@@ -1,0 +1,1036 @@
+#!/usr/bin/perl
+use strict;
+use warnings FATAL => 'all';
+use DBI;
+use Getopt::Long qw(:config no_ignore_case);
+use Data::Dumper;
+use Time::Piece;
+use ScriptLock;
+use VsupIfis;
+
+binmode STDOUT, ":utf8";
+
+sub handleContact;
+sub handleAkt;
+
+my $username;
+my $password;
+my $tableName = 'ELA_OSB';
+my $tableNameAdr = 'ELA_ADR';
+my $tableNameSpj = 'ELA_SPJ';
+my $tableNameVzt = 'ELA_VZTAHY';
+my $tableNameAkt = 'ELA_AKT';
+my $tableNameCas = 'ELA_CAS';
+
+# define service
+my $service_name = "vsup_ifis";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+my $service_file = "$service_files_dir/$service_name.csv";
+
+# propagation destination
+my $destination = $ARGV[1];
+chomp($destination);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $destination);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# parse destination
+my ($db_machine,$db_port,$db_name) = split(/:/, $destination);
+
+# load authz
+my $configPath = "/etc/perun/services/$service_name/$db_name";
+open FILE, $configPath or die "Could not open config file $configPath: $!";
+while(my $line = <FILE>) {
+	if($line =~ /^username: .*/) {
+		$username = ($line =~ m/^username: (.*)$/)[0];
+	} elsif($line =~ /^password: .*/) {
+		$password = ($line =~ m/^password: (.*)$/)[0];
+	}
+}
+
+if(!defined($password) || !defined($username)) {
+	print "Can't get config data from config file.\n";
+	exit 14;
+}
+
+#Main Structure
+my $dataByKey = {};
+
+open FILE, $service_file or die "Could not open $service_file: $!";
+binmode FILE, ":utf8";
+while(my $line = <FILE>) {
+	my @parts = split /\t/, $line;
+	chomp(@parts);
+	my $uco = $parts[0]; # UČO
+	$dataByKey->{$uco}->{'OS_CISLO'} = $uco;
+	$dataByKey->{$uco}->{'TYP_VZTAHU'} = $parts[1]; # STU/ZAM/Externista - pedagog
+	$dataByKey->{$uco}->{'TITUL'} = (($parts[2] ne '') ? $parts[2] : undef);
+	$dataByKey->{$uco}->{'JMENO'} = (($parts[3] ne '') ? $parts[3] : undef);
+	$dataByKey->{$uco}->{'PRIJMENI'} = (($parts[4] ne '') ? $parts[4] : undef);
+	$dataByKey->{$uco}->{'TITUL2'} = (($parts[5] ne '') ? $parts[5] : undef);
+	$dataByKey->{$uco}->{'ROD_CISLO'} = $parts[6];
+	$dataByKey->{$uco}->{'POHLAVI'} = $parts[7];
+	$dataByKey->{$uco}->{'FUNKCE'} = (($parts[8] ne '') ? $parts[8] : undef);
+	$dataByKey->{$uco}->{'ULICE'} = (($parts[9] ne '') ? $parts[9] : undef);
+	$dataByKey->{$uco}->{'MST_NAZEV'} = (($parts[10] ne '') ? $parts[10] : undef);
+	$dataByKey->{$uco}->{'PSC'} = (($parts[11] ne '') ? $parts[11] : undef);
+	$dataByKey->{$uco}->{'COUNTRY_CODE'} = (($parts[12] ne '') ? $parts[12] : undef);
+	$dataByKey->{$uco}->{'ADR_TYPE'} = (($parts[13] ne '') ? $parts[13] : undef);
+	$dataByKey->{$uco}->{'EMAIL'} = (($parts[14] ne '') ? $parts[14] : undef);
+	$dataByKey->{$uco}->{'BANK_ACCOUNT'} = (($parts[15] ne '') ? $parts[15] : undef);
+	$dataByKey->{$uco}->{'PHONE'} = (($parts[16] ne '') ? $parts[16] : undef);
+	$dataByKey->{$uco}->{'USER_ID'} = (($parts[17] ne '') ? $parts[17] : undef);
+
+}
+close FILE;
+
+my $dbh = DBI->connect("dbi:Oracle://$db_machine:$db_port/$db_name", $username, $password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+$dbh->do("alter session set nls_date_format='YYYY-MM-DD HH24:MI:SS'");
+
+my $DEBUG=0;
+#statistic and information variables
+my $foundAndSkipped = 0;
+my $foundAndUpdated = 0;
+my $inserted = 0;
+my $deleted = 0;
+my $insertedAdr = 0;
+my $deletedAdr = 0;
+my $foundAndSkippedAdr = 0;
+my $foundAndUpdatedAdr = 0;
+my $insertedSpj = 0;
+my $deletedSpj = 0;
+my $foundAndSkippedSpj = 0;
+my $foundAndUpdatedSpj = 0;
+my $insertedVzt = 0;
+my $deletedVzt = 0;
+my $foundAndSkippedVzt = 0;
+my $foundAndUpdatedVzt = 0;
+my $dc2_inserted = 0;
+my $dc2_foundAndUpdated = 0;
+my $dc2_foundAndSkipped = 0;
+my $dc2_deleted = 0;
+my $kos_inserted = 0;
+my $kos_foundAndUpdated = 0;
+my $kos_foundAndSkipped = 0;
+my $kos_deleted = 0;
+
+# Allow storing change info (AKT)
+my $insertAkt = $dbh->prepare(qq{INSERT INTO $tableNameAkt (OSB_ID, KDYZAP, OBJ, PRIO) VALUES (?,sysdate,?,?)});
+
+#
+# HANDLE PERSONS
+#
+
+foreach my $uco (sort keys $dataByKey) {
+
+	my $OS_CISLO = $dataByKey->{$uco}->{'OS_CISLO'};
+	my $TYP_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
+	my $TITUL = $dataByKey->{$uco}->{'TITUL'};
+	my $JMENO = $dataByKey->{$uco}->{'JMENO'};
+	my $PRIJMENI = $dataByKey->{$uco}->{'PRIJMENI'};
+	my $TITUL2 = $dataByKey->{$uco}->{'TITUL2'};
+	my $RODCISLO = $dataByKey->{$uco}->{'ROD_CISLO'};
+	my $POHLAVI = $dataByKey->{$uco}->{'POHLAVI'};
+	my $FUNKCE = $dataByKey->{$uco}->{'FUNKCE'};
+
+	# for the purpose of ELA_OSB table, "Externista - pedagog" = "EXT"
+	if ($TYP_VZTAHU eq "Externista - pedagog") {
+		$TYP_VZTAHU = "EXT";
+	}
+
+	# Use max. 20 bytes for TITUL
+	if ($TITUL) {
+		$TITUL = substr($TITUL, -20);
+	}
+	if ($TITUL2) {
+		$TITUL2 = substr($TITUL2, -20);
+	}
+	# Use max. 40 chars for FUNKCE
+	if ($FUNKCE) {
+		$FUNKCE = substr($FUNKCE, 0, ((length $FUNKCE >= 40) ? 40 : (length $FUNKCE)) );
+	}
+
+	# There is
+	my $personExists = $dbh->prepare(qq{select 1 from $tableName where OSB_ID=?});
+	$personExists->execute($uco);
+
+	if($personExists->fetch) {
+
+		if($DEBUG == 1) { print "FIND: $uco\n"; }
+
+		#we need to know if these two records are without changes, if yes, skip them
+		my $select = "SELECT 1 from $tableName where OSB_ID=? and OS_CISLO=?";
+		my @params = ($uco, $OS_CISLO);
+
+		if ($JMENO) {
+			$select = $select . " and JMENO=?";
+			push(@params, $JMENO);
+		} else {
+			$select = $select . " and JMENO is NULL";
+		}
+		if ($PRIJMENI) {
+			$select = $select . " and PRIJMENI=?";
+			push(@params, $PRIJMENI);
+		} else {
+			$select = $select . " and PRIJMENI is NULL";
+		}
+		if ($TITUL) {
+			$select = $select . " and TITUL=?";
+			push(@params, $TITUL);
+		} else {
+			$select = $select . " and TITUL is NULL";
+		}
+		if ($TITUL2) {
+			$select = $select . " and TITUL2=?";
+			push(@params, $TITUL2);
+		} else {
+			$select = $select . " and TITUL2 is NULL";
+		}
+		if ($RODCISLO) {
+			$select = $select . " and ROD_CISLO=?";
+			push(@params, $RODCISLO);
+		} else {
+			$select = $select . " and ROD_CISLO is NULL";
+		}
+		if ($FUNKCE) {
+			$select = $select . " and FUNKCE=?";
+			push(@params, $FUNKCE);
+		} else {
+			$select = $select . " and FUNKCE is NULL";
+		}
+		if ($POHLAVI) {
+			$select = $select . " and POHLAVI=?";
+			push(@params, $POHLAVI);
+		} else {
+			$select = $select . " and POHLAVI is NULL";
+		}
+		if ($TYP_VZTAHU) {
+			$select = $select . " and TYP_VZTAHU=?";
+			push(@params, $TYP_VZTAHU);
+		} else {
+			$select = $select . " and TYP_VZTAHU is NULL";
+		}
+
+		my $recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
+
+		if(!$recordAreEquals->fetch) {
+
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET PRIJMENI=? , POHLAVI=? , TITUL=? , JMENO=? , TITUL2=? , FUNKCE=? , TYP_VZTAHU=? , OS_CISLO=? , ROD_CISLO=? WHERE OSB_ID=?});
+			$updatePerson->execute($PRIJMENI, $POHLAVI, $TITUL, $JMENO, $TITUL2, $FUNKCE, $TYP_VZTAHU , $OS_CISLO, $RODCISLO, $uco);
+			if($DEBUG == 1) { print "UPDATING EXISTING PERSON: $uco\n"; }
+			$foundAndUpdated++;
+
+			handleAkt($uco, 'OSB');
+
+		} else {
+
+			if($DEBUG == 1) { print "SKIP PERSON: $uco\n"; }
+			$foundAndSkipped++;
+
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW PERSON: $uco\n"; }
+		$inserted++;
+		# we will do insert
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (OSB_ID, PRIJMENI, POHLAVI, TITUL, JMENO, TITUL2, FUNKCE, TYP_VZTAHU, OS_CISLO, ROD_CISLO) VALUES (?,?,?,?,?,?,?,?,?,?)});
+		$insertPerson->execute($uco, $PRIJMENI, $POHLAVI, $TITUL, $JMENO, $TITUL2, $FUNKCE, $TYP_VZTAHU, $OS_CISLO, $RODCISLO);
+
+		handleAkt($uco, 'OSB');
+
+	}
+}
+
+# delete unwanted persons
+my $ary_ref = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableName where OSB_ID is not null});
+my @ucos = @$ary_ref;
+my $deletePerson = $dbh->prepare(qq{DELETE FROM $tableName where OSB_ID=?});
+foreach my $uco (@ucos) {
+	unless (exists $dataByKey->{$uco}) {
+		if($DEBUG == 1) { print "DELETE PERSON: $uco\n"; }
+		$deletePerson->execute($uco);
+		$deleted++;
+		handleAkt($uco, 'OSB');
+	}
+}
+
+#
+# HANDLE ADDRESSES
+#
+
+# prepared statements
+my $addressExists = $dbh->prepare(qq{select 1 from $tableNameAdr where OSB_ID=?});
+my $insertAdr = $dbh->prepare(qq{INSERT INTO $tableNameAdr (OSB_ID, ULICE, MST_NAZEV, PSC, ZME_ID, VAD_TYP_OSB) VALUES (?,?,?,?,?,?)});
+my $addressAreEquals = $dbh->prepare(qq{SELECT 1 FROM $tableNameAdr WHERE ULICE=? and MST_NAZEV=? and PSC=? and ZME_ID=? and VAD_TYP_OSB=? and OSB_ID=?});
+my $updateAdr = $dbh->prepare(qq{UPDATE $tableNameAdr SET ULICE=?, MST_NAZEV=?, PSC=?, ZME_ID=?, VAD_TYP_OSB=? WHERE OSB_ID=?});
+my $deleteAdr = $dbh->prepare(qq{DELETE FROM $tableNameAdr where OSB_ID=?});
+
+foreach my $uco (sort keys $dataByKey) {
+
+	my $ULICE = $dataByKey->{$uco}->{'ULICE'};
+	my $MST_NAZEV = $dataByKey->{$uco}->{'MST_NAZEV'};
+	my $PSC = $dataByKey->{$uco}->{'PSC'};
+	my $COUNTRY_CODE = $dataByKey->{$uco}->{'COUNTRY_CODE'};
+	my $ADR_TYPE = $dataByKey->{$uco}->{'ADR_TYPE'};
+
+	if ($ULICE and $MST_NAZEV and $PSC and $COUNTRY_CODE and $ADR_TYPE) {
+		# user has address
+		$addressExists->execute($uco);
+
+		if ($addressExists->fetch) {
+
+			$addressAreEquals->execute($ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE, $uco);
+
+			if(!$addressAreEquals->fetch) {
+				$updateAdr->execute($ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE, $uco);
+				if($DEBUG == 1) { print "UPDATING EXISTING ADR RECORD: $uco\n"; }
+				$foundAndUpdatedAdr++;
+				handleAkt($uco, 'ADR');
+			} else {
+				if($DEBUG == 1) { print "SKIP ADR RECORD: $uco\n"; }
+				$foundAndSkippedAdr++;
+			}
+
+		} else {
+			if($DEBUG == 1) { print "INSERT NEW ADR: $uco\n"; }
+			$insertedAdr++;
+			# we will do insert
+			$insertAdr->execute($uco, $ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE);
+			handleAkt($uco, 'ADR');
+		}
+
+	} else {
+		$addressExists->execute($uco);
+		if ($addressExists->fetch) {
+			# user don't have an address - remove any existing address
+			if($DEBUG == 1) { print "DELETE ADR: $uco\n"; }
+			$deleteAdr->execute($uco);
+			$deleteAdr++;
+			handleAkt($uco, 'ADR');
+		}
+	}
+
+}
+
+# delete addresses of unwanted persons
+my $ary_ref_adr = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameAdr where OSB_ID is not null});
+my @ucos_adr = @$ary_ref_adr;
+my $deletePerson_adr = $dbh->prepare(qq{DELETE FROM $tableNameAdr where OSB_ID=?});
+foreach my $uco (@ucos_adr) {
+	unless (exists $dataByKey->{$uco}) {
+		if($DEBUG == 1) { print "DELETE ADR RECORD: $uco\n"; }
+		$deletePerson_adr->execute($uco);
+		$deletedAdr++;
+		handleAkt($uco, 'ADR');
+	}
+}
+
+#
+# HANDLE CONTACTS
+#
+
+# prepared statements
+my $contactExists = $dbh->prepare(qq{select 1 from $tableNameSpj where SPJ_TYP=? and OSB_ID=? });
+my $insertContact = $dbh->prepare(qq{INSERT INTO $tableNameSpj (OSB_ID, SPJ_TYP, SPJ_CISLO, HLAVNI) VALUES (?,?,?,'+')});
+my $contactsAreEquals = $dbh->prepare(qq{SELECT 1 FROM $tableNameSpj WHERE SPJ_TYP=? and SPJ_CISLO=? and OSB_ID=?});
+my $updateContact = $dbh->prepare(qq{UPDATE $tableNameSpj SET SPJ_CISLO=? WHERE SPJ_TYP=? and OSB_ID=?});
+my $deleteContact = $dbh->prepare(qq{DELETE FROM $tableNameSpj where SPJ_TYP=? and OSB_ID=?});
+
+foreach my $uco (sort keys $dataByKey) {
+
+	my $EMAIL = $dataByKey->{$uco}->{'EMAIL'};
+	my $BANK_ACCOUNT = $dataByKey->{$uco}->{'BANK_ACCOUNT'};
+	my $PHONE = $dataByKey->{$uco}->{'PHONE'};
+
+	handleContact($uco, 'MAIL', $EMAIL);
+	handleContact($uco, 'UCET', $BANK_ACCOUNT);
+	handleContact($uco, 'TLF', $PHONE);
+
+}
+
+# delete all contacts of unwanted persons
+my $ary_ref_spj = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameSpj where OSB_ID is not null});
+my @ucos_spj = @$ary_ref_spj;
+my $deletePerson_spj = $dbh->prepare(qq{DELETE FROM $tableNameSpj where OSB_ID=?});
+foreach my $uco (@ucos_spj) {
+	unless (exists $dataByKey->{$uco}) {
+		if($DEBUG == 1) { print "DELETE SPJ RECORD: $uco\n"; }
+		$deletePerson_spj->execute($uco);
+		$deletedSpj++;
+		handleAkt($uco, 'SPJ');
+	}
+}
+
+
+#
+# HANDLE VZTAHY for EXT persons
+#
+
+# prepared statements
+my $vztahExists = $dbh->prepare(qq{select 1 from $tableNameVzt where OSB_ID=? and TYP_VZTAHU=? and DRUH_VZTAHU=?});
+my $insertVztah = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, TYP_VZTAHU, DRUH_VZTAHU, VZTAH_CISLO, KARTA_IDENT, EXT_ID) VALUES (?,?,?,?,?,?)});
+my $updateVztah = $dbh->prepare(qq{UPDATE $tableNameVzt SET KARTA_IDENT=? WHERE TYP_VZTAHU=? and DRUH_VZTAHU=? and OSB_ID=?});
+my $deleteVztah = $dbh->prepare(qq{DELETE FROM $tableNameVzt where OSB_ID=?});
+
+foreach my $uco (sort keys $dataByKey) {
+
+	my $TYP_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
+	unless ($TYP_VZTAHU eq "Externista - pedagog") {
+		# process only external teachers
+		next;
+	}
+
+	# fix sent params (EXT vs. Externista - pedagog)
+	my $DRUH_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
+	$TYP_VZTAHU = "EXT";
+	my $USER_ID = $dataByKey->{$uco}->{'USER_ID'};
+	my $EXT_ID = $dataByKey->{$uco}->{'USER_ID'};
+
+	# FIXME - TODO - resolve ISIC/ITIC
+	my $KARTA_IDENT = undef;
+
+	$vztahExists->execute($uco, $TYP_VZTAHU, $DRUH_VZTAHU);
+	if ($vztahExists->fetch) {
+
+		my @params = ($TYP_VZTAHU, $DRUH_VZTAHU, $USER_ID, $uco);
+
+		my $vztahAreEqualsSelect = qq{SELECT 1 FROM $tableNameVzt WHERE TYP_VZTAHU=? and DRUH_VZTAHU=? and VZTAH_CISLO=? and OSB_ID=? and KARTA_IDENT};
+		if ($KARTA_IDENT) {
+			$vztahAreEqualsSelect = $vztahAreEqualsSelect . "=?";
+			push(@params, $KARTA_IDENT);
+		} else {
+			$vztahAreEqualsSelect = $vztahAreEqualsSelect . " is NULL"
+		}
+
+		my $vztahAreEquals = $dbh->prepare($vztahAreEqualsSelect);
+		$vztahAreEquals->execute(@params);
+
+		if(!$vztahAreEquals->fetch) {
+			$updateVztah->execute($KARTA_IDENT, $TYP_VZTAHU, $DRUH_VZTAHU, $uco);
+			if($DEBUG == 1) { print "UPDATING EXISTING VZTAH RECORD: $uco\n"; }
+			$foundAndUpdatedVzt++;
+			handleAkt($uco, 'VZTAHY');
+		} else {
+			if($DEBUG == 1) { print "SKIP VZTAH RECORD: $uco\n"; }
+			$foundAndSkippedVzt++;
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW VZTAH: $uco\n"; }
+		$insertedVzt++;
+		# we will do insert
+		$insertVztah->execute($uco, $TYP_VZTAHU, $DRUH_VZTAHU, $USER_ID, $KARTA_IDENT, $EXT_ID);
+		handleAkt($uco, 'VZTAHY');
+	}
+
+}
+
+# delete vztah of unwanted persons (for simplicity of other scripts (KOS/DC2 to IFIS) we delete vztah of any type !!
+my $ary_ref_vzt = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null});
+my @ucos_vzt = @$ary_ref_vzt;
+foreach my $uco (@ucos_vzt) {
+	unless (exists $dataByKey->{$uco}) {
+		if($DEBUG == 1) { print "DELETE VZTAH RECORD UCO: $uco / any\n"; }
+		$deleteVztah->execute($uco);
+		$deletedVzt++;
+		handleAkt($uco, 'VZTAHY');
+	}
+}
+
+# close handlers which fetches but are not used to manipulate data
+$addressAreEquals->finish();
+$addressExists->finish();
+$contactExists->finish();
+$contactsAreEquals->finish();
+$vztahExists->finish();
+
+#
+# process relations from dc2
+#
+
+my $dc2_data = load_dc2();
+
+foreach my $key (sort keys %$dc2_data) {
+
+	my $OSB_ID = $dc2_data->{$key}->{'OSB_ID'}; # OSB_ID = UCO
+	my $NS = $dc2_data->{$key}->{'NS'};
+	my $TYP_VZTAHU = "ZAM";
+	my $DRUH_VZTAHU = $dc2_data->{$key}->{'VZTAH_STATUS_NAZEV'};
+	my $VZTAH_CISLO = $key;
+	my $VZTAH_OD = $dc2_data->{$key}->{'VZTAH_OD'};
+	my $VZTAH_DO = $dc2_data->{$key}->{'VZTAH_DO'};
+	my $KARTA_IDENT = $dc2_data->{$key}->{'KARTA_IDENT'};
+	my $EXT_ID = $key; # same as VZTAH_CISLO
+
+	# To resolve "HLAVNI" vztah
+	my $VZTAH_STATUS_CISLO = $dc2_data->{$key}->{'VZTAH_STATUS_CISLO'};
+
+	#If osb_id or typ_vztahu are undef, skip it.
+	if ((!defined($OSB_ID)) || (!defined($TYP_VZTAHU))) {
+		next;
+	}
+
+	# If relation belongs to person which is missing in data from perun, skip it.
+	unless (exists $dataByKey->{$OSB_ID}) {
+		next;
+	}
+
+	#Check if record already exists in output database (IFIS)
+	my $personExists = $dbh->prepare(qq{select 1 from $tableNameVzt where OSB_ID=? AND TYP_VZTAHU=? AND VZTAH_CISLO=?});
+	$personExists->execute($OSB_ID, $TYP_VZTAHU, $VZTAH_CISLO);
+
+	if($personExists->fetch) {
+		if($DEBUG == 1) { print "FIND: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
+
+		#Generate proper select on NULLs
+		my $select = "SELECT 1 from $tableNameVzt where OSB_ID=? and VZTAH_CISLO=? and EXT_ID=? and TYP_VZTAHU=? and NS";
+		my @params = ($OSB_ID, $VZTAH_CISLO, $EXT_ID, $TYP_VZTAHU);
+		if (defined($NS)) {
+			$select = $select . "=?";
+			push(@params, $NS);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and DRUH_VZTAHU";
+		if (defined($DRUH_VZTAHU)) {
+			$select = $select . "=?";
+			push(@params, $DRUH_VZTAHU);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and OD";
+		if (defined($VZTAH_OD)) {
+			$select = $select . "=?";
+			push(@params, $VZTAH_OD);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and DO_";
+		if (defined($VZTAH_DO)) {
+			$select = $select . "=?";
+			push(@params, $VZTAH_DO);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and KARTA_IDENT";
+		if (defined($KARTA_IDENT)) {
+			$select = $select . "=?";
+			push(@params, $KARTA_IDENT);
+		} else {
+			$select = $select . " is NULL";
+		}
+
+		# We need to know if these two records are without changes, if yes, skip them
+		my $recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
+
+		if(!$recordAreEquals->fetch) {
+
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableNameVzt SET NS=? , DRUH_VZTAHU=? , OD=? , DO_=? , KARTA_IDENT=? WHERE OSB_ID=? AND VZTAH_CISLO=? AND TYP_VZTAHU=?});
+			$updatePerson->execute($NS, $DRUH_VZTAHU, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $OSB_ID, $VZTAH_CISLO, $TYP_VZTAHU);
+			handleAkt($OSB_ID, 'VZTAHY');
+			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
+			$dc2_foundAndUpdated++;
+
+		} else {
+
+			if($DEBUG == 1) { print "SKIP RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
+			$dc2_foundAndSkipped++;
+
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
+		$dc2_inserted++;
+		#We will insert new record to output database (IFIS)
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, NS, TYP_VZTAHU, DRUH_VZTAHU, VZTAH_CISLO, OD, DO_, KARTA_IDENT, EXT_ID) VALUES (?,?,?,?,?,?,?,?,?)});
+		$insertPerson->execute($OSB_ID, $NS, $TYP_VZTAHU, $DRUH_VZTAHU, $VZTAH_CISLO, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID);
+		handleAkt($OSB_ID, 'VZTAHY');
+
+	}
+
+}
+
+# Delete unwanted relations of ZAM type
+
+my $deleteVztah_dc2 = $dbh->prepare(qq{DELETE FROM $tableNameVzt where VZTAH_CISLO=? and TYP_VZTAHU='ZAM'});
+my $existingVztah_dc2 = $dbh->prepare(qq{select VZTAH_CISLO, OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null and TYP_VZTAHU='ZAM'});
+$existingVztah_dc2->execute();
+while(my $row = $existingVztah_dc2->fetchrow_hashref()) {
+	my $VZTAH_CISLO = $row->{VZTAH_CISLO};
+	my $UCO = $row->{OSB_ID};
+	unless (exists $dc2_data->{$VZTAH_CISLO}) {
+		# ZAM vztah is not in DC2 source, remove from IFIS.
+		if ($DEBUG == 1) { print "DELETE VZTAH RECORD CISLO_VZTAHU: $VZTAH_CISLO / ZAM\n"; }
+		$deleteVztah_dc2->execute($VZTAH_CISLO);
+		$dc2_deleted++;
+		handleAkt($UCO, 'VZTAHY');
+	}
+}
+
+# close opened select handler
+$existingVztah_dc2->finish();
+
+#
+# ROCESS RELATIONS FROM KOS
+#
+
+my $kos_data = load_kos();
+
+foreach my $key (sort keys %$kos_data) {
+
+	my $OSB_ID = $kos_data->{$key}->{'OSB_ID'};
+	my $NS = $kos_data->{$key}->{'NS'};
+	my $TYP_VZTAHU = $kos_data->{$key}->{'TYP_VZTAHU'};
+	my $DRUH_VZTAHU = $kos_data->{$key}->{'DRUH_VZTAHU'};
+	my $STU_FORMA = $kos_data->{$key}->{'STU_FORMA'};
+	my $STUD_STAV = $kos_data->{$key}->{'STUD_STAV'};
+	my $STU_PROGR = $kos_data->{$key}->{'STU_PROGR'};
+	my $VZTAH_CISLO = $key;
+	my $VZTAH_OD = $kos_data->{$key}->{'VZTAH_OD'};
+	my $VZTAH_DO = $kos_data->{$key}->{'VZTAH_DO'};
+	my $KARTA_IDENT = $kos_data->{$key}->{'KARTA_IDENT'};
+	my $EXT_ID = $key; # same as VZTAH_CISLO
+
+	#If osb_id or typ_vztahu are undef, skip this record
+	if ((!defined($OSB_ID)) || (!defined($TYP_VZTAHU))) {
+		next;
+	}
+
+	# If relation belongs to person which is missing in data from perun, skip it.
+	unless (exists $dataByKey->{$OSB_ID}) {
+		next;
+	}
+
+	#Check if record already exists in output database (IFIS)
+	my $personExists = $dbh->prepare(qq{select 1 from $tableNameVzt where OSB_ID=? AND TYP_VZTAHU=? AND VZTAH_CISLO=?});
+	$personExists->execute($OSB_ID, $TYP_VZTAHU, $VZTAH_CISLO);
+
+	if($personExists->fetch) {
+		if($DEBUG == 1) { print "FIND: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
+
+		#Generate proper select on NULLs
+		my $select = "SELECT 1 from $tableNameVzt where OSB_ID=? and VZTAH_CISLO=? and EXT_ID=? and TYP_VZTAHU=? and NS";
+		my @params = ($OSB_ID, $VZTAH_CISLO, $EXT_ID, $TYP_VZTAHU);
+		if (defined($NS)) {
+			$select = $select . "=?";
+			push(@params, $NS);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and DRUH_VZTAHU";
+		if (defined($DRUH_VZTAHU)) {
+			$select = $select . "=?";
+			push(@params, $DRUH_VZTAHU);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and STU_FORMA";
+		if (defined($STU_FORMA)) {
+			$select = $select . "=?";
+			push(@params, $STU_FORMA);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and STUD_STAV";
+		if (defined($STUD_STAV)) {
+			$select = $select . "=?";
+			push(@params, $STUD_STAV);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and STU_PROGR";
+		if (defined($STU_PROGR)) {
+			$select = $select . "=?";
+			push(@params, $STU_PROGR);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and OD";
+		if (defined($VZTAH_OD)) {
+			$select = $select . "=?";
+			push(@params, $VZTAH_OD);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and DO_";
+		if (defined($VZTAH_DO)) {
+			$select = $select . "=?";
+			push(@params, $VZTAH_DO);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and KARTA_IDENT";
+		if (defined($KARTA_IDENT)) {
+			$select = $select . "=?";
+			push(@params, $KARTA_IDENT);
+		} else {
+			$select = $select . " is NULL";
+		}
+
+		# We need to know if these two records are without changes, if yes, skip them
+		my $recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
+
+		if(!$recordAreEquals->fetch) {
+
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableNameVzt SET NS=? , DRUH_VZTAHU=? , STU_FORMA=? , STUD_STAV=? , STU_PROGR=? , OD=? , DO_=? , KARTA_IDENT=? WHERE OSB_ID=? AND VZTAH_CISLO=? AND TYP_VZTAHU=?});
+			$updatePerson->execute($NS, $DRUH_VZTAHU, $STU_FORMA, $STUD_STAV, $STU_PROGR, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $OSB_ID, $VZTAH_CISLO, $TYP_VZTAHU);
+			handleAkt($OSB_ID, 'VZTAHY');
+			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
+			$kos_foundAndUpdated++;
+
+		} else {
+
+			if($DEBUG == 1) { print "SKIP RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
+			$kos_foundAndSkipped++;
+
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
+		$kos_inserted++;
+		#We will insert new record to output database (IFIS)
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, NS, TYP_VZTAHU, DRUH_VZTAHU, STU_FORMA, STUD_STAV, STU_PROGR, VZTAH_CISLO, OD, DO_, KARTA_IDENT, EXT_ID) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)});
+		$insertPerson->execute($OSB_ID, $NS, $TYP_VZTAHU, $DRUH_VZTAHU, $STU_FORMA, $STUD_STAV, $STU_PROGR, $VZTAH_CISLO, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID);
+		handleAkt($OSB_ID, 'VZTAHY');
+
+	}
+
+}
+
+# Delete unwanted relations of STU type
+
+my $deleteVztah_kos = $dbh->prepare(qq{DELETE FROM $tableNameVzt where VZTAH_CISLO=? and TYP_VZTAHU='STU'});
+my $existingVztah_kos = $dbh->prepare(qq{select VZTAH_CISLO, OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null and TYP_VZTAHU='STU'});
+$existingVztah_kos->execute();
+while(my $row = $existingVztah_kos->fetchrow_hashref()) {
+	my $VZTAH_CISLO = $row->{VZTAH_CISLO};
+	my $UCO = $row->{OSB_ID};
+	unless (exists $kos_data->{$VZTAH_CISLO}) {
+		# STU vztah is not in KOS source, remove from IFIS.
+		if ($DEBUG == 1) { print "DELETE VZTAH RECORD CISLO_VZTAHU: $VZTAH_CISLO /STU \n"; }
+		$deleteVztah_kos->execute($VZTAH_CISLO);
+		$kos_deleted++;
+		handleAkt($UCO, 'VZTAHY');
+	}
+}
+
+$existingVztah_kos->finish();
+
+#
+# SET WHICH RELATIONS ARE 'HLAVNI'
+#
+
+my $selectCountVztahy = $dbh->prepare(qq{SELECT count(*) FROM $tableNameVzt where OSB_ID=?});
+my $updateHlavniSingle = $dbh->prepare(qq{UPDATE $tableNameVzt SET HLAVNI='A' where OSB_ID=? and (HLAVNI is null or HLAVNI='N')});
+my $updateHlavniMultiple = $dbh->prepare(qq{UPDATE $tableNameVzt SET HLAVNI='A' where OSB_ID=? and VZTAH_CISLO=? and TYP_VZTAHU=?});
+my $clearHlavni = $dbh->prepare(qq{UPDATE $tableNameVzt SET HLAVNI=null where OSB_ID=?});
+
+for my $UCO (sort keys %$dataByKey) {
+
+	$selectCountVztahy->execute($UCO);
+	my $rowcount = $selectCountVztahy->fetch();
+
+	if (@$rowcount[0] > 1) {
+		# user has multiple VZTAH - calculate which is HLAVNI
+		my $selectVztahy = $dbh->prepare(qq{SELECT OSB_ID, VZTAH_CISLO, TYP_VZTAHU, DO_ FROM $tableNameVzt where OSB_ID=?});
+		$selectVztahy->execute($UCO);
+		my $existingVztah = {};
+		while(my $row = $selectVztahy->fetchrow_hashref()) {
+			my $key = $row->{VZTAH_CISLO} . ":" . $row->{TYP_VZTAHU};
+			$existingVztah->{$key}->{'OSB_ID'} = $row->{OSB_ID};
+			$existingVztah->{$key}->{'VZTAH_CISLO'} = $row->{VZTAH_CISLO};
+			$existingVztah->{$key}->{'TYP_VZTAHU'} = $row->{TYP_VZTAHU};
+			$existingVztah->{$key}->{'DO_'} = $row->{DO_};
+		}
+
+		# Resolve HLAVNI by priority
+
+		#1. ZAM (VZTAH_STATUS = 1,2,5,8,9,10,16,17)
+		#2. ZAM (VZTAH_STATUS = 4,7,21)
+		#3. STU
+		#4. EXT
+
+		# duplicity on same level: for ZAM take one with later DO_ or bigger ID, for rest take one with bigger ID.
+
+		my %priority1 = map { $_ => 1 } (1,2,5,8,9,10,16,17);
+		my %priority2 = map { $_ => 1 } (4,7,21);
+
+		my $priorityMap = {};
+
+		for my $key (sort keys %$existingVztah) {
+			if ($existingVztah->{$key}->{"TYP_VZTAHU"} eq "ZAM") {
+				my $vztah_status_cislo = $dc2_data->{$existingVztah->{$key}->{"VZTAH_CISLO"}}->{"VZTAH_STATUS_CISLO"};
+				if (exists $priority1{$vztah_status_cislo}) {
+
+					if (exists $priorityMap->{1}) {
+						# multiple ZAM VZTAH prio 1
+						my $existingDo = $existingVztah->{$priorityMap->{1}->{"VZTAH_CISLO"}.":ZAM"}->{"DO_"};
+						my $newDo = $existingVztah->{$key}->{"DO_"};
+						if (defined $existingDo and defined $newDo) {
+							# compare dates if equals, compare IDs
+							my $existingDoTime = Time::Piece->strptime($existingDo,"%Y-%m-%d %H:%M:%S");
+							my $newDoTime = Time::Piece->strptime($newDo,"%Y-%m-%d %H:%M:%S");
+							if ($newDoTime > $existingDoTime) {
+								# newDo last longer
+								$priorityMap->{1}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+							} elsif ($newDoTime < $existingDoTime) {
+								# keep existingDo
+							} else {
+								# they last the same, compatre IDs
+								unless ($priorityMap->{1}->{"VZTAH_CISLO"} gt $existingVztah->{$key}->{"VZTAH_CISLO"}) {
+									# next VZTAH has ID > current VZTAH
+									$priorityMap->{1}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+								}
+							}
+						} elsif (defined $existingDo and !defined $newDo) {
+							# put in newDo
+							$priorityMap->{1}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+						} elsif (!defined $existingDo and defined $newDo) {
+							# keep existingDo
+						} elsif (!defined $existingDo and !defined $newDo) {
+							# compare IDS
+							unless ($priorityMap->{1}->{"VZTAH_CISLO"} gt $existingVztah->{$key}->{"VZTAH_CISLO"}) {
+								# next VZTAH has ID > current VZTAH
+								$priorityMap->{1}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+							}
+						}
+					} else {
+						$priorityMap->{1}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+					}
+					$priorityMap->{1}->{"TYP_VZTAHU"} = 'ZAM';
+				} elsif (exists $priority2{$vztah_status_cislo}) {
+					if (exists $priorityMap->{2}) {
+						# multiple ZAM VZTAH prio 2
+						my $existingDo = $existingVztah->{$priorityMap->{2}->{"VZTAH_CISLO"}.":ZAM"}->{"DO_"};
+						my $newDo = $existingVztah->{$key}->{"DO_"};
+						if (defined $existingDo and defined $newDo) {
+							# compare dates if equals, compare IDs
+							my $existingDoTime = Time::Piece->strptime($existingDo,"%Y-%m-%d %H:%M:%S");
+							my $newDoTime = Time::Piece->strptime($newDo,"%Y-%m-%d %H:%M:%S");
+							if ($newDoTime > $existingDoTime) {
+								# newDo last longer
+								$priorityMap->{2}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+							} elsif ($newDoTime < $existingDoTime) {
+								# keep existingDo
+							} else {
+								# they last the same, compatre IDs
+								unless ($priorityMap->{2}->{"VZTAH_CISLO"} gt $existingVztah->{$key}->{"VZTAH_CISLO"}) {
+									# next VZTAH has ID > current VZTAH
+									$priorityMap->{2}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+								}
+							}
+						} elsif (defined $existingDo and !defined $newDo) {
+							# put in newDo
+							$priorityMap->{2}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+						} elsif (!defined $existingDo and defined $newDo) {
+							# keep existingDo
+						} elsif (!defined $existingDo and !defined $newDo) {
+							# compare IDS
+							unless ($priorityMap->{2}->{"VZTAH_CISLO"} gt $existingVztah->{$key}->{"VZTAH_CISLO"}) {
+								# next VZTAH has ID > current VZTAH
+								$priorityMap->{2}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+							}
+						}
+					} else {
+						$priorityMap->{2}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+					}
+					$priorityMap->{2}->{"TYP_VZTAHU"} = 'ZAM';
+				}
+			} elsif ($existingVztah->{$key}->{"TYP_VZTAHU"} eq "STU")  {
+				if (exists $priorityMap->{3}) {
+					# multiple STU VZTAH
+					unless ($priorityMap->{3}->{"VZTAH_CISLO"} gt $existingVztah->{$key}->{"VZTAH_CISLO"}) {
+						# next VZTAH has ID > current VZTAH
+						$priorityMap->{3}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+					}
+				} else {
+					$priorityMap->{3}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+				}
+				$priorityMap->{3}->{"TYP_VZTAHU"} = 'STU';
+			} elsif ($existingVztah->{$key}->{"TYP_VZTAHU"} eq "EXT")  {
+				if (exists $priorityMap->{4}) {
+					# multiple EXT VZTAH
+					unless ($priorityMap->{4}->{"VZTAH_CISLO"} gt $existingVztah->{$key}->{"VZTAH_CISLO"}) {
+						# next VZTAH has ID > current VZTAH
+						$priorityMap->{4}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+					}
+				} else {
+					$priorityMap->{4}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
+				}
+				$priorityMap->{4}->{"TYP_VZTAHU"} = 'EXT';
+			}
+		}
+
+		# clear all hlavni marks for persons VZTAH
+		$clearHlavni->execute($UCO);
+
+		# set new hlavni VZTAH
+		if (exists $priorityMap->{1}) {
+			$updateHlavniMultiple->execute($UCO, $priorityMap->{1}->{"VZTAH_CISLO"}, $priorityMap->{1}->{"TYP_VZTAHU"});
+		} elsif (exists $priorityMap->{2}) {
+			$updateHlavniMultiple->execute($UCO, $priorityMap->{2}->{"VZTAH_CISLO"}, $priorityMap->{2}->{"TYP_VZTAHU"});
+		} elsif (exists $priorityMap->{3}) {
+			$updateHlavniMultiple->execute($UCO, $priorityMap->{3}->{"VZTAH_CISLO"}, $priorityMap->{3}->{"TYP_VZTAHU"});
+		} elsif (exists $priorityMap->{4}) {
+			$updateHlavniMultiple->execute($UCO, $priorityMap->{4}->{"VZTAH_CISLO"}, $priorityMap->{4}->{"TYP_VZTAHU"});
+		}
+
+	} else {
+		# Person has only single VZTAH - set as HLAVNI if not set already
+		$updateHlavniSingle->execute($UCO);
+	}
+
+	if($DEBUG == 1) { print "UPDATING HLAVNI: UCO -> $UCO\n"; }
+	handleAkt($UCO, 'VZTAHY');
+
+}
+
+$selectCountVztahy->finish();
+
+#
+# tell IFIS, that IDM source updated it's state
+#
+my $casExists = $dbh->prepare(qq{select 1 from $tableNameCas where PRIO=?});
+$casExists->execute('IDM');
+if($casExists->fetch) {
+	my $updateCas = $dbh->prepare(qq{update $tableNameCas set CAS=sysdate where PRIO=?});
+	$updateCas->execute('IDM');
+} else {
+	my $insertCas = $dbh->prepare(qq{insert into $tableNameCas (PRIO, CAS) values (?,sysdate)});
+	$insertCas->execute('IDM');
+}
+
+$casExists->finish();
+
+# Commit all changes and disconnect
+
+commit $dbh;
+$dbh->disconnect();
+
+$lock->unlock();
+
+# Print info about operations
+print "=======================================\n";
+print "User inserted:    \t$inserted\n";
+print "User skiped:      \t$foundAndSkipped\n";
+print "User updated:	 \t$foundAndUpdated\n";
+print "User deleted:     \t$deleted\n";
+print "---------------------------------------\n";
+print "Address inserted: \t$insertedAdr\n";
+print "Address skiped:   \t$foundAndSkippedAdr\n";
+print "Address updated:  \t$foundAndUpdatedAdr\n";
+print "Address deleted:  \t$deletedAdr\n";
+print "---------------------------------------\n";
+print "Contact inserted: \t$insertedSpj\n";
+print "Contact skiped:   \t$foundAndSkippedSpj\n";
+print "Contact updated:  \t$foundAndUpdatedSpj\n";
+print "Contact deleted:  \t$deletedSpj\n";
+print "---------------------------------------\n";
+print "Vztah (ext) inserted: \t$insertedVzt\n";
+print "Vztah (ext) skiped:   \t$foundAndSkippedVzt\n";
+print "Vztah (ext) updated:  \t$foundAndUpdatedVzt\n";
+print "Vztah (any) deleted:  \t$deletedVzt\n";
+print "---------------------------------------\n";
+print "Vztah (zam) inserted: \t$dc2_inserted\n";
+print "Vztah (zam) skiped:   \t$dc2_foundAndSkipped\n";
+print "Vztah (zam) updated:  \t$dc2_foundAndUpdated\n";
+print "Vztah (zam) deleted:  \t$dc2_deleted\n";
+print "---------------------------------------\n";
+print "Vztah (stu) inserted: \t$kos_inserted\n";
+print "Vztah (stu) skiped:   \t$kos_foundAndSkipped\n";
+print "Vztah (stu) updated:  \t$kos_foundAndUpdated\n";
+print "Vztah (stu) deleted:  \t$kos_deleted\n";
+print "=======================================\n";
+
+#
+# Handles DB change for specified contact (mail, bank account, phone)
+#
+# param 1: $uco (VŠUP UCO),
+# param 2: $SPJ_TYP (TLF|MAIL|MOB|UCET)
+# param 3: $SPJ_CISLO (contact value itself)
+#
+sub handleContact() {
+
+	my $uco = shift;
+	my $SPJ_TYP = shift;
+	my $SPJ_CISLO = shift;
+
+	if ($uco and $SPJ_TYP) {
+
+		$contactExists->execute($SPJ_TYP, $uco);
+
+		if ($contactExists->fetch) {
+
+			if ($SPJ_CISLO) {
+				# user has spj
+				$contactsAreEquals->execute($SPJ_TYP, $SPJ_CISLO, $uco);
+
+				if(!$contactsAreEquals->fetch) {
+					$updateContact->execute($SPJ_CISLO, $SPJ_TYP, $uco);
+					if($DEBUG == 1) { print "UPDATING EXISTING SPJ RECORD: $uco\n"; }
+					$foundAndUpdatedSpj++;
+					handleAkt($uco, 'SPJ');
+				} else {
+					if($DEBUG == 1) { print "SKIP SPJ RECORD: $uco\n"; }
+					$foundAndSkippedSpj++;
+				}
+
+			} else {
+				# user had spj, now will be removed
+				if($DEBUG == 1) { print "DELETE SPJ: $uco\n"; }
+				$deleteContact->execute($SPJ_TYP, $uco);
+				$deletedSpj++;
+				handleAkt($uco, 'SPJ');
+			}
+
+		} else {
+
+			if ($SPJ_CISLO) {
+				if($DEBUG == 1) { print "INSERT NEW SPJ: $uco\n"; }
+				$insertedSpj++;
+				# we will do insert
+				$insertContact->execute($uco, $SPJ_TYP, $SPJ_CISLO);
+				handleAkt($uco, 'SPJ');
+			}
+
+		}
+
+	} else {
+		print "Wrong usage of handleContact()."
+	}
+
+}
+
+#
+# Handle writing performed changes in ELA_AKT table
+#
+# param 1: $UCO (VŠUP UCO),
+# param 2: $CHANGE_TYPE (OSB,ADR,SPJ,VZTAHY)
+#
+sub handleAkt() {
+
+	my $UCO = shift;
+	my $CHANGE_TYPE = shift;
+
+	if ($UCO and $CHANGE_TYPE) {
+
+		$insertAkt->execute($UCO, $CHANGE_TYPE, 'IDM');
+
+	} else {
+		print "Wrong usage of handleAkt()."
+	}
+
+}

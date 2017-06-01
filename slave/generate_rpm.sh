@@ -70,10 +70,10 @@ if ls -A conf/* > /dev/null 2>&1 ; then cp -r conf/* %{buildroot}/etc/perun/${CO
 fi
 if [ $WITH_LIB == 1 ]; then
   CUSTOM_CONF="$CUSTOM_CONF
-mkdir -p %{buildroot}/opt/perun/lib/${SERVICE_NAME}/
-cp -r lib/* %{buildroot}/opt/perun/lib/${SERVICE_NAME}/"
+mkdir -p %{buildroot}/opt/perun/lib/${CONF_SERVICE_NAME}/
+cp -r lib/* %{buildroot}/opt/perun/lib/${CONF_SERVICE_NAME}/"
   CUSTOM_FILE_DATA="$CUSTOM_FILE_DATA
-/opt/perun/lib/${SERVICE_NAME}/"
+/opt/perun/lib/${CONF_SERVICE_NAME}/"
 fi
 
 # generate spec file
@@ -132,11 +132,13 @@ Perun slave scripts
 
 %install
 mkdir -p %{buildroot}/opt/perun/bin/
+mkdir -p %{buildroot}/var/lib/perun/${GENERATE_RPM_FOR_SERVICE}/
 cp -r bin/* %{buildroot}/opt/perun/bin/
 $CUSTOM_CONF
 
 %files
 /opt/perun/bin/*
+/var/lib/perun/${GENERATE_RPM_FOR_SERVICE}/
 $CUSTOM_FILE_DATA
 EOF
 

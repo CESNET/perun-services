@@ -5,7 +5,7 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 
-local $::SERVICE_NAME = "ldap_ad_ceitec";
+local $::SERVICE_NAME = "ad_ceitec";
 local $::PROTOCOL_VERSION = "3.0.0";
 my $SCRIPT_VERSION = "3.0.0";
 
@@ -14,43 +14,71 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $fileNameGroups = "$DIRECTORY/$::SERVICE_NAME"."_groups.ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
+my $baseDnFileNameService = "$DIRECTORY/baseDNService";
 my $baseDnFileNameGroups = "$DIRECTORY/baseDNGroups";
 
 my $data = perunServicesInit::getHierarchicalData;
 
-#Constants
-our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDN';
+# Constants
+our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN'; # previously f:d:ldapBaseDN
+our $A_F_SERV_BASE_DN;  *A_F_SERV_BASE_DN = \'urn:perun:facility:attribute-def:def:adServiceBaseDN';
+our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
+our $A_F_DOMAIN;  *A_F_DOMAIN = \'urn:perun:facility:attribute-def:def:adDomain';
+our $A_F_UAC;  *A_F_UAC = \'urn:perun:facility:attribute-def:def:adUAC';
+our $A_F_UAC_SERV;  *A_F_UAC_SERV = \'urn:perun:facility:attribute-def:def:adServiceUAC';
+# Resources = Groups
+our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName'; # previously r:d:secGroupCnCeitecAD
 
 # User attributes
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
-#our $A_EPPN;  *A_EPPN = \'urn:perun:user:attribute-def:def:preferredEduPersonPrincipalName';
 our $A_EPPNS; *A_EPPNS = \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 our $A_O; *A_O = \'urn:perun:member:attribute-def:def:organization';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
 our $A_CN; *A_CN = \'urn:perun:user:attribute-def:def:cnCeitecAD';
-our $A_R_SEC_GROUP_CN; *A_R_SEC_GROUP_CN = \'urn:perun:resource:attribute-def:def:secGroupCnCeitecAD';
+our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
 # GATHER USERS FROM RESOURCES
-my $usersByResource;  # $usersByResource->{$A_R_SEC_GROUP_CN}->{users DN} = 1
+my $usersByResource;  # $usersByResource->{$A_R_GROUP_NAME}->{users DN} = 1
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
+
 if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_SERV_BASE_DN})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_GROUP_BASE_DN})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_DOMAIN})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_UAC})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_UAC_SERV})) {
 	exit 1;
 }
 
 #
 # PRINT BASE_DN FILEs
 #
-my $baseDNUsers = "OU=Users,".$facilityAttributes{$A_F_BASE_DN};
-my $baseDNGroups = "OU=Security Groups,".$facilityAttributes{$A_F_BASE_DN};
+my $baseDNUsers = $facilityAttributes{$A_F_BASE_DN};
+my $baseDNService = $facilityAttributes{$A_F_SERV_BASE_DN};
+my $baseDNGroups = $facilityAttributes{$A_F_GROUP_BASE_DN};
 
 open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
 print FILE $baseDNUsers;
+close(FILE);
+
+open FILE,">:encoding(UTF-8)","$baseDnFileNameService" or die "Cannot open $baseDnFileNameService: $! \n";
+print FILE $baseDNService;
 close(FILE);
 
 open FILE,">:encoding(UTF-8)","$baseDnFileNameGroups" or die "Cannot open $baseDnFileNameGroups: $! \n";
@@ -88,9 +116,19 @@ foreach my $rData (@resourcesData) {
 		$users->{$login}->{$A_EPPNS} = $mAttributes{$A_EPPNS};
 		$users->{$login}->{$A_O} = $mAttributes{$A_O};
 		$users->{$login}->{$A_CN} = $mAttributes{$A_CN};
+		$users->{$login}->{$A_IS_SERVICE} = $mAttributes{$A_IS_SERVICE};
 
 		# store which users (their DN) are on this resource
-		$usersByResource->{$rAttributes{$A_R_SEC_GROUP_CN}}->{"CN=" . $mAttributes{$A_CN} . "," . $baseDNUsers} = 1
+
+		if (defined $mAttributes{$A_IS_SERVICE} and ($mAttributes{$A_IS_SERVICE} == 1)) {
+			# service users
+			$users->{$login}->{"DN"} = "cn=" . $mAttributes{$A_CN} . "," . $baseDNService;
+			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $mAttributes{$A_CN} . "," . $baseDNService} = 1
+		} else {
+			# normal users
+			$users->{$login}->{"DN"} = "cn=" . $mAttributes{$A_CN} . "," . $baseDNUsers;
+			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $mAttributes{$A_CN} . "," . $baseDNUsers} = 1
+		}
 
 	}
 
@@ -133,12 +171,12 @@ for my $login (@logins) {
 	my $cn = "$users->{$login}->{$A_CN}";
 
 	# Localy defined attributes
-	my $userPrincipalName = "$login\@ceitec.local";
+	my $userPrincipalName = "$login\@$facilityAttributes{$A_F_DOMAIN}";
 	my $samAccountName = $login;
 	my $displayName = "$users->{$login}->{$A_LAST_NAME} $users->{$login}->{$A_FIRST_NAME}";
 
 	# print attributes, which are never empty
-	print FILE "dn: cn=" . $cn . "," . $baseDNUsers . "\n";
+	print FILE "dn: " . $users->{$login}->{"DN"} . "\n";
 	print FILE "cn: " . $cn . "\n";
 
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
@@ -147,6 +185,7 @@ for my $login (@logins) {
 	my $mail = $users->{$login}->{$A_MAIL};
 	my $eppns = $users->{$login}->{$A_EPPNS};
 	my $o = $users->{$login}->{$A_O};
+	my $service = $users->{$login}->{$A_IS_SERVICE};
 
 	if (defined $displayName and length $displayName) {
 		print FILE "displayName: " . $displayName . "\n";
@@ -174,8 +213,11 @@ for my $login (@logins) {
 	}
 
 	# Set userAccountControl to 66048 which means Normal account + Password never expires + enabled
-	# ONLY FOR CEITEC
-	print FILE "userAccountControl: 66048\n";
+	if (defined $service and ($service == 1)) {
+		print FILE "userAccountControl: $facilityAttributes{$A_F_UAC_SERV}\n";
+	} else {
+		print FILE "userAccountControl: $facilityAttributes{$A_F_UAC}\n";
+	}
 
 	# print classes
 	print FILE "objectclass: top\n";
