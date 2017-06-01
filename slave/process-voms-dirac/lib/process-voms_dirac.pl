@@ -135,8 +135,8 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 
 	my @roles_current=`voms-admin --vo \Q${name}\E list-roles`;
 	if ( $? != 0 ) {
-		syslog LOG_ERR, "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
-		print STDERR "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
+		syslog LOG_ERR, "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @roles_current";
+		print STDERR "Failed listing roles in VO \"$name\". Error Code $?, original message from voms-admin: @roles_current\n";
 		$retval = 1;
 		next;
 	}
@@ -145,8 +145,8 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 
 	my @cas=`voms-admin --vo \Q${name}\E list-cas`;
 	if ( $? != 0 ) {
-		syslog LOG_ERR, "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
-		print STDERR "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
+		syslog LOG_ERR, "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @cas";
+		print STDERR "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @cas\n";
 		$retval = 1;
 		next;
 	}
@@ -154,8 +154,8 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 
 	my @attributeClasses_current=`voms-admin --vo \Q${name}\E list-attribute-classes`;
 	if ( $? != 0 ) {
-		syslog LOG_ERR, "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current";
-		print STDERR "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @groups_current\n";
+		syslog LOG_ERR, "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @attributeClasses_current";
+		print STDERR "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @attributeClasses_current\n";
 		$retval = 1;
 		next;
 	}
