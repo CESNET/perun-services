@@ -1,3 +1,9 @@
+perun-slave-process-voms (3.1.6) stable; urgency=high
+
+  * fixing error output for list-roles and list-cas operations
+
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Thu, 1 Jun 2017 15:28:00 +0200
+
 perun-slave-process-voms (3.1.5) stable; urgency=high
 
   * escaping input from perun to voms
