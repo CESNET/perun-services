@@ -5,7 +5,7 @@ LIB_DIR='/opt/perun/lib/'
 CACHE_DIR='/var/lib/perun/'
 CUSTOM_SCRIPTS_DIR="/etc/perun/"
 OLD_CUSTOM_SCRIPTS_DIR="/opt/perun/bin/"
-LOCK_DIR=${LOCK_DIR:=/var/lock}
+LOCK_DIR=${LOCK_DIR:=/var/lock/perun}
 SERVICE_BLACKLIST=()	# syntax: (item1 item2 item3)
 SERVICE_WHITELIST=()
 
@@ -150,7 +150,7 @@ function diff_mv_sync {
 	RET=$?;
 	sync
 
-	return $RET;                                                                                
+	return $RET;
 }
 
 function diff_mv {
@@ -246,7 +246,7 @@ function diff_update {
 
 # If lock file exits, recover all existing files
 #
-# Recover only those files, which are represented in new 
+# Recover only those files, which are represented in new
 # list of files to backup (need to know path to recovering files)
 #
 # If lock not exists, remove everything from backup directory and
@@ -259,7 +259,7 @@ function diff_update {
 function backup_and_recover_files {
 	FILES="$@"
 	SERVICE_LOCK_FILE="${BACKUP_DIR}/lock"
-	
+
 	#If backup dir for service not exists, create it
 	if [ ! -d "${BACKUP_DIR}" ]; then
 		catch_error E_BACKUP_DIR mkdir -p "${BACKUP_DIR}"
@@ -273,7 +273,7 @@ function backup_and_recover_files {
 			LOCAL=`echo $FILE | sed -e 's/^.*\///'`
 			if [ -f "${BACKUP_DIR}/${LOCAL}" ]; then
 				catch_error E_FILE_CANT_RECOVER  diff_mv_sync "${BACKUP_DIR}/${LOCAL}" "${FILE}"
-				log_msg I_FILE_RECOVERED	
+				log_msg I_FILE_RECOVERED
 			else
 				#if not, skip it and info about it
 				log_msg I_FILE_CANT_RECOVER
@@ -341,7 +341,7 @@ WARN_USING_OLD_PATH_FOR_SCRIPTS="Warning: Old configuration dir ${OLD_CUSTOM_SCR
 ls "${OLD_CUSTOM_SCRIPTS_DIR}/${SERVICE}.d/" 2>/dev/null | grep '^pre_\|^post_\|^mid_' 1>/dev/null && echo "${WARN_USING_OLD_PATH_FOR_SCRIPTS}" 1>&2
 
 DNS_ALIAS_OK=0
-# check if perun send via allowed hostname 
+# check if perun send via allowed hostname
 if [ "${#DNS_ALIAS_WHITELIST[@]}" -gt 0  ]; then
 	if in_array "${SEND_TO_HOSTNAME}" "${DNS_ALIAS_WHITELIST[@]}"; then
 		DNS_ALIAS_OK=1
@@ -376,7 +376,7 @@ if [ "${#SERVICE_BLACKLIST[@]}" -gt 0  ]; then
 fi
 
 SERVICE_PROCESS_FILE="${SCRIPTS_DIR}/process-${SERVICE}.sh";
-catch_error E_UNSUPPORTED_SERVICE [ -r "$SERVICE_PROCESS_FILE" ] 
+catch_error E_UNSUPPORTED_SERVICE [ -r "$SERVICE_PROCESS_FILE" ]
 
 . "$SERVICE_PROCESS_FILE"
 
