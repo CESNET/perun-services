@@ -2,6 +2,7 @@
 NAME='perunv3'
 SCRIPTS_DIR=`dirname $0`
 LIB_DIR='/opt/perun/lib/'
+LIB_SYNC="$LIB_DIR/base/sync.pl"
 CACHE_DIR='/var/lib/perun/'
 CUSTOM_SCRIPTS_DIR="/etc/perun/"
 OLD_CUSTOM_SCRIPTS_DIR="/opt/perun/bin/"
@@ -141,14 +142,32 @@ function version_check {
 	[ ${RECEIVED_PROTOCOL_VERSION} = ${PROTOCOL_VERSION} ] || log_msg I_PROTOCOL_MINOR_DIFF
 }
 
+function sync_files {
+  SRC=$@
+
+  for i in $SRC
+  do                                                                                                                                                                                          
+    perl $LIB_SYNC $i || sync
+  done
+}
+
+function mv_sync {
+	SRC="$1"
+	DST="$2"
+
+	sync_files "$SRC"
+	catch_error E_MOVE_ERROR mv -f "$SRC" "$DST"
+	sync_files "$DST"
+}
+
 function diff_mv_sync {
 	SRC="$1"
 	DST="$2"
 
-	sync
-	diff_mv $SRC $DST
+	sync_files "$SRC"
+	diff_mv "$SRC" "$DST"
 	RET=$?;
-	sync
+	sync_files "$DST"
 
 	return $RET;                                                                                
 }

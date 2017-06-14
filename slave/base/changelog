@@ -1,3 +1,15 @@
+perun-slave-base (3.1.7) stable; urgency=high
+
+  * Add perl script sync.pl to the base package of perun slave scripts,
+    because we need to sync just one file instead of whole filesystem and we
+    can use perl core function for this purpose.
+  * Reason: command "sync" does synchronization of all mounted file systems on
+    machine and if some of them are network fs, it can freeze the server for
+    really long time. Synchronization of specific files can prevent this
+    situation.
+
+ -- Michal Stava <stavamichal@gmail.com>  Wed, 14 Jun 2017 13:19:00 +0200
+
 perun-slave-base (3.1.6) stable; urgency=low
 
   * Export perun variables with service name and path to directories (like
