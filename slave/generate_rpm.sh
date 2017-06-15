@@ -13,6 +13,7 @@ CHANGELOG_FILE="$GENERATE_RPM_FOR_SERVICE/changelog"
 BIN_DIR="$GENERATE_RPM_FOR_SERVICE/bin/"
 CONF_DIR="$GENERATE_RPM_FOR_SERVICE/conf/"
 LIB_DIR="$GENERATE_RPM_FOR_SERVICE/lib"
+TMPFILES_DIR="$GENERATE_RPM_FOR_SERVICE/tmpfiles.d"
 DEPENDENCIES="$GENERATE_RPM_FOR_SERVICE/rpm.dependencies"
 
 if [ ! $GENERATE_RPM_FOR_SERVICE ]; then
@@ -36,6 +37,11 @@ if [ -d "$LIB_DIR" ]; then
 	WITH_LIB=1
 fi
 
+WITH_TMPFILES=0
+if [ -d "$TMPFILES_DIR" ]; then
+	WITH_TMPFILES=1
+fi
+
 #tar everything in directory of concrete perun-service
 
 
@@ -55,7 +61,7 @@ BUILDROOT="%{_tmppath}/%{name}-%{version}-build"
 DESCRIPTION="Perun slave script $GENERATE_RPM_FOR_SERVICE"
 
 # load dependencies
-if [ -f "$DEPENDENCIES" ]; then 
+if [ -f "$DEPENDENCIES" ]; then
 	REQUIRES=`sed -e '$ ! s/$/,/' $DEPENDENCIES | tr '\n' ' '`
 	REQUIRES="Requires: ${REQUIRES}";
 fi
@@ -74,6 +80,14 @@ mkdir -p %{buildroot}/opt/perun/lib/${CONF_SERVICE_NAME}/
 cp -r lib/* %{buildroot}/opt/perun/lib/${CONF_SERVICE_NAME}/"
   CUSTOM_FILE_DATA="$CUSTOM_FILE_DATA
 /opt/perun/lib/${CONF_SERVICE_NAME}/"
+fi
+# Append /usr/lib/tmpfiles.d/
+if [ $WITH_TMPFILES == 1 ]; then
+  CUSTOM_CONF="$CUSTOM_CONF
+mkdir -p %{buildroot}/usr/lib/tmpfiles.d/
+cp tmpfiles.d/perun.conf %{buildroot}/usr/lib/tmpfiles.d/"
+  CUSTOM_FILE_DATA="$CUSTOM_FILE_DATA
+/usr/lib/tmpfiles.d/perun.conf"
 fi
 
 # generate spec file

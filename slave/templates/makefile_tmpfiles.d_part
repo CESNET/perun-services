@@ -1,0 +1,2 @@
+	$(INSTALL) -d -m 755 $(TMPFILESDIR)
+	$(INSTALL) ./tmpfiles.d/perun.conf $(TMPFILESDIR)
