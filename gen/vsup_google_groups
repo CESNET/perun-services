@@ -92,7 +92,7 @@ binmode FILE, ":utf8";
 
 my @keys = sort keys %{$users};
 for my $key (@keys) {
-	print FILE $key . "\@" . $domainName . ";" . $users->{$key}->{$A_U_FIRST_NAME} . ";" . $users->{$key}->{$A_U_LAST_NAME} . "\n";
+	print FILE $key . "\@" . $domainName . ";" . $users->{$key}->{$A_U_FIRST_NAME} . ";" . $users->{$key}->{$A_U_LAST_NAME} . ";" . "\n";
 }
 close(FILE) or die "Cannot close $usersFileName: $! \n";
 
