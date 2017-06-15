@@ -11,62 +11,103 @@ my $SCRIPT_VERSION = "3.0.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data      = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHierarchicalData;
 
-#Constants
-our $A_FACILITY_GOOGLE_NAMESPACE;		*A_FACILITY_GOOGLE_NAMESPACE =			\'urn:perun:facility:attribute-def:def:googleGroupNameNamespace';
-our $A_GROUP_RESOURCE_GOOGLE_GROUP_NAME;	*A_GROUP_RESOURCE_GOOGLE_GROUP_NAME =		\'urn:perun:group_resource:attribute-def:virt:googleGroupName';
-our $A_USER_GOOGLE_NAMESPACE;			*A_USER_GOOGLE_NAMESPACE =			\'urn:perun:user:attribute-def:def:login-namespace:vsup';
+# Constants
+our $A_F_GOOGLE_GROUP_DOMAIN;		*A_F_GOOGLE_GROUP_DOMAIN =			\'urn:perun:facility:attribute-def:def:googleGroupDomain';
+our $A_R_GOOGLE_GROUP_NAME;				*A_R_GOOGLE_GROUP_NAME =		\'urn:perun:resource:attribute-def:def:googleGroupName';
+our $A_R_GOOGLE_GROUP_DISPLAY_NAME;		*A_R_GOOGLE_GROUP_DISPLAY_NAME =\'urn:perun:resource:attribute-def:def:googleGroupDisplayName';
+our $A_U_GOOGLE_GROUP_LOGIN;			*A_U_GOOGLE_GROUP_LOGIN =		\'urn:perun:user:attribute-def:def:login-namespace:vsup';
+our $A_U_FIRST_NAME; 			*A_U_FIRST_NAME =			\'urn:perun:user:attribute-def:core:firstName';
+our $A_U_LAST_NAME; 			*A_U_LAST_NAME =			\'urn:perun:user:attribute-def:core:lastName';
+our $A_U_ARTISTIC_FIRST_NAME; 	*A_U_ARTISTIC_FIRST_NAME = 	\'urn:perun:user:attribute-def:def:artisticFirstName';
+our $A_U_ARTISTIC_LAST_NAME; 	*A_U_ARTISTIC_LAST_NAME = 	\'urn:perun:user:attribute-def:def:artisticLastName';
 
-#Global data structure
-our $groupStruc = {};
-our @groups;
+# Global data structure
+
+# $users->{$login}->{ATTR} = $attrValue;
+our $users = {};
+# $groups->{name}->{"displayName"} = nice name of a group;
+# $groups->{name}->{"members"}->{$login} = 1;
+our $groups = {};
 
 my %facilityAttributes = attributesToHash $data->getAttributes;
-my $domainName = $facilityAttributes{$A_FACILITY_GOOGLE_NAMESPACE};
+if (!defined($facilityAttributes{$A_F_GOOGLE_GROUP_DOMAIN})) {
+	exit 1;
+}
+my $domainName = $facilityAttributes{$A_F_GOOGLE_GROUP_DOMAIN};
 
-foreach my $resourceData ( $data->getChildElements ) {
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements){
-		my %groupAttributes = attributesToHash $groupData->getAttributes;
-		my $membersElement = ($groupData->getChildElements)[1];
+#
+# AGGREGATE DATA
+#
+# FOR EACH RESOURCE
+foreach my $rData ($data->getChildElements) {
 
-		if($groupAttributes{$A_GROUP_RESOURCE_GOOGLE_GROUP_NAME}) {
-			my $groupName = $groupAttributes{$A_GROUP_RESOURCE_GOOGLE_GROUP_NAME} . "@" . $domainName;
-			## add group name to group array
-			push @groups, $groupName;
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
 
-			foreach my $memberData($membersElement->getChildElements) {
-				my %memberAttributes = attributesToHash $memberData->getAttributes;
-				my $login = $memberAttributes{$A_USER_GOOGLE_NAMESPACE};
-				unless(exists $groupStruc->{$groupName}->{$login}) {
-					$groupStruc->{$groupName}->{$login} = {};
-				}
-			}
+	my $groupName = $resourceAttributes{$A_R_GOOGLE_GROUP_NAME};
+	my $groupDisplayName = $resourceAttributes{$A_R_GOOGLE_GROUP_DISPLAY_NAME};
+
+	if (defined $groupName and length $groupName) {
+		unless(exists $groups->{$groupName}) {
+			$groups->{$groupName}->{"displayName"} = $groupDisplayName;
+			$groups->{$groupName}->{"members"} = {};
 		}
 	}
+
+	my @membersData = $rData->getChildElements;
+
+	foreach my $member (@membersData) {
+
+		my %uAttributes = attributesToHash $member->getAttributes;
+		my $login = $uAttributes{$A_U_GOOGLE_GROUP_LOGIN};
+
+		# create user entry
+		$users->{$login}->{$A_U_FIRST_NAME} = ($uAttributes{$A_U_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_U_FIRST_NAME} || ''));
+		$users->{$login}->{$A_U_LAST_NAME} = ($uAttributes{$A_U_ARTISTIC_LAST_NAME} || ($uAttributes{$A_U_LAST_NAME} || ''));
+
+		# put member in a group
+		if (defined $groupName and length $groupName) {
+			$groups->{$groupName}->{"members"}->{$login."\@".$domainName} = 1;
+		}
+
+	}
+
 }
 
-my $fileName = "$DIRECTORY/$::SERVICE_NAME";
-open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
-
-# output of google_groups file:
-# - first line only contains groups sorted by name separated by white space
-# - all other lines looks like this: groupName id1 id2 id3, where groupName is 'group1@domain.name.com'
-
-# output of google_groups_domain file:
-# - there is only one line containing name of the domain
-
-print FILE join(' ', sort @groups), "\n";
-
-foreach my $group (sort keys %$groupStruc) {
-	print FILE $group, " ", join(' ', sort keys %{$groupStruc->{$group}}), "\n";
-}
-
-close(FILE) or die "Cannot close $fileName: $! \n";
-
-my $fileNameDomain = $DIRECTORY . "google_groups_domain";
+#
+# PRINT DOMAIN FILE
+#
+my $fileNameDomain = $DIRECTORY . "vsup_google_groups_domain";
 open FILE, ">$fileNameDomain" or die "Cannot open $fileNameDomain: $! \n";
 print FILE $domainName;
 close(FILE) or die "Cannot close $fileNameDomain: $! \n";
+
+#
+# PRINT USERS DATA FILE
+#
+my $usersFileName = "$DIRECTORY/$::SERVICE_NAME"."_users.csv";
+open FILE,">$usersFileName" or die "Cannot open $usersFileName: $! \n";
+binmode FILE, ":utf8";
+
+my @keys = sort keys %{$users};
+for my $key (@keys) {
+	print FILE $key . "\@" . $domainName . ";" . $users->{$key}->{$A_U_FIRST_NAME} . ";" . $users->{$key}->{$A_U_LAST_NAME} . "\n";
+}
+close(FILE) or die "Cannot close $usersFileName: $! \n";
+
+#
+# PRINT GROUPS DATA FILE
+#
+my $groupsFileName = "$DIRECTORY/$::SERVICE_NAME"."_groups.csv";
+open FILE,">$groupsFileName" or die "Cannot open $groupsFileName: $! \n";
+binmode FILE, ":utf8";
+
+my @groupKeys = sort keys %{$groups};
+for my $key (@groupKeys) {
+	my @userKeys = sort keys %{$groups->{$key}->{"members"}};
+	print FILE $key . ";" . $groups->{$key}->{"displayName"} . ";" . join(',', @userKeys) . "\n";
+}
+close(FILE) or die "Cannot close $groupsFileName: $! \n";
 
 perunServicesInit::finalize;
