@@ -15,6 +15,12 @@ SERVICE_WHITELIST=()
 DNS_ALIAS_WHITELIST=( `hostname -f` )
 FACILITY_WHITELIST=()        # from which facilities this host accept configuration
 
+# check if lock dir is writable
+if ! [ -w $LOCK_DIR ] ; then
+	# If not - redirect lock to /tmp as most compatible non-persistent place for locks.
+	LOCK_DIR="/tmp";
+fi
+
 if [ -f "/etc/${NAME}.conf" ]; then
 	. "/etc/${NAME}.conf"
 fi
@@ -49,6 +55,7 @@ E_REMOVE_SERVICE_LOCK_FILE=(11 'Cannot remove service lock file and backup files
 E_FILE_CANT_RECOVER=(12 'File ${BACKUP_DIR}/${LOCAL} cannot be recovered. Moving file problems')
 E_CREATE_BACKUP_FILE=(13 'Cannot copy file ${FILE} to backup directory ${BACKUP_DIR}')
 E_CREATE_LOCK_FILE=(14 'Cannot create lock file in backup directory ${BACKUP_DIR}')
+E_LOCK_DIR_NOT_WRITABLE=(15 'Lock dir {$LOCK_DIR} is not writable')
 E_PROTOCOL_VERSION=(200 'Wrong version of received files - (local=${PROTOCOL_VERSION},remote=${RECEIVED_PROTOCOL_VERSION})')
 E_PROTOCOL_VERSION_FILE=(201 'Remote protocol version file missing')
 E_PROTOCOL_VERSION_VARIABLE=(202 'PROTOCOL_VERSION variable not set')
@@ -115,11 +122,7 @@ function catch_error {
 
 function create_lock {
 
-	# test if lock dir is writable !
-	if ! [ -w $LOCK_DIR ] ; then
-		# If not - redirect lock to /tmp as most compatible non-persistent place for locks.
-		LOCK_DIR="/tmp";
-	fi
+	catch_error E_LOCK_DIR_NOT_WRITABLE test -w $LOCK_DIR
 
 	if mkdir "${LOCK_FILE}"; then
 		trap 'rm -r -f "${WORK_DIR}" "${LOCK_FILE}"' EXIT
@@ -150,12 +153,12 @@ function version_check {
 }
 
 function sync_files {
-  SRC=$@
+	SRC=$@
 
-  for i in $SRC
-  do                                                                                                                                                                                          
-    perl $LIB_SYNC $i || sync
-  done
+	for i in $SRC
+	do
+		perl $LIB_SYNC $i || sync
+	done
 }
 
 function mv_sync {
