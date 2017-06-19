@@ -20,7 +20,6 @@ our $A_USER_GOOGLE_NAMESPACE;			*A_USER_GOOGLE_NAMESPACE =			\'urn:perun:user:at
 
 #Global data structure
 our $groupStruc = {};
-our @groups;
 
 my %facilityAttributes = attributesToHash $data->getAttributes;
 my $domainName = $facilityAttributes{$A_FACILITY_GOOGLE_NAMESPACE};
@@ -32,8 +31,6 @@ foreach my $resourceData ( $data->getChildElements ) {
 
 		if($groupAttributes{$A_GROUP_RESOURCE_GOOGLE_GROUP_NAME}) {
 			my $groupName = $groupAttributes{$A_GROUP_RESOURCE_GOOGLE_GROUP_NAME} . "@" . $domainName;
-			## add group name to group array
-			push @groups, $groupName;
 
 			foreach my $memberData($membersElement->getChildElements) {
 				my %memberAttributes = attributesToHash $memberData->getAttributes;
@@ -49,20 +46,20 @@ foreach my $resourceData ( $data->getChildElements ) {
 	}
 }
 
-my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+my $fileName = "$DIRECTORY/$::SERVICE_NAME" . "_groups.csv";
 open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
 
-# output of google_groups file:
-# - first line only contains groups sorted by name separated by white space
-# - all other lines looks like this: groupName id1 id2 id3, where groupName is 'group1@domain.name.com'
+# output of google_groups_groups.csv file:
+# - groupName;groupDisplayName;id1,id2,id3 where
+# groupName is 'group1@domain.name.com'
+# groupDisplayName is optional and unused here
+# id[x] is a list of group member identifiers
 
 # output of google_groups_domain file:
 # - there is only one line containing name of the domain
 
-print FILE join(' ', sort @groups), "\n";
-
 foreach my $group (sort keys %$groupStruc) {
-	print FILE $group, " ", join(' ', sort keys %{$groupStruc->{$group}}), "\n";
+	print FILE $group, ";;", join(',', sort keys %{$groupStruc->{$group}}), "\n";
 }
 
 close(FILE) or die "Cannot close $fileName: $! \n";
