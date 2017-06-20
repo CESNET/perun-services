@@ -1,3 +1,10 @@
+perun-slave-metacentrum (3.0.5) stable; urgency=low
+
+  * add missing conflicts for perun-slave-metacentrum package on
+    perun-slave and perun-slave meta
+
+ -- Michal Stava <stavamichal@gmail.com>  Tue, 20 Jun 2017 17:29:00 +0200
+
 perun-slave-metacentrum (3.0.4) stable; urgency=low
 
   * No changes, only verion bump.

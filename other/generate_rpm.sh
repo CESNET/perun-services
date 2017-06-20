@@ -17,6 +17,7 @@ DEST_DIR2="$5"
 DEST_DIR3="$7"
 
 DEPENDENCIES="$SERVICE_NAME/rpm.dependencies"
+CONFLICTS_FILE="$SERVICE_NAME/conflicts"
 
 if [ ! $SERVICE_NAME ]; then
   echo "Missing SERVICE directory info, exit without any work!"
@@ -83,6 +84,16 @@ if [ -f "$DEPENDENCIES" ]; then
 	fi
 fi
 
+# load conflicts
+if [ -f "$CONFLICTS_FILE" ]; then
+  CONFLICTS=`cat ${CONFLICTS_FILE}`
+  if [ ! -z "$CONFLICTS" ]; then
+    CONFLICTS="Conflicts: ${CONFLICTS}";
+  else
+    CONFLICTS=""
+  fi
+fi
+
 BASIC_CONF=""
 BASIC_CONF_DATA=""
 if [ $WITH_DIR1 == 1 ]; then
@@ -115,7 +126,6 @@ cat > $SPEC_FILE_NAME <<EOF
 Name: ${SERVICE_NAME}
 Version: ${VERSION}
 Release: ${RELEASE}
-Conflicts: some-conflict-package
 Summary: ${SUMMARY}
 License: ${LICENSE}
 Group: ${GROUP}
@@ -123,6 +133,7 @@ BuildArch: noarch
 Source: ${SOURCE}
 BuildRoot: $BUILDROOT
 $REQUIRES
+$CONFLICTS
 
 %description
 $DESCRIPTION
