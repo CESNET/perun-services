@@ -1,3 +1,14 @@
+perun-slave-base (3.1.8) stable; urgency=low
+
+  * Perform write check on default locking folder LOCK_DIR=/var/lock/.
+    If not writable, fallback to /tmp location. This ensure compatibility
+    across most systems.
+  * Locks location can be customized in /etc/perunv3.conf by setting
+    LOCK_DIR to custom value. If specified path is not writable, script
+    ends with exit code 15.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Tue, 20 Jun 2017 12:02:00 +0200
+
 perun-slave-base (3.1.7) stable; urgency=high
 
   * Add perl script sync.pl to the base package of perun slave scripts,
@@ -40,9 +51,9 @@ perun-slave-base (3.1.3) stable; urgency=low
 
 perun-slave-base (3.1.2) stable; urgency=low
 
-  * Use also the old path for {service}.d (pre, mid, post) scripts. Old path 
-    is /opt/perun/bin/{service}.d/ and the new path is 
-    /etc/perun/{service}.d/. Same files in both paths has higher priority from 
+  * Use also the old path for {service}.d (pre, mid, post) scripts. Old path
+    is /opt/perun/bin/{service}.d/ and the new path is
+    /etc/perun/{service}.d/. Same files in both paths has higher priority from
     old path (take these).
   * Info to stderr if old path with scrips is still used (there are some
     scripts)
