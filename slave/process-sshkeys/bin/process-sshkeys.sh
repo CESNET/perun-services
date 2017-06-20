@@ -46,9 +46,7 @@ function process {
 
 		if [ -f "$SSH_AUTHORIZED_KEYS" ]; then
 			catch_error E_MERGE_SSH_KEYS sort -u "$SSH_AUTHORIZED_KEYS" "$FROM_PERUN_AUTHORIZED_KEYS" > "$TMP_FILE"
-			sync
-			catch_error E_IO mv "$TMP_FILE" "$FROM_PERUN_AUTHORIZED_KEYS"
-			sync
+			sync_mv "$TMP_FILE" "$FROM_PERUN_AUTHORIZED_KEYS"
 		else
 			touch "$SSH_AUTHORIZED_KEYS" || log_msg E_IO
 			USER_PRIMARY_GROUP_ID=`id -g $USER` || log_msg E_PRIMARY_GROUP_ID_NOT_FOUND

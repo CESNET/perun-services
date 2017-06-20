@@ -1,3 +1,14 @@
+perun-slave-process-sympa-cesnet (3.1.4) stable; urgency=high
+
+  * Use new sync for specific files by perl library instead of whole
+    filesystem sync
+  * Reason: command "sync" does synchronization of all mounted file systems on
+    machine and if some of them are network fs, it can freeze the server for
+    really long time. Synchronization of specific files can prevent this
+    situation.
+
+ -- Michal Stava <stavamichal@gmail.com>  Wed, 14 Jun 2017 13:55:00 +0200
+
 perun-slave-process-sympa-cesnet (3.1.3) stable; urgency=medium
 
   * Generate configuration directory /etc/perun/{service}.d automatically even
