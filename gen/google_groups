@@ -36,9 +36,13 @@ foreach my $resourceData ( $data->getChildElements ) {
 				my %memberAttributes = attributesToHash $memberData->getAttributes;
 				my @logins = shift(@{$memberAttributes{$A_USER_GOOGLE_NAMESPACE}});
 
-				foreach my $member(@logins){
-					unless(exists $groupStruc->{$groupName}->{$member}) {
-						$groupStruc->{$groupName}->{$member} = {};
+				# skip users without google login, might happen, when user removes his UserExtSource
+				# since google login is virtual attribute calculated from Google IdP UES.
+				if (@logins) {
+					foreach my $member(@logins){
+						unless(exists $groupStruc->{$groupName}->{$member}) {
+							$groupStruc->{$groupName}->{$member} = {};
+						}
 					}
 				}
 			}
