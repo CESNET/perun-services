@@ -7,6 +7,7 @@ echo "--------------------------------------------"
 TMPDIR="/tmp/package-rpm-build"
 SERVICE_NAME=$1
 CHANGELOG_FILE="$SERVICE_NAME/debian/changelog"
+POST_FILE="$SERVICE_NAME/post_file"
 
 SOURCE_DIR1="$2"
 SOURCE_DIR2="$4"
@@ -54,6 +55,11 @@ if [ ! -z "$SOURCE_DIR3" -a -d "$SERVICE_NAME/$SOURCE_DIR3" ]; then
 		exit 1;
 	fi
 	WITH_DIR3=1
+fi
+
+POST_DATA=""
+if [ -f "$POST_FILE" ]; then
+	POST_DATA=`cat "$POST_FILE"`
 fi
 
 #tar everything in directory of concrete perun-service
@@ -150,6 +156,8 @@ $CUSTOM_CONF
 %files
 $BASIC_CONF_DATA
 $CUSTOM_FILE_DATA
+
+$POST_DATA
 EOF
 
 #generate RPM

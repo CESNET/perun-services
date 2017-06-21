@@ -1,0 +1,21 @@
+if [ -x "/usr/bin/deb-systemd-helper" ]; then
+	if deb-systemd-helper --quiet was-enabled perun_propagate.service; then
+		deb-systemd-helper enable perun_propagate.service >/dev/null || true
+	else
+		deb-systemd-helper update-state perun_propagate.service >/dev/null || true
+	fi
+	if [ -x "/etc/init.d/perun_propagate" ]; then
+		update-rc.d perun_propagate defaults >/dev/null
+		if [ -n "$2" ]; then
+			_dh_action=restart
+		else
+			_dh_action=start
+		fi
+		invoke-rc.d perun_propagate $_dh_action || exit $?
+	fi
+else
+	if [ -x "/etc/init.d/perun_propagate" ]; then
+		update-rc.d perun_propagate defaults 20 >/dev/null
+		invoke-rc.d perun_propagate start || exit $?
+	fi
+fi
