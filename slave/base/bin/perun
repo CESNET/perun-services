@@ -15,6 +15,12 @@ SERVICE_WHITELIST=()
 DNS_ALIAS_WHITELIST=( `hostname -f` )
 FACILITY_WHITELIST=()        # from which facilities this host accept configuration
 
+# check if lock dir is writable
+if ! [ -w $LOCK_DIR ] ; then
+	# If not - redirect lock to /tmp as most compatible non-persistent place for locks.
+	LOCK_DIR="/tmp";
+fi
+
 if [ -f "/etc/${NAME}.conf" ]; then
 	. "/etc/${NAME}.conf"
 fi
@@ -49,6 +55,7 @@ E_REMOVE_SERVICE_LOCK_FILE=(11 'Cannot remove service lock file and backup files
 E_FILE_CANT_RECOVER=(12 'File ${BACKUP_DIR}/${LOCAL} cannot be recovered. Moving file problems')
 E_CREATE_BACKUP_FILE=(13 'Cannot copy file ${FILE} to backup directory ${BACKUP_DIR}')
 E_CREATE_LOCK_FILE=(14 'Cannot create lock file in backup directory ${BACKUP_DIR}')
+E_LOCK_DIR_NOT_WRITABLE=(15 'Lock dir {$LOCK_DIR} is not writable')
 E_PROTOCOL_VERSION=(200 'Wrong version of received files - (local=${PROTOCOL_VERSION},remote=${RECEIVED_PROTOCOL_VERSION})')
 E_PROTOCOL_VERSION_FILE=(201 'Remote protocol version file missing')
 E_PROTOCOL_VERSION_VARIABLE=(202 'PROTOCOL_VERSION variable not set')
@@ -114,6 +121,9 @@ function catch_error {
 }
 
 function create_lock {
+
+	catch_error E_LOCK_DIR_NOT_WRITABLE test -w $LOCK_DIR
+
 	if mkdir "${LOCK_FILE}"; then
 		trap 'rm -r -f "${WORK_DIR}" "${LOCK_FILE}"' EXIT
 		catch_error E_LOCK_PIDFILE echo $$ > "$LOCK_PIDFILE"
@@ -143,12 +153,12 @@ function version_check {
 }
 
 function sync_files {
-  SRC=$@
+	SRC=$@
 
-  for i in $SRC
-  do                                                                                                                                                                                          
-    perl $LIB_SYNC $i || sync
-  done
+	for i in $SRC
+	do
+		perl $LIB_SYNC $i || sync
+	done
 }
 
 function mv_sync {
@@ -169,7 +179,7 @@ function diff_mv_sync {
 	RET=$?;
 	sync_files "$DST"
 
-	return $RET;                                                                                
+	return $RET;
 }
 
 function diff_mv {
@@ -265,7 +275,7 @@ function diff_update {
 
 # If lock file exits, recover all existing files
 #
-# Recover only those files, which are represented in new 
+# Recover only those files, which are represented in new
 # list of files to backup (need to know path to recovering files)
 #
 # If lock not exists, remove everything from backup directory and
@@ -278,7 +288,7 @@ function diff_update {
 function backup_and_recover_files {
 	FILES="$@"
 	SERVICE_LOCK_FILE="${BACKUP_DIR}/lock"
-	
+
 	#If backup dir for service not exists, create it
 	if [ ! -d "${BACKUP_DIR}" ]; then
 		catch_error E_BACKUP_DIR mkdir -p "${BACKUP_DIR}"
@@ -292,7 +302,7 @@ function backup_and_recover_files {
 			LOCAL=`echo $FILE | sed -e 's/^.*\///'`
 			if [ -f "${BACKUP_DIR}/${LOCAL}" ]; then
 				catch_error E_FILE_CANT_RECOVER  diff_mv_sync "${BACKUP_DIR}/${LOCAL}" "${FILE}"
-				log_msg I_FILE_RECOVERED	
+				log_msg I_FILE_RECOVERED
 			else
 				#if not, skip it and info about it
 				log_msg I_FILE_CANT_RECOVER
@@ -360,7 +370,7 @@ WARN_USING_OLD_PATH_FOR_SCRIPTS="Warning: Old configuration dir ${OLD_CUSTOM_SCR
 ls "${OLD_CUSTOM_SCRIPTS_DIR}/${SERVICE}.d/" 2>/dev/null | grep '^pre_\|^post_\|^mid_' 1>/dev/null && echo "${WARN_USING_OLD_PATH_FOR_SCRIPTS}" 1>&2
 
 DNS_ALIAS_OK=0
-# check if perun send via allowed hostname 
+# check if perun send via allowed hostname
 if [ "${#DNS_ALIAS_WHITELIST[@]}" -gt 0  ]; then
 	if in_array "${SEND_TO_HOSTNAME}" "${DNS_ALIAS_WHITELIST[@]}"; then
 		DNS_ALIAS_OK=1
@@ -395,7 +405,7 @@ if [ "${#SERVICE_BLACKLIST[@]}" -gt 0  ]; then
 fi
 
 SERVICE_PROCESS_FILE="${SCRIPTS_DIR}/process-${SERVICE}.sh";
-catch_error E_UNSUPPORTED_SERVICE [ -r "$SERVICE_PROCESS_FILE" ] 
+catch_error E_UNSUPPORTED_SERVICE [ -r "$SERVICE_PROCESS_FILE" ]
 
 . "$SERVICE_PROCESS_FILE"
 

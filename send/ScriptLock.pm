@@ -3,9 +3,7 @@ use strict;
 use warnings FATAL => 'all';
 use Fcntl qw(:flock);
 
-use constant {
-	MAIN_LOCK_DIR => "/var/lock",
-};
+my $MAIN_LOCK_DIR="/var/lock";
 
 sub new
 {
@@ -13,7 +11,12 @@ sub new
 	my $lockName = shift;
 	unless(defined($lockName)) { die "Can't create ScriptLock object without definition of lockName!\n"; }
 	my $self = bless {}, $class;
-	$self->{_lockPath} = MAIN_LOCK_DIR . "/" . $lockName . ".lock";
+
+	# if lock dir is not writable, fallback to /tmp
+	if (!(-w $MAIN_LOCK_DIR)) {
+		$MAIN_LOCK_DIR = "/tmp"
+	}
+	$self->{_lockPath} = $MAIN_LOCK_DIR . "/" . $lockName . ".lock";
 
 	return $self;
 }
