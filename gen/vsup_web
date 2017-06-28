@@ -7,13 +7,14 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_web";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.4";
+my $SCRIPT_VERSION = "3.0.5";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
 my $fileNameCAO = "$DIRECTORY/$::SERVICE_NAME"."_cao.csv";
 my $fileNameEXT = "$DIRECTORY/$::SERVICE_NAME"."_ext.csv";
+my $fileNamePass = "$DIRECTORY/$::SERVICE_NAME"."_pass.csv";
 my $data = perunServicesInit::getDataWithGroups;
 
 #Constants
@@ -29,6 +30,12 @@ our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMa
 our $A_EMAIL_PRIV_KOS;  *A_EMAIL_PRIV_KOS = \'urn:perun:user:attribute-def:opt:privateMailKos';
 our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
 our $A_FOTO;  *A_FOTO = \'urn:perun:user:attribute-def:def:cardPhoto';
+
+our $A_STUDY_ID;  *A_STUDY_ID = \'urn:perun:user:attribute-def:def:studyId';
+our $A_STUDY_SINCE;  *A_STUDY_SINCE = \'urn:perun:user:attribute-def:def:studySince';
+our $A_STUDY_PRIHLASKA;  *A_STUDY_PRIHLASKA = \'urn:perun:user:attribute-def:def:applicationId';
+our $A_STUDY_ROCNIK;  *A_STUDY_ROCNIK = \'urn:perun:user:attribute-def:def:rocnik';
+our $A_BIRTH_DATE;  *A_BIRTH_DATE = \'urn:perun:user:attribute-def:def:birthNumber';
 
 our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
 our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
@@ -85,6 +92,32 @@ foreach my $rData ($data->getChildElements) {
 			$users->{$uco}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
 			$users->{$uco}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER} || '';
 
+			$users->{$uco}->{$A_STUDY_ID} = $uAttributes{$A_STUDY_ID} || '';
+			$users->{$uco}->{$A_STUDY_SINCE} = $uAttributes{$A_STUDY_SINCE} || '';
+			$users->{$uco}->{$A_STUDY_ROCNIK} = $uAttributes{$A_STUDY_ROCNIK} || '';
+			$users->{$uco}->{$A_STUDY_PRIHLASKA} = $uAttributes{$A_STUDY_PRIHLASKA} || '';
+
+			# Convert BirthNumber to birth date
+			if (defined $uAttributes{$A_BIRTH_DATE}) {
+
+				my $YY = substr($uAttributes{$A_BIRTH_DATE}, 0, 2);
+				my $MM = substr($uAttributes{$A_BIRTH_DATE}, 2, 2);
+				my $DD = substr($uAttributes{$A_BIRTH_DATE}, 4, 2);
+
+				# fix womans birth number month
+				if (substr($MM, 0, 1) eq "5") {
+					$MM = "0" . substr($uAttributes{$A_BIRTH_DATE}, 3, 1);
+				}
+				if (substr($MM, 0, 1) eq "6") {
+					$MM = "1" . substr($uAttributes{$A_BIRTH_DATE}, 3, 1);
+				}
+
+				$users->{$uco}->{$A_BIRTH_DATE} = $DD . $MM . $YY;
+
+			} else {
+				$users->{$uco}->{$A_BIRTH_DATE} = '';
+			}
+
 			$users->{$uco}->{$A_FOTO} = $uAttributes{$A_FOTO} || '';
 
 			# work contacts
@@ -128,6 +161,24 @@ for my $uco (@keys) {
 		$users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_MOBILE} . "\t" .
 		$users->{$uco}->{$A_EMAIL_PRIV} . "\t" . $users->{$uco}->{$A_PHONE_PRIV} . "\t" .
 		$users->{$uco}->{$A_FOTO} . "\n";
+
+}
+
+close(FILE);
+
+open FILE,">$fileNamePass" or die "Cannot open $fileNamePass: $! \n";
+binmode FILE, ":utf8";
+
+# first password app
+my @passKeys = sort keys %{$users};
+for my $uco (@passKeys) {
+
+	if ($users->{$uco}->{$A_STUDY_ID} and $users->{$uco}->{$A_STUDY_PRIHLASKA} and length $users->{$uco}->{$A_BIRTH_DATE}) {
+		# print only users with at least one study (now or in history)
+		print FILE $uco . "\t" . $users->{$uco}->{$A_STUDY_ID} . "\t" . $users->{$uco}->{$A_STUDY_SINCE} . "\t" .
+			$users->{$uco}->{$A_STUDY_PRIHLASKA} . "\t" . $users->{$uco}->{$A_STUDY_ROCNIK} . "\t" .
+			$users->{$uco}->{$A_BIRTH_DATE} . "\n";
+	}
 
 }
 
