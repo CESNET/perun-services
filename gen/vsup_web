@@ -173,7 +173,7 @@ binmode FILE, ":utf8";
 my @passKeys = sort keys %{$users};
 for my $uco (@passKeys) {
 
-	if ($users->{$uco}->{$A_STUDY_ID}) {
+	if ($users->{$uco}->{$A_STUDY_ID} and $users->{$uco}->{$A_STUDY_PRIHLASKA} and length $users->{$uco}->{$A_BIRTH_DATE}) {
 		# print only users with at least one study (now or in history)
 		print FILE $uco . "\t" . $users->{$uco}->{$A_STUDY_ID} . "\t" . $users->{$uco}->{$A_STUDY_SINCE} . "\t" .
 			$users->{$uco}->{$A_STUDY_PRIHLASKA} . "\t" . $users->{$uco}->{$A_STUDY_ROCNIK} . "\t" .

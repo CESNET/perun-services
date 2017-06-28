@@ -13,6 +13,7 @@ my $password;
 my $tableName = 'IDM2WEB_OSOBY';
 my $tableName_cao = 'IDM2WEB_CAO';
 my $tableName_ext = 'IDM2WEB_EXT';
+my $tableName_pass = 'IDM2WEB_PRIHLASKY';
 
 # define service
 my $service_name = "vsup_web";
@@ -25,6 +26,7 @@ my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
 my $service_file = "$service_files_dir/$service_name.csv";
 my $service_file_cao = "$service_files_dir/$service_name" . "_cao.csv";
 my $service_file_ext = "$service_files_dir/$service_name" . "_ext.csv";
+my $service_file_pass = "$service_files_dir/$service_name" . "_pass.csv";
 
 # propagation destination
 my $destination = $ARGV[1];
@@ -303,7 +305,7 @@ while(my $line = <FILE>) {
 	my $ZAM_FCE_CIS = (($parts[4] ne '') ? $parts[4] : undef);
 	my $NS = (($parts[5] ne '') ? $parts[5] : undef);
 
-	# fill existing CAO relations for UCO
+	# fill existing EXT relations for UCO
 	$ext->{$UCO} = 1;
 
 	# There is a EXT
@@ -382,6 +384,108 @@ if (length $elementsExt) {
 	$deletedExt += $dbh->do("DELETE FROM $tableName_ext");
 }
 
+##########################
+#
+# First pass app handling
+#
+##########################
+my $pass;
+my $insertedPass = 0;
+my $foundAndUpdatedPass = 0;
+my $foundAndSkippedPass = 0;
+my $deletedPass = 0;
+
+my $passExist = $dbh->prepare(qq{select 1 from $tableName_pass where UCO=?});
+my $insertExt = $dbh->prepare(qq{INSERT INTO $tableName_pass (UCO, STUDIUM_ID, STUDIUM_OD, PRIHLASKA_KOD, ROCNIK, DR, ZMENENO_KDY) VALUES (?,?,STR_TO_DATE(?,'%Y-%m-%d'),?,?,?,NOW())});
+
+open FILE, $service_file_pass or die "Could not open $service_file_pass: $!";
+while(my $line = <FILE>) {
+
+	my @parts = split /\t/, $line;
+	chomp(@parts);
+
+	my $UCO = (($parts[0] ne '') ? $parts[0] : undef);
+	my $STUDY_ID = (($parts[1] ne '') ? $parts[1] : undef);
+	my $STUDY_SINCE = (($parts[2] ne '') ? $parts[2] : undef);
+	my $STUDY_PRIHLASKA = (($parts[3] ne '') ? $parts[3] : undef);
+	my $STUDY_ROCNIK = (($parts[4] ne '') ? $parts[4] : undef);
+	my $DR = (($parts[5] ne '') ? $parts[5] : undef);
+
+	unless ($STUDY_ID and $STUDY_PRIHLASKA and $DR) {
+		if ($DEBUG == 1) { print "SKIPPED PASS - WRONG INPUT PARAMS: $UCO\n"; }
+		next;
+	}
+
+	# fill existing CAO relations for UCO
+	$pass->{$UCO} = 1;
+
+	# There is a PASS
+	$passExist->execute($UCO);
+
+	if($passExist->fetch) {
+		if ($DEBUG == 1) { print "FIND PASS: $UCO\n"; }
+
+		my $select = "SELECT 1 from $tableName_pass where UCO=? and STUDIUM_ID=? and PRIHLASKA_KOD=? and DR=? and STUDIUM_OD";
+		my @params = ($UCO, $STUDY_ID, $STUDY_PRIHLASKA, $DR);
+		if ($STUDY_SINCE) {
+			$select = $select . "=STR_TO_DATE(?,'%Y-%m-%d')";
+			push(@params, $STUDY_SINCE);
+		} else {
+			$select = $select . " is NULL";
+		}
+		$select = $select . " and ROCNIK";
+		if ($STUDY_ROCNIK) {
+			$select = $select . "=?";
+			push(@params, $STUDY_ROCNIK);
+		} else {
+			$select = $select . " is NULL";
+		}
+
+		my $recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
+
+		if(!$recordAreEquals->fetch) {
+
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName_pass SET STUDIUM_ID=? , STUDIUM_OD=STR_TO_DATE(?,'%Y-%m-%d') , PRIHLASKA_KOD=? , DR=? , ROCNIK=? , ZMENENO_KDY=NOW() WHERE UCO=?});
+			$updatePerson->execute($STUDY_ID, $STUDY_SINCE, $STUDY_PRIHLASKA, $DR, $STUDY_ROCNIK, $UCO);
+			if($DEBUG == 1) { print "UPDATING EXISTING PASS RECORD: $UCO\n"; }
+			$foundAndUpdatedPass++;
+
+		} else {
+
+			if($DEBUG == 1) { print "SKIP PASS RECORD: $UCO\n"; }
+			$foundAndSkippedPass++;
+
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW PASS RECORD: $UCO\n"; }
+		$insertedPass++;
+		# we will do insert
+		$insertExt->execute($UCO, $STUDY_ID, $STUDY_SINCE, $STUDY_PRIHLASKA, $STUDY_ROCNIK, $DR);
+
+	}
+
+}
+close FILE;
+
+#####
+# Delete removed PASS
+#####
+
+# delete completly removed people from PASS
+my @keptPassUcos = sort keys %{$pass};
+my $elementsPass = join(',',@keptPassUcos);
+if($DEBUG == 1) { print "DELETED PASS NOT IN ($elementsPass)\n"; }
+if (length $elementsPass) {
+	# delete some
+	$deletedPass += $dbh->do("DELETE FROM $tableName_pass WHERE UCO not in ($elementsPass)");
+} else {
+	# delete all
+	$deletedPass += $dbh->do("DELETE FROM $tableName_pass");
+}
+
 commit $dbh;
 $dbh->disconnect();
 
@@ -400,6 +504,11 @@ print "Newly inserted EXT:    \t$insertedExt\n";
 print "Found and updated EXT: \t$foundAndUpdatedExt\n";
 print "Found and skipped EXT: \t$foundAndSkippedExt\n";
 print "Deleted EXT completely:\t$deletedExt (rows)\n";
+print "---------------------------------------\n";
+print "Newly inserted PASS:    \t$insertedPass\n";
+print "Found and updated PASS: \t$foundAndUpdatedPass\n";
+print "Found and skipped PASS: \t$foundAndSkippedPass\n";
+print "Deleted PASS completely:\t$deletedPass (rows)\n";
 print "=======================================\n";
 
 $lock->unlock();
