@@ -1,3 +1,11 @@
+perun-slave-process-sshkeys (3.1.6) stable; urgency=emergency
+
+  * Fix of bug introduced in 3.1.4 - typo in method name "sync_mv" which
+    should be "mv_sync"
+  * It causes removal of all authorized key which were not stored in Perun
+
+ -- Michal Stava <stavamichal@gmail.com>  Sun, 02 Jul 2017 22:36:00 +0200
+
 perun-slave-process-sshkeys (3.1.5) stable; urgency=high
 
   * Fixed wrong dependency on perun-slave-base (3.7.1 -> 3.1.7)
