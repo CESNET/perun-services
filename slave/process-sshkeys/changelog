@@ -1,3 +1,9 @@
+perun-slave-process-sshkeys (3.1.6) stable; urgency=high
+
+  * Fixed typo of method "sync_mv" to "mv_sync"
+
+ -- Michal Stava <stavamichal@gmail.com>  Sun, 02 Jul 2017 22:36:00 +0200
+
 perun-slave-process-sshkeys (3.1.5) stable; urgency=high
 
   * Fixed wrong dependency on perun-slave-base (3.7.1 -> 3.1.7)
