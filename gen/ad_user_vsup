@@ -228,9 +228,9 @@ sub calculateExpiration() {
 	my $expirationManTime = ($expirationMan) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
 
 	my @expirations = ();
-	if ($expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
-	if ($expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
-	if ($expirationManTime) { push(@expirations, $expirationManTime->epoch); }
+	if (defined $expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
+	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
+	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
 
 	# sort all expirations
 	my @sorted_expirations = sort { $a <=> $b } @expirations;
@@ -239,6 +239,11 @@ sub calculateExpiration() {
 	my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d");
 
 	my $result;
+
+	if (!defined $expirationKos and !defined $expirationDc2 and !defined $expirationMan) {
+		# if no expiration set in source data - take as "never"
+		return 0;
+	}
 
 	if ($latest_expiration > $currentDate->epoch) {
 
