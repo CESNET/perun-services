@@ -40,7 +40,6 @@ CONN_STRING = "dbname='{0}' user='{1}' host='{2}' password='{3}' port='{4}'".for
 ''' Names of tables in DB'''
 USER_TABLE = 'users'
 GROUP_TABLE = 'idm_group'
-IDENTITY_TABLE = 'user_identity'
 USERINGROUP_TABLE = 'user_idm_group'
 
 ''' Source JSON files '''
@@ -69,19 +68,10 @@ class Group(object):
 	def __init__(self):
 		self.name = ""
 		self.external_id = 0
-		self.parent_group_id = 0
+		self.status = ""
 
 	def __eq__(self,other):
-		return self.name == other.name and self.external_id == other.external_id
-
-class Identity(object):
-	def __init__(self):
-		self.user_id = 0
-		self.external_id = 0
-		self.login = ""
-		
-	def __eq__(self,other):
-		return self.external_id == other.external_id and self.login == other.login
+		return self.name == other.name and self.external_id == other.external_id and self.status == other.status
 
 class UserInGroup(object):
 	def __init__(self):
@@ -95,7 +85,6 @@ class UserInGroup(object):
 
 usersDB = list()
 groupsDB = list()
-identitiesDB = list()
 userInGroupDB = list()
 
 userDB_ids = list() 
@@ -108,16 +97,13 @@ groupIdsToDel = list()
 
 userJSON_ids = list()
 groupJSON_ids = list()
-identities_json = list()
 
 users_list = list()
-identities_list = list()
 groups_list = list()
 usersInGroups_list = list()
 
 changedUsers = list()
 changesGroups = list()
-identitiesToDel = list()
 
 ''' GETTING DATA FROM JSON '''
 json_users = open(USERS_SRC)
@@ -139,27 +125,12 @@ for item in users_data:
 	tmpUser.external_id = int(item['id'])
 	users_list.append(tmpUser)
 
-	for i in item['identities']:
-		identities_json.append(i)
-		tmpIdentity = Identity()
-		tmpIdentity.login = i
-		tmpIdentity.external_id = int(item['id'])
-		identities_list.append(tmpIdentity)
-
 ''' PARSING DATA FROM groups.scim '''		
 for item in groups_data:
 	groupJSON_ids.append(int(item['id']))
 	tmpGroup = Group()
 	tmpGroup.name = (item['name'])
 	tmpGroup.external_id = int(item['id'])
-	
-	if item['parentGroupId'] is None:
-		tmpGroup.parent_group_id = None
-	else:
-		tmpGroup.parent_group_id = int(item['parentGroupId'])
-		#This removes prefix of parent group exported from perun, that is not suitable
-		tmpGroup.name = tmpGroup.name.split(':')[-1]
-
 
 	groups_list.append(tmpGroup)
 	
@@ -174,7 +145,7 @@ cur = conn.cursor()
 
 ''' GETTING ACTUAL USERS FROM DB '''
 try:
-	cur.execute('SELECT id,display_name,external_id,mail,status,liferay_sn FROM {0};'
+	cur.execute('SELECT id, display_name, external_id, mail, status, liferay_sn FROM {0};'
 		.format(USER_TABLE));
 except psycopg2.Error as e:
 	sys.stderr.write("Getting users: DB Error {0} \n".format(e))
@@ -231,7 +202,7 @@ for item in users_list:
 
 ''' GETTING ACTUAL GROUPS FROM DB '''
 try:
-	cur.execute('SELECT id,external_id,name,parent_group_id FROM {0};'
+	cur.execute('SELECT id,external_id,name,status FROM {0};'
 		.format(GROUP_TABLE))
 except psycopg2.Error as e:
 	sys.stderr.write("Getting groups: DB Error {0} \n".format(e))
@@ -248,7 +219,7 @@ for row in cur:
 	tmpGroup = Group()
 	tmpGroup.name = row[2]
 	tmpGroup.external_id = row[1]
-	tmpGroup.parent_group_id = row[3]
+	tmpGroup.status = row[3];
 	groupsDB.append(tmpGroup)
 
 ''' GETTING GROUPS THAT HAVE BEEN CHANGED TO LIST'''
@@ -264,14 +235,7 @@ groupIdsToDel = list(set(groupDB_ids) - set(groupJSON_ids))
 for item in groups_list:	
 	if int(item.external_id) not in groupDB_ids:
 		try:
-			if item.parent_group_id is not None:
-				cur.execute('SELECT id FROM {0} WHERE external_id = '"'{1}'"';'
-					.format(GROUP_TABLE, item.parent_group_id))
-				id = cur.fetchone()[0]
-				cur.execute('INSERT INTO {0} (id, name, external_id, parent_group_id) VALUES (default, '"'{1}'"', '"'{2}'"', {3});'
-					.format(GROUP_TABLE, item.name, item.external_id, id))
-			else:
-				cur.execute('INSERT INTO {0} (id, name, external_id) VALUES (default, '"'{1}'"', '"'{2}'"');'
+			cur.execute('INSERT INTO {0} (id, name, external_id) VALUES (default, '"'{1}'"', '"'{2}'"');'
 					.format(GROUP_TABLE, item.name, item.external_id))
 
 		except psycopg2.Error as e:
@@ -283,55 +247,10 @@ for item in groups_list:
 
 	if int(item.external_id) in groupIdsToUpd:	
 		try:
-			
-			if item.parent_group_id is not None:
-				cur.execute('SELECT id FROM {0} WHERE external_id = '"'{1}'"';'
-					.format(GROUP_TABLE, item.parent_group_id))
-				id = cur.fetchone()[0]
-		
-				cur.execute('UPDATE {0} SET name = '"'{1}'"', parent_group_id = {2}  WHERE external_id = '"'{3}'"';'
-					.format(GROUP_TABLE, item.name, id, item.external_id))
-			else:
-				cur.execute('UPDATE {0} SET name = '"'{1}'"'  WHERE external_id = '"'{2}'"';'
-					.format(GROUP_TABLE, item.name, item.external_id))
+			cur.execute('UPDATE {0} SET name = '"'{1}'"', status = '"'{2}'"' WHERE external_id = '"'{3}'"';'
+					.format(GROUP_TABLE, item.name, item.status, item.external_id))
 		except psycopg2.Error as e:
 			sys.stderr.write("Updating group with ext_id:{0} DB Error {1} \n".format(item.external_id, e))
-			cur.close()
-			conn.close()
-			sys.exit(1)
-		conn.commit()
-
-''' GETTING ACTUAL IDENTITES FROM DB '''
-try:
-	cur.execute('SELECT id, external_id, login FROM {0}, {1} WHERE id = user_id;'
-		.format(USER_TABLE, IDENTITY_TABLE))
-except psycopg2.Error as e:
-	print("Getting identities: DB Error {0} \n".format(e))
-	cur.close()
-	conn.close()
-	sys.exit(1)
-
-for row in cur:
-	tmpIdentity = Identity()
-	tmpIdentity.login = row[2]
-	tmpIdentity.external_id = row[1]
-	tmpIdentity.user_id = row[0]
-	identitiesDB.append(row[2])
-
-''' GETTING IDENTITIES NOT IN JSON BUT IN DB '''
-identitiesToDel = list(set(identitiesDB) - set(identities_json))
-
-''' INSERTS OF IDENTITIES '''
-for item in identities_list:
-	if item.login not in identitiesDB:
-		try:
-			cur.execute('SELECT id FROM {0} WHERE external_id = {1};'
-				.format(USER_TABLE, item.external_id))
-			id = cur.fetchone()[0]
-			cur.execute('INSERT INTO {0} (user_id, login) VALUES ('"'{1}'"', '"'{2}'"');'
-				.format(IDENTITY_TABLE, id, item.login))
-		except psycopg2.Error as e:
-			sys.stderr.write("Inserting identity with login:{0} DB Error {1} \n".format(item.login, e))
 			cur.close()
 			conn.close()
 			sys.exit(1)
@@ -393,18 +312,6 @@ for item in userInGroupToDel:
 		sys.exit(1)
 	conn.commit()
 
-''' DELETING IDENTITIES FROM DB '''
-for item in identitiesToDel:
-	try:
-		cur.execute('DELETE FROM {0} WHERE login = '"'{1}'"';'
-			.format(IDENTITY_TABLE, item))
-	except psycopg2.Error as e:
-		sys.stderr.write("Deleting identity with login:{0} DB Error {1} \n".format(item, e))
-		cur.close()
-		conn.close()
-		sys.exit(1)
-	conn.commit()
-
 ''' USERS NOT IN JSON ARE SETTED TO DISABLE'''
 for item in userIdsToDis:
 	try:
@@ -425,11 +332,13 @@ for item in groupIdsToDel:
 		group_id = cur.fetchone()[0]
 		cur.execute('DELETE FROM {0} WHERE idm_group_id = '"'{1}'"';'
 			.format(USERINGROUP_TABLE, group_id))
+		cur.execute('UPDATE {0} SET status = '"'DELETE'"' WHERE external_id = '"'{1}'"';'
+		    .format(GROUP_TABLE, item))
 	except psycopg2.Error as e:
 		sys.stderr.write("Deleting users from group: DB Error {0} \n".format(e))
 		cur.close()
 		conn.close()
-		sys.exit(1)
+		sys.exit(1)	
 	conn.commit()
 
 cur.close()
