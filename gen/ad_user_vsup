@@ -4,10 +4,13 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
+use Time::Piece;
+
+sub calculateExpiration;
 
 local $::SERVICE_NAME = "ad_user_vsup";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -34,6 +37,9 @@ our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleA
 our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phoneDc2';
 our $A_CARD_BARCODES;  *A_CARD_BARCODES = \'urn:perun:user:attribute-def:def:cardBarCodes';
 our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:cardCodes';
+our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:expirationKos';
+our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
+our $A_EXPIRATION_MANUAL;  *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -97,6 +103,9 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 		$users->{$login}->{$A_PHONE} = $uAttributes{$A_PHONE};
 		$users->{$login}->{$A_CARD_BARCODES} = $uAttributes{$A_CARD_BARCODES};
 		$users->{$login}->{$A_CARD_CHIP_NUMBERS} = $uAttributes{$A_CARD_CHIP_NUMBERS};
+		$users->{$login}->{$A_EXPIRATION_KOS} = $uAttributes{$A_EXPIRATION_KOS};
+		$users->{$login}->{$A_EXPIRATION_DC2} = $uAttributes{$A_EXPIRATION_DC2};
+		$users->{$login}->{$A_EXPIRATION_MANUAL} = $uAttributes{$A_EXPIRATION_MANUAL};
 
 	}
 
@@ -120,6 +129,9 @@ for my $login (@logins) {
 	print FILE "userPrincipalName: " . $login . "\@" . $domain . "\n";
 	# enable accounts (if not) using service propagation
 	print FILE "userAccountControl: " . $uac . "\n";
+
+	my $expiration = calculateExpiration($users->{$login}->{$A_EXPIRATION_KOS}, $users->{$login}->{$A_EXPIRATION_DC2}, $users->{$login}->{$A_EXPIRATION_MANUAL});
+	print FILE "accountExpires: " . $expiration . "\n";
 
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME,...)
 	my $sn = $users->{$login}->{$A_LAST_NAME};
@@ -191,3 +203,71 @@ for my $login (@logins) {
 close(FILE);
 
 perunServicesInit::finalize;
+
+#
+# Calculate later from three expiration dates based on users relations on VŠUP.
+#
+# 1. param - expiration in KOS (studies)
+# 2. param - expiration in DC2 (employees)
+# 3. param - manually set expiration
+#
+# Returns Windows FILETIME timestamp of users account expiration
+# - in case of expiration on 1.1.4000 -> Zero is returned as "expiration = never".
+# - in case of any other exact date, pick the largest (future). If it comes from study system (KOS),
+#   add 7 days grace period.
+#
+sub calculateExpiration() {
+
+	# read input
+	my $expirationKos = shift;
+	my $expirationDc2 = shift;
+	my $expirationMan = shift;
+	# parse to time or undef
+	my $expirationKosTime = ($expirationKos) ? Time::Piece->strptime($expirationKos,"%Y-%m-%d") : undef;
+	my $expirationDc2Time = ($expirationDc2) ? Time::Piece->strptime($expirationDc2,"%Y-%m-%d") : undef;
+	my $expirationManTime = ($expirationMan) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
+
+	my @expirations = ();
+	if (defined $expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
+	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
+	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
+
+	# sort all expirations
+	my @sorted_expirations = sort { $a <=> $b } @expirations;
+
+	my $latest_expiration = $sorted_expirations[$#sorted_expirations];
+	my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d");
+
+	my $result;
+
+	if (!defined $expirationKos and !defined $expirationDc2 and !defined $expirationMan) {
+		# if no expiration set in source data - take as "never"
+		return 0;
+	}
+
+	if ($latest_expiration > $currentDate->epoch) {
+
+		# case expiration "never" = 1.1.4000
+		if ($latest_expiration == Time::Piece->strptime("4000-01-01","%Y-%m-%d")->epoch) {
+			# return without specified expiration date
+			return 0;
+		}
+
+	}
+
+	# (will) expire by studies - add 7 days grace period
+	if ($expirationKosTime and ($latest_expiration == $expirationKosTime->epoch)) {
+		$result = $latest_expiration + (7*24*60*60);
+	} else {
+		# Expired by employment or manual - push exact date
+		$result = $latest_expiration;
+	}
+
+	# add seconds before 1.1.1970 since Windows epoch starts at 1601-01-01T00:00:00Z
+	$result = $result + 11644473600;
+	# convert seconds to 100-nano seconds (hundreds of nano seconds)
+	$result = $result * 10000000;
+
+	return $result;
+
+}

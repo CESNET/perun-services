@@ -1,9 +1,11 @@
 #!/usr/bin/perl
-
 use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
+use Time::Piece;
+
+sub isExpired;
 
 our $SERVICE_NAME     = "vsup_google_groups";
 our $PROTOCOL_VERSION = "3.0.0";
@@ -22,6 +24,9 @@ our $A_U_FIRST_NAME; 			*A_U_FIRST_NAME =			\'urn:perun:user:attribute-def:core:
 our $A_U_LAST_NAME; 			*A_U_LAST_NAME =			\'urn:perun:user:attribute-def:core:lastName';
 our $A_U_ARTISTIC_FIRST_NAME; 	*A_U_ARTISTIC_FIRST_NAME = 	\'urn:perun:user:attribute-def:def:artisticFirstName';
 our $A_U_ARTISTIC_LAST_NAME; 	*A_U_ARTISTIC_LAST_NAME = 	\'urn:perun:user:attribute-def:def:artisticLastName';
+our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:expirationKos';
+our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
+our $A_EXPIRATION_MANUAL;  *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
 
 # Global data structure
 
@@ -65,6 +70,7 @@ foreach my $rData ($data->getChildElements) {
 		# create user entry
 		$users->{$login}->{$A_U_FIRST_NAME} = ($uAttributes{$A_U_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_U_FIRST_NAME} || ''));
 		$users->{$login}->{$A_U_LAST_NAME} = ($uAttributes{$A_U_ARTISTIC_LAST_NAME} || ($uAttributes{$A_U_LAST_NAME} || ''));
+		$users->{$login}->{"suspended"} = (isExpired($uAttributes{$A_EXPIRATION_KOS}, $uAttributes{$A_EXPIRATION_DC2}, $uAttributes{$A_EXPIRATION_MANUAL}) == 1) ? "suspended" : "";
 
 		# put member in a group
 		if (defined $groupName and length $groupName) {
@@ -92,7 +98,7 @@ binmode FILE, ":utf8";
 
 my @keys = sort keys %{$users};
 for my $key (@keys) {
-	print FILE $key . "\@" . $domainName . ";" . $users->{$key}->{$A_U_FIRST_NAME} . ";" . $users->{$key}->{$A_U_LAST_NAME} . ";" . "\n";
+	print FILE $key . "\@" . $domainName . ";" . $users->{$key}->{$A_U_FIRST_NAME} . ";" . $users->{$key}->{$A_U_LAST_NAME} . ";" . $users->{$key}->{"suspended"} . "\n";
 }
 close(FILE) or die "Cannot close $usersFileName: $! \n";
 
@@ -111,3 +117,49 @@ for my $key (@groupKeys) {
 close(FILE) or die "Cannot close $groupsFileName: $! \n";
 
 perunServicesInit::finalize;
+
+#
+# Calculate if user is expired or not.
+#
+# 1. param - expiration in KOS (studies)
+# 2. param - expiration in DC2 (employees)
+# 3. param - manually set expiration
+#
+# Returns 1 if expired, 0 if not or can't be determined
+#
+sub isExpired() {
+
+	# read input
+	my $expirationKos = shift;
+	my $expirationDc2 = shift;
+	my $expirationMan = shift;
+	# parse to time or undef
+	my $expirationKosTime = ($expirationKos) ? Time::Piece->strptime($expirationKos,"%Y-%m-%d") : undef;
+	my $expirationDc2Time = ($expirationDc2) ? Time::Piece->strptime($expirationDc2,"%Y-%m-%d") : undef;
+	my $expirationManTime = ($expirationMan) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
+
+	my @expirations = ();
+	if (defined $expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
+	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
+	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
+
+	# sort all expirations
+	my @sorted_expirations = sort { $a <=> $b } @expirations;
+
+	my $latest_expiration = $sorted_expirations[$#sorted_expirations];
+	my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d");
+
+	if (!defined $expirationKos and !defined $expirationDc2 and !defined $expirationMan) {
+		# if no expiration set in source data - take as "never"
+		return 0;
+	}
+
+	if ($latest_expiration > $currentDate->epoch) {
+		# not expired yet
+		return 0;
+	}
+
+	# is expired
+	return 1;
+
+}
