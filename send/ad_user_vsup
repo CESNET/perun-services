@@ -281,7 +281,7 @@ sub get_entry_by_login() {
 	my $response = $ldap->search( base => $top_dn ,
 		scope => 'sub' ,
 		filter => $filter ,
-		attrs => ['cn','displayName','sn','givenName','mail','vsupPersonPersonalId','vsupPersonTitleHead','vsupPersonTitleTail','telephoneNumber','vsupPersonIdCardBarcode','vsupPersonIdCardChipNumber','userAccountControl','samAccountName']
+		attrs => ['cn','displayName','sn','givenName','mail','vsupPersonPersonalId','vsupPersonTitleHead','vsupPersonTitleTail','telephoneNumber','vsupPersonIdCardBarcode','vsupPersonIdCardChipNumber','userAccountControl','samAccountName','accountExpires']
 	);
 
 	unless ($response->is_error()) {
