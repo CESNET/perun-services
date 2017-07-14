@@ -59,6 +59,15 @@ case $DESTINATION_TYPE in
 		HOSTNAME=`echo $HOST | sed -e 's/^.*@//'`
 		PORT=`echo $DESTINATION | sed -e 's/^.*://'`
 		;;
+	url)
+		HOSTNAME="$DESTINATION"
+		HOST="$DESTINATION"
+		TRANSPORT_COMMAND="curl -i -H Content-Type:application/tar -f -X PUT"
+		;;
+	email)
+		echo "Destination type '$DESTINATION_TYPE' is not supported yet." >&2
+		exit 1;
+		;;
 	*)
 		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
 		exit 1;
@@ -83,12 +92,25 @@ if [ $? -ne 0 ]; then
 	exit 255
 fi
 
+TEMPORARY_FILE="/tmp/${SERVICE_NAME}-$$.tar"
 if [ -d "$SERVICE_FILES_FOR_DESTINATION" ]
 then
-	tar -c -C "$SERVICE_FILES_FOR_DESTINATION" . -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" .  | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND $HOST $SLAVE_COMMAND
+	tar -c -f "$TEMPORARY_FILE" -C "$SERVICE_FILES_FOR_DESTINATION" . -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . 
 else
-	tar -c -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" .  | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND $HOST $SLAVE_COMMAND
+	tar -c -f "$TEMPORARY_FILE" -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . 
 fi
+
+if [ $? -ne 0 ]; then
+	echo "Can't archive service files to $TEMPORARY_FILE" >&2
+	exit 255
+fi
+
+if [ "$DESTINATION_TYPE"="url" ]; then
+	timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND --data-binary @$TEMPORARY_FILE $HOST
+else
+	cat $TEMPORARY_FILE | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND $HOST $SLAVE_COMMAND
+fi
+
 ERR_CODE=$?
 
 echo "Communication with slave script ends with return code: $ERR_CODE" >&2
