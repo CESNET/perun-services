@@ -13,6 +13,9 @@ my $vos = XMLin( '-',
 	KeyAttr => [] );
 my $csv = Text::CSV->new({ sep_char => ',' });
 
+my $etcDir = "/etc/voms-admin";
+my $etcPropertyFilename = "service.properties";
+
 ### serialize is used to turn an array of hash references into a manageable structure
 sub serialize {
     JSON::XS->new->relaxed(0)->ascii(1)->canonical(1)->encode($_[0]);
@@ -101,6 +104,45 @@ sub knownCA {
 	}
 }
 
+### readProperties reads VO properties file into an array
+#      $path           Path to the file
+sub readProperties {
+       $path = shift;
+       my %properties;
+       if (open(INI, "$path")) {
+                syslog LOG_DEBUG, "Reading config file \"$path\".";
+                print STDERR "Reading config file \"$path\".\n";
+               while (<INI>) {
+                       chomp;
+                       if (/^(\S*)\s*=\s*(\S*)(#.*)?$/) {
+                               $properties{"$1"} = "$2";
+                       }
+               }
+                close (INI);
+       }
+       else {
+                syslog LOG_WARN, "Could not open config file \"$path\". No way to read VO properties";
+                print STDERR "Could not open config file \"$path\". No way to read VO properties\n";
+       }
+       return %properties;
+}
+
+### uniqueDN checks if the user's DN already exists in a list of DNs seen
+#      $user_ref       User structure reference
+#      $seen_ref       List of DNs for comparison
+sub uniqueDN {
+       $seen_ref = $_[1];
+       $user_ref = $_[0];
+
+       if(grep {$_ eq "$user_ref->{'DN'}"} @$seen_ref) {
+               syslog LOG_ERR, "Duplicate user \"" . $user_ref->{'DN'} .
+                       "\" dropped with CA \"" . $user_ref->{'CA'} . "\"";
+               print STDERR "Duplicate user \"" . $user_ref->{'DN'} .
+                       "\" dropped with CA \"" . $user_ref->{'CA'} . "\"\n";
+               return 0;
+       }
+       return 1;
+}
 
 # This is the actual start.
 
@@ -112,6 +154,10 @@ my $retval = 0;
 foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	$name = $vo->{'name'};
 
+	my %properties = readProperties("$etcDir/$name/$etcPropertyFilename");
+	my $checkCA = $properties{"voms.skip_ca_check"} eq "True" ? 0 : 1;
+	syslog LOG_DEBUG, "voms.skip_ca_check: " . $properties{"voms.skip_ca_check"} . ", $checkCA\n";
+	print STDERR "voms.skip_ca_check: " . $properties{"voms.skip_ca_check"} . ", $checkCA\n";
 
 	#Collect lists from voms-admin
 	my @groups_current=`voms-admin --vo \Q${name}\E list-groups`;
@@ -162,9 +208,12 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my %groupMembers_toBe;		# Desired membership in groups (pure, disregarding roles)
 	my @groups_toBe = ( "/$name" );	# Desired list of groups
 	my @roles_toBe = ( "VO-Admin" );# Desired list of roles, plus the default VO-Admin role
+	my @DNs_Seen;                   # DNs already included
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
 		next unless knownCA($user->{'CA'});
 		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
+		next unless ($checkCA || uniqueDN(\%theUser, \@DNs_Seen));
+		push(@DNs_Seen, $theUser{'DN'});
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
 		foreach $group (@{$user->{'groups'}->{'group'}}){
 			push(@groups_toBe, "/$name/$group->{'name'}") unless grep{$_ eq "/$name/$group->{'name'}"} @groups_toBe;

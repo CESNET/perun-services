@@ -1,3 +1,11 @@
+perun-slave-process-voms (3.1.7) stable; urgency=high
+
+  * Actively check the setting of property voms.skip_ca_check and remove
+    duplicate user entries that only differ in CA before attempting to
+    create/handle duplicate VOMS accounts.
+
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Tue Jul 18 17:19:34 CEST 2017
+
 perun-slave-process-voms (3.1.6) stable; urgency=high
 
   * fixing error output for list-roles and list-cas operations
