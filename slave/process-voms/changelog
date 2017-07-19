@@ -1,3 +1,10 @@
+perun-slave-process-voms (3.1.7) stable; urgency=high
+
+  * working around inconsistent normalization of DNs in voms-admin
+    by pre-normalizing perun exports using the same pattern
+
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Mon Jul 17 17:36:21 CEST 2017
+
 perun-slave-process-voms (3.1.6) stable; urgency=high
 
   * fixing error output for list-roles and list-cas operations
