@@ -15,15 +15,15 @@ my $csv = Text::CSV->new({ sep_char => ',' });
 
 ### serialize is used to turn an array of hash references into a manageable structure
 sub serialize {
-    JSON::XS->new->relaxed(0)->ascii(1)->canonical(1)->encode($_[0]);
+	JSON::XS->new->relaxed(0)->ascii(1)->canonical(1)->encode($_[0]);
 }
 
 ### array_minus_deep is a replacement for array_minus that expands hash references
 sub array_minus_deep(\@\@) {
-    my ($array,$minus) = @_;
+	my ($array,$minus) = @_;
 
-    my %minus = map( ( serialize($_) => 1 ), @$minus );
-    grep !$minus{ serialize($_) }, @$array
+	my %minus = map( ( serialize($_) => 1 ), @$minus );
+	grep !$minus{ serialize($_) }, @$array
 }
 
 ### getCN extracts a CN from DN. It accepts one aregument:
@@ -173,7 +173,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 		#Role Membership
 		foreach $role (@roles_current) {
 			$groupRoles_current{"$group"}{"$role"}=listToHashes(`voms-admin --vo \Q${name}\E list-users-with-role \Q${group}\E \Q${role}\E`);
-	        }
+		}
 	}
 
 
@@ -212,7 +212,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my %membersToAdd;
 	my %rolesToAssign;
 	my %rolesToDismiss;
-        foreach $group (@groups_toBe) {
+	foreach $group (@groups_toBe) {
 		@{$membersToRemove{"$group"}} = array_minus_deep(@{$groupMembers_current{"$group"}}, @{$groupMembers_toBe{"$group"}});
 		@{$membersToRemove{"$group"}} = array_minus_deep(@{$membersToRemove{"$group"}}, @{$membersToRemove{"/$name"}}) unless( "$group" eq "/$name" ); # No need to remove user from groups if they are going to be fully removed
 		@{$membersToAdd{"$group"}} = array_minus_deep(@{$groupMembers_toBe{"$group"}}, @{$groupMembers_current{"$group"}});
@@ -222,7 +222,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$rolesToDismiss{"$group"}{"$role"}}, @{$membersToRemove{"/$name"}}); # No need to revoke roles if the user is going to be fully removed
 			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$rolesToDismiss{"$group"}{"$role"}}, @{$membersToRemove{"$group"}}); # No need to revoke roles if the user is going to be removed from the group
 		}
-        }
+	}
 
 
 	# Effect changes
@@ -288,4 +288,3 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 closelog();
 
 exit $retval;
-

@@ -45,9 +45,9 @@ sub getCN {
 #   is not called in some cases
 #       DN      DN to process
 sub normalizeEmail {
-        my $normalized = shift;
-        $normalized =~ s/\/(E|e|((E|e|)(mail|mailAddress|mailaddress|MAIL|MAILADDRESS)))=/\/Email=/;
-        return $normalized
+	my $normalized = shift;
+	$normalized =~ s/\/(E|e|((E|e|)(mail|mailAddress|mailaddress|MAIL|MAILADDRESS)))=/\/Email=/;
+	return $normalized
 }
 
 ### normalizeUID applies the same normalization replacement on user DNs as voms-admin itself
@@ -55,9 +55,9 @@ sub normalizeEmail {
 #   is not called in some cases
 #       DN      DN to process
 sub normalizeUID {
-        my $normalized = shift;
-        $normalized =~ s/\/(UserId|USERID|userId|userid|uid|Uid)=/\/UID=/;
-        return $normalized
+	my $normalized = shift;
+	$normalized =~ s/\/(UserId|USERID|userId|userid|uid|Uid)=/\/UID=/;
+	return $normalized
 }
 
 ### listToHashes accepts a three-column CSV and produces an array of hashes with the following structure:
@@ -191,7 +191,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 		#Role Membership
 		foreach $role (@roles_current) {
 			$groupRoles_current{"$group"}{"$role"}=listToHashes(\@cas, `voms-admin --vo \Q${name}\E list-users-with-role \Q${group}\E \Q${role}\E`);
-	        }
+		}
 	}
 
 	$attributeStatusFile = $attributeStatusFilePrefix.$name.".xml";
@@ -344,13 +344,13 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @attributes_deleted;
 	foreach $attribute (@attributesToDelete) {
 		push (@attributes_deleted, $attribute) if effectCall "voms-admin --nousercert --vo \Q$name\E delete-user-attribute \Q$attribute->{'DN'}\E \Q$attribute->{'CA'}\E \Q$attribute->{'name'}\E",
-		"deleting Attribute \"$attribute->{'name'}\" for user \"$attribute->{'DN'}\" in VO \"$name\""; 
+		"deleting Attribute \"$attribute->{'name'}\" for user \"$attribute->{'DN'}\" in VO \"$name\"";
 	}
-	# then set new ones	
+	# then set new ones
 	foreach $attribute (@attributesToSet) {
 		push (@attributes_current, $attribute) if effectCall "voms-admin --nousercert --vo \Q$name\E set-user-attribute \Q$attribute->{'DN'}\E \Q$attribute->{'CA'}\E \Q$attribute->{'name'}\E \Q$attribute->{'value'}\E",
-		"setting Attribute \"$attribute->{'name'}\" to value \"$attribute->{'value'}\" for user \"$attribute->{'DN'}\" in VO \"$name\""; 
-		
+		"setting Attribute \"$attribute->{'name'}\" to value \"$attribute->{'value'}\" for user \"$attribute->{'DN'}\" in VO \"$name\"";
+
 	}
 
 	my @attributes_existing = array_minus_deep( @attributes_current, @attributes_deleted );
@@ -368,4 +368,3 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 closelog();
 
 exit $retval;
-
