@@ -125,24 +125,24 @@ sub knownCA {
 }
 
 ### readProperties reads VO properties file into an array
-#      $path           Path to the file
+#      $path	   Path to the file
 sub readProperties {
        $path = shift;
        my %properties;
        if (open(INI, "$path")) {
-                syslog LOG_DEBUG, "Reading config file \"$path\".";
-                print STDERR "Reading config file \"$path\".\n";
-               while (<INI>) {
-                       chomp;
-                       if (/^(\S*)\s*=\s*(\S*)(#.*)?$/) {
-                               $properties{"$1"} = "$2";
-                       }
-               }
-                close (INI);
+		syslog LOG_DEBUG, "Reading config file \"$path\".";
+		print STDERR "Reading config file \"$path\".\n";
+	       while (<INI>) {
+		       chomp;
+		       if (/^(\S*)\s*=\s*(\S*)(#.*)?$/) {
+			       $properties{"$1"} = "$2";
+		       }
+	       }
+		close (INI);
        }
        else {
-                syslog LOG_WARN, "Could not open config file \"$path\". No way to read VO properties";
-                print STDERR "Could not open config file \"$path\". No way to read VO properties\n";
+		syslog LOG_WARN, "Could not open config file \"$path\". No way to read VO properties";
+		print STDERR "Could not open config file \"$path\". No way to read VO properties\n";
        }
        return %properties;
 }
@@ -155,11 +155,11 @@ sub uniqueDN {
        $user_ref = $_[0];
 
        if(grep {$_ eq "$user_ref->{'DN'}"} @$seen_ref) {
-               syslog LOG_ERR, "Duplicate user \"" . $user_ref->{'DN'} .
-                       "\" dropped with CA \"" . $user_ref->{'CA'} . "\"";
-               print STDERR "Duplicate user \"" . $user_ref->{'DN'} .
-                       "\" dropped with CA \"" . $user_ref->{'CA'} . "\"\n";
-               return 0;
+	       syslog LOG_ERR, "Duplicate user \"" . $user_ref->{'DN'} .
+		       "\" dropped with CA \"" . $user_ref->{'CA'} . "\"";
+	       print STDERR "Duplicate user \"" . $user_ref->{'DN'} .
+		       "\" dropped with CA \"" . $user_ref->{'CA'} . "\"\n";
+	       return 0;
        }
        return 1;
 }
@@ -175,7 +175,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	$name = $vo->{'name'};
 
 	my %properties = readProperties("$etcDir/$name/$etcPropertyFilename");
-	my $checkCA = $properties{"voms.skip_ca_check"} eq "True" ? 0 : 1;
+	my $checkCA = $properties{"voms.skip_ca_check"} ne "True";
 	syslog LOG_DEBUG, "voms.skip_ca_check: " . $properties{"voms.skip_ca_check"} . ", $checkCA\n";
 	print STDERR "voms.skip_ca_check: " . $properties{"voms.skip_ca_check"} . ", $checkCA\n";
 
@@ -219,7 +219,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 		#Role Membership
 		foreach $role (@roles_current) {
 			$groupRoles_current{"$group"}{"$role"}=listToHashes(`voms-admin --vo \Q${name}\E list-users-with-role \Q${group}\E \Q${role}\E`);
-	        }
+		}
 	}
 
 
@@ -228,7 +228,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my %groupMembers_toBe;		# Desired membership in groups (pure, disregarding roles)
 	my @groups_toBe = ( "/$name" );	# Desired list of groups
 	my @roles_toBe = ( "VO-Admin" );# Desired list of roles, plus the default VO-Admin role
-	my @DNs_Seen;                   # DNs already included
+	my @DNs_Seen;		   # DNs already included
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
 		next unless knownCA($user->{'CA'});
 		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => normalizeUID(normalizeEmail($user->{'DN'})), 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
@@ -261,7 +261,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my %membersToAdd;
 	my %rolesToAssign;
 	my %rolesToDismiss;
-        foreach $group (@groups_toBe) {
+	foreach $group (@groups_toBe) {
 		@{$membersToRemove{"$group"}} = array_minus_deep(@{$groupMembers_current{"$group"}}, @{$groupMembers_toBe{"$group"}});
 		@{$membersToRemove{"$group"}} = array_minus_deep(@{$membersToRemove{"$group"}}, @{$membersToRemove{"/$name"}}) unless( "$group" eq "/$name" ); # No need to remove user from groups if they are going to be fully removed
 		@{$membersToAdd{"$group"}} = array_minus_deep(@{$groupMembers_toBe{"$group"}}, @{$groupMembers_current{"$group"}});
@@ -271,7 +271,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$rolesToDismiss{"$group"}{"$role"}}, @{$membersToRemove{"/$name"}}); # No need to revoke roles if the user is going to be fully removed
 			@{$rolesToDismiss{"$group"}{"$role"}} = array_minus_deep(@{$rolesToDismiss{"$group"}{"$role"}}, @{$membersToRemove{"$group"}}); # No need to revoke roles if the user is going to be removed from the group
 		}
-        }
+	}
 
 
 	# Effect changes

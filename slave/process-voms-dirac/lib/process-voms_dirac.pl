@@ -47,9 +47,9 @@ sub getCN {
 #   is not called in some cases
 #       DN      DN to process
 sub normalizeEmail {
-        my $normalized = shift;
-        $normalized =~ s/\/(E|e|((E|e|)(mail|mailAddress|mailaddress|MAIL|MAILADDRESS)))=/\/Email=/;
-        return $normalized
+	my $normalized = shift;
+	$normalized =~ s/\/(E|e|((E|e|)(mail|mailAddress|mailaddress|MAIL|MAILADDRESS)))=/\/Email=/;
+	return $normalized
 }
 
 ### normalizeUID applies the same normalization replacement on user DNs as voms-admin itself
@@ -57,9 +57,9 @@ sub normalizeEmail {
 #   is not called in some cases
 #       DN      DN to process
 sub normalizeUID {
-        my $normalized = shift;
-        $normalized =~ s/\/(UserId|USERID|userId|userid|uid|Uid)=/\/UID=/;
-        return $normalized
+	my $normalized = shift;
+	$normalized =~ s/\/(UserId|USERID|userId|userid|uid|Uid)=/\/UID=/;
+	return $normalized
 }
 
 ### listToHashes accepts a three-column CSV and produces an array of hashes with the following structure:
@@ -138,19 +138,19 @@ sub readProperties {
 	$path = shift;
 	my %properties;
 	if (open(INI, "$path")) {
-                syslog LOG_DEBUG, "Reading config file \"$path\".";
-                print STDERR "Reading config file \"$path\".\n";
-	        while (<INI>) {
+		syslog LOG_DEBUG, "Reading config file \"$path\".";
+		print STDERR "Reading config file \"$path\".\n";
+		while (<INI>) {
 			chomp;
 			if (/^(\S*)\s*=\s*(\S*)(#.*)?$/) {
 				$properties{"$1"} = "$2";
 			}
 		}
-                close (INI);
+		close (INI);
 	}
 	else {
-                syslog LOG_WARN, "Could not open config file \"$path\". No way to read VO properties";
-                print STDERR "Could not open config file \"$path\". No way to read VO properties\n";
+		syslog LOG_WARN, "Could not open config file \"$path\". No way to read VO properties";
+		print STDERR "Could not open config file \"$path\". No way to read VO properties\n";
 	}
 	return %properties;
 }
@@ -183,7 +183,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	$name = $vo->{'name'};
 
 	my %properties = readProperties("$etcDir/$name/$etcPropertyFilename");
-	my $checkCA = $properties{"voms.skip_ca_check"} eq "True" ? 0 : 1;
+	my $checkCA = $properties{"voms.skip_ca_check"} ne "True";
 	syslog LOG_DEBUG, "voms.skip_ca_check: " . $properties{"voms.skip_ca_check"} . ", $checkCA\n";
 	print STDERR "voms.skip_ca_check: " . $properties{"voms.skip_ca_check"} . ", $checkCA\n";
 
@@ -237,7 +237,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 		#Role Membership
 		foreach $role (@roles_current) {
 			$groupRoles_current{"$group"}{"$role"}=listToHashes(\@cas, `voms-admin --vo \Q${name}\E list-users-with-role \Q${group}\E \Q${role}\E`);
-	        }
+		}
 	}
 
 	$attributeStatusFile = $attributeStatusFilePrefix.$name.".xml";
