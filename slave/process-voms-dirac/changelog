@@ -1,8 +1,10 @@
-perun-slave-process-voms (1.0.1) stable; urgency=high
+perun-slave-process-voms-dirac (1.0.1) stable; urgency=high
 
   * Actively check the setting of property voms.skip_ca_check and remove
     duplicate user entries that only differ in CA before attempting to
     create/handle duplicate VOMS accounts.
+  * working around inconsistent normalization of DNs in voms-admin
+    by pre-normalizing perun exports using the same pattern
 
  -- Zdenek Sustr <sustr4@cesnet.cz>  Tue Jul 18 17:19:34 CEST 2017
 

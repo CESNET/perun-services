@@ -38,6 +38,26 @@ sub getCN {
 	return $cn;
 }
 
+### normalizeEmail applies the same normalization replacement on user DNs as voms-admin itself
+#   Calling normalizeEmail() works around bugs in voms-admin wherein the normalization function
+#   is not called in some cases
+#	DN	DN to process
+sub normalizeEmail {
+	my $normalized = shift;
+	$normalized =~ s/\/(E|e|((E|e|)(mail|mailAddress|mailaddress|MAIL|MAILADDRESS)))=/\/Email=/;
+	return $normalized
+}
+
+### normalizeUID applies the same normalization replacement on user DNs as voms-admin itself
+#   Calling normalizeUID() works around bugs in voms-admin wherein the normalization function
+#   is not called in some cases
+#	DN	DN to process
+sub normalizeUID {
+	my $normalized = shift;
+	$normalized =~ s/\/(UserId|USERID|userId|userid|uid|Uid)=/\/UID=/;
+	return $normalized
+}
+
 ### listToHashes accepts a three-column CSV and produces an array of hashes with the following structure:
 #	DN	VO Member DN
 #	CA	Certificate Authority that vouches for the member
@@ -211,7 +231,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @DNs_Seen;                   # DNs already included
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
 		next unless knownCA($user->{'CA'});
-		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
+		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => normalizeUID(normalizeEmail($user->{'DN'})), 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
 		next unless ($checkCA || uniqueDN(\%theUser, \@DNs_Seen));
 		push(@DNs_Seen, $theUser{'DN'});
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
