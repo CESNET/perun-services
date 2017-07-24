@@ -202,7 +202,7 @@ for item in users_list:
 
 ''' GETTING ACTUAL GROUPS FROM DB '''
 try:
-	cur.execute('SELECT id,external_id,name,status FROM {0};'
+	cur.execute('SELECT id, external_id, name, status FROM {0};'
 		.format(GROUP_TABLE))
 except psycopg2.Error as e:
 	sys.stderr.write("Getting groups: DB Error {0} \n".format(e))
@@ -315,7 +315,7 @@ for item in userInGroupToDel:
 ''' USERS NOT IN JSON ARE SETTED TO DISABLE'''
 for item in userIdsToDis:
 	try:
-		cur.execute ('UPDATE {0} SET status  = '"'disabled'"' WHERE external_id = '"'{1}'"';'
+		cur.execute ('UPDATE {0} SET status = '"'disabled'"' WHERE external_id = '"'{1}'"';'
 			.format(USER_TABLE, item))
 	except psycopg2.Error as e:
 		sys.stderr.write("Disabling users: DB Error {0} \n".format(e))
@@ -335,10 +335,10 @@ for item in groupIdsToDel:
 		cur.execute('UPDATE {0} SET status = '"'DELETE'"' WHERE external_id = '"'{1}'"';'
 		    .format(GROUP_TABLE, item))
 	except psycopg2.Error as e:
-		sys.stderr.write("Deleting users from group: DB Error {0} \n".format(e))
+		sys.stderr.write("Deleting users from group and setting its status to DELETE: DB Error {0} \n".format(e))
 		cur.close()
 		conn.close()
-		sys.exit(1)	
+		sys.exit(1)
 	conn.commit()
 
 cur.close()
