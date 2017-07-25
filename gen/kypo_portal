@@ -36,16 +36,16 @@ our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
 our $STATUS_EXPIRED;              *STATUS_EXPIRED =          \'EXPIRED';
 our $STATUS_SUSPENDED;            *STATUS_SUSPENDED =        \'SUSPENDED';
 
-our $userStruc = {};
-our $u_status = {};
-our $u_email = {};
-our $u_name = {};
-our $u_lf_name = {};
+my $userStruc = {};
+my $u_status = {};
+my $u_email = {};
+my $u_name = {};
+my $u_lf_name = {};
 
-our $groupStruc = {};
-our $g_name = {};
+my $groupStruc = {};
+my $g_name = {};
 
-our $membershipStruc = {};
+my $membershipStruc = {};
 
 my $fileUsers = $DIRECTORY . "/users.scim";
 my $fileGroups = $DIRECTORY . "/groups.scim";
