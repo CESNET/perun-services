@@ -5,6 +5,8 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 
+sub getStatus;
+
 local $::SERVICE_NAME = "vsup_zimbra";
 local $::PROTOCOL_VERSION = "3.0.0";
 my $SCRIPT_VERSION = "3.0.0";
@@ -21,9 +23,12 @@ our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstNam
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
 our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
-
 our $A_EMAIL_VSUP;  *A_EMAIL_VSUP = \'urn:perun:user:attribute-def:def:vsupMail';
 our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
+our $A_BLACKLISTED;  *A_BLACKLISTED = \'urn:perun:user_facility:attribute-def:virt:blacklisted';
+our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:expirationKos';
+our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
+our $A_EXPIRATION_MANUAL; *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
 
 # GATHER USERS
 my $users;  # $users->{$uco}->{ATTR} = $attrValue;
@@ -37,7 +42,7 @@ foreach my $rData ($data->getChildElements) {
 	my %resourceAttributes = attributesToHash $rData->getAttributes;
 	my $relationType = $resourceAttributes{$A_R_RELATION_TYPE};
 
-	# Must be in a relation
+	# Users from Resource must be in a relation
 	unless ($relationType) {
 		next;
 	}
@@ -52,16 +57,36 @@ foreach my $rData ($data->getChildElements) {
 		$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
 		$users->{$uco}->{'EMAIL'} = ($uAttributes{$A_EMAIL_VSUP} || $uAttributes{$A_LOGIN} . '@vsup.cz');
 
-		$users->{$uco}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
-		$users->{$uco}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
-
 		# determine user account type (preferred ZAM over STU)
 		if ($relationType eq "ZAM") {
 			$users->{$uco}->{'TYPE'} = $relationType;
+			$users->{$uco}->{'COS'} = '0603cf86-f917-4448-bb34-57dd11a2c381';
 		} elsif ($relationType eq "STU") {
 			unless ($users->{$uco}->{'TYPE'}) {
 				$users->{$uco}->{'TYPE'} = $relationType;
+				$users->{$uco}->{'COS'} = 'e00428a1-0c00-11d9-836a-000d93afea2a';
 			}
+		}
+
+		# merge name to displayName
+		my $firstName = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
+		my $lastName = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+
+		my $displayName = undef;
+		if (defined $firstName and length $firstName and defined $lastName and length $lastName) {
+			$displayName = $firstName . " " . $lastName;
+		} elsif (defined $firstName and length $firstName and !(defined $lastName and length $lastName)) {
+			$displayName = $firstName;
+		} elsif (!(defined $firstName and length $firstName) and defined $lastName and length $lastName) {
+			$displayName = $lastName;
+		}
+		$users->{$uco}->{"NAME"} = ($displayName || '');
+
+		if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
+			# blacklisted users !security ban! are locked
+			$users->{$uco}->{"STATUS"} = 'locked';
+		} else {
+			$users->{$uco}->{"STATUS"} = getStatus();
 		}
 
 	}
@@ -79,10 +104,21 @@ for my $uco (@keys) {
 
 	# print attributes, which are never empty
 	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{'TYPE'} . "\t" .
-		$users->{$uco}->{'EMAIL'} . "\t" . $users->{$uco}->{$A_FIRST_NAME} . "\t" . $users->{$uco}->{$A_LAST_NAME} . "\n";
+		$users->{$uco}->{'EMAIL'} . "\t" . $users->{$uco}->{"NAME"} . "\t" . $users->{$uco}->{"STATUS"} . "\t" .
+		$users->{$uco}->{"COS"} . "\n";
 
 }
 
 close(FILE);
 
 perunServicesInit::finalize;
+
+#
+# active - výchozí stav, netřeba nastavovat při vytváření schránky, pouze pokud byl účet předtím v jiném stavu
+# locked - uzamčen pro přihlašování, maily jsou doručovány
+# closed - nelze se přihlásit, maily nejsou doručovány - soft-delete
+#
+sub getStatus() {
+	# TODO - implement logic
+	return 'active';
+}
