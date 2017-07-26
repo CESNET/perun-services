@@ -4,6 +4,8 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
+use File::Copy;
+use Time::Piece;
 
 sub getStatus;
 
@@ -30,6 +32,13 @@ our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:e
 our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
 our $A_EXPIRATION_MANUAL; *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
 
+# Read which accounts are "system wide" => IGNORED by Perun.
+open FILE, "<" . "/etc/perun/services/$::SERVICE_NAME/vsup_zimbra_ignored_accounts";
+my @ignoredAccountsList = <FILE>;
+close FILE;
+chomp(@ignoredAccountsList);
+my %ignoredAccounts = map { $_ => 1 } @ignoredAccountsList;
+
 # GATHER USERS
 my $users;  # $users->{$uco}->{ATTR} = $attrValue;
 
@@ -52,6 +61,11 @@ foreach my $rData ($data->getChildElements) {
 	foreach my $member (@membersData) {
 
 		my %uAttributes = attributesToHash $member->getAttributes;
+
+		# SKIP MEMBERS WHICH SUPOSSED TO BE SYSTEM WIDE ACCOUNTS => IGNORED BY PERUN
+		if (exists $ignoredAccounts{$uAttributes{$A_LOGIN}}) {
+			next;
+		}
 
 		my $uco = $uAttributes{$A_UCO};
 		$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
@@ -86,7 +100,7 @@ foreach my $rData ($data->getChildElements) {
 			# blacklisted users !security ban! are locked
 			$users->{$uco}->{"STATUS"} = 'locked';
 		} else {
-			$users->{$uco}->{"STATUS"} = getStatus();
+			$users->{$uco}->{"STATUS"} = getStatus($uAttributes{$A_EXPIRATION_KOS},$uAttributes{$A_EXPIRATION_DC2},$uAttributes{$A_EXPIRATION_MANUAL});
 		}
 
 	}
@@ -111,6 +125,11 @@ for my $uco (@keys) {
 
 close(FILE);
 
+#
+# Copy ignored accounts
+#
+copy("/etc/perun/services/$::SERVICE_NAME/vsup_zimbra_ignored_accounts", "$DIRECTORY/vsup_zimbra_ignored_accounts") or die "Couldn't copy file of ignored Zimbra accounts.";
+
 perunServicesInit::finalize;
 
 #
@@ -119,6 +138,56 @@ perunServicesInit::finalize;
 # closed - nelze se přihlásit, maily nejsou doručovány - soft-delete
 #
 sub getStatus() {
-	# TODO - implement logic
-	return 'active';
+
+	# read input
+	my $expirationKos = shift;
+	my $expirationDc2 = shift;
+	my $expirationMan = shift;
+	# parse to time or undef
+	my $expirationKosTime = ($expirationKos) ? Time::Piece->strptime($expirationKos,"%Y-%m-%d") : undef;
+	my $expirationDc2Time = ($expirationDc2) ? Time::Piece->strptime($expirationDc2,"%Y-%m-%d") : undef;
+	my $expirationManTime = ($expirationMan) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
+
+	my @expirations = ();
+	if (defined $expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
+	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
+	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
+
+	# sort all expirations
+	my @sorted_expirations = sort { $a <=> $b } @expirations;
+
+	my $latest_expiration = $sorted_expirations[$#sorted_expirations];
+	my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d");
+
+	if (!defined $expirationKos and !defined $expirationDc2 and !defined $expirationMan) {
+		# if no expiration set in source data - take as "never"
+		return 'active';
+	}
+
+	if ($latest_expiration > $currentDate->epoch) {
+		return 'active';
+	}
+
+	# (will) expire by studies - add 7 days grace period
+	if ($expirationKosTime and ($latest_expiration == $expirationKosTime->epoch)) {
+
+		# within 7 days grace period - still active
+		if (($latest_expiration + (7*24*60*60)) > $currentDate->epoch) {
+			return 'active';
+		} else {
+			# is within 30 days period
+			if (($latest_expiration + (30*24*60*60)) > $currentDate->epoch) {
+				return 'locked';
+			}
+			return 'closed'
+		}
+
+	} else {
+		# Expired by employment or manual
+		if (($latest_expiration + (30*24*60*60)) > $currentDate->epoch) {
+			return 'locked';
+		}
+		return 'closed';
+	}
+
 }
