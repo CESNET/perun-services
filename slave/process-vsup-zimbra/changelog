@@ -1,0 +1,5 @@
+perun-slave-process-vsup-zimbra (3.0.0) stable; urgency=low
+
+  * New package version for perun-slave-process-vsup-zimbra
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Wed, 31 May 2017 06:40:00 +0200
