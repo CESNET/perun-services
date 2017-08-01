@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+'''
+EXAMPLE of python script for processing SCIM files from Perun
+'''
+
+USERS_FILE = '/var/spool/perun/scim-service-users.scim'
+GROUPS_FILE = '/var/spool/perun/scim-service-grops.scim'
+
+import os
+import sys
+import json
+
+''' GETTING DATA FROM JSON '''
+json_users = open(USERS_FILE)
+users_data = json.load(json_users)
+json_users.close()
+
+json_groups = open(GROUPS_FILE)
+groups_data = json.load(json_groups)
+json_groups.close()
+
+''' PARSING DATA FROM users.scim '''
+for item in users_data:
+	userJSON_ids.append(int(item['id']))	
+	tmpUser = User()
+	tmpUser.displayName = (item['displayName'])
+	tmpUser.mail = (item['mail'])
+	tmpUser.status = (item['status'])
+	tmpUser.external_id = int(item['id'])
+	users_list.append(tmpUser)
+
+	for i in item['identities']:
+		identities_json.append(i)
+		tmpIdentity = Identity()
+		tmpIdentity.login = i
+		tmpIdentity.external_id = int(item['id'])
+		identities_list.append(tmpIdentity)
+
+''' PARSING DATA FROM groups.scim '''		
+for item in groups_data:
+	groupJSON_ids.append(int(item['id']))
+	tmpGroup = Group()
+	tmpGroup.name = (item['name'])
+	tmpGroup.external_id = int(item['id'])
+	
+	if item['parentGroupId'] is None:
+		tmpGroup.parent_group_id = None
+	else:
+		tmpGroup.parent_group_id = int(item['parentGroupId'])
+		#This removes prefix of parent group exported from perun, that is not suitable
+		tmpGroup.name = tmpGroup.name.split(':')[-1]
+
+	groups_list.append(tmpGroup)
+	
+	for i in item['members']:
+		tmpUserInGroup = UserInGroup()
+		tmpUserInGroup.user_external_id = int(i['userId'])
+		tmpUserInGroup.group_external_id = int(item['id'])
+		usersInGroups_list.append(tmpUserInGroup)
