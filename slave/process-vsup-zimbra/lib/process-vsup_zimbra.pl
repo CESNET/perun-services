@@ -10,8 +10,8 @@ sub updateAccounts;
 sub compareAndUpdateAttribute;
 sub logMessage;
 
-my $perunAccounts;  # $perunAccounts->{login}->{MAILBOX|COS|STATUS|NAME}=value
-my $zimbraAccounts;  # $zimbraAccounts->{login}->{MAILBOX|COS|STATUS|NAME}=value
+my $perunAccounts;  # $perunAccounts->{login}->{MAILBOX|givenName|sn|displayName|zimbraAccountStatus|zimbraCOSid}=value
+my $zimbraAccounts;  # $zimbraAccounts->{login}->{MAILBOX|givenName|sn|displayName|zimbraAccountStatus|zimbraCOSid}=value
 
 # read input files path
 my $accountsFilePath = shift;
@@ -29,10 +29,13 @@ foreach my $line ( @lines ) {
 	my @parts = split /\t/, $line;
 	chomp(@parts);
 
+	$perunAccounts->{$parts[1]}->{'TYPE'} = $parts[2];   # original relation to prevent creation of wrong "active".
 	$perunAccounts->{$parts[1]}->{'MAILBOX'} = $parts[3];
-	$perunAccounts->{$parts[1]}->{'displayName'} = (($parts[4] ne '') ? $parts[4] : undef);
-	$perunAccounts->{$parts[1]}->{'zimbraAccountStatus'} = (($parts[5] ne '') ? $parts[5] : undef);
-	$perunAccounts->{$parts[1]}->{'zimbraCOSid'} = (($parts[6] ne '') ? $parts[6] : undef);
+	$perunAccounts->{$parts[1]}->{'givenName'} = (($parts[4] ne '') ? $parts[4] : undef);
+	$perunAccounts->{$parts[1]}->{'sn'} = (($parts[5] ne '') ? $parts[5] : undef);
+	$perunAccounts->{$parts[1]}->{'displayName'} = (($parts[6] ne '') ? $parts[6] : undef);
+	$perunAccounts->{$parts[1]}->{'zimbraAccountStatus'} = (($parts[7] ne '') ? $parts[7] : undef);
+	$perunAccounts->{$parts[1]}->{'zimbraCOSid'} = (($parts[8] ne '') ? $parts[8] : undef);
 
 }
 
@@ -109,6 +112,16 @@ sub getAllAccounts() {
 			$existingAccounts->{$currentLogin}->{"displayName"} = $currentName;
 		}
 
+		if ($line =~ m/^givenName: (.*)$/) {
+			my $currentName = ($line =~ m/^givenName: (.*)$/)[0];
+			$existingAccounts->{$currentLogin}->{"givenName"} = $currentName;
+		}
+
+		if ($line =~ m/^sn: (.*)$/) {
+			my $currentName = ($line =~ m/^sn: (.*)$/)[0];
+			$existingAccounts->{$currentLogin}->{"sn"} = $currentName;
+		}
+
 	}
 
 	return $existingAccounts;
@@ -135,14 +148,14 @@ sub createAccounts() {
 				next;
 			}
 
-			if ($perunAccounts->{$login}->{"zimbraAccountStatus"} eq 'active') {
+			if (($perunAccounts->{$login}->{"zimbraAccountStatus"} eq 'active') and ($perunAccounts->{$login}->{"TYPE"} ne 'EXPIRED')) {
 
-				# create new account
+				# create new account for active STU/ZAM
 				createAccount($perunAccounts->{$login});
 
 			} else {
 
-				# not-active accounts are not created in Zimbra again !
+				# not-active or EXPIRED accounts are not created in Zimbra again !
 				print $perunAccounts->{$login}->{"MAILBOX"} . " skipped.\n";
 				logMessage("WARN: " . $perunAccounts->{$login}->{"MAILBOX"} . " not created - is not in active state and was probably manually deleted from Zimbra.");
 
@@ -165,7 +178,7 @@ sub updateAccounts() {
 
 		if (exists $ignoredAccounts{$login}) {
 			print $zimbraAccounts->{$login}->{"MAILBOX"} . " ignored.\n";
-			logMessage("Mailbox: " . $zimbraAccounts->{$login}->{"MAILBOX"} . " not updated. Belongs to ignored.");
+			logMessage("WARN: " . $zimbraAccounts->{$login}->{"MAILBOX"} . " not updated. Belongs to ignored.");
 			next;
 		}
 
@@ -173,6 +186,8 @@ sub updateAccounts() {
 
 			# compare and update each attribute
 			compareAndUpdateAttribute($perunAccounts->{$login}, $zimbraAccounts->{$login}, "zimbraCOSid");
+			compareAndUpdateAttribute($perunAccounts->{$login}, $zimbraAccounts->{$login}, "givenName");
+			compareAndUpdateAttribute($perunAccounts->{$login}, $zimbraAccounts->{$login}, "sn");
 			compareAndUpdateAttribute($perunAccounts->{$login}, $zimbraAccounts->{$login}, "displayName");
 			compareAndUpdateAttribute($perunAccounts->{$login}, $zimbraAccounts->{$login}, "zimbraAccountStatus");
 
@@ -180,7 +195,7 @@ sub updateAccounts() {
 
 			# is missing from perun but present in zimbra => 'closed', in future delete !!
 
-			if ($zimbraAccounts->{$login}->{"STATUS"} ne 'closed') {
+			if ($zimbraAccounts->{$login}->{"zimbraAccountStatus"} ne 'closed') {
 				my $ret = updateAccount($zimbraAccounts->{$login}->{"MAILBOX"}, "zimbraAccountStatus", 'closed');
 				if ($ret != 0) {
 					print "ERROR: " . $zimbraAccounts->{$login}->{"MAILBOX"} . " not closed.\n";
@@ -214,13 +229,16 @@ sub compareAndUpdateAttribute() {
 	my $attrName = shift;
 
 	if ($perunAccount->{$attrName} ne $zimbraAccount->{$attrName}) {
+
+		my $zimbraVal = (defined $zimbraAccount->{$attrName}) ? $zimbraAccount->{$attrName} : '';
+
 		my $ret = updateAccount($perunAccount->{"MAILBOX"}, $attrName, $perunAccount->{$attrName});
 		if ($ret != 0) {
 			print "ERROR: " . $perunAccount->{"MAILBOX"} . " update of $attrName failed.\n";
 			logMessage("ERROR: " . $perunAccount->{"MAILBOX"} . " update of $attrName failed, ret.code: " . $ret);
 		} else {
-			print $perunAccount->{"MAILBOX"} . " $attrName updated '$zimbraAccount->{$attrName}'=>'$perunAccount->{$attrName}'.\n";
-			logMessage($perunAccount->{"MAILBOX"} . " $attrName updated '$zimbraAccount->{$attrName}'=>'$perunAccount->{$attrName}'.\n");
+			print $perunAccount->{"MAILBOX"} . " $attrName updated '$zimbraVal'=>'$perunAccount->{$attrName}'.\n";
+			logMessage($perunAccount->{"MAILBOX"} . " $attrName updated '$zimbraVal'=>'$perunAccount->{$attrName}'.\n");
 		}
 	}
 
@@ -235,16 +253,16 @@ sub createAccount() {
 
 	my $account = shift;
 
-	my $output = `sudo -u zimbra /opt/zimbra/bin/zmprov ca $account->{"MAILBOX"} '' zimbraCOSid $account->{"zimbraCOSid"}`;
+	my $output = `sudo /opt/zimbra/bin/zmprov ca $account->{"MAILBOX"} '' zimbraCOSid $account->{"zimbraCOSid"} givenName $account->{"givenName"} sn $account->{"sn"} displayName $account->{"displayName"}`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
 	if ($ret != 0) {
 		print "ERROR: $account->{'MAILBOX'} not created, ret.code: $ret, output: $output.\n";
-		logMessage("ERROR: $account->{'MAILBOX'} not created, ret.code: $ret, output: $output.\n");
+		logMessage("ERROR: $account->{'MAILBOX'} not created, ret.code: $ret, output: $output.");
 	} else {
 		print "$account->{'MAILBOX'} created.\n";
-		logMessage("$account->{'MAILBOX'} created, ret.code: $ret, output: $output.\n");
+		logMessage("$account->{'MAILBOX'} created, ret.code: $ret, output: $output.");
 	}
 
 }
@@ -264,13 +282,13 @@ sub updateAccount() {
 	my $attrName = shift;
 	my $value = shift;
 
-	my $output = `sudo -u zimbra /opt/zimbra/bin/zmprov ma $account->{"MAILBOX"} $attrName $value`;
+	my $output = `sudo /opt/zimbra/bin/zmprov ma $account->{"MAILBOX"} $attrName $value`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
 	# only for logging verbose output
 	if ($ret != 0) {
-		logMessage("ERROR: $account->{'MAILBOX'} attribute $attrName not updated, ret.code: $ret, output: $output.\n");
+		logMessage("ERROR: $account->{'MAILBOX'} attribute $attrName not updated, ret.code: $ret, output: $output.");
 	}
 
 	return $ret;

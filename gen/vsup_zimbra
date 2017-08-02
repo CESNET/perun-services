@@ -31,6 +31,7 @@ our $A_BLACKLISTED;  *A_BLACKLISTED = \'urn:perun:user_facility:attribute-def:vi
 our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:expirationKos';
 our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
 our $A_EXPIRATION_MANUAL; *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
+our $A_ZIMBRA_DISPLAY_NAME;  *A_ZIMBRA_DISPLAY_NAME = \'urn:perun:user:attribute-def:def:zimbraDisplayName';
 
 # Read which accounts are "system wide" => IGNORED by Perun.
 open FILE, "<" . "/etc/perun/services/$::SERVICE_NAME/vsup_zimbra_ignored_accounts";
@@ -71,30 +72,44 @@ foreach my $rData ($data->getChildElements) {
 		$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
 		$users->{$uco}->{'EMAIL'} = ($uAttributes{$A_EMAIL_VSUP} || $uAttributes{$A_LOGIN} . '@vsup.cz');
 
-		# determine user account type (preferred ZAM over STU)
+		# determine user account type
 		if ($relationType eq "ZAM") {
+			# prefer ZAM over anything
 			$users->{$uco}->{'TYPE'} = $relationType;
 			$users->{$uco}->{'COS'} = '0603cf86-f917-4448-bb34-57dd11a2c381';
 		} elsif ($relationType eq "STU") {
+			# prefer active STU if is also EXPIRED or not yet set
+			if ((!defined $users->{$uco}->{'TYPE'}) || $users->{$uco}->{'TYPE'} eq 'EXPIRED') {
+				$users->{$uco}->{'TYPE'} = $relationType;
+				$users->{$uco}->{'COS'} = 'e00428a1-0c00-11d9-836a-000d93afea2a';
+			}
+		} elsif ($relationType eq "EXPIRED") {
+			# mark user expired if has no other relation (STU/ZAM)
 			unless ($users->{$uco}->{'TYPE'}) {
 				$users->{$uco}->{'TYPE'} = $relationType;
 				$users->{$uco}->{'COS'} = 'e00428a1-0c00-11d9-836a-000d93afea2a';
 			}
 		}
 
-		# merge name to displayName
+		# get users name
 		my $firstName = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
 		my $lastName = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
-
-		my $displayName = undef;
-		if (defined $firstName and length $firstName and defined $lastName and length $lastName) {
-			$displayName = $firstName . " " . $lastName;
-		} elsif (defined $firstName and length $firstName and !(defined $lastName and length $lastName)) {
-			$displayName = $firstName;
-		} elsif (!(defined $firstName and length $firstName) and defined $lastName and length $lastName) {
-			$displayName = $lastName;
+		# use custom zimbra displayName
+		my $displayName = $uAttributes{$A_ZIMBRA_DISPLAY_NAME} || undef;
+		# if custom name not present, create it from givenName and sn
+		unless($displayName) {
+			if (defined $firstName and length $firstName and defined $lastName and length $lastName) {
+				$displayName = $firstName . " " . $lastName;
+			} elsif (defined $firstName and length $firstName and !(defined $lastName and length $lastName)) {
+				$displayName = $firstName;
+			} elsif (!(defined $firstName and length $firstName) and defined $lastName and length $lastName) {
+				$displayName = $lastName;
+			}
 		}
-		$users->{$uco}->{"NAME"} = ($displayName || '');
+
+		$users->{$uco}->{"FIRST_NAME"} = ($firstName || '');
+		$users->{$uco}->{"LAST_NAME"} = ($lastName || '');
+		$users->{$uco}->{"DISPLAY_NAME"} = ($displayName || '');
 
 		if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
 			# blacklisted users !security ban! are locked
@@ -118,8 +133,8 @@ for my $uco (@keys) {
 
 	# print attributes, which are never empty
 	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{'TYPE'} . "\t" .
-		$users->{$uco}->{'EMAIL'} . "\t" . $users->{$uco}->{"NAME"} . "\t" . $users->{$uco}->{"STATUS"} . "\t" .
-		$users->{$uco}->{"COS"} . "\n";
+		$users->{$uco}->{'EMAIL'} . "\t" . $users->{$uco}->{"FIRST_NAME"} . "\t" . $users->{$uco}->{"LAST_NAME"} .
+		"\t" . $users->{$uco}->{"DISPLAY_NAME"} . "\t" . $users->{$uco}->{"STATUS"} . "\t" . $users->{$uco}->{"COS"} . "\n";
 
 }
 
