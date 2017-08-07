@@ -11,7 +11,7 @@ use JSON::XS;
 use utf8;
 
 local $::SERVICE_NAME = "kypo_portal";
-local $::PROTOCOL_VERSION = "1.0.0";
+local $::PROTOCOL_VERSION = "1.1.0";
 my $SCRIPT_VERSION = "1.0.0";
 
 perunServicesInit::init;
