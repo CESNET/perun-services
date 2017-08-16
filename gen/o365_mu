@@ -1,0 +1,161 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Data::Dumper;
+
+sub processMember;
+sub processResource;
+sub processGroup;
+
+our $SERVICE_NAME     = "o365_mu";
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data      = perunServicesInit::getDataWithGroups;
+
+#Constants
+our $A_GR_AD_NAME;                *A_GR_AD_NAME =                \'urn:perun:group_resource:attribute-def:def:adName';
+our $A_F_DOMAIN_NAME;             *A_F_DOMAIN_NAME =             \'urn:perun:facility:attribute-def:def:o365-domainName';
+our $A_MR_O365_SEND_AS;           *A_MR_O365_SEND_AS =           \'urn:perun:member_group:attribute-def:def:o365SendAs';
+our $A_UF_LOGIN;                  *A_UF_LOGIN =                  \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UF_O365_MAIL_FORWARD;      *A_UF_O365_MAIL_FORWARD =      \'urn:perun:user_facility:attribute-def:def:o365MailForward';
+our $A_UF_O365_ARCHIVE;           *A_UF_O365_ARCHIVE =           \'urn:perun:user_facility:attribute-def:def:o365MailInPlaceArchive';
+our $A_UF_O365_STORE_AND_FORWARD; *A_UF_O365_STORE_AND_FORWARD = \'urn:perun:user_facility:attribute-def:def:o365MailStoreAndForward';
+our $A_R_IS_FOR_O365_GROUP;       *A_R_IS_FOR_O365_GROUP =       \'urn:perun:resource:attribute-def:def:isForO365Group';
+our $A_U_LANGUAGE;                *A_U_LANGUAGE =                \'urn:perun:user:attribute-def:def:preferredLanguage';
+our $A_F_ID;                      *A_F_ID =                      \'urn:perun:facility:attribute-def:core:id';
+
+our $UPN_TEXT = "UPN";
+our $MAIL_FORWARD_TEXT = "mailForward";
+our $ARCHIVE_TEXT = "archive";
+our $STORE_AND_FORWARD_TEXT = "storeAndForward";
+our $LANGUAGE_TEXT = "language";
+our $LANGUAGE_EN = "en-US";
+our $LANGUAGE_CZ = "cs-CZ";
+
+#Global data structure
+our $users = {};
+our $groups = {};
+
+my %facilityAttributes = attributesToHash $data->getAttributes;
+
+my $facilityId = $facilityAttributes{$A_F_ID};
+unless($facilityId) { die "Facility id can't be empty, it is used to find directory with cache and active users from AD!\n"; }
+my $domainName = $facilityAttributes{$A_F_DOMAIN_NAME};
+unless($domainName) { die "Domain name can't be empty for service o365_mu!\n"; }
+
+foreach my $resourceData ( $data->getChildElements ) {
+	processResource $resourceData	
+}
+
+#Save data to the files (separate groups and users)
+my $usersFileName = "$DIRECTORY/$::SERVICE_NAME-users";
+my $groupsFileName = "$DIRECTORY/$::SERVICE_NAME-groups";
+my $facilityIdFileName = "$DIRECTORY/$::SERVICE_NAME-facilityId";
+
+#save data about users as user per line
+open FILE, ">$usersFileName" or die "Cannot open $usersFileName: $! \n";
+foreach my $UCO (sort keys %$users) {
+	print FILE $users->{$UCO}->{'UPN'} . "\t" . $users->{$UCO}->{'mailForward'} . "\t" . $users->{$UCO}->{'archive'} . "\t" . $users->{$UCO}->{'storeAndForward'} . "\t" . $users->{$UCO}->{'language'} . "\n";
+}
+close(FILE) or die "Cannot close $usersFileName: $! \n";
+
+#save data about groups as group per line
+open FILE, ">$groupsFileName" or die "Cannot open $groupsFileName: $! \n";
+foreach my $adName (sort keys %$groups) {
+	my $contacts = join " ", sort keys %{$groups->{$adName}};
+	unless($contacts) { $contacts = ""; }
+	print FILE $adName . "\t" . $contacts . "\n";
+}
+close(FILE) or die "Cannot close $groupsFileName: $! \n";
+
+#save id of this facility to the file
+open FILE, ">$facilityIdFileName" or die "Cannot open $facilityIdFileName: $! \n";
+print FILE $facilityId . "\n";
+close(FILE) or die "Cannot close $facilityIdFileName: $! \n";
+
+perunServicesInit::finalize;
+#End of main part of code
+
+### SUBS for processing objects
+
+#Name: processResource
+#Description:
+# - take resource data and process groups and members assigned to it
+# - groups are processed only if resource is set for them, members always
+sub processResource {
+	my $resourceData = shift;
+	
+	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
+	my $isForO365Group = $resourceAttributes{$A_R_IS_FOR_O365_GROUP};
+
+	foreach my $memberData(($resourceData->getChildElements)[1]->getChildElements) {
+		processMember $memberData;	
+	}	
+		
+	if($isForO365Group) {
+		foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements){
+			processGroup $groupData;
+		}
+	}
+}
+
+#Name: processGroup
+#Description:
+# - take group data and add record to the map of all groups with
+#   specific attributes
+sub processGroup {
+	my $groupData = shift;
+	
+	my %groupAttributes = attributesToHash $groupData->getAttributes;
+	my $membersElement = ($groupData->getChildElements)[1];
+	
+	if($groupAttributes{$A_GR_AD_NAME}) {
+		my $groupADName = $groupAttributes{$A_GR_AD_NAME};
+		$groups->{$groupADName} = undef;
+
+		foreach my $memberData($membersElement->getChildElements) {
+			my %memberAttributes = attributesToHash $memberData->getAttributes;
+			my $UCO = $memberAttributes{$A_UF_LOGIN};
+			my $UPN = $users->{$UCO}->{$UPN_TEXT};
+			my $sendAsGroup = $memberAttributes{$A_MR_O365_SEND_AS};
+			if($sendAsGroup) { $groups->{$groupADName}->{$UPN} = 1; }
+		}
+	}
+}
+
+#Name: processMember
+#Description:
+# - take member data and add record to the map of all users with
+#   specific attributes
+sub processMember {
+	my $memberData = shift;
+	my %memberAttributes = attributesToHash $memberData->getAttributes;
+
+	my $UCO = $memberAttributes{$A_UF_LOGIN};
+	my $mailForward = $memberAttributes{$A_UF_O365_MAIL_FORWARD};
+	my $archive = $memberAttributes{$A_UF_O365_ARCHIVE};
+	my $storeAndForward = $memberAttributes{$A_UF_O365_STORE_AND_FORWARD};
+	my $language = $memberAttributes{$A_U_LANGUAGE};
+
+	unless($users->{$UCO}) {
+		$users->{$UCO}->{$UPN_TEXT} = $UCO . "@" . $domainName;
+		$users->{$UCO}->{$MAIL_FORWARD_TEXT} = $mailForward ? $mailForward : "";
+		$users->{$UCO}->{$ARCHIVE_TEXT} = $archive ? "1" : "0";
+		$users->{$UCO}->{$STORE_AND_FORWARD_TEXT} = $storeAndForward ? "1" : "0";
+		unless($language) {
+			$users->{$UCO}->{$LANGUAGE_TEXT} = $LANGUAGE_EN;
+		} else {
+			if($language =~ /cs/) { 
+				$users->{$UCO}->{$LANGUAGE_TEXT} = $LANGUAGE_CZ;
+			} else {
+				$users->{$UCO}->{$LANGUAGE_TEXT} = $LANGUAGE_EN;
+			}
+		}
+	}
+}
