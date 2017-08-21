@@ -34,7 +34,7 @@ foreach my $resourceData ( $data->getChildElements ) {
 
 			foreach my $memberData($membersElement->getChildElements) {
 				my %memberAttributes = attributesToHash $memberData->getAttributes;
-				my @logins = shift(@{$memberAttributes{$A_USER_GOOGLE_NAMESPACE}});
+				my @logins = @{$memberAttributes{$A_USER_GOOGLE_NAMESPACE}};
 
 				# skip users without google login, might happen, when user removes his UserExtSource
 				# since google login is virtual attribute calculated from Google IdP UES.
