@@ -393,13 +393,13 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @attributes_deleted;
 	foreach $attribute (@attributesToDelete) {
 		push (@attributes_deleted, $attribute) if effectCall "voms-admin --nousercert --vo \Q$name\E delete-user-attribute \Q$attribute->{'DN'}\E \Q$attribute->{'CA'}\E \Q$attribute->{'name'}\E",
-		"deleting Attribute \"$attribute->{'name'}\" for user \"$attribute->{'DN'}\" in VO \"$name\""; 
+		"deleting Attribute \"$attribute->{'name'}\" for user \"$attribute->{'DN'}\" in VO \"$name\"";
 	}
-	# then set new ones	
+	# then set new ones
 	foreach $attribute (@attributesToSet) {
 		push (@attributes_current, $attribute) if effectCall "voms-admin --nousercert --vo \Q$name\E set-user-attribute \Q$attribute->{'DN'}\E \Q$attribute->{'CA'}\E \Q$attribute->{'name'}\E \Q$attribute->{'value'}\E",
-		"setting Attribute \"$attribute->{'name'}\" to value \"$attribute->{'value'}\" for user \"$attribute->{'DN'}\" in VO \"$name\""; 
-		
+		"setting Attribute \"$attribute->{'name'}\" to value \"$attribute->{'value'}\" for user \"$attribute->{'DN'}\" in VO \"$name\"";
+
 	}
 
 	my @attributes_existing = array_minus_deep( @attributes_current, @attributes_deleted );
@@ -417,4 +417,3 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 closelog();
 
 exit $retval;
-

@@ -4,7 +4,6 @@ SERVICE_NAME="tinia_winpak"
 
 FACILITY_NAME=$1
 DESTINATION=$2
-#just optional here, not used now
 DESTINATION_TYPE=$3
 
 if [ -z "$DESTINATION" ]; then
@@ -15,6 +14,17 @@ fi
 if [ -z "$FACILITY_NAME" ]; then
 	echo "Missing FacilityName argument" >&2
 	exit 256
+fi
+
+if [ -z "$DESTINATION_TYPE" ]; then
+	echo "Destination type of this service can't be empty" >&2
+	exit 255;
+else 
+	TYPE="service-specific"
+	if [ "$DESTINATION_TYPE" != "$TYPE" ]; then
+		echo "Destination type of this service need to be $TYPE" >&2
+		exit 254;
+	fi
 fi
 
 #Destination is name of database on oracle in localhost tnsnames file
@@ -70,16 +80,14 @@ function create_lock {
 
 create_lock
 
-#if there is no destination type, use default 'host'
-if [ -z "$DESTINATION_TYPE" ]; then
-	DESTINATION_TYPE="database"
-fi
-
 TMP_HOSTNAME_DIR="`mktemp -d /tmp/perun-send.XXXXXXXXXX`"
 if [ $? -ne 0 ]; then
 	echo "Can't create temporary dir" >&2
 	exit 255
 fi
+
+#prepare removing of temporary files and dirs after exit of script
+trap 'rm -r -f "${LOCK_FILE}" "${TMP_HOSTNAME_DIR}"' EXIT
 
 cp $SERVICE_FILES_DIR/$SERVICE_NAME $TMP_HOSTNAME_DIR
 if [ $? -ne 0 ]; then
@@ -101,8 +109,6 @@ if [ $ERRORCODE -ne 0 ]; then
 	echo "Process exit with error" >&2
 	exit $ERRORCODE
 fi
-
-trap 'rm -r -f "${LOCK_FILE}" "${TMP_HOSTNAME_DIR}"' EXIT
 
 ERR_CODE=$?
 

@@ -18,15 +18,15 @@ my $etcPropertyFilename = "service.properties";
 
 ### serialize is used to turn an array of hash references into a manageable structure
 sub serialize {
-    JSON::XS->new->relaxed(0)->ascii(1)->canonical(1)->encode($_[0]);
+	JSON::XS->new->relaxed(0)->ascii(1)->canonical(1)->encode($_[0]);
 }
 
 ### array_minus_deep is a replacement for array_minus that expands hash references
 sub array_minus_deep(\@\@) {
-    my ($array,$minus) = @_;
+	my ($array,$minus) = @_;
 
-    my %minus = map( ( serialize($_) => 1 ), @$minus );
-    grep !$minus{ serialize($_) }, @$array
+	my %minus = map( ( serialize($_) => 1 ), @$minus );
+	grep !$minus{ serialize($_) }, @$array
 }
 
 ### getCN extracts a CN from DN. It accepts one aregument:
@@ -337,4 +337,3 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 closelog();
 
 exit $retval;
-
