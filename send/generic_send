@@ -12,6 +12,7 @@ FACILITY_NAME=$1
 DESTINATION=$2
 DESTINATION_TYPE=$3
 KEY_PATH="`echo ~`/.ssh/id_rsa"
+TRANSPORT_COMMAND="ssh -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5  -i $KEY_PATH"
 
 if [ -f "/etc/perun/services/${SERVICE_NAME}/${SERVICE_NAME}.conf" ]; then
 	. "/etc/perun/services/${SERVICE_NAME}/${SERVICE_NAME}.conf"
@@ -21,7 +22,6 @@ fi
 export LC_TIME="C"
 export LANG="C"
 
-TRANSPORT_COMMAND="ssh -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5  -i $KEY_PATH"
 SLAVE_COMMAND="/opt/perun/bin/perun"
 SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
 SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"

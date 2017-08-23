@@ -1,5 +1,11 @@
+perun-slave-process-mailman-vsup (3.1.1) stable; urgency=medium
+
+  * Changed sync_members command to: /usr/lib/mailman/bin/sync_members
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 24 Jul 2017 05:53:00 +0200
+
 perun-slave-process-mailman-vsup (3.1.0) stable; urgency=low
 
   * New package version for perun-slave-process-mailman-vsup
 
- -- Pavel Zlamal <zlamal@cesnet.cz>  Fri, 30 Jul 2017 12:57:00 +0200
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Fri, 30 Jun 2017 12:57:00 +0200

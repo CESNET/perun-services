@@ -12,7 +12,7 @@ function process {
 
 	for MAILING_LIST_NAME in `ls $FROM_PERUN_DIR/` ; do
 			# set list members
-			cat "${FROM_PERUN_DIR}/${MAILING_LIST_NAME}" | grep -v "^#" | sudo /usr/local/mailman/bin/sync_members --welcome-msg=no --goodbye-msg=no -f - $MAILING_LIST_NAME
+			cat "${FROM_PERUN_DIR}/${MAILING_LIST_NAME}" | grep -v "^#" | sudo /usr/lib/mailman/bin/sync_members --welcome-msg=no --goodbye-msg=no -f - $MAILING_LIST_NAME
 			log_msg I_MAILING_LIST_UPDATED
 	done
 
