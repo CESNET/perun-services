@@ -39,8 +39,9 @@ function process {
 		python3 $DST_KYPO_IMPORT
 	fi
 
+	# If python import script ends with error, tmp files are deleted
 	RETVAL=$?
-	if [ $RETVAL -eq 1 ]; then
+	if [ $RETVAL -ne 0 ]; then
 		rm $DST_FILE_USERS $DST_FILE_GROUPS
 	fi
 
