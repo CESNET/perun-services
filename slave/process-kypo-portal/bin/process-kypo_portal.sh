@@ -31,11 +31,19 @@ function process {
 	diff_mv "${FROM_PERUN_GROUPS}" "${DST_FILE_GROUPS}"
 	group_diff=$?
 	
-	if [ $user_diff -eq 0 ] || [ $group_diff -eq 0 ]; then
+	if [ $user_diff -ne 0 ] && [ $group_diff -ne 0 ]; then
+		log_msg I_NOT_CHANGED
+		exit 0
+	else
 		log_msg I_CHANGED
 		python3 $DST_KYPO_IMPORT
-		exit $?               
-	else
-		log_msg I_NOT_CHANGED
 	fi
+
+	# If python import script ends with error, tmp files are deleted
+	RETVAL=$?
+	if [ $RETVAL -ne 0 ]; then
+		rm $DST_FILE_USERS $DST_FILE_GROUPS
+	fi
+
+	exit $RETVAL
 }
