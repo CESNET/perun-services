@@ -1,0 +1,469 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+sub processMembers;
+sub processGroups;
+
+local $::SERVICE_NAME = "ad_mu";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
+my $fileNameGroups = "$DIRECTORY/$::SERVICE_NAME"."_groups";  # printed for each OU
+my $fileNameOus = "$DIRECTORY/$::SERVICE_NAME"."_ous.ldif";
+my $baseDnFileName = "$DIRECTORY/baseDN";
+my $baseDnFileNameGroups = "$DIRECTORY/baseDNGroups";
+my $fileNameRelations = "$DIRECTORY/userRelations";
+my $fileNameLicenses = "$DIRECTORY/userLicenses";
+my $fileNameFID = "$DIRECTORY/facilityId";
+
+my $data = perunServicesInit::getDataWithGroups;
+
+# Constants
+our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
+our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
+our $A_F_DOMAIN;  *A_F_DOMAIN = \'urn:perun:facility:attribute-def:def:adDomain';
+our $A_F_UAC;  *A_F_UAC = \'urn:perun:facility:attribute-def:def:adUAC';
+our $A_F_ID;  *A_F_ID = \'urn:perun:facility:attribute-def:core:id';
+
+# OU, Group
+our $A_R_OU_NAME;  *A_R_OU_NAME = \'urn:perun:resource:attribute-def:def:adOuName';
+our $A_R_RELATION_TYPE;  *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType'; # STU/ZAM/ABS
+
+our $A_G_R_AD_NAME;  *A_G_R_AD_NAME = \'urn:perun:group_resource:attribute-def:def:adName';
+our $A_G_R_AD_DISPLAY_NAME;  *A_G_R_AD_DISPLAY_NAME = \'urn:perun:group_resource:attribute-def:def:adDisplayName';
+our $A_G_R_msExchRequireAuthToSendTo;  *A_G_R_msExchRequireAuthToSendTo = \'urn:perun:group_resource:attribute-def:def:adRequireSenderAuthenticationEnabled';
+our $A_G_R_AD_EMAIL_ADDRESSES;  *A_G_R_AD_EMAIL_ADDRESSES = \'urn:perun:group_resource:attribute-def:def:adEmailAdresses';
+our $A_G_R_AD_EMAIL_ADDRESS;  *A_G_R_AD_EMAIL_ADDRESS = \'urn:perun:group_resource:attribute-def:def:adPrimaryEmailAdress';
+
+# User/member attributes
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
+our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_M_G_O365_SEND_ON_BEHALF; *A_M_G_O365_SEND_ON_BEHALF = \'urn:perun:member_group:attribute-def:def:o365SendOnBehalf';
+our $A_MEMBER_STATUS; *A_MEMBER_STATUS = \'urn:perun:member:attribute-def:core:status';
+
+our $STATUS_VALID;                   *STATUS_VALID =                   \'VALID';
+
+# GATHER USERS
+my $users;  # $users->{$login}->{ATTR} = $attrValue;
+my $usersRelation; # $usersRelation->{$login}->{ZAM|STU} = 1;
+my $groups; # $groups->{ouName}->{group DN}->{ATTR} = $attrValue;
+my $ous; # $ous->{ouName} = 1;
+my $licenses; # $licenses->{$login}->{license_group_name} = 1;
+
+# CHECK ON FACILITY ATTRIBUTES
+my %facilityAttributes = attributesToHash $data->getAttributes;
+
+if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_GROUP_BASE_DN})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_DOMAIN})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_UAC})) {
+	exit 1;
+}
+if (!defined($facilityAttributes{$A_F_ID})) {
+	exit 1;
+}
+
+#
+# PRINT BASE_DN FILEs
+#
+my $baseDNUsers = $facilityAttributes{$A_F_BASE_DN};
+my $baseDNGroups = $facilityAttributes{$A_F_GROUP_BASE_DN};
+
+open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
+print FILE $baseDNUsers;
+close(FILE);
+
+open FILE,">:encoding(UTF-8)","$baseDnFileNameGroups" or die "Cannot open $baseDnFileNameGroups: $! \n";
+print FILE $baseDNGroups;
+close(FILE);
+
+open FILE,">:encoding(UTF-8)","$fileNameFID" or die "Cannot open $fileNameFID: $! \n";
+print FILE $facilityAttributes{$A_F_ID};
+close(FILE);
+
+#
+# AGGREGATE DATA ABOUT MEMBERS from relation resources
+#
+foreach my $resourceData ($data->getChildElements) {
+
+	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
+	my $relationType = $resourceAttrs{$A_R_RELATION_TYPE};
+
+	if ($relationType) {
+		# users relation resource
+		processMembers($relationType , ($resourceData->getChildElements)[1]);
+	}
+}
+
+#
+# AGGREGATE DATA ABOUT GROUPS from OU resources
+#
+foreach my $resourceData ($data->getChildElements) {
+
+	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
+	my $ouName = $resourceAttrs{$A_R_OU_NAME};
+
+	if ($ouName) {
+
+		# groups resources (per-each end-service)
+		foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
+			processGroups($ouName, $groupData);
+		}
+
+		# Store to the list of OUs
+		$ous->{$ouName} = 1;
+
+	}
+
+}
+
+#
+# Process relation (STU/ZAM) and user entry only for VALID members
+#
+sub processMembers() {
+
+	my $relationType = shift;
+	my $membersElement = shift;
+
+	for my $memberData ($membersElement->getChildElements) {
+
+		my %memberAttributes = attributesToHash $memberData->getAttributes;
+		my $login = $memberAttributes{$A_LOGIN};
+
+		if($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID){
+
+			# store users relations
+			my $dn = "CN=" . $memberAttributes{$A_LOGIN} . "," . $baseDNUsers;
+			$usersRelation->{$dn}->{$relationType} = 1;
+
+			$users->{$login}->{"DN"} = $dn;
+			# store standard attrs
+			$users->{$login}->{$A_FIRST_NAME} = $memberAttributes{$A_FIRST_NAME};
+			$users->{$login}->{$A_LAST_NAME} = $memberAttributes{$A_LAST_NAME};
+			$users->{$login}->{$A_DISPLAY_NAME} = $memberAttributes{$A_DISPLAY_NAME};
+			$users->{$login}->{$A_MAIL} = $memberAttributes{$A_MAIL};
+
+		}
+	}
+
+}
+
+#
+# Process groups and its members
+#
+sub processGroups {
+
+	my $ouName = shift;
+	my $groupData = shift;
+	my $subGroupsElement = ($groupData->getChildElements)[0];
+	my $membersElement = ($groupData->getChildElements)[1];
+	my %groupAttributes = attributesToHash $groupData->getAttributes;
+
+	# process normal groups
+	unless ($ouName eq 'licenses') {
+
+		# create group entry
+		my $key = "CN=".$groupAttributes{$A_G_R_AD_NAME}.",OU=".$ouName.",".$baseDNGroups;
+
+		$groups->{$ouName}->{$key}->{$A_G_R_AD_NAME} = $groupAttributes{$A_G_R_AD_NAME};
+		$groups->{$ouName}->{$key}->{$A_G_R_AD_DISPLAY_NAME} = $groupAttributes{$A_G_R_AD_DISPLAY_NAME};
+		$groups->{$ouName}->{$key}->{$A_G_R_msExchRequireAuthToSendTo} = $groupAttributes{$A_G_R_msExchRequireAuthToSendTo};
+		$groups->{$ouName}->{$key}->{$A_G_R_AD_EMAIL_ADDRESS} = $groupAttributes{$A_G_R_AD_EMAIL_ADDRESS};
+		$groups->{$ouName}->{$key}->{$A_G_R_AD_EMAIL_ADDRESSES} = $groupAttributes{$A_G_R_AD_EMAIL_ADDRESSES};
+
+		# resolve groups members
+		for my $memberData ($membersElement->getChildElements) {
+			my %memberAttributes = attributesToHash $memberData->getAttributes;
+
+			if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID) {
+				# process only valid members
+				$groups->{$ouName}->{$key}->{"MEMBERS"}->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers} = 1;
+				# get o365SendOnBehalf for non-license groups
+				if (defined $memberAttributes{$A_M_G_O365_SEND_ON_BEHALF} and $memberAttributes{$A_M_G_O365_SEND_ON_BEHALF} == 1) {
+					$groups->{$ouName}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}->{$memberAttributes{$A_LOGIN}."\@muni.cz"} = 1;
+				}
+			}
+		}
+
+
+	} else {
+
+		# handle license groups for employees and students
+		my @rels = ("Employee","Student");
+		for my $rel (@rels) {
+
+			# create group entry
+			my $key = "CN=O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME} . ",OU=" . $ouName . "," . $baseDNGroups;
+
+			$groups->{$ouName}->{$key}->{$A_G_R_AD_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME};
+			$groups->{$ouName}->{$key}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME};
+
+			# resolve groups members
+			for my $memberData ($membersElement->getChildElements) {
+				my %memberAttributes = attributesToHash $memberData->getAttributes;
+				if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID) {
+					# process only valid members
+
+					# if person is employee (or student+employee)
+					if (defined $usersRelation->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers}->{"ZAM"}) {
+						# emplyees will be placed only to employee groups
+						if ($rel eq "Employee") {
+							$groups->{$ouName}->{$key}->{"MEMBERS"}->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers} = 1;
+						}
+
+					# if person is only student
+					} elsif (defined $usersRelation->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers}->{"STU"}) {
+						# students will be placed only to student groups
+						if ($rel eq "Student") {
+							$groups->{$ouName}->{$key}->{"MEMBERS"}->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers} = 1;
+						}
+					}
+
+					# store basic licenses of users (might contain users, which are no longer employee/student - it's resolved by send script)
+					$licenses->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers}->{$groupAttributes{$A_G_R_AD_NAME}} = 1;
+
+				}
+			}
+
+		}
+
+	}
+
+	# process all sub-groups
+	foreach my $subGroupData ($subGroupsElement->getChildElements) {
+		processGroups($ouName, $subGroupData);
+	}
+
+}
+
+####################
+#
+# CREATE SPECIFIC LICENSE GROUPS
+#
+####################
+my $key1 = "CN=O365Lic_Employee,OU=licenses," . $baseDNGroups;
+$groups->{"licenses"}->{$key1}->{$A_G_R_AD_NAME} = "O365Lic_Employee";
+$groups->{"licenses"}->{$key1}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Employee";
+
+my $key2 = "CN=O365Lic_Student,OU=licenses," . $baseDNGroups;
+$groups->{"licenses"}->{$key2}->{$A_G_R_AD_NAME} = "O365Lic_Student";
+$groups->{"licenses"}->{$key2}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Student";
+
+foreach my $mem (sort keys %{$usersRelation}) {
+
+	if (defined $usersRelation->{$mem}->{"ZAM"}) {
+		$groups->{"licenses"}->{$key1}->{"MEMBERS"}->{$mem} = 1;
+	} elsif (defined $usersRelation->{$mem}->{"STU"}) {
+		$groups->{"licenses"}->{$key2}->{"MEMBERS"}->{$mem} = 1;
+	}
+
+}
+
+# this group members are resolved by the send script !!
+my $key3 = "CN=O365Lic_Alumni,OU=licenses," . $baseDNGroups;
+$groups->{"licenses"}->{$key3}->{$A_G_R_AD_NAME} = "O365Lic_Alumni";
+$groups->{"licenses"}->{$key3}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Alumni";
+
+############################
+#
+# PRINT OUs LDIF
+#
+############################
+open FILE,">:encoding(UTF-8)","$fileNameOus" or die "Cannot open $fileNameOus: $! \n";
+my @ouKeys = sort keys %{$ous};
+for my $key (@ouKeys) {
+
+	# we create OUs only in groups section !!
+	print FILE "dn: OU=" . $key . "," . $baseDNGroups . "\n";
+	print FILE "ou: " . $key . "\n";
+	print FILE "objectclass: top\n";
+	print FILE "objectclass: organizationalUnit\n";
+
+	# there must be empty line after each entry
+	print FILE "\n";
+
+}
+
+close FILE;
+
+
+#############################
+#
+# PRINT GROUPs LDIF
+#
+#############################
+
+my @groupOus = sort keys %{$groups};
+for my $ouKey (@groupOus) {
+
+	open FILE,">:encoding(UTF-8)","$fileNameGroups\_$ouKey.ldif" or die "Cannot open $fileNameGroups\_$ouKey.ldif: $! \n";
+
+	my $ouGroups = $groups->{$ouKey};
+	my @groupKeys = sort keys %{$ouGroups};
+	for my $key (@groupKeys) {
+
+		print FILE "dn: " . $key . "\n";
+		print FILE "cn: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "\n";
+		print FILE "displayName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_DISPLAY_NAME} . "\n";
+		print FILE "MailNickName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "\n";
+		my $msExchVal = $groups->{$ouKey}->{$key}->{$A_G_R_msExchRequireAuthToSendTo};
+		print FILE "msExchRequireAuthToSendTo: " . ((defined $msExchVal and $msExchVal == 1) ? 'TRUE' : 'FALSE') . "\n";
+
+		# get proxy addresses
+		my $proxyAddresses = ($groups->{$ouKey}->{$key}->{$A_G_R_AD_EMAIL_ADDRESSES}) ? $groups->{$ouKey}->{$key}->{$A_G_R_AD_EMAIL_ADDRESSES} : ();
+
+		# if primary is defined, put it at the start of array
+		if ($groups->{$ouKey}->{$key}->{$A_G_R_AD_EMAIL_ADDRESS} and length $groups->{$ouKey}->{$key}->{$A_G_R_AD_EMAIL_ADDRESS}) {
+			unshift @$proxyAddresses, $groups->{$ouKey}->{$key}->{$A_G_R_AD_EMAIL_ADDRESS};
+		}
+		my $first = 0;
+		foreach my $proxyAddress (@$proxyAddresses) {
+			if ($proxyAddress) {
+				if ($first == 0) {
+					print FILE "ProxyAddresses: SMTP:" . $proxyAddress . "\n";
+					$first = 1;
+				} else {
+					print FILE "ProxyAddresses: smtp:" . $proxyAddress . "\n";
+				}
+			}
+		}
+
+		if (defined $groups->{$ouKey}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}) {
+			# get public delegates only when they are there
+			my @publicDelegates = sort keys %{$groups->{$ouKey}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}};
+			for my $pdVal (@publicDelegates) {
+				print FILE "publicDelegates: " . $pdVal . "\n";
+			}
+		}
+
+		print FILE "objectClass: group\n";
+		print FILE "objectClass: top\n";
+
+		if (defined $groups->{$ouKey}->{$key}->{"MEMBERS"}) {
+			# print members only when they are there
+			my @groupMembers = sort keys %{$groups->{$ouKey}->{$key}->{"MEMBERS"}};
+			for my $member (@groupMembers) {
+				print FILE "member: " . $member . "\n";
+			}
+		}
+
+		# there must be empty line after each entry
+		print FILE "\n";
+
+	}
+
+	close FILE;
+
+}
+
+
+##################################
+#
+# PRINT USERs LDIF
+#
+##################################
+open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
+
+# FOR EACH USER ON FACILITY
+my @logins = sort keys %{$users};
+for my $login (@logins) {
+
+	# Localy defined attributes
+	my $userPrincipalName = "$login\@$facilityAttributes{$A_F_DOMAIN}";
+	my $samAccountName = $login;
+	my $displayName = "$users->{$login}->{$A_DISPLAY_NAME}";
+
+	# print attributes, which are never empty
+	print FILE "dn: " . $users->{$login}->{"DN"} . "\n";
+	print FILE "cn: " . $login . "\n";
+
+	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
+	my $sn = $users->{$login}->{$A_LAST_NAME};
+	my $givenName = $users->{$login}->{$A_FIRST_NAME};
+	my $mail = $users->{$login}->{$A_MAIL};
+
+	if (defined $displayName and length $displayName) {
+		print FILE "displayName: " . $displayName . "\n";
+	}
+	if (defined $sn and length $sn) {
+		print FILE "sn: " . $sn . "\n";
+	}
+	if (defined $givenName and length $givenName) {
+		print FILE "givenName: " . $givenName . "\n";
+	}
+	if (defined $mail and length $mail) {
+		print FILE "mail: " . $mail . "\n";
+	}
+	if (defined $samAccountName and length $samAccountName) {
+		print FILE "samAccountName: " . $samAccountName . "\n";
+	}
+	if (defined $userPrincipalName and length $userPrincipalName) {
+		print FILE "userPrincipalName: " . $userPrincipalName . "\n";
+	}
+
+	print FILE "userAccountControl: $facilityAttributes{$A_F_UAC}\n";
+
+	# print classes
+	print FILE "objectclass: top\n";
+	print FILE "objectclass: person\n";
+	print FILE "objectclass: user\n";
+	print FILE "objectclass: organizationalPerson\n";
+
+	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
+	print FILE "\n";
+
+}
+
+close(FILE);
+
+########################################
+#
+# PRINT USERS RELATIONS (ZAM or STU)
+#
+########################################
+open FILE,">:encoding(UTF-8)","$fileNameRelations" or die "Cannot open $fileNameRelations: $! \n";
+foreach my $login (sort keys %{$usersRelation}) {
+
+	my @rels = sort keys %{$usersRelation->{$login}};
+	if (@rels) {
+		print FILE $login . "\t";
+		print FILE join(",", @rels);
+		print FILE "\n";
+	}
+
+}
+close(FILE);
+
+########################################
+#
+# PRINT USERS LICENSES (ZAM or STU)
+#
+########################################
+open FILE,">:encoding(UTF-8)","$fileNameLicenses" or die "Cannot open $fileNameLicenses: $! \n";
+foreach my $login (sort keys %{$licenses}) {
+
+	print FILE $login . "\t";
+	my @rels = sort keys %{$licenses->{$login}};
+	print FILE join(",", @rels);
+	print FILE "\n";
+
+}
+close(FILE);
+
+perunServicesInit::finalize;
