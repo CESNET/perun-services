@@ -20,23 +20,19 @@ my $data      = perunServicesInit::getDataWithGroups;
 
 #Constants
 our $A_GR_AD_NAME;                *A_GR_AD_NAME =                \'urn:perun:group_resource:attribute-def:def:adName';
-our $A_F_DOMAIN_NAME;             *A_F_DOMAIN_NAME =             \'urn:perun:facility:attribute-def:def:o365-domainName';
+our $A_F_DOMAIN_NAME;             *A_F_DOMAIN_NAME =             \'urn:perun:facility:attribute-def:def:o365DomainName';
 our $A_MR_O365_SEND_AS;           *A_MR_O365_SEND_AS =           \'urn:perun:member_group:attribute-def:def:o365SendAs';
 our $A_UF_LOGIN;                  *A_UF_LOGIN =                  \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_UF_O365_MAIL_FORWARD;      *A_UF_O365_MAIL_FORWARD =      \'urn:perun:user_facility:attribute-def:def:o365MailForward';
 our $A_UF_O365_ARCHIVE;           *A_UF_O365_ARCHIVE =           \'urn:perun:user_facility:attribute-def:def:o365MailInPlaceArchive';
 our $A_UF_O365_STORE_AND_FORWARD; *A_UF_O365_STORE_AND_FORWARD = \'urn:perun:user_facility:attribute-def:def:o365MailStoreAndForward';
 our $A_R_IS_FOR_O365_GROUP;       *A_R_IS_FOR_O365_GROUP =       \'urn:perun:resource:attribute-def:def:isForO365Group';
-our $A_U_LANGUAGE;                *A_U_LANGUAGE =                \'urn:perun:user:attribute-def:def:preferredLanguage';
 our $A_F_ID;                      *A_F_ID =                      \'urn:perun:facility:attribute-def:core:id';
 
 our $UPN_TEXT = "UPN";
 our $MAIL_FORWARD_TEXT = "mailForward";
 our $ARCHIVE_TEXT = "archive";
 our $STORE_AND_FORWARD_TEXT = "storeAndForward";
-our $LANGUAGE_TEXT = "language";
-our $LANGUAGE_EN = "en-US";
-our $LANGUAGE_CZ = "cs-CZ";
 
 #Global data structure
 our $users = {};
@@ -61,7 +57,7 @@ my $facilityIdFileName = "$DIRECTORY/$::SERVICE_NAME-facilityId";
 #save data about users as user per line
 open FILE, ">$usersFileName" or die "Cannot open $usersFileName: $! \n";
 foreach my $UCO (sort keys %$users) {
-	print FILE $users->{$UCO}->{'UPN'} . "\t" . $users->{$UCO}->{'mailForward'} . "\t" . $users->{$UCO}->{'archive'} . "\t" . $users->{$UCO}->{'storeAndForward'} . "\t" . $users->{$UCO}->{'language'} . "\n";
+	print FILE $users->{$UCO}->{'UPN'} . "\t" . $users->{$UCO}->{'mailForward'} . "\t" . $users->{$UCO}->{'archive'} . "\t" . $users->{$UCO}->{'storeAndForward'} . "\n";
 }
 close(FILE) or die "Cannot close $usersFileName: $! \n";
 
@@ -116,7 +112,8 @@ sub processGroup {
 	my $membersElement = ($groupData->getChildElements)[1];
 	
 	if($groupAttributes{$A_GR_AD_NAME}) {
-		my $groupADName = $groupAttributes{$A_GR_AD_NAME};
+		#all groups for mu should have specific part of name
+		my $groupADName = $groupAttributes{$A_GR_AD_NAME} . '_group.muni.cz';
 		$groups->{$groupADName} = undef;
 
 		foreach my $memberData($membersElement->getChildElements) {
@@ -141,21 +138,11 @@ sub processMember {
 	my $mailForward = $memberAttributes{$A_UF_O365_MAIL_FORWARD};
 	my $archive = $memberAttributes{$A_UF_O365_ARCHIVE};
 	my $storeAndForward = $memberAttributes{$A_UF_O365_STORE_AND_FORWARD};
-	my $language = $memberAttributes{$A_U_LANGUAGE};
 
 	unless($users->{$UCO}) {
 		$users->{$UCO}->{$UPN_TEXT} = $UCO . "@" . $domainName;
 		$users->{$UCO}->{$MAIL_FORWARD_TEXT} = $mailForward ? $mailForward : "";
 		$users->{$UCO}->{$ARCHIVE_TEXT} = $archive ? "1" : "0";
 		$users->{$UCO}->{$STORE_AND_FORWARD_TEXT} = $storeAndForward ? "1" : "0";
-		unless($language) {
-			$users->{$UCO}->{$LANGUAGE_TEXT} = $LANGUAGE_EN;
-		} else {
-			if($language =~ /cs/) { 
-				$users->{$UCO}->{$LANGUAGE_TEXT} = $LANGUAGE_CZ;
-			} else {
-				$users->{$UCO}->{$LANGUAGE_TEXT} = $LANGUAGE_EN;
-			}
-		}
 	}
 }

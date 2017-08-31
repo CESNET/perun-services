@@ -24,14 +24,15 @@ local $Data::Dumper::Useqq = 1;
 
 ### Examples of possible commands with parameters
 =c
-./o365-connector.pl -s o365_mu -S develMU -c checkIfEmailExists -i jan@izydorczyk.cz
-./o365-connector.pl -s o365_mu -S develMU -c getMuniContactByEmail -i jan@izydorczyk.cz
-./o365-connector.pl -s o365_mu -S develMU -c getGroupByEmail -i test-lab-crocs@mandragora.onmicrosoft.com
-./o365-connector.pl -s o365_mu -S develMU -c getO365GroupByEmail -i oss@ics.muni.cz
-./o365-connector.pl -s o365_mu -S develMU -c getMuniMailboxByEmail -i 255920@mandragora.muni.cz
-./o365-connector.pl -s o365_mu -S develMU -c getMuniShareboxByEmail -i jan@izydorczyk.cz
-./o365-connector.pl -s o365_mu -S develMU -c setMuniGroup -i test-lab-crocs@mandragora.onmicrosoft.com -t 255920@mandragora.muni.cz 465818@mandragora.muni.cz
-./o365-connector.pl -s o365_mu -S develMU -c setMuniMailbox -i 255920@mandragora.muni.cz -a 1 -d 0 -l "en-US" -f slavek@ics.muni.cz
+./o365-connector.pl -s o365_mu -S prodMU -c "Ping-MuniEmailAddress" -i 396462@mandragora.muni.cz
+./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniEmailAddress" -i 396462@mandragora.muni.cz
+./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniGroup" -i test-lab-crocs@mandragora.onmicrosoft.com
+./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniO365Group" -i oss@ics.muni.cz
+./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniMailbox" -i 396462@mandragora.muni.cz
+./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniSharebox" -i jan@izydorczyk.cz
+./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniGroup" -i test-lab-crocs@mandragora.onmicrosoft.com -t 255920@mandragora.muni.cz 465818@mandragora.muni.cz
+./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniMailBox" -i 396462@mandragora.muni.cz -a 1 -d 0 -f slavek@ics.muni.cz
+./o365-connector.pl -s o365_mu -S prodMU -c "Test-MuniError" -i soft
 =cut
 
 #-----------------------------CONSTANTS------------------------------------
@@ -39,16 +40,20 @@ local $Data::Dumper::Useqq = 1;
 our $DEBUG=0;
 #Maximum time to wait on server response (after that it tries the same time to get result)
 #Time to get result is 2xMAX_WAIT_SEC sec
-our $MAX_WAIT_SEC=20;
+our $MAX_WAIT_SEC=15;
 our $MAX_WAIT_MSEC = $MAX_WAIT_SEC * 1000;
 
 #Mandatory settings to be able to call server as authorized user
+our $BASIC_URL;
 our $URL;
+our $CHECK_URL;
 our $USERNAME;
 our $PASSWORD;
 our $HOST;
 our $PORT;
-our $PSWS_HOST;
+our $TYPE_GET = 'GET';
+our $TYPE_POST = 'POST';
+our $USED_TYPE = $TYPE_GET;
 
 #All possible exceptions
 our $ERROR_UNKNOWN_RETURNED_CODE      = "Unknown returned code get from status of call. This is an internal script error!\n";
@@ -71,20 +76,19 @@ our $COMMAND_STATUS_SET = 'SET';
 our $COMMAND_STATUS_RESOLVE = 'RESOLVE';
 
 #All possible commands to call
-our $COMMAND_PING_EMAIL = "checkIfEmailExists";
-our $COMMAND_GET_CONTACT = "getMuniContactByEmail";
-our $COMMAND_GET_GROUP = "getGroupByEmail";
-our $COMMAND_GET_O365_GROUP = "getO365GroupByEmail";
-our $COMMAND_GET_MAILBOX = "getMuniMailboxByEmail";
-our $COMMAND_GET_SHAREBOX = "getMuniShareboxByEmail";
-our $COMMAND_SET_GROUP = "setMuniGroup";
-our $COMMAND_SET_MAILBOX = "setMuniMailbox";
-
+our $COMMAND_PING_EMAIL = "Ping-MuniEmailAddress";
+our $COMMAND_GET_CONTACT = "Get-MuniEmailAddress";
+our $COMMAND_GET_GROUP = "Get-MuniGroup";
+our $COMMAND_GET_O365_GROUP = "Get-MuniO365Group";
+our $COMMAND_GET_MAILBOX = "Get-MuniMailbox";
+our $COMMAND_GET_SHAREBOX = "Get-MuniSharebox";
+our $COMMAND_SET_GROUP = "Set-MuniGroup";
+our $COMMAND_SET_MAILBOX = "Set-MuniMailBox";
+our $COMMAND_TEST_MUNI_ERROR = "Test-MuniError";
 #Basic content of every call
-our %content = (
-  "OutputFormat" => "json",
-  "WaitMsec" => $MAX_WAIT_MSEC
-);
+our %content = ();
+	#"WaitMsec" => $MAX_WAIT_MSEC
+#);
 
 #Global needed variables
 our $actualCommand = "";
@@ -98,7 +102,7 @@ Return help + exit 1 if help is needed.
 Return STDOUT + exit 0 if everything is ok.
 Return STDERR + exit >0 if error happens.
 Available commands with mandatory options:
- --command "$COMMAND_SET_MAILBOX" -i "emailOfMailbox" -a 1|0 -d 1|0 -l "language" -f "email"
+ --command "$COMMAND_SET_MAILBOX" -i "emailOfMailbox" -a 1|0 -d 1|0 -f "email"
  --command "$COMMAND_SET_GROUP" -i "nameOfGroup" -t contact1 contact2 ...
  --command "$COMMAND_PING_EMAIL" -i "emailToPing"
  --command "$COMMAND_GET_CONTACT" -i "nameOfContact"
@@ -115,7 +119,6 @@ All methods mandatory options:
  --command     | -c command to call
  --identifier  | -i main identifier of object (most often email)
 SetMailbox mandatory options:
- --language    | -l language to use for mailbox, "en-US" is default
  --archiving   | -a enable or disable archiving, values 1=enable, 0=disable, disabled by default
  --delivering  | -d enable or disable delivering to mailbox, values 1=enable, 0=disable, disabled by default
  --forwarding  | -f forward to email address for mailing list
@@ -131,7 +134,7 @@ SetGroup mandatory options:
 #Get parameters of script and assign them to variables
 my $inputCommand = $0;
 foreach my $argument (@ARGV) { $inputCommand .= " " . $argument; }
-my ($service, $server, $argIdent, $argCommand, $argLang, $argArch, $argDeliv, $argForw, @argContacts);
+my ($service, $server, $argIdent, $argCommand, $argArch, $argDeliv, $argForw, @argContacts);
 GetOptions("help|h"	=> sub {
 		print help;
 		exit 1;
@@ -140,7 +143,6 @@ GetOptions("help|h"	=> sub {
 	"server|S=s"      => \$server,
 	"command|c=s"     => \$argCommand,
 	"identifier|i=s"  => \$argIdent,
-	"language|l=s"    => \$argLang,
 	"archiving|a=i"   => \$argArch,
 	"delivering|d=i"  => \$argDeliv,
 	"forwarding|f=s"  => \$argForw,
@@ -159,10 +161,10 @@ while(my $line = <FILE>) {
 	chomp( $line );
 	if($line =~ /^username: .*/) {
 		$USERNAME = ($line =~ /^username: (.*)$/)[0];
-	} elsif($line =~ /^password: .*/) {                                                         
+	} elsif($line =~ /^password: .*/) {
 		$PASSWORD = ($line =~ /^password: (.*)$/)[0];
 	} elsif($line =~ /^url: .*/) {
-		$URL = ($line =~ /^url: (.*)$/)[0];
+		$BASIC_URL = ($line =~ /^url: (.*)$/)[0];
 	} elsif($line =~ /^host: .*/) {
 		$HOST = ($line =~ /^host: (.*)$/)[0];
 	} elsif($line =~ /^port: .*/) {
@@ -171,7 +173,7 @@ while(my $line = <FILE>) {
 }
 
 #Check mandatory configuration
-if(!defined($PASSWORD) || !defined($USERNAME) || !defined($URL) || !defined($HOST) || !defined($PORT)) {
+if(!defined($PASSWORD) || !defined($USERNAME) || !defined($BASIC_URL) || !defined($HOST) || !defined($PORT)) {
 	diePretty ( $ERROR_CANNOT_FOUND_CONFIGURATION, "Path to find: $configPath \n" );
 }
 
@@ -179,22 +181,23 @@ if(!defined($PASSWORD) || !defined($USERNAME) || !defined($URL) || !defined($HOS
 if($argCommand eq $COMMAND_SET_MAILBOX) {
 	unless (defined $argArch) { $argArch = 0; }
 	unless (defined $argDeliv) { $argDeliv = 0; }
-	unless (defined $argLang) { $argLang = "en-US"; }
-	setMailbox ( $COMMAND_STATUS_SET, undef, $argIdent, $argDeliv, $argArch, $argForw, $argLang );
+	setMailbox ( $COMMAND_STATUS_SET, undef, $argIdent, $argDeliv, $argArch, $argForw );
 } elsif ($argCommand eq $COMMAND_SET_GROUP) {
 	setGroup ( $COMMAND_STATUS_SET, undef, $argIdent, \@argContacts);
 } elsif ($argCommand eq $COMMAND_PING_EMAIL) {
-	pingEmail ( $COMMAND_STATUS_SET, undef, $argIdent);	
+	pingEmail ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_GET_CONTACT) {
-	getContact ( $COMMAND_STATUS_SET, undef, $argIdent );	
+	getContact ( $COMMAND_STATUS_SET, undef, $argIdent );
 } elsif ($argCommand eq $COMMAND_GET_GROUP) {
-	getGroup ( $COMMAND_STATUS_SET, undef, $argIdent);	
+	getGroup ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_GET_MAILBOX) {
-	getMailbox ( $COMMAND_STATUS_SET, undef, $argIdent);	
+	getMailbox ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_GET_O365_GROUP) {
-	getO365Group ( $COMMAND_STATUS_SET, undef, $argIdent);	
+	getO365Group ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_GET_SHAREBOX) {
-	getSharebox ( $COMMAND_STATUS_SET, undef, $argIdent);	
+	getSharebox ( $COMMAND_STATUS_SET, undef, $argIdent);
+} elsif ($argCommand eq $COMMAND_TEST_MUNI_ERROR) {
+	testMuniError ( $COMMAND_STATUS_SET, undef, $argIdent);
 } else {
 	diePretty ( $ERROR_UNKNOWN_COMMAND, "Unknown command $argCommand!\n");
 }
@@ -238,11 +241,10 @@ sub setGroup {
 		$actualCommand = $COMMAND_SET_GROUP;
 		unless($groupEmail) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty group email object!\n") };
 		unless($sendAs) { $sendAs = []; }
-		my $group = ();
-		$group->{'groupName'} = $groupEmail;
-		$group->{'sendAs'} = $sendAs;
-		my $jsonGroup = JSON->new->utf8->encode( $group );
-		$content{"Command"} = "Set-MuniGroup -DataJson '$jsonGroup'";
+		$URL = $BASIC_URL . $actualCommand . "/";
+		$USED_TYPE = $TYPE_POST;
+		$content{'groupName'} = $groupEmail;
+		$content{'sendAs'} = $sendAs;
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
 		if($jsonOutput->{'Status'} eq 'OK') {
@@ -265,7 +267,6 @@ sub setGroup {
 # deliverToMailbox - if delivering is set to true or false
 # archive          - if archiving is set to true or false
 # forwardTo        - address for forwaring all emails to
-# language         - o365 mailbox language
 #-----------------------
 #Returns: void with exit status 0 = OK, error with exit status > 0 = not OK
 #-----------------------
@@ -279,7 +280,6 @@ sub setMailbox {
 	my $deliverToMailbox = shift;
 	my $archive = shift;
 	my $forwardTo = shift;
-	my $language = shift;
 
 	if(defined($jsonOutput->{"ErrorType"})) {
 		diePretty ( $ERROR_O365_OR_PS_ERROR , "Some HARD internal message error in method call -> " . $jsonOutput->{"ErrorMessage"} . "\n" );
@@ -288,14 +288,12 @@ sub setMailbox {
 	if($status eq $COMMAND_STATUS_SET) {
 		$actualCommand = $COMMAND_SET_MAILBOX;
 		unless($upn) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty user identifier object!\n") };
-		my $user = ();
-		$user->{'upn'} = $upn;
-		$user->{'language'} = $language;
-		$user->{'forwardingSmtpAddress'} = $forwardTo ? $forwardTo : JSON::null;
-		$user->{'deliverToMailboxAndForward'} = $deliverToMailbox ? JSON::true : JSON::false;
-		$user->{'archive'} = $archive ? JSON::true : JSON::false;
-		my $jsonUser = encode_json( $user );
-		$content{"Command"} = "Set-MuniMailbox -DataJson '$jsonUser'";
+		$URL = $BASIC_URL . $actualCommand . "/";
+		$USED_TYPE = $TYPE_POST;
+		$content{'upn'} = $upn;
+		$content{'forwardingSmtpAddress'} = $forwardTo ? $forwardTo : JSON::null;
+		$content{'deliverToMailboxAndForward'} = $deliverToMailbox ? JSON::true : JSON::false;
+		$content{'archive'} = $archive ? JSON::true : JSON::false;
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
 		if($jsonOutput->{'Status'} eq 'OK') {
@@ -333,7 +331,8 @@ sub getSharebox {
 	if($status eq $COMMAND_STATUS_SET) {
 		$actualCommand = $COMMAND_GET_SHAREBOX;
 		unless($email) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty email object!\n") };
-		$content{"Command"} = "Get-MuniSharedMailbox $email -property '*'";
+		$URL = $BASIC_URL . $actualCommand . "/$email/displayName,ObjectId/";
+		$USED_TYPE = $TYPE_POST;
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
 		unless($jsonOutput) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To resolve command $actualCommand we need to have not empty JSON output object!\n") };
@@ -368,7 +367,8 @@ sub getMailbox {
 	if($status eq $COMMAND_STATUS_SET) {
 		$actualCommand = $COMMAND_GET_MAILBOX;
 		unless($email) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty email object!\n") };
-		$content{"Command"} = "Get-MuniMailbox $email -property 'forwardingSmtpAddress,deliverToMailboxAndForward,ArchiveStatus,Languages,userprincipalname'";
+		$URL = $BASIC_URL . $actualCommand . "/$email/displayName,ObjectId,ForwardingSmtpAddress,DeliverToMailboxAndForward,ArchiveStatus,UserPrincipalName/";
+		$USED_TYPE = $TYPE_GET;
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
 		unless($jsonOutput) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To resolve command $actualCommand we need to have not empty JSON output object!\n") };
@@ -403,7 +403,8 @@ sub getGroup {
 	if($status eq $COMMAND_STATUS_SET) {
 		$actualCommand = $COMMAND_GET_GROUP;
 		unless($email) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty email object!\n") };
-		$content{"Command"} = "Get-MuniGroup $email -property 'EmailAddresses, members, TrusteeSendAs'";
+		$URL = $BASIC_URL . $actualCommand . "/$email/displayName,ObjectId,EmailAddresses,members,TrusteeSendAs/";
+		$USED_TYPE = $TYPE_GET;
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
 		unless($jsonOutput) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To resolve command $actualCommand we need to have not empty JSON output object!\n") };
@@ -438,8 +439,9 @@ sub getO365Group {
 
 	if($status eq $COMMAND_STATUS_SET) {
 		$actualCommand = $COMMAND_GET_O365_GROUP;
+		$URL = $BASIC_URL . $actualCommand . "/$email/displayName,ObjectId/";
+		$USED_TYPE = $TYPE_GET;
 		unless($email) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty email object!\n") };
-		$content{"Command"} = "Get-MuniGroup $email -property 'EmailAddresses, members'";
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
 		unless($jsonOutput) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To resolve command $actualCommand we need to have not empty JSON output object!\n") };
@@ -474,18 +476,56 @@ sub pingEmail {
 	if($status eq $COMMAND_STATUS_SET) {
 		unless($email) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty email object!\n") };
 		$actualCommand = $COMMAND_PING_EMAIL;
-		$content{"Command"} = "ping-muniemailaddress $email -short";
+		$URL = $BASIC_URL . $actualCommand . "/$email/displayName,ObjectId/";
+		$USED_TYPE = $TYPE_GET;
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
 		unless($jsonOutput) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To resolve command $actualCommand we need to have not empty JSON output object!\n") };
 		my $emailExists = $jsonOutput->{'EmailExists'};
-		if($emailExists eq 'True') {
+		if($emailExists) {
 			if($DEBUG>0) { print "Email exists in the system!\n"; }
 			return 0;
 		} else {
 			if($DEBUG>0) { print "Email NOT exists in the system!\n"; }
 			diePretty ( $ERROR_OBJECT_NOT_FOUND, "Email not exists in the system!\n" );
 		}
+	} else {
+		diePretty ( $ERROR_UNSUPPORTED_COMMAND_STATUS, "Unsupported status $status\n" );
+	}
+}
+
+#Name:
+# testMuniError
+#-----------------------
+#Parameters: 
+# status     - status of command, do we want to set this command or resolve it
+# jsonOutput - json output from the server as hash in perl, undef if there is no such output yet
+# type       - type of the error you want to test (hard|soft)
+#-----------------------
+#Returns: void and always throw soft or hard exception
+#-----------------------
+#Description: 
+# Testing of specific error type (hard|soft).
+#-----------------------
+
+sub testMuniError {
+	my $status = shift;
+	my $jsonOutput = shift;
+	my $type = shift;
+
+	if(defined($jsonOutput->{"ErrorType"})) {
+		diePretty ( $ERROR_O365_OR_PS_ERROR , "Some HARD internal message error in method call -> " . $jsonOutput->{"ErrorMessage"} . "\n" );
+	}
+
+	if($status eq $COMMAND_STATUS_SET) {
+		unless($type) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty type of error!\n") };
+		$actualCommand = $COMMAND_TEST_MUNI_ERROR;
+		$URL = $BASIC_URL . $actualCommand . "/$type/";
+		$USED_TYPE = $TYPE_GET;
+		return 1;
+	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
+		unless($jsonOutput) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To resolve command $actualCommand we need to have not empty JSON output object!\n") };
+		return $jsonOutput;
 	} else {
 		diePretty ( $ERROR_UNSUPPORTED_COMMAND_STATUS, "Unsupported status $status\n" );
 	}
@@ -516,7 +556,8 @@ sub getContact {
 	if($status eq $COMMAND_STATUS_SET) {
 		unless($email) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty email object!\n") };
 		$actualCommand = $COMMAND_GET_CONTACT;
-		$content{"Command"} = "Get-MuniContact $email -property 'DisplayName,EmailAddress'";
+		$URL = $BASIC_URL . $actualCommand . "/$email/displayName,ObjectId/";
+		$USED_TYPE = $TYPE_GET;
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
 		unless($jsonOutput) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To resolve command $actualCommand we need to have not empty JSON output object!\n") };
@@ -546,12 +587,13 @@ sub getContact {
 #-----------------------
 sub startSession {
 	my $sessionNumber = int rand(1000000);
-	if($DEBUG>0) { 
+	if($DEBUG>0) {
 		print "#######################################################################################\n";
-		print "Session number $sessionNumber: START\n"; 
+		print "Session number $sessionNumber: START\n";
 	}
+
 	#First call of command
-	my $urlToRepeat = callServer( $URL, 'POST', \%content );
+	my $urlToRepeat = callServer( $URL, $USED_TYPE, \%content );
 
 	#When there is something nasty (soft error or maxwait) then repeat till error or done
 	my $waitingInSec = 0;
@@ -560,22 +602,23 @@ sub startSession {
 		if($urlToRepeat eq $URL) {
 			#Problem with soft error
 			if($DEBUG>0) { print "Need to repeat calling because of soft error: $urlToRepeat\n"; }
-			$urlToRepeat = callServer( $urlToRepeat, 'POST', \%content );
+			$urlToRepeat = callServer( $urlToRepeat, $USED_TYPE, \%content );
 		} else {
 			#Problem with executing state
 			if($DEBUG>0) { print "Need to repeat calling because of timeout on execution maxWait: $urlToRepeat\n"; }
 			sleep 1;
-			$urlToRepeat = callServer( $urlToRepeat, 'GET', {} );
+			$urlToRepeat = callServer( $urlToRepeat, $TYPE_GET, {} );
 		}
 		$waitingInSec++;
+		sleep 1;
 	}
 
 	my $result = resolveOutputByCommandName ( $finalJsonOutput );
 	if($DEBUG>0) { print "RESULT IS: " . Dumper($result); }
 
 	#everything is ok
-	if($DEBUG>0) { 
-		print "Session number $sessionNumber: DONE SUCCESSFULLY\n"; 
+	if($DEBUG>0) {
+		print "Session number $sessionNumber: DONE SUCCESSFULLY\n";
 		print "#######################################################################################\n";
 	}
 
@@ -606,8 +649,12 @@ sub callServer {
 	my $type = shift;
 	my $content = shift;
 
-	my $serverResponse = createConnection( $url, $type, JSON->new->utf8->encode( $content ) );
+	my $jsonContent = JSON->new->utf8->encode( $content );
+	if($DEBUG>1) { print "CONTENT: " . $jsonContent . "\n"; }
+
+	my $serverResponse = createConnection( $url, $type, $jsonContent );
 	my $serverResponseJson = checkServerResponse( $serverResponse );
+
 	#Just for debug purposes print whole information about json object
 	printJsonOutput( $serverResponseJson );
 	return resolveStatusOfCall( $serverResponseJson );
@@ -634,15 +681,15 @@ sub createConnection {
 
 	my $address = $HOST . ":" . $PORT;
 	my $domain = $HOST;
-	
+
 	my $headers = HTTP::Headers->new;
 	$headers->header('Content-Type' => 'application/json');
 	$headers->header('Accept' => 'application/json,text/json');
+	$headers->header('MUNI-WAITTIME' => $MAX_WAIT_MSEC );
 
 	my $ua = LWP::UserAgent->new;
-	$ua->credentials( $address, $domain, $USERNAME, $PASSWORD ); 
+	$ua->credentials( $address, $domain, $USERNAME, $PASSWORD );
 	my $request = HTTP::Request->new( $type, $url, $headers, $content );
-
 	return $ua->request($request);
 }
 
@@ -663,11 +710,12 @@ sub checkServerResponse {
 	my $responseJson;
 
 	if ($response->is_success) {
-		$PSWS_HOST = $response->header( "psws-host" );
 		$responseJson = JSON->new->utf8->decode( $response->content );
+		$CHECK_URL = $responseJson->{'checkURL'};
+		$HOST = $responseJson->{'host'};
 	} else {
 		my $responseInfo = $response->status_line . "\n" . $response->decoded_content . "\n";
-		diePretty( $ERROR_ISS_COM_PROBLEM, $responseInfo ); 
+		diePretty( $ERROR_ISS_COM_PROBLEM, $responseInfo );
 	}
 	return $responseJson;
 }
@@ -678,7 +726,7 @@ sub checkServerResponse {
 #Parameters: 
 # responseJson = server response in decoded json format (hash in perl)
 #-----------------------
-#Returns: decoded json output (part of response of the server - there is json output as part of json response)
+#Returns: output of response (part of response of the server - hash map of arguments)
 #-----------------------
 #Description: 
 # Parse and return json output (if any exists) from the server response
@@ -686,10 +734,10 @@ sub checkServerResponse {
 sub getOutputInJson {
 	my $responseJson = shift;
 	my $outputJson = {};
-	if ($responseJson->{'Output'}) { 
-		$outputJson = JSON->new->decode( $responseJson->{'Output'} ); 
-	} 
-	return $outputJson; 
+	if ($responseJson->{'psOutput'}) {
+		$outputJson = $responseJson->{'psOutput'};
+	}
+	return $outputJson;
 }
 
 #Name:
@@ -707,21 +755,20 @@ sub getOutputInJson {
 #-----------------------
 sub printJsonOutput {
 	my $responseJson = shift;
-	if($DEBUG<2) { return 1 };
 
-	my $outputJson = getOutputInJson( $responseJson );
+	if($DEBUG<2) { return 1 };
 
 	print "\n------------------------------------------\n";
 	print "RESPONSE:\n";
 	print "------------------------------------------\n";
-	print "COMMAND = " . $responseJson->{'Command'} . "\n";
-	print "HOST    = " . $HOST . "\n";
-	print "PSWS_HOST = " . $PSWS_HOST . "\n";
-	print "URL     = " . $URL . "\n";
-	print "STATUS  = " . $responseJson->{'Status'} . "\n";
-	print "ERRORS  = " . Dumper($responseJson->{'Errors'});
-	print "FORMAT  = " . $responseJson->{'OutputFormat'} . "\n";
-	print "OUTPUT  = " . Dumper($outputJson);
+	print "COMMAND   = " . $actualCommand . "\n";
+	print "HOST      = " . $HOST . "\n";
+	print "BASIC_URL = " . $BASIC_URL . "\n";
+	print "CHECK_URL = " . $CHECK_URL . "\n";
+	print "URL       = " . $URL . "\n";
+	print "STATUS    = " . $responseJson->{'status'} . "\n";
+	print "GUID      = " . $responseJson->{'queryGuid'} . "\n";
+	print "OUTPUT    = " . Dumper($responseJson->{'psOutput'});
 	print "-------------------------------------------\n\n";
 }
 
@@ -748,9 +795,8 @@ sub checkStatusOfCall {
 	my $STATUS_OK = "OK";
 
 	my $outputJson = getOutputInJson( $responseJson );
-	if ($responseJson->{'Output'}) { $outputJson = JSON->new->decode($responseJson->{'Output'}); }
 
-	if(@{$responseJson->{'Errors'}}) {
+	if($responseJson->{'Errors'}) {
 		return $SERVER_ERR;
 	}
 
@@ -761,7 +807,7 @@ sub checkStatusOfCall {
 			return $HARD_ERR;
 		}
 	}
-	
+
 	return $STATUS_OK;
 }
 
@@ -788,18 +834,13 @@ sub resolveStatusOfCall {
 	my $returnedCode = checkStatusOfCall( $responseJson );
 
 	if($returnedCode eq "OK") {
-		if($responseJson->{'Status'} eq 'Completed') {
+		if($responseJson->{'status'} eq 'Completed') {
 			$finalJsonOutput = getOutputInJson( $responseJson );
 			return 0;
-		} elsif ($responseJson->{'Status'} eq 'Executing') {
-			my $newURL = $URL;
-			if($HOST ne $PSWS_HOST) {
-				$HOST = $PSWS_HOST;
-				$newURL =~ s/$HOST/$PSWS_HOST/g;
-			}
-			return $newURL . "(guid'" . $responseJson->{"ID"} . "')";
+		} elsif ($responseJson->{'status'} eq 'Executing') {
+			return $CHECK_URL;
 		} else {
-			diePretty( $ERROR_UNKNOWN_STATUS, "Unknown status = " . $responseJson->{'Status'} . "\n" ) ;
+			diePretty( $ERROR_UNKNOWN_STATUS, "Unknown status = " . $responseJson->{'status'} . "\n" ) ;
 		}
 	} elsif( $returnedCode eq "ERROR" ) {
 		diePretty( $ERROR_WRONG_ISS_EXECUTION, Dumper($responseJson->{'Errors'}) . "\n" );
@@ -832,7 +873,7 @@ sub diePretty {
 	my $status =       "               STATUS = ERROR\n";
 	my $forCommand = "INPUT COMMAND: " . $inputCommand . "\n";
 
-	$errorMessage = $rowDelimeter . $status . $rowDelimeter . $errorMessage . $rowDelimeter . $moreErrorInfo  . $rowDelimeter . $forCommand . $rowDelimeter;
+	$errorMessage = "\n" . $rowDelimeter . $status . $rowDelimeter . $errorMessage . $rowDelimeter . $moreErrorInfo  . $rowDelimeter . $forCommand . $rowDelimeter . "\n";
 
 	die $errorMessage;
 }
@@ -851,7 +892,7 @@ sub diePretty {
 # It returns output of one of these methods or die if such command is not known yet.
 #-----------------------
 sub resolveOutputByCommandName {
-	my $jsonOutput = shift;	
+	my $jsonOutput = shift;
 	if($actualCommand eq $COMMAND_PING_EMAIL) {
 		return pingEmail( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_GET_CONTACT) {
@@ -868,6 +909,8 @@ sub resolveOutputByCommandName {
 		return setGroup ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_SET_MAILBOX) {
 		return setMailbox ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
+	} elsif ($actualCommand eq $COMMAND_TEST_MUNI_ERROR) {
+		return testMuniError ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} else {
 		diePretty( $ERROR_UNSUPPORTED_COMMAND, "Command with number $actualCommand not known.\n" );
 	}

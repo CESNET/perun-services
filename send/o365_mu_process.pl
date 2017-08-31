@@ -9,6 +9,7 @@ use DBI;
 use Getopt::Long qw(:config no_ignore_case);
 use File::Temp qw/ tempfile tempdir /;
 use File::Copy;
+use File::Path qw(make_path);
 use Data::Dumper;
 
 #predefined subs
@@ -49,7 +50,6 @@ my $UPN_TEXT = "upn";
 my $DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT = "deliverToMailBoxAndForward";
 my $FORWARDING_SMTP_ADDRESS_TEXT = "forwardingSmtpAdress";
 my $ARCHIVE_TEXT = "archive";
-my $LANGUAGE_TEXT = "language";
 my $PLAIN_TEXT_OBJECT_TEXT = "plainTextObject";
 my $AD_GROUP_NAME_TEXT = "adGroupName";
 my $SEND_AS_TEXT = "sendAs";
@@ -101,7 +101,7 @@ if(! -f $groupsDataFilename) {
 my $facilityIdFilename = "$pathToServiceFile/$serviceName-facilityId";
 if(! -f $facilityIdFilename) {
   print "ERORR - Missing file with facilit id.\n";
-  exit 16;
+  exit 15;
 }
 
 #read facility id from file
@@ -110,6 +110,11 @@ my $facilityId = readFacilityId $facilityIdFilename;
 #prepare paths to files with cache (users and groups cache)
 my $basicCacheDir = "/var/cache/perun/services/$facilityId/$serviceName/";
 my $cacheDir = $basicCacheDir . "/" . $instanceName . "/";
+make_path($cacheDir, { chmod => 0755, error => \my $err });
+if(@$err) {
+	print "ERROR - Can't create whole cache directory $cacheDir.\n";
+	exit 16;
+}
 my $lastStateOfUsersFilename = $cacheDir . "o365_mu-users";
 my $lastStateOfGroupsFilename = $cacheDir . "o365_mu-groups";
 
@@ -117,7 +122,7 @@ my $lastStateOfGroupsFilename = $cacheDir . "o365_mu-groups";
 my $pathToActiveUsersFile = $basicCacheDir . "activeO365Users";
 if(! -f $pathToActiveUsersFile) {
 	print "ERORR - Missing file with list of active o365 users.\n";
-	exit 15;
+	exit 17;
 }
 
 #read data from files and convert them to the hash structure in perl
@@ -263,7 +268,7 @@ sub processGroup {
 	my $localOperation = shift;
 
 	if( $localOperation eq $OPERATION_GROUP_CHANGED ) {
-		my $command = $o365ConnectorFile . " -s " . shellEscape($serviceName)  . " -S " . shellEscape($instanceName) . " -c setMuniGroup" . " -i " . shellEscape $groupObject->{$AD_GROUP_NAME_TEXT};
+		my $command = $o365ConnectorFile . " -s " . shellEscape($serviceName)  . " -S " . shellEscape($instanceName) . " -c Set-MuniGroup" . " -i " . shellEscape $groupObject->{$AD_GROUP_NAME_TEXT};
 		my $sendAsMails = join " ", map { shellEscape $_ } @{$groupObject->{$SEND_AS_TEXT}} ;
 		if($sendAsMails) {
 			$command = $command . " -t " . $sendAsMails;
@@ -300,7 +305,7 @@ sub processUser {
 	my $localOperation = shift;
 
 	if( $localOperation eq $OPERATION_USER_CHANGED ) {
-		my $command = $o365ConnectorFile . " -s " . shellEscape($serviceName)  . " -S " . shellEscape($instanceName) . " -c setMuniMailbox " . " -i " . shellEscape($userObject->{$UPN_TEXT}) . " -a " . shellEscape($userObject->{$ARCHIVE_TEXT}) . " -d " . shellEscape($userObject->{$DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT}) . " -l " . shellEscape $userObject->{$LANGUAGE_TEXT};
+		my $command = $o365ConnectorFile . " -s " . shellEscape($serviceName)  . " -S " . shellEscape($instanceName) . " -c Set-MuniMailBox " . " -i " . shellEscape($userObject->{$UPN_TEXT}) . " -a " . shellEscape($userObject->{$ARCHIVE_TEXT}) . " -d " . shellEscape($userObject->{$DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT});
 		if($userObject->{$FORWARDING_SMTP_ADDRESS_TEXT}) {
 			$command = $command . " -f " . shellEscape $userObject->{$FORWARDING_SMTP_ADDRESS_TEXT};
 		}
@@ -349,7 +354,6 @@ sub readDataAboutUsers {
 		$usersStruc->{$UPN}->{$FORWARDING_SMTP_ADDRESS_TEXT} = $parts[1];
 		$usersStruc->{$UPN}->{$ARCHIVE_TEXT} = $parts[2];
 		$usersStruc->{$UPN}->{$DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT} = $parts[3];
-		$usersStruc->{$UPN}->{$LANGUAGE_TEXT} = $parts[4];
 		$usersStruc->{$UPN}->{$PLAIN_TEXT_OBJECT_TEXT} = $line ;
 	}
 	close FILE or die "Could not close file $pathToFile: $!\n";
