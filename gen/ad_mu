@@ -320,6 +320,7 @@ for my $ouKey (@groupOus) {
 
 		print FILE "dn: " . $key . "\n";
 		print FILE "cn: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "\n";
+		print FILE "samAccountName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "_" . $ouKey . "\n";
 		print FILE "displayName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_DISPLAY_NAME} . "\n";
 		print FILE "MailNickName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "\n";
 		my $msExchVal = $groups->{$ouKey}->{$key}->{$A_G_R_msExchRequireAuthToSendTo};
@@ -333,15 +334,22 @@ for my $ouKey (@groupOus) {
 			unshift @$proxyAddresses, $groups->{$ouKey}->{$key}->{$A_G_R_AD_EMAIL_ADDRESS};
 		}
 		my $first = 0;
+		my $mail;
 		foreach my $proxyAddress (@$proxyAddresses) {
 			if ($proxyAddress) {
 				if ($first == 0) {
 					print FILE "ProxyAddresses: SMTP:" . $proxyAddress . "\n";
+					$mail = $proxyAddress;
 					$first = 1;
 				} else {
 					print FILE "ProxyAddresses: smtp:" . $proxyAddress . "\n";
 				}
 			}
+		}
+
+		# print first of ProxyAddresses to mail too:
+		if ($mail) {
+			print FILE "mail: " . $mail . "\n";
 		}
 
 		if (defined $groups->{$ouKey}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}) {
