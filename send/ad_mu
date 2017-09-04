@@ -324,7 +324,7 @@ sub process_groups() {
 
 	my @perun_entries_groups = load_perun($service_files_dir."/".$service_name."_groups_".$ouName.".ldif");
 	my @ad_entries_groups = load_ad($ldap, "OU=".$ouName.",".$base_dn_groups, $filter_groups,
-		[ 'cn', 'samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates' , 'ProxyAddresses', 'mail']);
+		[ 'cn', 'samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates' , 'ProxyAddresses', 'mail', 'extensionAttribute1']);
 
 	my %ad_entries_group_map = ();
 	my %perun_entries_group_map = ();
@@ -375,7 +375,7 @@ sub process_groups() {
 				my $perun_entry = $perun_entries_group_map{$cn};
 
 				# attrs without cn!
-				my @attrs = ('samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates', 'ProxyAddresses', 'mail');
+				my @attrs = ('samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates', 'ProxyAddresses', 'mail', 'extensionAttribute1');
 				# stored log messages to check if entry should be updated
 				my @entry_changed = ();
 
