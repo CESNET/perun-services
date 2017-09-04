@@ -45,7 +45,6 @@ our $A_G_R_AD_EMAIL_ADDRESS;  *A_G_R_AD_EMAIL_ADDRESS = \'urn:perun:group_resour
 # User/member attributes
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
-our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_M_G_O365_SEND_ON_BEHALF; *A_M_G_O365_SEND_ON_BEHALF = \'urn:perun:member_group:attribute-def:def:o365SendOnBehalf';
@@ -156,7 +155,6 @@ sub processMembers() {
 			# store standard attrs
 			$users->{$login}->{$A_FIRST_NAME} = $memberAttributes{$A_FIRST_NAME};
 			$users->{$login}->{$A_LAST_NAME} = $memberAttributes{$A_LAST_NAME};
-			$users->{$login}->{$A_DISPLAY_NAME} = $memberAttributes{$A_DISPLAY_NAME};
 			$users->{$login}->{$A_MAIL} = $memberAttributes{$A_MAIL};
 
 		}
@@ -179,7 +177,7 @@ sub processGroups {
 	unless ($ouName eq 'licenses') {
 
 		# create group entry
-		my $key = "CN=".$groupAttributes{$A_G_R_AD_NAME}.",OU=".$ouName.",".$baseDNGroups;
+		my $key = "CN=".$groupAttributes{$A_G_R_AD_NAME}."_group.muni.cz,OU=".$ouName.",".$baseDNGroups;
 
 		$groups->{$ouName}->{$key}->{$A_G_R_AD_NAME} = $groupAttributes{$A_G_R_AD_NAME};
 		$groups->{$ouName}->{$key}->{$A_G_R_AD_DISPLAY_NAME} = $groupAttributes{$A_G_R_AD_DISPLAY_NAME};
@@ -209,9 +207,9 @@ sub processGroups {
 		for my $rel (@rels) {
 
 			# create group entry
-			my $key = "CN=O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME} . ",OU=" . $ouName . "," . $baseDNGroups;
+			my $key = "CN=O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME} . "_group.muni.cz,OU=" . $ouName . "," . $baseDNGroups;
 
-			$groups->{$ouName}->{$key}->{$A_G_R_AD_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME};
+			$groups->{$ouName}->{$key}->{$A_G_R_AD_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME} . "_group.muni.cz";
 			$groups->{$ouName}->{$key}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME};
 
 			# resolve groups members
@@ -257,12 +255,12 @@ sub processGroups {
 # CREATE SPECIFIC LICENSE GROUPS
 #
 ####################
-my $key1 = "CN=O365Lic_Employee,OU=licenses," . $baseDNGroups;
-$groups->{"licenses"}->{$key1}->{$A_G_R_AD_NAME} = "O365Lic_Employee";
+my $key1 = "CN=O365Lic_Employee_group.muni.cz,OU=licenses," . $baseDNGroups;
+$groups->{"licenses"}->{$key1}->{$A_G_R_AD_NAME} = "O365Lic_Employee_group.muni.cz";
 $groups->{"licenses"}->{$key1}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Employee";
 
-my $key2 = "CN=O365Lic_Student,OU=licenses," . $baseDNGroups;
-$groups->{"licenses"}->{$key2}->{$A_G_R_AD_NAME} = "O365Lic_Student";
+my $key2 = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $baseDNGroups;
+$groups->{"licenses"}->{$key2}->{$A_G_R_AD_NAME} = "O365Lic_Student_group.muni.cz";
 $groups->{"licenses"}->{$key2}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Student";
 
 foreach my $mem (sort keys %{$usersRelation}) {
@@ -276,8 +274,8 @@ foreach my $mem (sort keys %{$usersRelation}) {
 }
 
 # this group members are resolved by the send script !!
-my $key3 = "CN=O365Lic_Alumni,OU=licenses," . $baseDNGroups;
-$groups->{"licenses"}->{$key3}->{$A_G_R_AD_NAME} = "O365Lic_Alumni";
+my $key3 = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $baseDNGroups;
+$groups->{"licenses"}->{$key3}->{$A_G_R_AD_NAME} = "O365Lic_Alumni_group.muni.cz";
 $groups->{"licenses"}->{$key3}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Alumni";
 
 ############################
@@ -395,7 +393,6 @@ for my $login (@logins) {
 	# Localy defined attributes
 	my $userPrincipalName = "$login\@$facilityAttributes{$A_F_DOMAIN}";
 	my $samAccountName = $login;
-	my $displayName = "$users->{$login}->{$A_DISPLAY_NAME}";
 
 	# print attributes, which are never empty
 	print FILE "dn: " . $users->{$login}->{"DN"} . "\n";
@@ -406,9 +403,19 @@ for my $login (@logins) {
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
 	my $mail = $users->{$login}->{$A_MAIL};
 
-	if (defined $displayName and length $displayName) {
-		print FILE "displayName: " . $displayName . "\n";
+	# print display name from firstName/lastName only
+	my $printedDisplayName = undef;
+	if (defined $givenName and length $givenName and defined $sn and length $sn) {
+		$printedDisplayName = $givenName . " " . $sn;
+	} elsif (defined $givenName and length $givenName and !(defined $sn and length $sn)) {
+		$printedDisplayName = $givenName;
+	} elsif (!(defined $givenName and length $givenName) and defined $sn and length $sn) {
+		$printedDisplayName = $sn;
 	}
+	if (defined $printedDisplayName and length $printedDisplayName) {
+		print FILE "displayName: " . $printedDisplayName . "\n";
+	}
+
 	if (defined $sn and length $sn) {
 		print FILE "sn: " . $sn . "\n";
 	}
@@ -424,6 +431,7 @@ for my $login (@logins) {
 	if (defined $userPrincipalName and length $userPrincipalName) {
 		print FILE "userPrincipalName: " . $userPrincipalName . "\n";
 	}
+	print FILE "MailNickName: " . $login . "\n";
 
 	print FILE "userAccountControl: $facilityAttributes{$A_F_UAC}\n";
 

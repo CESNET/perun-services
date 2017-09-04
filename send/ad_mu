@@ -96,7 +96,7 @@ my $counter_group_failed = 0;
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
 
 # load normal user entries
-my @ad_entries = load_ad($ldap, $base_dn, $filter, ['displayName','cn','sn','givenName','mail','samAccountName','userPrincipalName','userAccountControl']);
+my @ad_entries = load_ad($ldap, $base_dn, $filter, ['displayName','cn','sn','givenName','mail','samAccountName','userPrincipalName','userAccountControl','MailNickName']);
 
 my %ad_entries_map = ();
 my %perun_entries_map = ();
@@ -159,6 +159,11 @@ print "Group updated: " . $counter_group_updated . " entries.\n";
 print "Group failed: " . $counter_group_failed . " entries.\n";
 
 $lock->unlock();
+
+if ($counter_fail or $counter_fail_ous or $counter_group_failed) {
+	# some update of AD failed, tell it to the engine to re-schedule the service.
+	exit 1;
+}
 
 # END of main script
 
@@ -569,10 +574,10 @@ sub process_licenses_groups() {
 	# CLEAR local CACHE based on current relation from perun
 	foreach (keys %{$userRelations}) {
 		if (defined $userRelations->{$_}->{"ZAM"}) {
-			$waitingForRemoval->{$_}->{"CN=O365Lic_Employee,OU=licenses," . $base_dn_groups} = 0;
-			$waitingForRemoval->{$_}->{"CN=O365Lic_Student,OU=licenses," . $base_dn_groups} = 0;  # clear also students
+			$waitingForRemoval->{$_}->{"CN=O365Lic_Employee_group.muni.cz,OU=licenses," . $base_dn_groups} = 0;
+			$waitingForRemoval->{$_}->{"CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups} = 0;  # clear also students
 		} elsif (defined $userRelations->{$_}->{"STU"}) {
-			$waitingForRemoval->{$_}->{"CN=O365Lic_Student,OU=licenses," . $base_dn_groups} = 0;  # clear also students
+			$waitingForRemoval->{$_}->{"CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups} = 0;  # clear also students
 		}
 	}
 
@@ -586,7 +591,7 @@ sub process_licenses_groups() {
 	#
 	# 1. resolve EMPLOYEES
 	#
-	my $employee_dn = "CN=O365Lic_Employee,OU=licenses," . $base_dn_groups;
+	my $employee_dn = "CN=O365Lic_Employee_group.muni.cz,OU=licenses," . $base_dn_groups;
 	my $employees;
 	# add employeees from perun
 	foreach my $user_dn (keys %{$userRelations}) {
@@ -610,7 +615,7 @@ sub process_licenses_groups() {
 	#
 	# 2. resolve STUDENTS
 	#
-	my $students_dn = "CN=O365Lic_Student,OU=licenses," . $base_dn_groups;
+	my $students_dn = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups;
 	my $students;
 
 	# add students from perun minus those, which were resolved as employees too !
@@ -635,7 +640,7 @@ sub process_licenses_groups() {
 	#
 	# 3. resolve ALUMNI
 	#
-	my $alumni_dn = "CN=O365Lic_Alumni,OU=licenses," . $base_dn_groups;
+	my $alumni_dn = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $base_dn_groups;
 	my $alumni;
 
 	# get all AD users
@@ -653,16 +658,16 @@ sub process_licenses_groups() {
 
 	# 4.1. create key entries for all possibilities
 	# FIXME - pass all possibilities from Perun
-	$perun_state->{"CN=O365Lic_Employee_Planner,OU=licenses,".$base_dn_groups} = ();
-	$perun_state->{"CN=O365Lic_Employee_PowerBl,OU=licenses,".$base_dn_groups} = ();
-	$perun_state->{"CN=O365Lic_Employee_Project,OU=licenses,".$base_dn_groups} = ();
-	$perun_state->{"CN=O365Lic_Employee_Teams,OU=licenses,".$base_dn_groups} = ();
-	$perun_state->{"CN=O365Lic_Employee_Yammer,OU=licenses,".$base_dn_groups} = ();
-	$perun_state->{"CN=O365Lic_Student_Planner,OU=licenses,".$base_dn_groups} = ();
-	$perun_state->{"CN=O365Lic_Student_PowerBl,OU=licenses,".$base_dn_groups} = ();
-	$perun_state->{"CN=O365Lic_Student_Project,OU=licenses,".$base_dn_groups} = ();
-	$perun_state->{"CN=O365Lic_Student_Teams,OU=licenses,".$base_dn_groups} = ();
-	$perun_state->{"CN=O365Lic_Student_Yammer,OU=licenses,".$base_dn_groups} = ();
+	$perun_state->{"CN=O365Lic_Employee_Planner_group.muni.cz,OU=licenses,".$base_dn_groups} = ();
+	$perun_state->{"CN=O365Lic_Employee_PowerBl_group.muni.cz,OU=licenses,".$base_dn_groups} = ();
+	$perun_state->{"CN=O365Lic_Employee_Project_group.muni.cz,OU=licenses,".$base_dn_groups} = ();
+	$perun_state->{"CN=O365Lic_Employee_Teams_group.muni.cz,OU=licenses,".$base_dn_groups} = ();
+	$perun_state->{"CN=O365Lic_Employee_Yammer_group.muni.cz,OU=licenses,".$base_dn_groups} = ();
+	$perun_state->{"CN=O365Lic_Student_Planner_group.muni.cz,OU=licenses,".$base_dn_groups} = ();
+	$perun_state->{"CN=O365Lic_Student_PowerBl_group.muni.cz,OU=licenses,".$base_dn_groups} = ();
+	$perun_state->{"CN=O365Lic_Student_Project_group.muni.cz,OU=licenses,".$base_dn_groups} = ();
+	$perun_state->{"CN=O365Lic_Student_Teams_group.muni.cz,OU=licenses,".$base_dn_groups} = ();
+	$perun_state->{"CN=O365Lic_Student_Yammer_group.muni.cz,OU=licenses,".$base_dn_groups} = ();
 
 	# 4.2 fill some keys with members
 	foreach my $user_dn (keys %{$userLicenses}) {
@@ -671,11 +676,11 @@ sub process_licenses_groups() {
 
 		if (defined $employees->{$user_dn}) {
 			foreach my $licenseGroupName (keys %{$licenseGroups}) {
-				$perun_state->{"CN=O365Lic_Employee_".$licenseGroupName.",OU=licenses,".$base_dn_groups}->{$user_dn} = 1;
+				$perun_state->{"CN=O365Lic_Employee_".$licenseGroupName."_group.muni.cz,OU=licenses,".$base_dn_groups}->{$user_dn} = 1;
 			}
 		} elsif (defined $students->{$user_dn}) {
 			foreach my $licenseGroupName (keys %{$licenseGroups}) {
-				$perun_state->{"CN=O365Lic_Student_".$licenseGroupName.",OU=licenses,".$base_dn_groups}->{$user_dn} = 1;
+				$perun_state->{"CN=O365Lic_Student_".$licenseGroupName."_group.muni.cz,OU=licenses,".$base_dn_groups}->{$user_dn} = 1;
 			}
 		}
 		# alumni doesn't have licenses
@@ -709,6 +714,9 @@ sub process_licenses_groups() {
 
 	# if store to cache fails - memory state is printed
 	store_waiting_for_removal($waitingForRemoval);
+
+	# store msDS-cloudExtensionAttribute2=FALSE for active persons
+	update_cloudExtensionAttribute2($employees, $students, $alumni);
 
 	# write active users for another O365 perun service
 	write_active_users($employees, $students, $alumni);
@@ -800,8 +808,8 @@ sub remove_from_license_group() {
 				$counter_group_updated++;
 				ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n", @to_be_removed));
 
-				my $students_dn = "CN=O365Lic_Student,OU=licenses," . $base_dn_groups;
-				my $employee_dn = "CN=O365Lic_Employee,OU=licenses," . $base_dn_groups;
+				my $students_dn = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups;
+				my $employee_dn = "CN=O365Lic_Employee_group.muni.cz,OU=licenses," . $base_dn_groups;
 				# For EMPLOYEE and STUDENTS groups, remove from cache
 				if (($ad_entry->dn() eq $employee_dn) or ($ad_entry->dn() eq $students_dn)) {
 					foreach (@to_be_removed) {
@@ -960,7 +968,7 @@ sub load_cached_students() {
 	# if cached file is empty, load from AD as current members of "O365Lic_Alumni" and "O365Lic_Student"
 	unless (@lines) {
 
-		my $dn = "CN=O365Lic_Alumni,OU=licenses," . $base_dn_groups;
+		my $dn = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $base_dn_groups;
 		my @alumni_members = load_group_members($ldap, $dn, $filter_groups);
 		if ($? != 0) {
 			ldap_log($service_name, "Unable to load group members from AD: " . $dn);
@@ -969,7 +977,7 @@ sub load_cached_students() {
 			push(@lines, @alumni_members);
 		}
 
-		my $dn2 = "CN=O365Lic_Student,OU=licenses," . $base_dn_groups;
+		my $dn2 = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups;
 		my @student_members = load_group_members($ldap, $dn2, $filter_groups);
 
 		if ($? != 0) {
@@ -1168,5 +1176,87 @@ sub write_active_users() {
 		}
 	}
 	close FILE;
+
+}
+
+
+#
+# Get current state of Student, Employee and Alumni group members
+# and push to user attribute msDS-cloudExtensionAttribute2 where
+# active users have "FALSE" and rest in AD has "TRUE".
+#
+# 1. param - hash of employess (user_dn->1)
+# 2. param - hash of students (user_dn->1)
+# 3. param - hash of alumni (user_dn->1)
+#
+sub update_cloudExtensionAttribute2() {
+
+	my $employees = shift;
+	my $students = shift;
+	my $alumni = shift;
+
+	my %active = map { $_ => 1 } keys %{$employees};
+	foreach (keys %{$students}) {
+		$active{$_} = 1
+	}
+	foreach (keys %{$alumni}) {
+		$active{$_} = 1
+	}
+
+	# load normal user entries
+	my @ad_persons = load_ad($ldap, $base_dn, $filter, ['msDS-cloudExtensionAttribute2']);
+
+	foreach my $ad_entry (@ad_persons) {
+
+		my $ad_val = $ad_entry->get_value('msDS-cloudExtensionAttribute2');
+		if ($active{$ad_entry->dn()}) {
+
+			unless ('FALSE' eq $ad_val) {
+
+				$ad_entry->replace(
+					'msDS-cloudExtensionAttribute2' => 'FALSE'
+				);
+
+				my $response = $ad_entry->update($ldap);
+
+				if ($response) {
+					unless ($response->is_error()) {
+						# SUCCESS (flag updated)
+						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag set: " . $ad_entry->dn() . " | 'FALSE'");
+					} else {
+						# FAIL (to update flag)
+						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag NOT set: " . $ad_entry->dn());
+						ldap_log($service_name, $ad_entry->ldif());
+						$counter_fail++;
+					}
+				}
+
+			}
+
+		} else {
+
+			unless ('TRUE' eq $ad_val) {
+
+				$ad_entry->replace(
+					'msDS-cloudExtensionAttribute2' => 'TRUE'
+				);
+
+				my $response = $ad_entry->update($ldap);
+
+				if ($response) {
+					unless ($response->is_error()) {
+						# SUCCESS (flag updated)
+						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag set: " . $ad_entry->dn() . " | 'TRUE'");
+					} else {
+						# FAIL (to update flag)
+						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag NOT set: " . $ad_entry->dn());
+						ldap_log($service_name, $ad_entry->ldif());
+						$counter_fail++;
+					}
+				}
+
+			}
+		}
+	}
 
 }
