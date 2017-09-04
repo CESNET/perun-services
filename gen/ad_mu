@@ -436,6 +436,8 @@ for my $login (@logins) {
 	}
 	print FILE "MailNickName: " . $login . "\n";
 
+	print FILE "msDS-cloudExtensionAttribute1: " . $login . "\@muni.cz\n";
+
 	print FILE "userAccountControl: $facilityAttributes{$A_F_UAC}\n";
 
 	# print classes
