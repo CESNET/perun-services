@@ -209,7 +209,7 @@ sub processGroups {
 			# create group entry
 			my $key = "CN=O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME} . "_group.muni.cz,OU=" . $ouName . "," . $baseDNGroups;
 
-			$groups->{$ouName}->{$key}->{$A_G_R_AD_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME} . "_group.muni.cz";
+			$groups->{$ouName}->{$key}->{$A_G_R_AD_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME};
 			$groups->{$ouName}->{$key}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME};
 
 			# resolve groups members
@@ -256,11 +256,11 @@ sub processGroups {
 #
 ####################
 my $key1 = "CN=O365Lic_Employee_group.muni.cz,OU=licenses," . $baseDNGroups;
-$groups->{"licenses"}->{$key1}->{$A_G_R_AD_NAME} = "O365Lic_Employee_group.muni.cz";
+$groups->{"licenses"}->{$key1}->{$A_G_R_AD_NAME} = "O365Lic_Employee";
 $groups->{"licenses"}->{$key1}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Employee";
 
 my $key2 = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $baseDNGroups;
-$groups->{"licenses"}->{$key2}->{$A_G_R_AD_NAME} = "O365Lic_Student_group.muni.cz";
+$groups->{"licenses"}->{$key2}->{$A_G_R_AD_NAME} = "O365Lic_Student";
 $groups->{"licenses"}->{$key2}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Student";
 
 foreach my $mem (sort keys %{$usersRelation}) {
@@ -275,7 +275,7 @@ foreach my $mem (sort keys %{$usersRelation}) {
 
 # this group members are resolved by the send script !!
 my $key3 = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $baseDNGroups;
-$groups->{"licenses"}->{$key3}->{$A_G_R_AD_NAME} = "O365Lic_Alumni_group.muni.cz";
+$groups->{"licenses"}->{$key3}->{$A_G_R_AD_NAME} = "O365Lic_Alumni";
 $groups->{"licenses"}->{$key3}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Alumni";
 
 ############################
@@ -317,7 +317,7 @@ for my $ouKey (@groupOus) {
 	for my $key (@groupKeys) {
 
 		print FILE "dn: " . $key . "\n";
-		print FILE "cn: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "\n";
+		print FILE "cn: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "_group.muni.cz\n";
 		print FILE "samAccountName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "_" . $ouKey . "\n";
 		print FILE "displayName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_DISPLAY_NAME} . "\n";
 		print FILE "MailNickName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "\n";
