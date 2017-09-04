@@ -45,7 +45,8 @@ our $A_G_R_AD_EMAIL_ADDRESS;  *A_G_R_AD_EMAIL_ADDRESS = \'urn:perun:group_resour
 # User/member attributes
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
-our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_M_MAILS;  *A_M_MAILS = \'urn:perun:member:attribute-def:def:mails';
+our $A_M_PREF_MAIL;  *A_M_PREF_MAIL  = \'urn:perun:member:attribute-def:def:o365PreferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_M_G_O365_SEND_ON_BEHALF; *A_M_G_O365_SEND_ON_BEHALF = \'urn:perun:member_group:attribute-def:def:o365SendOnBehalf';
 our $A_MEMBER_STATUS; *A_MEMBER_STATUS = \'urn:perun:member:attribute-def:core:status';
@@ -155,7 +156,8 @@ sub processMembers() {
 			# store standard attrs
 			$users->{$login}->{$A_FIRST_NAME} = $memberAttributes{$A_FIRST_NAME};
 			$users->{$login}->{$A_LAST_NAME} = $memberAttributes{$A_LAST_NAME};
-			$users->{$login}->{$A_MAIL} = $memberAttributes{$A_MAIL};
+			$users->{$login}->{$A_M_PREF_MAIL} = $memberAttributes{$A_M_PREF_MAIL};
+			$users->{$login}->{$A_M_MAILS} = $memberAttributes{$A_M_MAILS};
 
 		}
 	}
@@ -404,7 +406,6 @@ for my $login (@logins) {
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
 	my $sn = $users->{$login}->{$A_LAST_NAME};
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
-	my $mail = $users->{$login}->{$A_MAIL};
 
 	# print display name from firstName/lastName only
 	my $printedDisplayName = undef;
@@ -425,9 +426,7 @@ for my $login (@logins) {
 	if (defined $givenName and length $givenName) {
 		print FILE "givenName: " . $givenName . "\n";
 	}
-	if (defined $mail and length $mail) {
-		print FILE "mail: " . $mail . "\n";
-	}
+
 	if (defined $samAccountName and length $samAccountName) {
 		print FILE "samAccountName: " . $samAccountName . "\n";
 	}
@@ -436,7 +435,36 @@ for my $login (@logins) {
 	}
 	print FILE "MailNickName: " . $login . "\n";
 
+	# get proxy addresses of user
+	my $proxyAddresses = ($users->{$login}->{$A_M_MAILS}) ? $users->{$login}->{$A_M_MAILS} : ();
+
+	# if primary is defined, put it at the start of array
+	if ($users->{$login}->{$A_M_PREF_MAIL} and length $users->{$login}->{$A_M_PREF_MAIL}) {
+		unshift @$proxyAddresses, $users->{$login}->{$A_M_PREF_MAIL};
+	}
+	my $first = 0;
+	my $mail;
+	foreach my $proxyAddress (@$proxyAddresses) {
+		if ($proxyAddress) {
+			if ($first == 0) {
+				print FILE "ProxyAddresses: SMTP:" . $proxyAddress . "\n";
+				$mail = $proxyAddress;
+				$first = 1;
+			} else {
+				print FILE "ProxyAddresses: smtp:" . $proxyAddress . "\n";
+			}
+		}
+	}
+
+	if (defined $mail and length $mail) {
+		print FILE "mail: " . $mail . "\n";
+	}
+
 	print FILE "msDS-cloudExtensionAttribute1: " . $login . "\@muni.cz\n";
+
+	# msDS-cloudExtensionAttribute2 - is set in send script based on resulting o365 licenses
+
+	print "msDS-cloudExtensionAttribute3: TRUE\n";
 
 	print FILE "userAccountControl: $facilityAttributes{$A_F_UAC}\n";
 

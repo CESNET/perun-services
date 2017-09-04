@@ -96,7 +96,7 @@ my $counter_group_failed = 0;
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
 
 # load normal user entries
-my @ad_entries = load_ad($ldap, $base_dn, $filter, ['displayName','cn','sn','givenName','mail','samAccountName','userPrincipalName','userAccountControl','MailNickName','msDS-cloudExtensionAttribute1']);
+my @ad_entries = load_ad($ldap, $base_dn, $filter, ['displayName','cn','sn','givenName','mail','samAccountName','userPrincipalName','userAccountControl','ProxyAddresses','MailNickName','msDS-cloudExtensionAttribute1','msDS-cloudExtensionAttribute3']);
 
 my %ad_entries_map = ();
 my %perun_entries_map = ();
@@ -216,7 +216,7 @@ sub process_update_user() {
 			my $ad_entry = $ad_entries_map{$perun_entry->get_value('samAccountName')};
 
 			# attrs without cn since it's part of DN to be updated
-			my @attrs = ('displayName','sn','givenName','mail','MailNickName','msDS-cloudExtensionAttribute1');
+			my @attrs = ('displayName','sn','givenName','mail','MailNickName','ProxyAddresses','msDS-cloudExtensionAttribute1','msDS-cloudExtensionAttribute3');
 			# stored log messages to check if entry should be updated
 			my @entry_changed = ();
 
