@@ -1204,7 +1204,7 @@ sub update_cloudExtensionAttribute2() {
 	}
 
 	# load normal user entries
-	my @ad_persons = load_ad($ldap, $base_dn, $filter, ['msDS-cloudExtensionAttribute2']);
+	my @ad_persons = load_ad($ldap, $base_dn, $filter, ['cn','msDS-cloudExtensionAttribute2']);
 
 	foreach my $ad_entry (@ad_persons) {
 
