@@ -65,6 +65,7 @@ my $dataByChip = {};
 
 open FILE, $filename or die "Could not open $filename: $!";
 while(my $line = <FILE>) {
+	chomp( $line );
 	my @parts = split /\t/, $line;
 	$dataByChip->{$parts[0]}->{$FIRSTNAME} = $parts[1];
 	$dataByChip->{$parts[0]}->{$LASTNAME} = $parts[2];
