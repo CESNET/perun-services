@@ -38,6 +38,8 @@ our $A_O; *A_O = \'urn:perun:member:attribute-def:def:organization';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
 our $A_CN; *A_CN = \'urn:perun:user:attribute-def:def:cnCeitecAD';
 our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
+our $A_M_STATUS; *A_M_STATUS = \'urn:perun:member:attribute-def:core:status';
+our $STATUS_VALID;                   *STATUS_VALID =                   \'VALID';
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
@@ -104,8 +106,8 @@ foreach my $rData (@resourcesData) {
 		my %mAttributes = attributesToHash $mData->getAttributes;
 		my $login = $mAttributes{$A_LOGIN};
 
-		unless ($mAttributes{$A_CN} && $mAttributes{$A_LOGIN}) {
-			# skip users without CN or login
+		unless ($mAttributes{$A_CN} && $mAttributes{$A_LOGIN} && ($mAttributes{$A_M_STATUS} eq $STATUS_VALID)) {
+			# skip users without CN or login and all not-valid members
 			next;
 		}
 
