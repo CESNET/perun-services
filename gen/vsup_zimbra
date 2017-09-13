@@ -1,0 +1,208 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Copy;
+use Time::Piece;
+
+sub getStatus;
+
+local $::SERVICE_NAME = "vsup_zimbra";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
+my $data = perunServicesInit::getHierarchicalData;
+
+# Constants
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UCO; *A_UCO = \'urn:perun:user:attribute-def:def:ucoVsup';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
+our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
+our $A_EMAIL_VSUP;  *A_EMAIL_VSUP = \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
+our $A_BLACKLISTED;  *A_BLACKLISTED = \'urn:perun:user_facility:attribute-def:virt:blacklisted';
+our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:expirationKos';
+our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
+our $A_EXPIRATION_MANUAL; *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
+our $A_ZIMBRA_DISPLAY_NAME;  *A_ZIMBRA_DISPLAY_NAME = \'urn:perun:user:attribute-def:def:zimbraDisplayName';
+
+# Read which accounts are "system wide" => IGNORED by Perun.
+open FILE, "<" . "/etc/perun/services/$::SERVICE_NAME/vsup_zimbra_ignored_accounts";
+my @ignoredAccountsList = <FILE>;
+close FILE;
+chomp(@ignoredAccountsList);
+my %ignoredAccounts = map { $_ => 1 } @ignoredAccountsList;
+
+# GATHER USERS
+my $users;  # $users->{$uco}->{ATTR} = $attrValue;
+
+#
+# AGGREGATE DATA
+#
+# FOR EACH USER
+foreach my $rData ($data->getChildElements) {
+
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my $relationType = $resourceAttributes{$A_R_RELATION_TYPE};
+
+	# Users from Resource must be in a relation
+	unless ($relationType) {
+		next;
+	}
+
+	my @membersData = $rData->getChildElements;
+
+	foreach my $member (@membersData) {
+
+		my %uAttributes = attributesToHash $member->getAttributes;
+
+		# SKIP MEMBERS WHICH SUPOSSED TO BE SYSTEM WIDE ACCOUNTS => IGNORED BY PERUN
+		if (exists $ignoredAccounts{$uAttributes{$A_LOGIN}}) {
+			next;
+		}
+
+		my $uco = $uAttributes{$A_UCO};
+		$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
+		$users->{$uco}->{'EMAIL'} = ($uAttributes{$A_EMAIL_VSUP} || $uAttributes{$A_LOGIN} . '@vsup.cz');
+
+		# determine user account type
+		if ($relationType eq "ZAM") {
+			# prefer ZAM over anything
+			$users->{$uco}->{'TYPE'} = $relationType;
+			$users->{$uco}->{'COS'} = '0603cf86-f917-4448-bb34-57dd11a2c381';
+		} elsif ($relationType eq "STU") {
+			# prefer active STU if is also EXPIRED or not yet set
+			if ((!defined $users->{$uco}->{'TYPE'}) || $users->{$uco}->{'TYPE'} eq 'EXPIRED') {
+				$users->{$uco}->{'TYPE'} = $relationType;
+				$users->{$uco}->{'COS'} = 'e00428a1-0c00-11d9-836a-000d93afea2a';
+			}
+		} elsif ($relationType eq "EXPIRED") {
+			# mark user expired if has no other relation (STU/ZAM)
+			unless ($users->{$uco}->{'TYPE'}) {
+				$users->{$uco}->{'TYPE'} = $relationType;
+				$users->{$uco}->{'COS'} = 'e00428a1-0c00-11d9-836a-000d93afea2a';
+			}
+		}
+
+		# get users name
+		my $firstName = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
+		my $lastName = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+		# use custom zimbra displayName
+		my $displayName = $uAttributes{$A_ZIMBRA_DISPLAY_NAME} || undef;
+		# if custom name not present, create it from givenName and sn
+		unless($displayName) {
+			if (defined $firstName and length $firstName and defined $lastName and length $lastName) {
+				$displayName = $firstName . " " . $lastName;
+			} elsif (defined $firstName and length $firstName and !(defined $lastName and length $lastName)) {
+				$displayName = $firstName;
+			} elsif (!(defined $firstName and length $firstName) and defined $lastName and length $lastName) {
+				$displayName = $lastName;
+			}
+		}
+
+		$users->{$uco}->{"FIRST_NAME"} = ($firstName || '');
+		$users->{$uco}->{"LAST_NAME"} = ($lastName || '');
+		$users->{$uco}->{"DISPLAY_NAME"} = ($displayName || '');
+
+		if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
+			# blacklisted users !security ban! are locked
+			$users->{$uco}->{"STATUS"} = 'locked';
+		} else {
+			$users->{$uco}->{"STATUS"} = getStatus($uAttributes{$A_EXPIRATION_KOS},$uAttributes{$A_EXPIRATION_DC2},$uAttributes{$A_EXPIRATION_MANUAL});
+		}
+
+	}
+}
+
+#
+# PRINT user data
+#
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+# print personal info
+my @keys = sort keys %{$users};
+for my $uco (@keys) {
+
+	# print attributes, which are never empty
+	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{'TYPE'} . "\t" .
+		$users->{$uco}->{'EMAIL'} . "\t" . $users->{$uco}->{"FIRST_NAME"} . "\t" . $users->{$uco}->{"LAST_NAME"} .
+		"\t" . $users->{$uco}->{"DISPLAY_NAME"} . "\t" . $users->{$uco}->{"STATUS"} . "\t" . $users->{$uco}->{"COS"} . "\n";
+
+}
+
+close(FILE);
+
+#
+# Copy ignored accounts
+#
+copy("/etc/perun/services/$::SERVICE_NAME/vsup_zimbra_ignored_accounts", "$DIRECTORY/vsup_zimbra_ignored_accounts") or die "Couldn't copy file of ignored Zimbra accounts.";
+
+perunServicesInit::finalize;
+
+#
+# active - výchozí stav, netřeba nastavovat při vytváření schránky, pouze pokud byl účet předtím v jiném stavu
+# locked - uzamčen pro přihlašování, maily jsou doručovány
+# closed - nelze se přihlásit, maily nejsou doručovány - soft-delete
+#
+sub getStatus() {
+
+	# read input
+	my $expirationKos = shift;
+	my $expirationDc2 = shift;
+	my $expirationMan = shift;
+	# parse to time or undef
+	my $expirationKosTime = ($expirationKos) ? Time::Piece->strptime($expirationKos,"%Y-%m-%d") : undef;
+	my $expirationDc2Time = ($expirationDc2) ? Time::Piece->strptime($expirationDc2,"%Y-%m-%d") : undef;
+	my $expirationManTime = ($expirationMan) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
+
+	my @expirations = ();
+	if (defined $expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
+	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
+	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
+
+	# sort all expirations
+	my @sorted_expirations = sort { $a <=> $b } @expirations;
+
+	my $latest_expiration = $sorted_expirations[$#sorted_expirations];
+	my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d");
+
+	if (!defined $expirationKos and !defined $expirationDc2 and !defined $expirationMan) {
+		# if no expiration set in source data - take as "never"
+		return 'active';
+	}
+
+	if ($latest_expiration > $currentDate->epoch) {
+		return 'active';
+	}
+
+	# (will) expire by studies - add 7 days grace period
+	if ($expirationKosTime and ($latest_expiration == $expirationKosTime->epoch)) {
+
+		# within 7 days grace period - still active
+		if (($latest_expiration + (7*24*60*60)) > $currentDate->epoch) {
+			return 'active';
+		} else {
+			# is within 30 days period
+			if (($latest_expiration + (30*24*60*60)) > $currentDate->epoch) {
+				return 'locked';
+			}
+			return 'closed'
+		}
+
+	} else {
+		# Expired by employment or manual
+		if (($latest_expiration + (30*24*60*60)) > $currentDate->epoch) {
+			return 'locked';
+		}
+		return 'closed';
+	}
+
+}
