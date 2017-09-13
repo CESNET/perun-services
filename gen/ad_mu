@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
+use Time::Piece;
 
 sub processMembers;
 sub processGroups;
@@ -51,6 +52,7 @@ our $A_M_MAILS;  *A_M_MAILS = \'urn:perun:member:attribute-def:def:mails';
 our $A_M_PREF_MAIL;  *A_M_PREF_MAIL  = \'urn:perun:member:attribute-def:def:o365PreferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_M_G_O365_SEND_ON_BEHALF; *A_M_G_O365_SEND_ON_BEHALF = \'urn:perun:member_group:attribute-def:def:o365SendOnBehalf';
+our $A_U_F_O365_ACCOUNT_EXTENSION; *A_U_F_O365_ACCOUNT_EXTENSION = \'urn:perun:user_facility:attribute-def:def:o365AccountExtension';
 our $A_MEMBER_STATUS; *A_MEMBER_STATUS = \'urn:perun:member:attribute-def:core:status';
 
 our $STATUS_VALID;                   *STATUS_VALID =                   \'VALID';
@@ -156,8 +158,17 @@ sub processMembers() {
 			my $dn = "CN=" . $memberAttributes{$A_LOGIN} . "," . $baseDNUsers;
 			$usersRelation->{$dn}->{$relationType} = 1 if($relationType);  # store relation if resource define it
 
+			# if user has manually extended employee relation - put him to employee too, disregard any other relation
+			if (defined $memberAttributes{$A_U_F_O365_ACCOUNT_EXTENSION} and length $memberAttributes{$A_U_F_O365_ACCOUNT_EXTENSION}) {
+				my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d");
+				my $employeeExtendedDate = Time::Piece->strptime($memberAttributes{$A_U_F_O365_ACCOUNT_EXTENSION},"%Y-%m-%d");
+				if ($employeeExtendedDate->epoch >= $currentDate->epoch){
+					$usersRelation->{$dn}->{"ZAM"} = 1;
+				}
+			}
+
+			# store standard user attributes
 			$users->{$login}->{"DN"} = $dn;
-			# store standard attrs
 			$users->{$login}->{$A_FIRST_NAME} = $memberAttributes{$A_FIRST_NAME};
 			$users->{$login}->{$A_LAST_NAME} = $memberAttributes{$A_LAST_NAME};
 			$users->{$login}->{$A_M_PREF_MAIL} = $memberAttributes{$A_M_PREF_MAIL};
