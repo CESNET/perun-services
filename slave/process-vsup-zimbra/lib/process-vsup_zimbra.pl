@@ -13,6 +13,9 @@ sub logMessage;
 my $perunAccounts;  # $perunAccounts->{login}->{MAILBOX|givenName|sn|displayName|zimbraAccountStatus|zimbraCOSid}=value
 my $zimbraAccounts;  # $zimbraAccounts->{login}->{MAILBOX|givenName|sn|displayName|zimbraAccountStatus|zimbraCOSid}=value
 
+# IF SET TO 1, no changes are actually done to Zimbra mail server
+my $dry_run = 0;
+
 # read input files path
 my $accountsFilePath = shift;
 my $ignoredFilePath = shift;
@@ -151,7 +154,12 @@ sub createAccounts() {
 			if (($perunAccounts->{$login}->{"zimbraAccountStatus"} eq 'active') and ($perunAccounts->{$login}->{"TYPE"} ne 'EXPIRED')) {
 
 				# create new account for active STU/ZAM
-				createAccount($perunAccounts->{$login});
+				if ($dry_run) {
+					print $perunAccounts->{$login}->{"MAILBOX"} . " would be created.\n";
+					logMessage($perunAccounts->{$login}->{"MAILBOX"} . " would be created.");
+				} else {
+					createAccount($perunAccounts->{$login});
+				}
 
 			} else {
 
@@ -196,13 +204,19 @@ sub updateAccounts() {
 			# is missing from perun but present in zimbra => 'closed', in future delete !!
 
 			if ($zimbraAccounts->{$login}->{"zimbraAccountStatus"} ne 'closed') {
-				my $ret = updateAccount($zimbraAccounts->{$login}->{"MAILBOX"}, "zimbraAccountStatus", 'closed');
-				if ($ret != 0) {
-					print "ERROR: " . $zimbraAccounts->{$login}->{"MAILBOX"} . " not closed.\n";
-					logMessage("ERROR: ".$zimbraAccounts->{$login}->{"MAILBOX"}." not closed, ret.code: ".$ret);
+
+				if ($dry_run) {
+					print $zimbraAccounts->{$login}->{"MAILBOX"}." would be closed.\n";
+					logMessage($zimbraAccounts->{$login}->{"MAILBOX"}." would be closed.");
 				} else {
-					print $zimbraAccounts->{$login}->{"MAILBOX"}." closed.\n";
-					logMessage($zimbraAccounts->{$login}->{"MAILBOX"}." closed.");
+					my $ret = updateAccount($zimbraAccounts->{$login}->{"MAILBOX"}, "zimbraAccountStatus", 'closed');
+					if ($ret != 0) {
+						print "ERROR: " . $zimbraAccounts->{$login}->{"MAILBOX"} . " not closed.\n";
+						logMessage("ERROR: ".$zimbraAccounts->{$login}->{"MAILBOX"}." not closed, ret.code: ".$ret);
+					} else {
+						print $zimbraAccounts->{$login}->{"MAILBOX"}." closed.\n";
+						logMessage($zimbraAccounts->{$login}->{"MAILBOX"}." closed.");
+					}
 				}
 			} else {
 				logMessage($zimbraAccounts->{$login}->{"MAILBOX"}." already is closed - skipped.");
@@ -230,15 +244,22 @@ sub compareAndUpdateAttribute() {
 
 	if ($perunAccount->{$attrName} ne $zimbraAccount->{$attrName}) {
 
-		my $zimbraVal = (defined $zimbraAccount->{$attrName}) ? $zimbraAccount->{$attrName} : '';
+		# Zimbra can have uninitialized string value !! - breaks print
+		my $zmval = $zimbraAccount->{$attrName};
+		if (!defined $zmval) { $zmval = ''; }
 
-		my $ret = updateAccount($perunAccount->{"MAILBOX"}, $attrName, $perunAccount->{$attrName});
-		if ($ret != 0) {
-			print "ERROR: " . $perunAccount->{"MAILBOX"} . " update of $attrName failed.\n";
-			logMessage("ERROR: " . $perunAccount->{"MAILBOX"} . " update of $attrName failed, ret.code: " . $ret);
+		if ($dry_run) {
+			print $perunAccount->{"MAILBOX"} . " $attrName would be updated '$zmval'=>'$perunAccount->{$attrName}'.\n";
+			logMessage($perunAccount->{"MAILBOX"} . " $attrName would be updated '$zmval'=>'$perunAccount->{$attrName}'.");
 		} else {
-			print $perunAccount->{"MAILBOX"} . " $attrName updated '$zimbraVal'=>'$perunAccount->{$attrName}'.\n";
-			logMessage($perunAccount->{"MAILBOX"} . " $attrName updated '$zimbraVal'=>'$perunAccount->{$attrName}'.\n");
+			my $ret = updateAccount($perunAccount->{"MAILBOX"}, $attrName, $perunAccount->{$attrName});
+			if ($ret != 0) {
+				print "ERROR: " . $perunAccount->{"MAILBOX"} . " update of $attrName failed.\n";
+				logMessage("ERROR: " . $perunAccount->{"MAILBOX"} . " update of $attrName failed, ret.code: " . $ret);
+			} else {
+				print $perunAccount->{"MAILBOX"} . " $attrName updated '$zmval'=>'$perunAccount->{$attrName}'.\n";
+				logMessage($perunAccount->{"MAILBOX"} . " $attrName updated '$zmval'=>'$perunAccount->{$attrName}'.\n");
+			}
 		}
 	}
 
