@@ -24,6 +24,7 @@ my $fileNameRelations = "$DIRECTORY/userRelations";
 my $fileNameLicenses = "$DIRECTORY/userLicenses";
 my $fileNameLicGroupNames = "$DIRECTORY/licGroupNames";
 my $fileNameFID = "$DIRECTORY/facilityId";
+my $fileNameManualEmployees = "$DIRECTORY/manualEmployees";
 
 my $data = perunServicesInit::getDataWithGroups;
 
@@ -64,6 +65,7 @@ my $groups; # $groups->{ouName}->{group DN}->{ATTR} = $attrValue;
 my $ous; # $ous->{ouName} = 1;
 my $licenses; # $licenses->{$login}->{license_group_name} = 1;
 my $licGroupNames; # licGroupNames->{partLicName} = 1;
+my $manualEmployees; # $manualEmployees->{user DN} = timestamp/date
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -164,6 +166,7 @@ sub processMembers() {
 				my $employeeExtendedDate = Time::Piece->strptime($memberAttributes{$A_U_F_O365_ACCOUNT_EXTENSION},"%Y-%m-%d");
 				if ($employeeExtendedDate->epoch >= $currentDate->epoch){
 					$usersRelation->{$dn}->{"ZAM"} = 1;
+					$manualEmployees->{$dn} = $employeeExtendedDate->ymd;
 				}
 			}
 
@@ -540,7 +543,18 @@ close(FILE);
 ########################################
 open FILE,">:encoding(UTF-8)","$fileNameLicGroupNames" or die "Cannot open $fileNameLicGroupNames: $! \n";
 foreach my $groupCN (sort keys %{$licGroupNames}) {
-	print FILE $groupCN. "\n";
+	print FILE $groupCN . "\n";
+}
+close(FILE);
+
+########################################
+#
+# PRINT MANUAL EMPLOYEES with expiration timestamp (Y-M-D).
+#
+########################################
+open FILE,">:encoding(UTF-8)","$fileNameManualEmployees" or die "Cannot open $fileNameManualEmployees: $! \n";
+foreach my $dn (sort keys %{$manualEmployees}) {
+	print FILE $dn . "\t" . $manualEmployees->{$dn} . "\n";
 }
 close(FILE);
 
