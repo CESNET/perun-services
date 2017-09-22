@@ -1,3 +1,11 @@
+perun-slave-process-kypo-portal (3.0.13) stable; urgency=medium
+
+  * Handling of statuses transferred from perun is updated in process-kypo_portal.py
+  * The script was changed to import only two statuses in the database in KYPO.
+  * Statuses are 'valid' or 'deleted', both for users and groups.
+
+ -- Frantisek Hrdina <hrdina@ics.muni.cz>  Fri, 22 Sep 2017 10:00:00 +0200
+
 perun-slave-process-kypo-portal (3.0.12) stable; urgency=medium
 
   * Update slave script to remove tmp files with users and groups when import skript
