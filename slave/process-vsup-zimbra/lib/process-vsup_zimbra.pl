@@ -275,7 +275,7 @@ sub createAccount() {
 
 	my $account = shift;
 
-	my $output = `sudo /opt/zimbra/bin/zmprov ca $account->{"MAILBOX"} '' zimbraCOSid $account->{"zimbraCOSid"} givenName $account->{"givenName"} sn $account->{"sn"} displayName $account->{"displayName"}`;
+	my $output = `sudo /opt/zimbra/bin/zmprov ca '$account->{"MAILBOX"}' '' zimbraCOSid '$account->{"zimbraCOSid"}' givenName '$account->{"givenName"}' sn '$account->{"sn"}' displayName '$account->{"displayName"}'`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
@@ -304,7 +304,7 @@ sub updateAccount() {
 	my $attrName = shift;
 	my $value = shift;
 
-	my $output = `sudo /opt/zimbra/bin/zmprov ma $account->{"MAILBOX"} $attrName $value`;
+	my $output = `sudo /opt/zimbra/bin/zmprov ma '$account->{"MAILBOX"}' $attrName '$value'`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
