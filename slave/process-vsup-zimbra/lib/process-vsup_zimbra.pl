@@ -242,23 +242,24 @@ sub compareAndUpdateAttribute() {
 	my $zimbraAccount = shift;
 	my $attrName = shift;
 
-	if ($perunAccount->{$attrName} ne $zimbraAccount->{$attrName}) {
+	# Make sure comparison and print work
+	my $perunAttr = ($perunAccount->{$attrName}) ? $perunAccount->{$attrName} : '';
+	my $zimbraAttr = ($zimbraAccount->{$attrName}) ? $zimbraAccount->{$attrName} : '';
 
-		# Zimbra can have uninitialized string value !! - breaks print
-		my $zmval = $zimbraAccount->{$attrName};
-		if (!defined $zmval) { $zmval = ''; }
+	if ($perunAttr ne $zimbraAttr) {
 
 		if ($dry_run) {
-			print $perunAccount->{"MAILBOX"} . " $attrName would be updated '$zmval'=>'$perunAccount->{$attrName}'.\n";
-			logMessage($perunAccount->{"MAILBOX"} . " $attrName would be updated '$zmval'=>'$perunAccount->{$attrName}'.");
+			print $perunAccount->{"MAILBOX"} . " $attrName would be updated '$zimbraAttr'=>'$perunAttr'.\n";
+			logMessage($perunAccount->{"MAILBOX"} . " $attrName would be updated '$zimbraAttr'=>'$perunAttr'.");
 		} else {
+			# user original value in update call
 			my $ret = updateAccount($perunAccount->{"MAILBOX"}, $attrName, $perunAccount->{$attrName});
 			if ($ret != 0) {
 				print "ERROR: " . $perunAccount->{"MAILBOX"} . " update of $attrName failed.\n";
 				logMessage("ERROR: " . $perunAccount->{"MAILBOX"} . " update of $attrName failed, ret.code: " . $ret);
 			} else {
-				print $perunAccount->{"MAILBOX"} . " $attrName updated '$zmval'=>'$perunAccount->{$attrName}'.\n";
-				logMessage($perunAccount->{"MAILBOX"} . " $attrName updated '$zmval'=>'$perunAccount->{$attrName}'.\n");
+				print $perunAccount->{"MAILBOX"} . " $attrName updated '$zimbraAttr'=>'$perunAttr'.\n";
+				logMessage($perunAccount->{"MAILBOX"} . " $attrName updated '$zimbraAttr'=>'$perunAttr'.\n");
 			}
 		}
 	}
@@ -274,7 +275,7 @@ sub createAccount() {
 
 	my $account = shift;
 
-	my $output = `sudo /opt/zimbra/bin/zmprov ca $account->{"MAILBOX"} '' zimbraCOSid $account->{"zimbraCOSid"} givenName $account->{"givenName"} sn $account->{"sn"} displayName $account->{"displayName"}`;
+	my $output = `sudo /opt/zimbra/bin/zmprov ca '$account->{"MAILBOX"}' '' zimbraCOSid '$account->{"zimbraCOSid"}' givenName '$account->{"givenName"}' sn '$account->{"sn"}' displayName '$account->{"displayName"}'`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
@@ -303,7 +304,7 @@ sub updateAccount() {
 	my $attrName = shift;
 	my $value = shift;
 
-	my $output = `sudo /opt/zimbra/bin/zmprov ma $account->{"MAILBOX"} $attrName $value`;
+	my $output = `sudo /opt/zimbra/bin/zmprov ma '$account->{"MAILBOX"}' $attrName '$value'`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
