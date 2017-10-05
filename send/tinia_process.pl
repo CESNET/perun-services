@@ -9,6 +9,7 @@ use Data::Dumper;
 my $username;
 my $password;
 my $dbname;
+my $database;
 my $pathToServiceFile;
 my $serviceName;
 my $tableName;
@@ -52,10 +53,12 @@ while(my $line = <FILE>) {
 		$password = ($line =~ m/^password: (.*)$/)[0];
 	} elsif($line =~ /^tablename: .*/) {
 		$tableName = ($line =~ m/^tablename: (.*)$/)[0];
+	} elsif($line =~ /^database: .*/) {
+		$database = ($line =~ m/^database: (.*)$/)[0];
 	}
 }
 
-if(!defined($password) || !defined($username) || !defined($tableName)) {
+if(!defined($password) || !defined($username) || !defined($tableName) || !defined($database)) {
 	print "Can't get config data from config file.\n";
 	exit 14;
 }
@@ -84,7 +87,7 @@ while(my $line = <FILE>) {
 }
 close FILE;
 
-my $dbh = DBI->connect("dbi:Oracle:$dbname",$username, $password,{RaiseError=>1,AutoCommit=>0,LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $dbname Error!\n";
+my $dbh = DBI->connect("dbi:Oracle:$database",$username, $password,{RaiseError=>1,AutoCommit=>0,LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $database Error!\n";
 
 ###TEMP DELETE ALL (clear DB)
 #my $deleteAllChips = $dbh->prepare(qq{DELETE from $tableName});
