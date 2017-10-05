@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SERVICE_NAME="tinia_winpak"
+SERVICE_NAME="tinia"
 
 FACILITY_NAME=$1
 DESTINATION=$2
@@ -53,7 +53,7 @@ function create_lock {
 		# lock file exists, check for existence of concurrent process
 		if ps | grep "$SERVICE_NAME" | sed 's/^\([0-9]\+\).*/\1/' | grep "\(^\| \)`cat $LOCK_PIDFILE`\( \|$\)"; then
 		# concurrent process is running - this skript must terminate
-			echo "Concuret process tinia_winpak_process is running" >&2
+			echo "Concuret process tinia_process is running" >&2
 			exit 249
 		else
 		# lock is not valid; it should be deleted
@@ -95,7 +95,7 @@ if [ $? -ne 0 ]; then
 	exit 254
 fi
 
-EXECSCRIPT="./tinia_winpak_process.pl"
+EXECSCRIPT="./tinia_process.pl"
 
 if [ ! -f "$EXECSCRIPT" ]; then
 	echo "Can't locate process script!" >&2
