@@ -7,7 +7,7 @@ use perunServicesUtils;
 use Data::Dumper;
 use utf8;
 
-local $::SERVICE_NAME = "tinia_winpak";
+local $::SERVICE_NAME = "tinia";
 local $::PROTOCOL_VERSION = "3.0.0";
 my $SCRIPT_VERSION = "3.0.0";
 
