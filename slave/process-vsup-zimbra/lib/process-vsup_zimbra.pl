@@ -292,7 +292,7 @@ sub createAccount() {
 #
 # Update account single attribute in Zimbra
 #
-# 1. param: hash reference of account to be created
+# 1. param: name of Zimbra account to update (mail)
 # 2. param: name of Zimbra attribute to update
 # 3. param: value of Zimbra attribute to update
 #
@@ -304,13 +304,13 @@ sub updateAccount() {
 	my $attrName = shift;
 	my $value = shift;
 
-	my $output = `sudo /opt/zimbra/bin/zmprov ma '$account->{"MAILBOX"}' $attrName '$value'`;
+	my $output = `sudo /opt/zimbra/bin/zmprov ma '$account' $attrName '$value'`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
 	# only for logging verbose output
 	if ($ret != 0) {
-		logMessage("ERROR: $account->{'MAILBOX'} attribute $attrName not updated, ret.code: $ret, output: $output.");
+		logMessage("ERROR: $account attribute $attrName not updated, ret.code: $ret, output: $output.");
 	}
 
 	return $ret;
