@@ -120,7 +120,14 @@ for item in users_data:
 	tmpUser = User()
 	tmpUser.displayName = (item['displayName'])
 	tmpUser.mail = (item['mail'])
-	tmpUser.status = (item['status'])
+
+	# if status from perun is VALID set status as valid
+	# otherwise set status as deleted
+	if item['status'] == 'VALID':
+		tmpUser.status = 'valid'
+	else:
+		tmpUser.status = 'deleted'
+
 	tmpUser.liferayScreenName = (item['liferayScreenName'])
 	tmpUser.external_id = int(item['id'])
 	users_list.append(tmpUser)
@@ -130,6 +137,7 @@ for item in groups_data:
 	groupJSON_ids.append(int(item['id']))
 	tmpGroup = Group()
 	tmpGroup.name = (item['name'])
+	tmpGroup.status = 'valid'
 	tmpGroup.external_id = int(item['id'])
 
 	groups_list.append(tmpGroup)
@@ -235,8 +243,8 @@ groupIdsToDel = list(set(groupDB_ids) - set(groupJSON_ids))
 for item in groups_list:	
 	if int(item.external_id) not in groupDB_ids:
 		try:
-			cur.execute('INSERT INTO {0} (id, name, external_id) VALUES (default, '"'{1}'"', '"'{2}'"');'
-					.format(GROUP_TABLE, item.name, item.external_id))
+			cur.execute('INSERT INTO {0} (id, name, status, external_id) VALUES (default, '"'{1}'"', '"'{2}'"', '"'{3}'"');'
+					.format(GROUP_TABLE, item.name, item.status, item.external_id))
 
 		except psycopg2.Error as e:
 			sys.stderr.write("Inserting group with ext_id:{0} DB Error {1} \n".format(item.external_id, e))
@@ -312,10 +320,10 @@ for item in userInGroupToDel:
 		sys.exit(1)
 	conn.commit()
 
-''' USERS NOT IN JSON ARE SETTED TO DISABLE'''
+''' USERS NOT IN JSON ARE SETTED TO DELETED'''
 for item in userIdsToDis:
 	try:
-		cur.execute ('UPDATE {0} SET status = '"'disabled'"' WHERE external_id = '"'{1}'"';'
+		cur.execute ('UPDATE {0} SET status = '"'deleted'"' WHERE external_id = '"'{1}'"';'
 			.format(USER_TABLE, item))
 	except psycopg2.Error as e:
 		sys.stderr.write("Disabling users: DB Error {0} \n".format(e))
@@ -332,10 +340,10 @@ for item in groupIdsToDel:
 		group_id = cur.fetchone()[0]
 		cur.execute('DELETE FROM {0} WHERE idm_group_id = '"'{1}'"';'
 			.format(USERINGROUP_TABLE, group_id))
-		cur.execute('UPDATE {0} SET status = '"'DELETE'"' WHERE external_id = '"'{1}'"';'
+		cur.execute('UPDATE {0} SET status = '"'deleted'"' WHERE external_id = '"'{1}'"';'
 		    .format(GROUP_TABLE, item))
 	except psycopg2.Error as e:
-		sys.stderr.write("Deleting users from group and setting its status to DELETE: DB Error {0} \n".format(e))
+		sys.stderr.write("Deleting users from group and setting its status to deleted: DB Error {0} \n".format(e))
 		cur.close()
 		conn.close()
 		sys.exit(1)
