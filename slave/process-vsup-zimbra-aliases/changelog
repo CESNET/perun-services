@@ -1,0 +1,5 @@
+perun-slave-process-vsup-zimbra-aliases (3.0.0) stable; urgency=low
+
+  * Package for managing aliases in Zimbra from Perun.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Wed, 11 Oct 2017 07:00:00 +0200

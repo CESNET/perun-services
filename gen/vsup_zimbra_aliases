@@ -1,0 +1,101 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Copy;
+
+local $::SERVICE_NAME = "vsup_zimbra_aliases";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
+my $data = perunServicesInit::getHierarchicalData;
+
+# Constants
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UCO; *A_UCO = \'urn:perun:user:attribute-def:def:ucoVsup';
+our $A_EMAIL_VSUP;  *A_EMAIL_VSUP = \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_EMAIL_VSUP_ALIAS;  *A_EMAIL_VSUP_ALIAS = \'urn:perun:user:attribute-def:def:vsupMailAlias';
+our $A_EMAIL_VSUP_ALIASES;  *A_EMAIL_VSUP_ALIASES = \'urn:perun:user:attribute-def:def:vsupMailAliases';
+our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
+our $A_BLACKLISTED;  *A_BLACKLISTED = \'urn:perun:user_facility:attribute-def:virt:blacklisted';
+
+# Read which accounts are "system wide" => IGNORED by Perun.
+open FILE, "<" . "/etc/perun/services/vsup_zimbra/vsup_zimbra_ignored_accounts";
+my @ignoredAccountsList = <FILE>;
+close FILE;
+chomp(@ignoredAccountsList);
+my %ignoredAccounts = map { $_ => 1 } @ignoredAccountsList;
+
+# GATHER USERS
+my $users;  # $users->{$uco}->{ATTR} = $attrValue;
+
+#
+# AGGREGATE DATA
+#
+# FOR EACH USER
+foreach my $rData ($data->getChildElements) {
+
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my $relationType = $resourceAttributes{$A_R_RELATION_TYPE};
+
+	# Users from Resource must be in a relation
+	unless ($relationType) {
+		next;
+	}
+
+	my @membersData = $rData->getChildElements;
+
+	foreach my $member (@membersData) {
+
+		my %uAttributes = attributesToHash $member->getAttributes;
+
+		# SKIP MEMBERS WHICH SUPOSSED TO BE SYSTEM WIDE ACCOUNTS => IGNORED BY PERUN
+		if (exists $ignoredAccounts{$uAttributes{$A_LOGIN}}) {
+			next;
+		}
+
+		if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
+			# skip blacklisted users !
+			next;
+		}
+
+		my $uco = $uAttributes{$A_UCO};
+		$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
+		$users->{$uco}->{'TYPE'} = $uAttributes{$A_R_RELATION_TYPE};
+		$users->{$uco}->{'EMAIL'} = ($uAttributes{$A_EMAIL_VSUP} || $uAttributes{$A_LOGIN} . '@vsup.cz');
+		$users->{$uco}->{'EMAIL_ALIAS'} = $uAttributes{$A_EMAIL_VSUP_ALIAS};
+		my @aliases = $uAttributes{$A_EMAIL_VSUP_ALIASES};
+		$users->{$uco}->{'EMAIL_ALIASES'} = join(",",@aliases) || '';
+
+	}
+}
+
+#
+# PRINT user data
+#
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+# print personal info
+my @keys = sort keys %{$users};
+for my $uco (@keys) {
+
+	# print attributes, which are never empty
+	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{'TYPE'} . "\t" .
+		$users->{$uco}->{'EMAIL'} . "\t" . $users->{$uco}->{"EMAIL_ALIAS"} . "\t" . $users->{$uco}->{"EMAIL_ALIASES"} . "\n";
+
+}
+
+close(FILE);
+
+#
+# Copy ignored accounts
+#
+copy("/etc/perun/services/vsup_zimbra/vsup_zimbra_ignored_accounts", "$DIRECTORY/vsup_zimbra_ignored_accounts") or die "Couldn't copy file of ignored Zimbra accounts.";
+
+perunServicesInit::finalize;
