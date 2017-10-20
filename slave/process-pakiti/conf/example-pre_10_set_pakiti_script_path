@@ -1,0 +1,5 @@
+#!/bin/sh
+# Set path where lies php script for import users to pakiti
+#PHP_LIB="/usr/bin/php"
+#PAKITI_IMPORT_SCRIPT_PATH="/var/www/pakiti3/lib/modules/cli/users.php"
+#PAKITI_CONFIG_PATH="/etc/pakiti"

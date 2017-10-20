@@ -1,0 +1,5 @@
+perun-slave-process-pakiti (3.0.0) stable; urgency=low
+
+  * Added service perun-slave-process-pakiti
+
+ -- Michal Stava <stavamichal@gmail.com>  Fri, 20 Oct 2017 14:05:53 +0200
