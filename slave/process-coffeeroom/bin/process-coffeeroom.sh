@@ -7,6 +7,8 @@ function process {
 	FILE_USERS="users.csv"
 	FILE_GROUPS="groups.csv"
 
+	CHANGED=0
+
 	### Status codes
 	I_CHANGED=(0 '${FILE} updated')
 	I_NOT_CHANGED=(0 '${FILE} has not changed')
@@ -31,8 +33,13 @@ function process {
 
 		if [ $? -eq 0 ]; then
 			log_msg I_CHANGED
+			CHANGED=1
 		else
 			log_msg I_NOT_CHANGED
 		fi
 	done
+
+	if [ $CHANGED -eq 1 ]; then
+		jq -s '{groups: .[0], users: .[1]}'  "$WORK_DIR/groups.scim" "$WORK_DIR/users.scim" | curl -k -X POST -H "Content-Type: application/json" -H "access-token:${ACCESS_TOKEN}" --data @- "${COFFEEROOM_ENTRYPOINT}" 
+	fi
 }
