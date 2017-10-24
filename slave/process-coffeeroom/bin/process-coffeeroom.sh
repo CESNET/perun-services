@@ -40,6 +40,6 @@ function process {
 	done
 
 	if [ $CHANGED -eq 1 ]; then
-		jq -s '{groups: .[0], users: .[1]}'  "$WORK_DIR/groups.scim" "$WORK_DIR/users.scim" | curl -k -X POST -H "Content-Type: application/json" -H "access-token:${ACCESS_TOKEN}" --data @- "${COFFEEROOM_ENTRYPOINT}" 
+		jq -s '{groups: .[0], users: .[1]}' "$WORK_DIR/groups.scim" "$WORK_DIR/users.scim" | curl -k -X POST -H "Content-Type: application/json" -H "access-token:${ACCESS_TOKEN}" --data @- "${COFFEEROOM_ENTRYPOINT}" 
 	fi
 }
