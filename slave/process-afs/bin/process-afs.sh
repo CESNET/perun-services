@@ -32,6 +32,8 @@ function process {
 
 		[ "$TARGET_AFS_CELL" = 'ics.muni.cz' -o $TARGET_AFS_CELL = 'ruk.cuni.cz' ] || continue;
 
+		[ -z "$AFS_USERS_MOUNTPOINT" -o -z "$AFS_USERS_VOLUME" -o -z "$AFS_VOLUME" ] && continue
+
 		OUT=`vos exa -id "$AFS_USERS_VOLUME.$USER_LOGIN" -cell "$AFS_CELL" 2>&1 >/dev/null`
 		if [ $? -ne 0 ]; then
 			if [ "$OUT" = "VLDB: no such entry" ]; then
