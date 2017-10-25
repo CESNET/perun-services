@@ -4,8 +4,8 @@ PROTOCOL_VERSION='3.0.0'
 
 
 function process {
-	FILE_USERS="users.csv"
-	FILE_GROUPS="groups.csv"
+	FILE_USERS="users.scim"
+	FILE_GROUPS="groups.scim"
 
 	CHANGED=0
 
