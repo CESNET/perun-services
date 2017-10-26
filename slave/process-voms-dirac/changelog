@@ -3,7 +3,7 @@ perun-slave-process-voms-dirac (1.0.1) stable; urgency=high
   * working around inconsistent normalization of DNs in voms-admin
     by pre-normalizing perun exports using the same pattern
 
- -- Zdenek Sustr <sustr4@cesnet.cz>  Mon Jul 17 17:36:21 CEST 2017
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Mon, 17 Jul 2017 17:36:21 +0200
 
 perun-slave-process-voms-dirac (1.0.0) stable; urgency=medium
 

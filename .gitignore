@@ -4,6 +4,10 @@
 *.war
 *.ear
 
+# Ignore slave packages
+*.deb
+*.rpm
+
 # Ignore Maven target #
 
 **/target
