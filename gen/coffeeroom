@@ -1,0 +1,168 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use open qw/:std :utf8/;
+use JSON::XS;
+use utf8;
+
+local $::SERVICE_NAME = "coffeeroom";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "1.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getDataWithGroups;
+
+#forward declaration
+sub processUsers;
+sub processGroups;
+sub processMemberships;
+
+#Constants
+our $A_USER_ID;                   *A_USER_ID =               \'urn:perun:user:attribute-def:core:id';
+our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:attribute-def:core:status';
+our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_LOGIN;                *A_USER_LOGIN =            \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_USER_D_NAME;               *A_USER_D_NAME =           \'urn:perun:user:attribute-def:core:displayName';
+our $A_GROUP_ID;                  *A_GROUP_ID =              \'urn:perun:group:attribute-def:core:id';
+our $A_GROUP_NAME;                *A_GROUP_NAME =            \'urn:perun:group:attribute-def:core:name';
+our $A_GROUP_PAR_ID;              *A_GROUP_PAR_ID =          \'urn:perun:group:attribute-def:core:parentGroupId';
+
+our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
+our $STATUS_EXPIRED;              *STATUS_EXPIRED =          \'EXPIRED';
+our $STATUS_SUSPENDED;            *STATUS_SUSPENDED =        \'SUSPENDED';
+
+my $userStruc = {};
+my $groupStruc = {};
+my $membershipStruc = {};
+
+my $userStatus = {};
+my $userEmail = {};
+my $userDisplayName = {};
+my $userLogin = {};
+
+my $fileUsers = $DIRECTORY . "/users.scim";
+my $fileGroups = $DIRECTORY . "/groups.scim";
+
+foreach my $resourceData ($data->getChildElements) {
+        foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
+                my $groupMembersLogins = processGroups $groupData;
+        }
+}
+
+# PREPARE USERSDATA TO JSON
+my @users;
+foreach my $uid (sort keys %$userStruc) {
+        my $user = {};
+        $user->{"id"} = $uid;
+        $user->{"displayName"} = $userStruc->{$uid}->{$userDisplayName};
+        $user->{"status"} = $userStruc->{$uid}->{$userStatus};
+        $user->{"mail"} = $userStruc->{$uid}->{$userEmail};
+        $user->{"login"} = $userStruc->{$uid}->{$userLogin};
+
+        push @users, $user;
+}
+
+# PRINT USERS TO JSON
+open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
+binmode(FILE_USERS);
+print FILE_USERS JSON::XS->new->utf8->pretty->encode(\@users);
+close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
+
+# PREPARE GROUPSDATA TO JSON
+my @groups;
+foreach my $gid (sort keys %$groupStruc) {
+        my $group = {};
+        $group->{"id"} = $gid;
+        $group->{"name"} = $groupStruc->{$gid}->{$A_GROUP_NAME};
+        $group->{"parentGroupId"} = $groupStruc->{$gid}->{$A_GROUP_PAR_ID};
+
+        my @members;
+        foreach my $uid (sort keys %{$membershipStruc->{$gid}}){
+                my $struct = {};
+                $struct->{"userId"} = $uid;
+                push @members, $struct;
+        }
+
+        $group->{"members"} = \@members;
+        push @groups, $group;
+}
+
+# PRINT GROUPS TO JSON
+open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
+binmode(FILE_GROUPS);
+print FILE_GROUPS JSON::XS->new->utf8->pretty->encode(\@groups);
+close (FILE_GROUPS) or die "Cannot close $fileGroups: $! \n";
+
+perunServicesInit::finalize;
+
+##############################################################################
+#   Only subs definitions down there
+##############################################################################
+## creates structure for users.scim file
+sub processUsers {
+        my ($gid, $memberData) = @_;
+
+        my %memberAttributes = attributesToHash $memberData->getAttributes;
+        my $uid = $memberAttributes{$A_USER_ID};
+        my $status = $memberAttributes{$A_USER_STATUS};
+        my $email = $memberAttributes{$A_USER_EMAIL};
+        my $d_name = $memberAttributes{$A_USER_D_NAME};
+        my $login = $memberAttributes{$A_USER_LOGIN};
+
+        if (exists $userStruc->{$uid}) {
+                my $memberStatus = $userStruc->{$uid}->{$userStatus};
+
+                if ($memberStatus eq $STATUS_EXPIRED && $status eq $STATUS_VALID){
+                        # change from EXPIRED to VALID
+                        $userStruc->{$uid}->{$userStatus} = $status;
+                } elsif ($memberStatus eq $STATUS_SUSPENDED && $status eq $STATUS_VALID){
+                        # change from SUSPENDED to VALID
+                        $userStruc->{$uid}->{$userStatus} = $status;
+                } elsif ($memberStatus eq $STATUS_SUSPENDED && $status eq $STATUS_EXPIRED){
+                        # change from SUSPENDED to EXPIRED
+                        $userStruc->{$uid}->{$userStatus} = $status;
+                }
+        } else {
+                $userStruc->{$uid}->{$userStatus} = $status;
+                $userStruc->{$uid}->{$userEmail} = $email;
+                $userStruc->{$uid}->{$userDisplayName} = $d_name;
+                $userStruc->{$uid}->{$userLogin} = $login;
+        }
+
+        processMemberships $gid, $uid;
+}
+
+## creates structure for groups.scim file
+sub processGroups {
+        my $group = shift;
+        my %groupAttributes = attributesToHash $group->getAttributes;
+        my $membersElement = ($group->getChildElements)[1];
+
+        if ($groupAttributes{$A_GROUP_NAME}) {
+                my $groupName = $groupAttributes{$A_GROUP_NAME};
+                my $gid = $groupAttributes{$A_GROUP_ID};
+                my $groupParId = $groupAttributes{$A_GROUP_PAR_ID};
+
+                unless(exists $groupStruc->{$gid}) {
+                        $groupStruc->{$gid}->{$A_GROUP_NAME} = $groupName;
+                        $groupStruc->{$gid}->{$A_GROUP_PAR_ID} = $groupParId;
+                }
+
+                foreach my $memberData ($membersElement->getChildElements) {
+                        processUsers $gid, $memberData;
+                }
+        }
+}
+
+## creates structure for memberships
+sub processMemberships {
+        my ($gid, $uid) = @_;
+
+        unless(exists $membershipStruc->{$gid}->{$uid}) {
+                $membershipStruc->{$gid}->{$uid} = {};
+        }
+}
