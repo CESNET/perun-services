@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="coffeeroom"
+
+. generic_send
