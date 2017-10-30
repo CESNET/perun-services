@@ -2,7 +2,7 @@
 
 # Kerberos realm of the service admin key
 # (empty for unsecured cluster)
-REALM='ICS.MUNI.CZ'
+# REALM=''
 
 # Keytab file of the service admin key
 #KEYTAB='/etc/security/keytab/hbase.service.keytab'
@@ -14,5 +14,4 @@ REALM='ICS.MUNI.CZ'
 #RESERVED='NAMESPACE|default|hbase|hive|oozie'
 
 # Perform real physical delete
-# (check /var/tmp/perun-hadoop-hdfs* for additional cleanups)
 #FORCE_DELETE=0

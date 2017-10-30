@@ -5,6 +5,8 @@
 #
 # In addition unix users and groups need to be managed on the whole Hadoop cluser.
 #
+# In secured cluster you must set REALM variable, by default Kerberos is not used.
+#
 # Where to lauch:
 # * on master node (or any node with HDFS client and admin client keytab)
 # * launch only once
@@ -45,7 +47,6 @@ function process() {
 	E_EMPTY_USERNAME=(4 'Empty username')
 
 	create_lock
-	chown hdfs "${WORK_DIR}"
 
 	# Kerberos ticket (only for secured cluster)
 	if [ -n "$REALM" ]; then

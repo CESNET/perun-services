@@ -5,6 +5,8 @@
 #
 # In addition unix users and groups need to be managed on the whole Hadoop cluser.
 #
+# In secured cluster you must set REALM variable, by default Kerberos is not used.
+#
 # Where to launch:
 # * on master node (or any node with HBase client and admin client keytab)
 # * launch only once
@@ -46,7 +48,6 @@ function process() {
 	E_EMPTY_USERNAME=(6 'Empty username')
 
 	create_lock
-	chown hbase "${WORK_DIR}"
 
 	# Kerberos ticket (only for secured cluster)
 	if [ -n "$REALM" ]; then
@@ -63,7 +64,6 @@ function process() {
 	grep -v -- '-' "${FROM_PERUN}" | sort > "${WORK_DIR}/perun-list.txt"
 
 	# compare and action
-	rm -f "${WORK_DIR}/add.hbase" "${WORK_DIR}/del.hbase"
 	diff "${WORK_DIR}/hbase-list.txt" "${WORK_DIR}/perun-list.txt" | while read op login; do
 		case "$op" in
 			'>')
@@ -93,7 +93,7 @@ function process() {
 				done < "${WORK_DIR}/hbase-user-tables.txt" >> "${WORK_DIR}/del.hbase"
 				# b) delete user
 				(echo "revoke '${login}', '@${login}'"
-				 echo "revoke '${login}', 'C'"
+				 echo "revoke '${login}'"
 				 echo "drop_namespace '${login}'"
 				 echo
 				) >> "${WORK_DIR}/del.hbase"

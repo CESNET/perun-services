@@ -2,7 +2,7 @@
 
 # Kerberos realm of the service admin key
 # (empty for unsecured cluster)
-REALM='ICS.MUNI.CZ'
+# REALM=''
 
 # Keytab file of the service admin key
 #KEYTAB='/etc/security/keytab/nn.service.keytab'
