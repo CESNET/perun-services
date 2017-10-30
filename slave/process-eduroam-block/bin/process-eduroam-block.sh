@@ -11,16 +11,16 @@ function process {
 
 	create_lock
 
-    cat "${FROM_PERUN}" > "${DST_FILE}"
+	cat "${FROM_PERUN}" > "${DST_FILE}"
 
-    if [ $? -ne 0 ]; then
-        echo "Update blocked users failed. Command failed: cat "${FROM_PERUN}" > "${DST_FILE}"" >&2
-    fi
+	if [ $? -ne 0 ]; then
+		echo "Update blocked users failed. Command failed: cat '${FROM_PERUN}' > '${DST_FILE}'" >&2
+	fi
 
-    #create empty file, so the cron can check it and restart radius server to reload the data
-    touch "/home/perun/blocked-file-changed"
+	#create empty file, so the cron can check it and restart radius server to reload the data
+	touch "/home/perun/blocked-file-changed"
 
-    if [ $? -ne 0 ]; then
-        echo "Create empty file failed. Command failed: touch "/home/perun/blocked-file-changed"" >&2
-    fi
+	if [ $? -ne 0 ]; then
+		echo "Create empty file failed. Command failed: touch '/home/perun/blocked-file-changed'" >&2
+	fi
 }
