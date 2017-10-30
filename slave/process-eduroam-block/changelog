@@ -1,0 +1,5 @@
+perun-slave-process-eduroam-block (3.0.0) stable; urgency=low
+
+  * New package version for perun-slave-process-eduroam-block
+
+ -- Zdenek Strmiska <zdenek.strm@gmail.com>  Mon, 25 Sep 2017 13:54:00 +0100
