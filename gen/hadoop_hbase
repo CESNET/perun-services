@@ -1,13 +1,11 @@
 #!/usr/bin/perl
 
-# to be replaced by hadoop_hbase
-
 use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 
-local $::SERVICE_NAME = "hadoop_base";
+local $::SERVICE_NAME = "hadoop_hbase";
 local $::PROTOCOL_VERSION = "3.0.0";
 my $SCRIPT_VERSION = "3.0.0";
 

@@ -1,0 +1,5 @@
+perun-slave-process-hadoop-hdfs (1.0.0) stable; urgency=low
+
+  * Initial release
+
+ -- František Dvořák <valtri@civ.zcu.cz>  Fri, 27 Oct 2017 18:15:30 +0200
