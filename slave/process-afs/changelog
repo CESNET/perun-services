@@ -1,3 +1,10 @@
+perun-slave-process-afs (3.1.6) stable; urgency=low
+
+  * create PTS entries and ACLs for principles in realms given 
+    env. variable AFS_OTHER_USERS_REALMS
+
+ -- Michal Vocu <michal.vocu@gmail.com>  Thu, 1 February 2018 14:53:10 +0200
+
 perun-slave-process-afs (3.1.5) stable; urgency=low
 
   * Fixed quotation in a test of $TARGET_AFS_CELL variable.
