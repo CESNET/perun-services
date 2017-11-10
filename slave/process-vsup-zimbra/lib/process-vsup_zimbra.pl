@@ -10,8 +10,8 @@ sub updateAccounts;
 sub compareAndUpdateAttribute;
 sub logMessage;
 
-my $perunAccounts;  # $perunAccounts->{login}->{MAILBOX|givenName|sn|displayName|zimbraAccountStatus|zimbraCOSid}=value
-my $zimbraAccounts;  # $zimbraAccounts->{login}->{MAILBOX|givenName|sn|displayName|zimbraAccountStatus|zimbraCOSid}=value
+my $perunAccounts;  # $perunAccounts->{login}->{MAILBOX|givenName|sn|displayName|zimbraAccountStatus|zimbraCOSId}=value
+my $zimbraAccounts;  # $zimbraAccounts->{login}->{MAILBOX|givenName|sn|displayName|zimbraAccountStatus|zimbraCOSId}=value
 
 # IF SET TO 1, no changes are actually done to Zimbra mail server
 my $dry_run = 0;
@@ -38,7 +38,7 @@ foreach my $line ( @lines ) {
 	$perunAccounts->{$parts[1]}->{'sn'} = (($parts[5] ne '') ? $parts[5] : undef);
 	$perunAccounts->{$parts[1]}->{'displayName'} = (($parts[6] ne '') ? $parts[6] : undef);
 	$perunAccounts->{$parts[1]}->{'zimbraAccountStatus'} = (($parts[7] ne '') ? $parts[7] : undef);
-	$perunAccounts->{$parts[1]}->{'zimbraCOSid'} = (($parts[8] ne '') ? $parts[8] : undef);
+	$perunAccounts->{$parts[1]}->{'zimbraCOSId'} = (($parts[8] ne '') ? $parts[8] : undef);
 
 }
 
@@ -193,7 +193,7 @@ sub updateAccounts() {
 		if (exists $perunAccounts->{$login}) {
 
 			# compare and update each attribute
-			compareAndUpdateAttribute($perunAccounts->{$login}, $zimbraAccounts->{$login}, "zimbraCOSid");
+			compareAndUpdateAttribute($perunAccounts->{$login}, $zimbraAccounts->{$login}, "zimbraCOSId");
 			compareAndUpdateAttribute($perunAccounts->{$login}, $zimbraAccounts->{$login}, "givenName");
 			compareAndUpdateAttribute($perunAccounts->{$login}, $zimbraAccounts->{$login}, "sn");
 			compareAndUpdateAttribute($perunAccounts->{$login}, $zimbraAccounts->{$login}, "displayName");
@@ -275,7 +275,7 @@ sub createAccount() {
 
 	my $account = shift;
 
-	my $output = `sudo /opt/zimbra/bin/zmprov ca '$account->{"MAILBOX"}' '' zimbraCOSid '$account->{"zimbraCOSid"}' givenName '$account->{"givenName"}' sn '$account->{"sn"}' displayName '$account->{"displayName"}'`;
+	my $output = `sudo /opt/zimbra/bin/zmprov ca '$account->{"MAILBOX"}' '' zimbraCOSid '$account->{"zimbraCOSId"}' givenName '$account->{"givenName"}' sn '$account->{"sn"}' displayName '$account->{"displayName"}'`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
