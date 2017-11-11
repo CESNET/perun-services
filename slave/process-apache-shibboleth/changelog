@@ -1,0 +1,5 @@
+perun-slave-process-apache-shibboleth (3.1.1) stable; urgency=medium
+
+  * Add appache-shibboleth as modified version of appache-ssl
+
+ -- Lukas Rucka <rucka@cesnet.cz>  Fri, 10 Nov 2017 19:50:00 +0100
