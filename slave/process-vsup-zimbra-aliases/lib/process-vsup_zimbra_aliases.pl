@@ -36,7 +36,7 @@ foreach my $line ( @lines ) {
 	$perunAccounts->{$parts[1]}->{'zimbraPrefFromAddress'} = (($parts[4] ne '') ? $parts[4] : undef);
 
 	my $aliases = (($parts[5] ne '') ? $parts[5] : undef);
-	unless ($aliases) {
+	if ($aliases) {
 		my @existing_aliases = split /,/, $aliases;
 		foreach my $alias (@existing_aliases) {
 			$perunAccounts->{$parts[1]}->{'zimbraMailAlias'}->{$alias} = 1;
@@ -196,7 +196,7 @@ sub updateAliases() {
 			# check and update existing
 
 			my $perunPrefFromAddress = $perunAccounts->{$login}->{"zimbraPrefFromAddress"};
-			my $zimbraPrefFromAddress = $zimbraAccounts->{$login}->{"zimbraPrefFromAddress"};
+			my $zimbraPrefFromAddress = $zimbraAccounts->{$login}->{"zimbraPrefFromAddress"} || '';
 
 			unless ($perunPrefFromAddress eq $zimbraPrefFromAddress) {
 
