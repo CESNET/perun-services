@@ -66,10 +66,14 @@ foreach my $rData ($data->getChildElements) {
 
 		my $uco = $uAttributes{$A_UCO};
 		$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
-		$users->{$uco}->{'TYPE'} = $uAttributes{$A_R_RELATION_TYPE};
+		$users->{$uco}->{'TYPE'} = $relationType;
 		$users->{$uco}->{'EMAIL'} = ($uAttributes{$A_EMAIL_VSUP} || $uAttributes{$A_LOGIN} . '@vsup.cz');
 		$users->{$uco}->{'EMAIL_ALIAS'} = $uAttributes{$A_EMAIL_VSUP_ALIAS};
-		my @aliases = $uAttributes{$A_EMAIL_VSUP_ALIASES};
+		my $aliases = $uAttributes{$A_EMAIL_VSUP_ALIASES};
+		my @aliases = ();
+		if ($aliases) {
+			@aliases = @$aliases;
+		}
 		$users->{$uco}->{'EMAIL_ALIASES'} = join(",",@aliases) || '';
 
 	}
