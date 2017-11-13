@@ -245,8 +245,8 @@ sub updateAliases() {
 			foreach my $zimbraAlias (@to_be_removed) {
 
 				if ($dry_run) {
-					print $perunAccounts->{$login}->{"MAILBOX"} . " alias would be added '$zimbraAlias'.\n";
-					logMessage($perunAccounts->{$login}->{"MAILBOX"} . " alias would be added '$zimbraAlias'.");
+					print $perunAccounts->{$login}->{"MAILBOX"} . " alias would be removed '$zimbraAlias'.\n";
+					logMessage($perunAccounts->{$login}->{"MAILBOX"} . " alias would be removed '$zimbraAlias'.");
 				} else {
 					removeAlias($perunAccounts->{$login}->{"MAILBOX"}, $zimbraAlias);
 				}
@@ -260,9 +260,10 @@ sub updateAliases() {
 }
 
 #
-# Create single account in Zimbra and print/log the output
+# Set one of aliases as PreferredFromAddress attribute in Zimbra
 #
-# 1. param: hash reference of account to be created
+# 1. param: mailbox name
+# 2. param: preferredFrom address
 #
 sub setPrefFrom() {
 
