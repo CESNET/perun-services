@@ -1,10 +1,18 @@
+perun-slave-process-voms-dirac (1.0.3) stable; urgency=low
+
+  * service process-voms-dirac is now same on the slave part as process-voms
+    and it calls process-voms instead of duplication of code. This service has
+    now set dependency on process-voms and it can't work without it.
+
+ -- Michal Stava <stavamichal@gmail.com>  Tue, 14 Nov 2017 16:15:00 +0100
+
 perun-slave-process-voms-dirac (1.0.2) stable; urgency=high
 
   * Actively check the setting of property voms.skip_ca_check and remove
     duplicate user entries that only differ in CA before attempting to
     create/handle duplicate VOMS accounts.
 
- -- Zdenek Sustr <sustr4@cesnet.cz>  Tue Jul 18 17:19:34 CEST 2017
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Tue, 18 Jul 2017 17:19:34 +0200
 
 perun-slave-process-voms-dirac (1.0.1) stable; urgency=high
 

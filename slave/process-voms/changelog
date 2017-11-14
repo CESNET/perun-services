@@ -1,10 +1,18 @@
+perun-slave-process-voms (3.1.9) stable; urgency=low
+
+  * service process-voms now can work with attributes in LDAP same as
+    process-voms-dirac. This service will be now the main one called from
+    process-voms-dirac service instead of creating duplicity of code.
+
+ -- Michal Stava <stavamichal@gmial.com>  Tue, 14 Nov 2017 16:12:00 +0100
+
 perun-slave-process-voms (3.1.8) stable; urgency=high
 
   * Actively check the setting of property voms.skip_ca_check and remove
     duplicate user entries that only differ in CA before attempting to
     create/handle duplicate VOMS accounts.
 
- -- Zdenek Sustr <sustr4@cesnet.cz>  Tue Jul 18 17:19:34 CEST 2017
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Tue, 18 Jul 2017 17:19:34 +0200
 
 perun-slave-process-voms (3.1.7) stable; urgency=high
 
