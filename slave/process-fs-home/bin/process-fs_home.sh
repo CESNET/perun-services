@@ -10,13 +10,15 @@ function process {
 
 	I_DIR_CREATED=(0 'Home directory ${HOME_DIR} ($U_UID.$U_GID) created.')
 
-	E_CANNOT_CREATE_DIR=(50 'Cannot create directory ${HOME_DIR}.')
-	E_CANNOT_SET_OWNERSHIP=(51 'Cannot set ownership ${U_UID}.${U_GID} for directory ${HOME_DIR}.')
-	E_CANNOT_SET_PERMISSIONS=(52 'Cannot set permissions ${UMASK} for directory ${HOME_DIR}.')
+	E_CANNOT_SET_OWNERSHIP=(51 'Cannot set ownership ${U_UID}.${U_GID} for directory ${TMP_DIR}.')
+	E_CANNOT_SET_PERMISSIONS=(52 'Cannot set permissions ${UMASK} for directory ${TMP_DIR}.')
 	E_CANNOT_GET_QUOTAFS=(53 'Cannot get filesystem se set quota on')
 	E_CANNOT_SET_QUOTA=(54 'Cannot set quota on ${QUOTA_FS} for user ${U_UID}')
-	E_CANNOT_COPY_SKEL=(55 'Cannot copy skel directory ${SKEL_DIR} to ${HOME_DIR}')
+	E_CANNOT_COPY_SKEL=(55 'Cannot copy skel directory ${SKEL_DIR} to ${TMP_DIR}')
 	E_BAD_HOME_OWNER=(56 'Home directory ${HOME_DIR} for user ${U_UID} has bad owner')
+
+	E_CANNOT_CREATE_TEMP=(57 'Cannot create temp directory ${TMP_DIR}.')
+	E_CANNOT_MOVE_TEMP=(58 'Cannot move ${TMP_DIR} to ${HOME_DIR}.')
 
 	create_lock
 
@@ -67,25 +69,28 @@ function process {
 		done
 	fi
 
-
-
-
 	# lines contains homeMountPoint\tlogin\tUID\tGID\t...
 	while IFS=`echo -e "\t"` read U_HOME_MNT_POINT U_LOGNAME U_UID U_GID SOFT_QUOTA_DATA HARD_QUOTA_DATA SOFT_QUOTA_FILES HARD_QUOTA_FILES USER_STATUS USER_GROUPS REST_OF_LINE; do
 		HOME_DIR="${U_HOME_MNT_POINT}/${U_LOGNAME}"
+		TMP_DIR=`mktemp -d --tmpdir="${U_HOME_MNT_POINT}" "tmp-perun-fs_home-${U_LOGNAME}.XXXX"`
+		if [ "$?" -ne 0 ]; then 
+			log_msg  E_CANNOT_CREATE_TEMP
+		fi
+		#set this temp directory for remove when script ends (if still exists)
+		add_on_exit "rm -rf ${TMP_DIR}"
 
 		run_mid_hooks
 
 		if [ ! -d "${HOME_DIR}" ]; then
 
 			if [ -n "$SKEL_DIR" ]; then
-				catch_error E_CANNOT_COPY_SKEL cp -r "$SKEL_DIR" "$HOME_DIR"
-			else
-				catch_error E_CANNOT_CREATE_DIR  mkdir "${HOME_DIR}"
+				catch_error E_CANNOT_COPY_SKEL cp -r "$SKEL_DIR" "$TMP_DIR"
 			fi
 
-			catch_error E_CANNOT_SET_OWNERSHIP chown -R "${U_UID}"."${U_GID}" "${HOME_DIR}"
-			catch_error E_CANNOT_SET_PERMISSIONS chmod -R "$UMASK" "${HOME_DIR}"
+			catch_error E_CANNOT_SET_OWNERSHIP chown -R "${U_UID}"."${U_GID}" "${TMP_DIR}"
+			catch_error E_CANNOT_SET_PERMISSIONS chmod -R "$UMASK" "${TMP_DIR}"
+
+			catch_error E_CANNOT_MOVE_TEMP mv "${TMP_DIR}" "${HOME_DIR}"
 
 			log_msg I_DIR_CREATED
 		else

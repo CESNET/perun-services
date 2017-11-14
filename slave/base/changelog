@@ -1,3 +1,10 @@
+perun-slave-base (3.1.9) stable; urgency=medium
+
+  * Add add_on_exit function instead of basic trap, this function is a new
+    trap management with dynamic content in trap during lifecycle of scripts
+
+ -- Michal Stava <stavamichal@gmail.com>  Fri, 20 Oct 2017 09:50:00 +0200
+
 perun-slave-base (3.1.8) stable; urgency=low
 
   * Perform write check on default locking folder LOCK_DIR=/var/lock/.
