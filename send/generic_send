@@ -13,6 +13,9 @@ DESTINATION=$2
 DESTINATION_TYPE=$3
 KEY_PATH="`echo ~`/.ssh/id_rsa"
 
+PERUN_CERT="/etc/perun/ssl/perun-send.pem"
+PERUN_KEY="/etc/perun/ssl/perun-send.key"
+
 #predefined different types of destination
 DESTINATION_TYPE_URL="url"
 DESTINATION_TYPE_EMAIL="email"
@@ -29,7 +32,11 @@ fi
 if [ "$DESTINATION_TYPE"!="$DESTINATION_TYPE_URL" ]; then
 	TRANSPORT_COMMAND="ssh -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5  -i $KEY_PATH"
 else
-	TRANSPORT_COMMAND="curl -i -H Content-Type:application/tar -f -X PUT --data-binary - "
+	#add certificate to the curl if cert file and key file exists and they are readable
+	if [ -r "${PERUN_CERT}" -a -r "${PERUN_KEY}" ]; then
+		PERUN_CERT_SETTING="--cert ${PERUN_CERT} --key ${PERUN_KEY}"
+	fi
+	TRANSPORT_COMMAND="curl ${PERUN_CERT_SETTING} -i -H Content-Type:application/tar -f -X PUT --data-binary - "
 fi
 
 #overriding of existing variables as TRANSPORT_COMMAND etc.
