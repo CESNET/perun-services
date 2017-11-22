@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="apache_shibboleth"
+
+. generic_send
