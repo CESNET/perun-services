@@ -50,7 +50,7 @@ foreach my $rData ($data->getChildElements) {
 
 	my @output = ();
 	foreach my $memberAttributes (dataToAttributesHashes $rData->getChildElements) {
-		my @eppns = @{$memberAttributes{$A_U_EPPNS}};
+		my @eppns = @{$memberAttributes->{$A_U_EPPNS}};
 		push @output, "require user " . join(" ", @eppns) . " # " . $memberAttributes->{$A_U_D_NAME};
 	}
 
