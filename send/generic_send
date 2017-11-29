@@ -36,7 +36,7 @@ else
 	if [ -r "${PERUN_CERT}" -a -r "${PERUN_KEY}" ]; then
 		PERUN_CERT_SETTING="--cert ${PERUN_CERT} --key ${PERUN_KEY}"
 	fi
-	TRANSPORT_COMMAND="curl ${PERUN_CERT_SETTING} -i -H Content-Type:application/x-tar -f --upload-file - "
+	TRANSPORT_COMMAND="curl ${PERUN_CERT_SETTING} -i -H Content-Type:application/x-tar -f -X PUT --data-binary @- "
 fi
 
 #overriding of existing variables as TRANSPORT_COMMAND etc.
