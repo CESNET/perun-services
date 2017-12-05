@@ -88,7 +88,7 @@ for my $login (@logins) {
 		$str =~ s/\p{NonspacingMark}//g;
 
 		if (defined $eppns) {
-			foreach my $val (@$eppns) {
+			foreach my $val (sort @$eppns) {
 				if (("Masarykova univerzita" eq $o) && ($val =~ /\@muni.cz$/)) {
 					print FILE "$val";
 					last;
@@ -99,7 +99,7 @@ for my $login (@logins) {
 				}
 			}
 			my $eppn_string = "";
-			foreach my $eppn_val (@$eppns) {
+			foreach my $eppn_val (sort @$eppns) {
 				# construct eppn string
 				$eppn_string = $eppn_string . $eppn_val . ",";
 			}
