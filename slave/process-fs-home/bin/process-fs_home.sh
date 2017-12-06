@@ -14,8 +14,9 @@ function process {
 	E_CANNOT_SET_PERMISSIONS=(52 'Cannot set permissions ${UMASK} for directory ${TMP_DIR}.')
 	E_CANNOT_GET_QUOTAFS=(53 'Cannot get filesystem se set quota on')
 	E_CANNOT_SET_QUOTA=(54 'Cannot set quota on ${QUOTA_FS} for user ${U_UID}')
-	E_CANNOT_COPY_SKEL=(55 'Cannot copy skel directory ${SKEL_DIR} to ${TMP_DIR}')
+	E_CANNOT_COPY_SKEL=(55 'Cannot copy skel directory ${SKEL_DIR} to ${TMP_HOME_DIR}')
 	E_BAD_HOME_OWNER=(56 'Home directory ${HOME_DIR} for user ${U_UID} has bad owner')
+	E_CANNOT_CREATE_TMP_HOME_DIR=(57 'Cannot create temporary home directory ${TMP_HOME_DIR}')
 
 	E_CANNOT_CREATE_TEMP=(57 'Cannot create temp directory ${TMP_DIR}.')
 	E_CANNOT_MOVE_TEMP=(58 'Cannot move ${TMP_DIR} to ${HOME_DIR}.')
@@ -78,19 +79,22 @@ function process {
 		fi
 		#set this temp directory for remove when script ends (if still exists)
 		add_on_exit "rm -rf ${TMP_DIR}"
+		TMP_HOME_DIR="${TMP_DIR}/${U_LOGNAME}"
 
 		run_mid_hooks
 
 		if [ ! -d "${HOME_DIR}" ]; then
 
 			if [ -n "$SKEL_DIR" ]; then
-				catch_error E_CANNOT_COPY_SKEL cp -r "$SKEL_DIR" "$TMP_DIR"
+				catch_error E_CANNOT_COPY_SKEL cp -ar "$SKEL_DIR" "$TMP_HOME_DIR"
+			else
+				catch_error E_CANNOT_CREATE_TMP_HOME_DIR mkdir "$TMP_HOME_DIR"
 			fi
 
-			catch_error E_CANNOT_SET_OWNERSHIP chown -R "${U_UID}"."${U_GID}" "${TMP_DIR}"
-			catch_error E_CANNOT_SET_PERMISSIONS chmod -R "$UMASK" "${TMP_DIR}"
+			catch_error E_CANNOT_SET_OWNERSHIP chown -R "${U_UID}"."${U_GID}" "${TMP_HOME_DIR}"
+			catch_error E_CANNOT_SET_PERMISSIONS chmod "$UMASK" "${TMP_HOME_DIR}"
 
-			catch_error E_CANNOT_MOVE_TEMP mv "${TMP_DIR}" "${HOME_DIR}"
+			catch_error E_CANNOT_MOVE_TEMP mv "${TMP_HOME_DIR}" "${HOME_DIR}"
 
 			log_msg I_DIR_CREATED
 		else
