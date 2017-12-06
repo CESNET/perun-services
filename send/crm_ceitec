@@ -3,13 +3,15 @@ use strict;
 use warnings;
 use File::Copy;
 use ScriptLock;
+use Data::Dumper;
+use Time::Piece;
 
 sub diffCSV;
 sub logCRM;
 
 my $service_name = "crm_ceitec";
 my $protocol_version = "3.0.0";
-my $script_version = "3.0.3";
+my $script_version = "3.0.4";
 
 my $facility_name = $ARGV[0];
 chomp($facility_name);
@@ -87,7 +89,10 @@ if ($error == 1) {
 	# ended OK
 	print "Update was successful.";
 
-	# IF runed OK, switch old to new
+	# backup previous state by timestamp
+	my $currentTimestamp = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d-%H-%M-%S");
+	copy("./$service_name.last","./logs/$service_name.previous.".$currentTimestamp) or die "Move to backup failed: $!";
+	# make new state as LAST
 	copy("../gen/spool/$facility_name/$service_name/$service_name","./$service_name.last") or die "Move failed: $!";
 	$lock->unlock();
 }
@@ -125,6 +130,37 @@ sub diffCSV() {
 
 	close $storage_file;
 	close $gen_file;
+
+	my $currentTimestamp = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d-%H-%M-%S");
+	my $dest_fname_new = "/tmp/$service_name.new.".$currentTimestamp;
+	my $dest_fname_prev = "/tmp/$service_name.last.".$currentTimestamp;
+
+	my $keynumber = keys %previous_state;
+	if ($keynumber < 1) {
+		print "Previous state was empty! Exiting! See:\n$dest_fname_new\n$dest_fname_prev";
+		copy("./$service_name.last",$dest_fname_prev) or die "Move to /tmp backup failed: $!";
+		copy($gen_file_path,$dest_fname_new) or die "Move to /tmp backup failed: $!";
+		$lock->unlock();
+		exit 1;
+	}
+
+	my $keynumber_new = keys %current_state;
+	if ($keynumber_new < 1) {
+		print "Current state is empty! Exiting! See:\n $dest_fname_new \n $dest_fname_prev";
+        copy("./$service_name.last",$dest_fname_prev) or die "Move to /tmp backup failed: $!";
+		copy($gen_file_path,$dest_fname_new) or die "Move to /tmp backup failed: $!";
+		$lock->unlock();
+		exit 1;
+	}
+
+	if (@diff > 500) {
+		copy("./$service_name.last",$dest_fname_prev) or die "Move to /tmp backup failed: $!";
+		copy($gen_file_path,$dest_fname_new) or die "Move to /tmp backup failed: $!";
+		print "Updating more than 500 entries! Exiting for safety!\n";
+		logCRM("--- Would update ---\n" . Dumper(\@diff));
+		$lock->unlock();
+		exit 1;
+	}
 
 	# actually "to be removed"
 	for my $login (sort keys %previous_state) {
