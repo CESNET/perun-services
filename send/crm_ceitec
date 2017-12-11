@@ -90,7 +90,7 @@ if ($error == 1) {
 	print "Update was successful.";
 
 	# backup previous state by timestamp
-	my $currentTimestamp = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d-%H-%M-%S");
+	my $currentTimestamp = localtime->ymd . "-" . localtime->hms;
 	copy("./$service_name.last","./logs/$service_name.previous.".$currentTimestamp) or die "Move to backup failed: $!";
 	# make new state as LAST
 	copy("../gen/spool/$facility_name/$service_name/$service_name","./$service_name.last") or die "Move failed: $!";
@@ -131,7 +131,7 @@ sub diffCSV() {
 	close $storage_file;
 	close $gen_file;
 
-	my $currentTimestamp = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d-%H-%M-%S");
+	my $currentTimestamp = localtime->ymd . "-" . localtime->hms;
 	my $dest_fname_new = "/tmp/$service_name.new.".$currentTimestamp;
 	my $dest_fname_prev = "/tmp/$service_name.last.".$currentTimestamp;
 
