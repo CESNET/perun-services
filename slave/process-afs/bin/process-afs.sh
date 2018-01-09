@@ -30,7 +30,7 @@ function process {
 			fi
 		fi
 
-		[ "$TARGET_AFS_CELL" = 'ics.muni.cz' -o $TARGET_AFS_CELL = 'ruk.cuni.cz' ] || continue;
+		[ "$TARGET_AFS_CELL" = 'ics.muni.cz' -o "$TARGET_AFS_CELL" = 'ruk.cuni.cz' ] || continue;
 
 		[ -z "$AFS_USERS_MOUNT_POINT" -o -z "$AFS_USERS_VOLUME" -o -z "$AFS_VOLUME" ] && continue
 
