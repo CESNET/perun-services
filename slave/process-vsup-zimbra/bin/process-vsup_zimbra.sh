@@ -2,7 +2,7 @@
 
 # Script for managing users in Zimbra mail server
 
-PROTOCOL_VERSION='3.0.0'
+PROTOCOL_VERSION='3.1.0'
 
 function process {
 
