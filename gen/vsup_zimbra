@@ -6,19 +6,23 @@ use perunServicesInit;
 use perunServicesUtils;
 use File::Copy;
 use Time::Piece;
+use Perun::Agent;
 
 sub getStatus;
 
 local $::SERVICE_NAME = "vsup_zimbra";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+local $::PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
 my $data = perunServicesInit::getHierarchicalData;
+my $agent = Perun::Agent->new();
+my $attributesAgent = $agent->getAttributesAgent;
 
 # Constants
+our $A_USER_ID; *A_USER_ID = \'urn:perun:user:attribute-def:core:id';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_UCO; *A_UCO = \'urn:perun:user:attribute-def:def:ucoVsup';
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
@@ -32,6 +36,9 @@ our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:e
 our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
 our $A_EXPIRATION_MANUAL; *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
 our $A_ZIMBRA_DISPLAY_NAME;  *A_ZIMBRA_DISPLAY_NAME = \'urn:perun:user:attribute-def:def:zimbraDisplayName';
+# following are manually retrieved
+our $A_EMAIL_VSUP_ALIAS;  *A_EMAIL_VSUP_ALIAS = \'urn:perun:user:attribute-def:def:vsupMailAlias';
+our $A_EMAIL_VSUP_ALIASES;  *A_EMAIL_VSUP_ALIASES = \'urn:perun:user:attribute-def:def:vsupMailAliases';
 
 # Read which accounts are "system wide" => IGNORED by Perun.
 open FILE, "<" . "/etc/perun/services/$::SERVICE_NAME/vsup_zimbra_ignored_accounts";
@@ -63,7 +70,7 @@ foreach my $rData ($data->getChildElements) {
 
 		my %uAttributes = attributesToHash $member->getAttributes;
 
-		# SKIP MEMBERS WHICH SUPOSSED TO BE SYSTEM WIDE ACCOUNTS => IGNORED BY PERUN
+		# SKIP MEMBERS WHICH SUPPOSED TO BE SYSTEM WIDE ACCOUNTS => IGNORED BY PERUN
 		if (exists $ignoredAccounts{$uAttributes{$A_LOGIN}}) {
 			next;
 		}
@@ -71,6 +78,8 @@ foreach my $rData ($data->getChildElements) {
 		my $uco = $uAttributes{$A_UCO};
 		$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
 		$users->{$uco}->{'EMAIL'} = ($uAttributes{$A_EMAIL_VSUP} || $uAttributes{$A_LOGIN} . '@vsup.cz');
+
+		$users->{$uco}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
 
 		# determine user account type
 		if ($relationType eq "ZAM") {
@@ -121,6 +130,33 @@ foreach my $rData ($data->getChildElements) {
 	}
 }
 
+# manually get mail aliases
+my @uco_keys = sort keys %{$users};
+for my $uco (@uco_keys) {
+
+	my $uid = $users->{$uco}->{$A_USER_ID};
+	my @attrNames = ($A_EMAIL_VSUP_ALIAS, $A_EMAIL_VSUP_ALIASES);
+
+	my @attributes = $attributesAgent->getAttributes( user => $uid , attrNames => \@attrNames );
+	foreach (@attributes) {
+		if ($_->getName() eq $A_EMAIL_VSUP_ALIAS) {
+
+			$users->{$uco}->{$A_EMAIL_VSUP_ALIAS} = $_->getValue || '';
+
+		} elsif ($_->getName() eq $A_EMAIL_VSUP_ALIASES) {
+
+			my $aliases = $_->getValue;
+			my @aliases = ();
+			if ($aliases) {
+				@aliases = @$aliases;
+			}
+			$users->{$uco}->{$A_EMAIL_VSUP_ALIASES} = join(",",@aliases) || '';
+
+		}
+	}
+
+}
+
 #
 # PRINT user data
 #
@@ -134,7 +170,8 @@ for my $uco (@keys) {
 	# print attributes, which are never empty
 	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{'TYPE'} . "\t" .
 		$users->{$uco}->{'EMAIL'} . "\t" . $users->{$uco}->{"FIRST_NAME"} . "\t" . $users->{$uco}->{"LAST_NAME"} .
-		"\t" . $users->{$uco}->{"DISPLAY_NAME"} . "\t" . $users->{$uco}->{"STATUS"} . "\t" . $users->{$uco}->{"COS"} . "\n";
+		"\t" . $users->{$uco}->{"DISPLAY_NAME"} . "\t" . $users->{$uco}->{"STATUS"} . "\t" . $users->{$uco}->{"COS"} .
+		"\t" . $users->{$uco}->{$A_EMAIL_VSUP_ALIAS} . "\t" . $users->{$uco}->{$A_EMAIL_VSUP_ALIASES} . "\n";
 
 }
 
