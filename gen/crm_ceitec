@@ -2,9 +2,9 @@
 use feature "switch";
 use strict;
 use warnings;
+use utf8;
 use perunServicesInit;
 use perunServicesUtils;
-use Unicode::Normalize;
 
 local $::SERVICE_NAME = "crm_ceitec";
 local $::PROTOCOL_VERSION = "3.0.0";
@@ -80,19 +80,19 @@ for my $login (@logins) {
 
 	if (defined $o and length $o) {
 
-		print FILE 'CEITEC\\' . "$login;" . "$firstName;" . "$lastName;" . "$mail;" . "$o;";
+		# unify VUT name to Czech version
+		if (("Brno University of Technology" eq $o)) {
+			$o = "Vysoké učení technické v Brně";
+		}
 
-		# normalize Organization for comparison, since accents are UTF-8 vs. Unicode
-		my $str = $o;
-		$str = NFKD ( $str );
-		$str =~ s/\p{NonspacingMark}//g;
+		print FILE 'CEITEC\\' . "$login;" . "$firstName;" . "$lastName;" . "$mail;" . "$o;";
 
 		if (defined $eppns) {
 			foreach my $val (sort @$eppns) {
 				if (("Masarykova univerzita" eq $o) && ($val =~ /\@muni.cz$/)) {
 					print FILE "$val";
 					last;
-				} elsif ((("Vysoke uceni technicke v Brne" eq $str) or ("Brno University of Technology" eq $str)) && ($val =~ /\@vutbr.cz$/)) {
+				} elsif (("Vysoké učení technické v Brně" eq $o) && ($val =~ /\@vutbr.cz$/)) {
 					my $index = index($val, '@');
 					print FILE substr($val, 0, $index);
 					last;
