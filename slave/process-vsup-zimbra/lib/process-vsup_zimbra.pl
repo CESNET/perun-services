@@ -471,7 +471,7 @@ sub updateAccount() {
 
 	my $account = shift;
 	my $attrName = shift;
-	my $value = shift;
+	my $value = shift || '';
 
 	my $output = `sudo /opt/zimbra/bin/zmprov ma '$account' $attrName '$value'`;
 	my $ret = $?; # get ret.code of backticks command
