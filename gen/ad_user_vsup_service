@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_user_vsup_service";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -34,6 +34,7 @@ our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleA
 our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phoneDc2';
 our $A_CARD_BARCODES;  *A_CARD_BARCODES = \'urn:perun:user:attribute-def:def:cardBarCodes';
 our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:cardCodes';
+our $A_VSUP_PREF_MAIL;  *A_VSUP_PREF_MAIL = \'urn:perun:user:attribute-def:def:vsupPreferredMail';
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -97,6 +98,7 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 		$users->{$login}->{$A_PHONE} = $uAttributes{$A_PHONE};
 		$users->{$login}->{$A_CARD_BARCODES} = $uAttributes{$A_CARD_BARCODES};
 		$users->{$login}->{$A_CARD_CHIP_NUMBERS} = $uAttributes{$A_CARD_CHIP_NUMBERS};
+		$users->{$login}->{$A_VSUP_PREF_MAIL} = $uAttributes{$A_VSUP_PREF_MAIL};
 
 	}
 
@@ -130,6 +132,7 @@ for my $login (@logins) {
 	my $phone = $users->{$login}->{$A_PHONE};
 	my $barcodes = $users->{$login}->{$A_CARD_BARCODES};
 	my $chipNumers = $users->{$login}->{$A_CARD_CHIP_NUMBERS};
+	my $vsupPrefMail = $users->{$login}->{$A_VSUP_PREF_MAIL};
 
 	# print display name from firstName/lastName only
 	my $printedDisplayName = undef;
@@ -151,7 +154,11 @@ for my $login (@logins) {
 		print FILE "givenName: " . $givenName . "\n";
 	}
 
-	print FILE "mail: " . $login . "\@" . $domain . "\n";
+	if (defined $vsupPrefMail and length $vsupPrefMail) {
+		print FILE "mail: " . $vsupPrefMail . "\n";
+	} else {
+		print FILE "mail: " . $login . "\@" . $domain . "\n";
+	}
 
 	if (defined $uco and length $uco) {
 		print FILE "vsupPersonPersonalId: " . $uco . "\n";
