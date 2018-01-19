@@ -23,6 +23,7 @@ function process {
 	I_NOT_CHANGED=(0 "${DST_FILE_USERS} and ${DST_FILE_GROUPS} has not changed")
 	E_DIR_NOT_EXISTS=(100 "${DST_DIR} does not exists")
 	E_DIR_NOT_WRITABLE=(101 "${DST_DIR} is not writable for user ${CURRENT_USER}")
+	E_PROCESS_SCRIPT_NOT_EXECUTABLE=(102 "'${PROCESS_SCRIPT}' is not executable")
 	
 	FROM_PERUN_USERS="${WORK_DIR}/users.scim"
 	FROM_PERUN_GROUPS="${WORK_DIR}/groups.scim"
@@ -47,8 +48,10 @@ function process {
 		log_msg I_CHANGED
 		# if script for processing SCIM data exists and is runnable, then run it
 		if [ -x ${PROCESS_SCRIPT} ]; then
-			$DST_KYPO_IMPORT
+			eval ${PROCESS_SCRIPT}
 			exit $?               
+		else
+		    log_msg  E_PROCESS_SCRIPT_NOT_EXECUTABLE
 		fi
 	else
 		log_msg I_NOT_CHANGED
