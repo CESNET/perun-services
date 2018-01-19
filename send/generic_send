@@ -112,6 +112,15 @@ if [ $? -ne 0 ]; then
 	exit 255
 fi
 
+#Default tar mode - create an archive
+TAR_MODE="-c"
+
+#Should we gzip the resulting tar archive?
+#Do it for HTTP transport by default
+if [ "$DESTINATION_TYPE" = "$DESTINATION_TYPE_URL" ]; then
+  TAR_MODE="${TAR_OPTIONS}z"
+fi
+
 #Add host to the transport command for all types of destination
 TRANSPORT_COMMAND="$TRANSPORT_COMMAND $HOST"
 #Add also slave command if this is not url type of destination
@@ -121,9 +130,10 @@ fi
 
 if [ -d "$SERVICE_FILES_FOR_DESTINATION" ]
 then
-	tar -c -C "$SERVICE_FILES_FOR_DESTINATION" . -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
+	tar $TAR_MODE -C "$SERVICE_FILES_FOR_DESTINATION" . -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
 else
-	tar -c -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND 
+	# Send a gziped tar archive via HTTP(s)
+	tar $TAR_MODE -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND 
 fi
 
 ERR_CODE=$?
