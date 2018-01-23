@@ -12,7 +12,7 @@ if [ -z "$DESTINATION" ]; then
 	echo "Missing Destination argument (Name of instance there)" >&2
 	exit 258
 else
-	if echo "$DESTINATION" | grep "[^A-Za-z_0-9-]"; then
+	if echo "$DESTINATION" | grep "[^.A-Za-z_0-9-]"; then
 		echo "Bad fromat of destination!" >&2
 		exit 257
 	fi
