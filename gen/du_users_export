@@ -38,6 +38,16 @@ our $A_MR_DATAQUOTA;             *A_MR_DATAQUOTA =             \'urn:perun:membe
 our $A_MR_FILESLIMIT;            *A_MR_FILESLIMIT =            \'urn:perun:member_resource:attribute-def:def:filesLimit';
 our $A_MR_FILESQUOTA;            *A_MR_FILESQUOTA =            \'urn:perun:member_resource:attribute-def:def:filesQuota';
 
+#new attributes for quotas
+our $A_MR_DATAQUOTAS;            *A_MR_DATAQUOTAS =            \'urn:perun:member_resource:attribute-def:virt:dataQuotas';
+our $A_MR_FILEQUOTAS;            *A_MR_FILEQUOTAS =            \'urn:perun:member_resource:attribute-def:virt:fileQuotas';
+our $A_MR_DATA_QUOTAS_OVERRIDE;  *A_MR_DATA_QUOTAS_OVERRIDE =  \'urn:perun:member_resource:attribute-def:def:dataQuotasOverride';
+our $A_MR_FILE_QUOTAS_OVERRIDE;  *A_MR_FILE_QUOTAS_OVERRIDE =  \'urn:perun:member_resource:attribute-def:def:fileQuotasOverride';
+our $A_R_DEFAULT_DATA_QUOTAS;    *A_R_DEFAULT_DATA_QUOTAS =    \'urn:perun:resource:attribute-def:def:defaultDataQuotas';
+our $A_R_DEFAULT_FILE_QUOTAS;    *A_R_DEFAULT_FILE_QUOTAS =    \'urn:perun:resource:attribute-def:def:defaultFileQuotas';
+our $A_R_MAX_DATA_QUOTAS;        *A_R_MAX_DATA_QUOTAS =        \'urn:perun:resource:attribute-def:def:maxUserDataQuotas';
+our $A_R_MAX_FILE_QUOTAS;        *A_R_MAX_FILE_QUOTAS =        \'urn:perun:resource:attribute-def:def:maxUserFileQuotas';
+
 our $A_U_KERBEROS_LOGINS;        *A_U_KERBEROS_LOGINS =        \'urn:perun:user:attribute-def:virt:kerberosLogins';
 our $A_U_SHIBBOLETH_EXT_SOURCES; *A_U_SHIBBOLETH_EXT_SOURCES = \'urn:perun:user:attribute-def:virt:shibbolethExtSources';
 our $A_U_ORGANIZATION;           *A_U_ORGANIZATION =           \'urn:perun:user:attribute-def:def:organization';
@@ -156,15 +166,19 @@ foreach my $rData (@resourcesData) {
 
 		push @{$attributesByLogin{$memberAttributes{$A_USER_LOGIN_EINFRA}}->{"Resources"}}, 
 							{ 
-								"Name"              => $resourcesAttributes{$A_RESOURCE_NAME},
-								"PerunResourceID"   => $resourcesAttributes{$A_RESOURCE_ID},
-								"UID"               => $memberAttributes{$A_USER_FACILITY_UID},
-								"Login"             => $memberAttributes{$A_USER_LOGIN_EINFRA},
-								"DataLimit"         => defined $memberAttributes{$A_MR_DATALIMIT} ? $memberAttributes{$A_MR_DATALIMIT} : $resourcesAttributes{$A_R_HARD_QUOTA_DATA},
-								"DataQuota"         => defined $memberAttributes{$A_MR_DATAQUOTA} ? $memberAttributes{$A_MR_DATAQUOTA} : $resourcesAttributes{$A_R_SOFT_QUOTA_DATA},
-								"FilesLimit"        => defined $memberAttributes{$A_MR_FILESLIMIT} ? $memberAttributes{$A_MR_FILESLIMIT} : $resourcesAttributes{$A_R_HARD_QUOTA_FILE},
-								"FilesQuota"        => defined $memberAttributes{$A_MR_FILESQUOTA} ? $memberAttributes{$A_MR_FILESQUOTA} : $resourcesAttributes{$A_R_SOFT_QUOTA_FILE},
-								"Status"            => $memberAttributes{$A_M_STATUS},
+								"Name"               => $resourcesAttributes{$A_RESOURCE_NAME},
+								"PerunResourceID"    => $resourcesAttributes{$A_RESOURCE_ID},
+								"UID"                => $memberAttributes{$A_USER_FACILITY_UID},
+								"Login"              => $memberAttributes{$A_USER_LOGIN_EINFRA},
+								"DataLimit"          => defined $memberAttributes{$A_MR_DATALIMIT} ? $memberAttributes{$A_MR_DATALIMIT} : $resourcesAttributes{$A_R_HARD_QUOTA_DATA},
+								"DataQuota"          => defined $memberAttributes{$A_MR_DATAQUOTA} ? $memberAttributes{$A_MR_DATAQUOTA} : $resourcesAttributes{$A_R_SOFT_QUOTA_DATA},
+								"FilesLimit"         => defined $memberAttributes{$A_MR_FILESLIMIT} ? $memberAttributes{$A_MR_FILESLIMIT} : $resourcesAttributes{$A_R_HARD_QUOTA_FILE},
+								"FilesQuota"         => defined $memberAttributes{$A_MR_FILESQUOTA} ? $memberAttributes{$A_MR_FILESQUOTA} : $resourcesAttributes{$A_R_SOFT_QUOTA_FILE},
+								"DataQuotas"         => defined $memberAttributes{$A_MR_DATAQUOTAS} ? $memberAttributes{$A_MR_DATAQUOTAS} : {}, 
+								"FilesQuotas"        => defined $memberAttributes{$A_MR_FILEQUOTAS} ? $memberAttributes{$A_MR_FILEQUOTAS} : {},
+								"DataQuotasOverride" => defined $memberAttributes{$A_MR_DATA_QUOTAS_OVERRIDE} ? $memberAttributes{$A_MR_DATA_QUOTAS_OVERRIDE} : {},
+								"FileQuotasOverride" => defined $memberAttributes{$A_MR_FILE_QUOTAS_OVERRIDE} ? $memberAttributes{$A_MR_FILE_QUOTAS_OVERRIDE} : {},
+								"Status"             => $memberAttributes{$A_M_STATUS},
 							};
 	}
 
@@ -204,15 +218,19 @@ foreach my $rData (@resourcesData) {
 
 	push @{$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"Resources"}}, 
 					{
-						"Name"              => $resourcesAttributes{$A_RESOURCE_NAME},
-						"FSHomeMountPoint"  => $resourcesAttributes{$A_R_FS_HOME_MOUNT_POINT},
-						"FSVolume"          => $resourcesAttributes{$A_R_FS_VOLUME},
-						"PerunResourceID"   => $resourcesAttributes{$A_RESOURCE_ID},
-						"DefaultDataLimit"  => $resourcesAttributes{$A_R_HARD_QUOTA_DATA},
-						"DefaultDataQuota"  => $resourcesAttributes{$A_R_SOFT_QUOTA_DATA},
-						"DefaultFilesLimit" => $resourcesAttributes{$A_R_HARD_QUOTA_FILE},
-						"DefaultFilesQuota" => $resourcesAttributes{$A_R_SOFT_QUOTA_FILE},
-						"UnixGroups"        => \@unixGroups,
+						"Name"               => $resourcesAttributes{$A_RESOURCE_NAME},
+						"FSHomeMountPoint"   => $resourcesAttributes{$A_R_FS_HOME_MOUNT_POINT},
+						"FSVolume"           => $resourcesAttributes{$A_R_FS_VOLUME},
+						"PerunResourceID"    => $resourcesAttributes{$A_RESOURCE_ID},
+						"DefaultDataLimit"   => $resourcesAttributes{$A_R_HARD_QUOTA_DATA},
+						"DefaultDataQuota"   => $resourcesAttributes{$A_R_SOFT_QUOTA_DATA},
+						"DefaultFilesLimit"  => $resourcesAttributes{$A_R_HARD_QUOTA_FILE},
+						"DefaultFilesQuota"  => $resourcesAttributes{$A_R_SOFT_QUOTA_FILE},
+						"MaxUserDataQuotas"  => defined $resourcesAttributes{$A_R_MAX_DATA_QUOTAS} ? $resourcesAttributes{$A_R_MAX_DATA_QUOTAS} : {},
+						"MaxUserFileQuotas"  => defined $resourcesAttributes{$A_R_MAX_FILE_QUOTAS} ? $resourcesAttributes{$A_R_MAX_FILE_QUOTAS} : {},
+						"DefaultDataQuotas"  => defined $resourcesAttributes{$A_R_DEFAULT_DATA_QUOTAS} ? $resourcesAttributes{$A_R_DEFAULT_DATA_QUOTAS} : {},
+						"DefaultFilesQuotas" => defined $resourcesAttributes{$A_R_DEFAULT_FILE_QUOTAS} ? $resourcesAttributes{$A_R_DEFAULT_FILE_QUOTAS} : {},
+						"UnixGroups"         => \@unixGroups,
 					};
 }
 
