@@ -2,11 +2,11 @@
 
 # Script for managing user membership in VOs
 
-PROTOCOL_VERSION='3.1.0'
+PROTOCOL_VERSION='3.1.1'
 
 function process {
 
-	EXECSCRIPT="${LIB_DIR}/${SERVICE}/process-voms.pl"
+	EXECSCRIPT="${LIB_DIR}/voms/process-voms.pl"
 
 	create_lock
 
