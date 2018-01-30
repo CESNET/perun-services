@@ -1,3 +1,10 @@
+perun-slave-process-voms-dirac (1.0.4) stable; urgency=high
+
+  * fix of typo in the name of process-voms slave script file, because of this
+    typo slave of voms_dirac service did not work and always ended with error
+
+ -- Michal Stava <stavamichal@gmail.com>  Tue, 30 Jan 2017 16:16:00 +0100
+
 perun-slave-process-voms-dirac (1.0.3) stable; urgency=low
 
   * service process-voms-dirac is now same on the slave part as process-voms
