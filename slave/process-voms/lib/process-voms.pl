@@ -4,15 +4,19 @@
 use Sys::Syslog;
 use XML::Simple;
 use Text::CSV;
-use Data::Dumper;
 use Array::Utils qw(:all);
 use JSON::XS;
+use File::Basename;
+use File::Path qw/make_path/;
 my $vos = XMLin( '-',
 	ForceArray => [ 'role', 'group', 'user', 'vo' ],
 #	GroupTags => { role => 'roles', groups => 'group', users => 'user', vos => 'vo' },
 	KeyAttr => [] );
 my $csv = Text::CSV->new({ sep_char => ',' });
 
+$attributeStatusFilePrefix = "/var/lib/perun/process-voms/process-voms-attributes-";
+my $attributeStatusDir = dirname($attributeStatusFilePrefix);
+make_path($attributeStatusDir) unless (-e $attributeStatusDir);
 my $etcDir = "/etc/voms-admin";
 my $etcPropertyFilename = "service.properties";
 
@@ -41,7 +45,7 @@ sub getCN {
 ### normalizeEmail applies the same normalization replacement on user DNs as voms-admin itself
 #   Calling normalizeEmail() works around bugs in voms-admin wherein the normalization function
 #   is not called in some cases
-#	DN	DN to process
+#       DN      DN to process
 sub normalizeEmail {
 	my $normalized = shift;
 	$normalized =~ s/\/(E|e|((E|e|)(mail|mailAddress|mailaddress|MAIL|MAILADDRESS)))=/\/Email=/;
@@ -51,7 +55,7 @@ sub normalizeEmail {
 ### normalizeUID applies the same normalization replacement on user DNs as voms-admin itself
 #   Calling normalizeUID() works around bugs in voms-admin wherein the normalization function
 #   is not called in some cases
-#	DN	DN to process
+#       DN      DN to process
 sub normalizeUID {
 	my $normalized = shift;
 	$normalized =~ s/\/(UserId|USERID|userId|userid|uid|Uid)=/\/UID=/;
@@ -61,9 +65,10 @@ sub normalizeUID {
 ### listToHashes accepts a three-column CSV and produces an array of hashes with the following structure:
 #	DN	VO Member DN
 #	CA	Certificate Authority that vouches for the member
-#	CN	VO Member CD, extracted from DN
+#	CN	VO Member CN, extracted from DN
 #	email	The email address of the user
 sub listToHashes {
+	my $cas_ref = shift;
 	my @hashes;
 	foreach $line (@_) {
 		chomp($line);
@@ -75,7 +80,7 @@ sub listToHashes {
 		}
 		else {
 			if ( scalar @components > 3 ) { # Using slower algorithm to match members with commas in their subjects
-				foreach $ca ( @cas ) {
+				foreach $ca ( @$cas_ref ) {
 					$pattern = qr/$ca/;
 					if ( $line =~ /^(.*),${pattern},([^,]*)$/ ) {
 						my %mbr= ( 'DN' => "$1",'CA' => "$ca", 'CN' => getCN($1), 'email' => "$2" );
@@ -111,11 +116,13 @@ sub effectCall {
 }
 
 ### knownCA indicates whether a given CA is known to the VOMS server. It accepts the user structure
-#	%user		The user whose CA should be checked (DN, CA, email)
+#	$cas_ref	Reference to an array of known CAs
+#	$CA		The CA that should be checked CA
 sub knownCA {
-	$ca = $_[0];
+	$cas_ref = $_[0];
+	$ca = $_[1];
 
-	if(grep {$_ eq "$ca"} @cas) {
+	if(grep {$_ eq "$ca"} @$cas_ref) {
 		return 1;
 	} else {
 		syslog LOG_ERR, "Unknown CA \"$user->{'CA'}\" requested with user \"$user->{'DN'}\"";
@@ -124,44 +131,45 @@ sub knownCA {
 	}
 }
 
+
 ### readProperties reads VO properties file into an array
-#      $path	   Path to the file
+#	$path		Path to the file
 sub readProperties {
-       $path = shift;
-       my %properties;
-       if (open(INI, "$path")) {
+	$path = shift;
+	my %properties;
+	if (open(INI, "$path")) {
 		syslog LOG_DEBUG, "Reading config file \"$path\".";
 		print STDERR "Reading config file \"$path\".\n";
-	       while (<INI>) {
-		       chomp;
-		       if (/^(\S*)\s*=\s*(\S*)(#.*)?$/) {
-			       $properties{"$1"} = "$2";
-		       }
-	       }
+		while (<INI>) {
+			chomp;
+			if (/^(\S*)\s*=\s*(\S*)(#.*)?$/) {
+				$properties{"$1"} = "$2";
+			}
+		}
 		close (INI);
-       }
-       else {
+	}
+	else {
 		syslog LOG_WARN, "Could not open config file \"$path\". No way to read VO properties";
 		print STDERR "Could not open config file \"$path\". No way to read VO properties\n";
-       }
-       return %properties;
+	}
+	return %properties;
 }
 
 ### uniqueDN checks if the user's DN already exists in a list of DNs seen
-#      $user_ref       User structure reference
-#      $seen_ref       List of DNs for comparison
+#	$user_ref	User structure reference
+#	$seen_ref	List of DNs for comparison
 sub uniqueDN {
-       $seen_ref = $_[1];
-       $user_ref = $_[0];
+	$seen_ref = $_[1];
+	$user_ref = $_[0];
 
-       if(grep {$_ eq "$user_ref->{'DN'}"} @$seen_ref) {
-	       syslog LOG_ERR, "Duplicate user \"" . $user_ref->{'DN'} .
-		       "\" dropped with CA \"" . $user_ref->{'CA'} . "\"";
-	       print STDERR "Duplicate user \"" . $user_ref->{'DN'} .
-		       "\" dropped with CA \"" . $user_ref->{'CA'} . "\"\n";
-	       return 0;
-       }
-       return 1;
+	if(grep {$_ eq "$user_ref->{'DN'}"} @$seen_ref) {
+		syslog LOG_ERR, "Duplicate user \"" . $user_ref->{'DN'} .
+			"\" dropped with CA \"" . $user_ref->{'CA'} . "\"";
+		print STDERR "Duplicate user \"" . $user_ref->{'DN'} .
+			"\" dropped with CA \"" . $user_ref->{'CA'} . "\"\n";
+		return 0;
+	}
+	return 1;
 }
 
 # This is the actual start.
@@ -200,7 +208,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	chomp(@roles_current);
 	s/^\s*Role=// for @roles_current;
 
-	our @cas=`voms-admin --vo \Q${name}\E list-cas`;
+	my @cas=`voms-admin --vo \Q${name}\E list-cas`;
 	if ( $? != 0 ) {
 		syslog LOG_ERR, "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @cas";
 		print STDERR "Failed listing known CAs for VO \"$name\". Error Code $?, original message from voms-admin: @cas\n";
@@ -209,31 +217,61 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	}
 	chomp(@cas);
 
+	my @attributeClasses_current=`voms-admin --vo \Q${name}\E list-attribute-classes`;
+	if ( $? != 0 ) {
+		syslog LOG_ERR, "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @attributeClasses_current";
+		print STDERR "Failed listing attribute classes in VO \"$name\". Error Code $?, original message from voms-admin: @attributeClasses_current\n";
+		$retval = 1;
+		next;
+	}
+	s/\s.*$// for @attributeClasses_current;
+	chomp(@attributeClasses_current);
+
 	#Collect current Group Membership and Role assignment
 	my %groupRoles_current;		# Current assignment of users to (per group) roles
 	my %groupMembers_current;	# Current membership in groups (pure, disregarding roles)
 	foreach $group (@groups_current) {
 		#Store members
-		$groupMembers_current{"$group"}=listToHashes(`voms-admin --vo \Q${name}\E list-members \Q${group}\E`);
+		$groupMembers_current{"$group"}=listToHashes(\@cas, `voms-admin --vo \Q${name}\E list-members \Q${group}\E`);
 
 		#Role Membership
 		foreach $role (@roles_current) {
-			$groupRoles_current{"$group"}{"$role"}=listToHashes(`voms-admin --vo \Q${name}\E list-users-with-role \Q${group}\E \Q${role}\E`);
+			$groupRoles_current{"$group"}{"$role"}=listToHashes(\@cas, `voms-admin --vo \Q${name}\E list-users-with-role \Q${group}\E \Q${role}\E`);
 		}
 	}
 
+	$attributeStatusFile = $attributeStatusFilePrefix.$name.".xml";
+	my @attributes_current;
+	if ( -e $attributeStatusFile ) {
+		my $attributes_read = XMLin( "$attributeStatusFile", ForceArray => [ 'attribute' ], KeyAttr => [], KeepRoot => 0 );
+		foreach $attribute (@{$attributes_read->{'attribute'}}) {
+				my %fixed = ( 'CA' => "$attribute->{'CA'}",'DN' => "$attribute->{'DN'}", 'name' => "$attribute->{'name'}", 'value' => "$attribute->{'value'}" );
+			push (@attributes_current, \%fixed);
+		}
+		syslog LOG_INFO, "Reading attribute status for VO \"$name\" from file $attributeStatusFile";
+	}
+	else {
+		syslog LOG_INFO, "No attribute status file exists for VO \"$name\" (looking for file $attributeStatusFile)";
+	}
 
 	# Produce comparable data structure from input data
 	my %groupRoles_toBe;		# Desired assignment of users to (per group) roles
 	my %groupMembers_toBe;		# Desired membership in groups (pure, disregarding roles)
+	my @attributeClasses_toBe;	# Desired attribute classes
+	my @attributes_toBe;		# List of al users with attributes
 	my @groups_toBe = ( "/$name" );	# Desired list of groups
 	my @roles_toBe = ( "VO-Admin" );# Desired list of roles, plus the default VO-Admin role
-	my @DNs_Seen;		   # DNs already included
+	my @DNs_Seen;			# DNs already included
 	foreach $user (@{$vo->{'users'}->{'user'}}) {
-		next unless knownCA($user->{'CA'});
+		next unless knownCA(\@cas, $user->{'CA'});
 		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => normalizeUID(normalizeEmail($user->{'DN'})), 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
 		next unless ($checkCA || uniqueDN(\%theUser, \@DNs_Seen));
 		push(@DNs_Seen, $theUser{'DN'});
+		if($user->{'nickname'}) {
+			my %userAttributes = ( 'CA' => "$user->{'CA'}",'DN' => "$user->{'DN'}", 'name' => 'nickname', 'value' => "$user->{'nickname'}" );
+			push(@attributes_toBe, \%userAttributes);
+			push(@attributeClasses_toBe, 'nickname') unless grep{$_ == 'nickname'} @attributeClasses_toBe;
+		}
 		push( @{$groupMembers_toBe{"/$name"}}, \%theUser ); #Add user to root group (make them a member)
 		foreach $group (@{$user->{'groups'}->{'group'}}){
 			push(@groups_toBe, "/$name/$group->{'name'}") unless grep{$_ eq "/$name/$group->{'name'}"} @groups_toBe;
@@ -256,6 +294,12 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 
 	my @rolesToDelete = array_minus( @roles_current, @roles_toBe );
 	my @rolesToCreate = array_minus( @roles_toBe, @roles_current );
+
+	my @attributeClassesToDelete = array_minus( @attributeClasses_current, @attributeClasses_toBe );
+	my @attributeClassesToCreate = array_minus( @attributeClasses_toBe, @attributeClasses_current );
+
+	my @attributesToDelete = array_minus_deep( @attributes_current, @attributes_toBe );
+	my @attributesToSet = array_minus_deep( @attributes_toBe, @attributes_current );
 
 	my %membersToAdd;
 	my %membersToAdd;
@@ -295,6 +339,17 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 		"creating Role \"$role\" in VO \"$name\".";
 	}
 
+	# 2.5. create / delete attribute classes
+	foreach $attributeClass (@attributeClassesToDelete) {
+		effectCall "voms-admin --vo \Q$name\E delete-attribute-class \Q$attributeClass\E",
+		"deleting Attribute Class \"$attributeClass\" from VO \"$name\".";
+	}
+
+	foreach $attributeClass (@attributeClassesToCreate) {
+		effectCall "voms-admin --vo \Q$name\E create-attribute-class \Q$attributeClass\E \Q$attributeClass\E false",
+		"creating Attribute Class \"$attributeClass\" in VO \"$name\".";
+	}
+
 	# 3. add members to/remove members from groups
 	foreach $group (@groups_toBe) {
 		foreach $user (@{$membersToRemove{"$group"}}) {
@@ -331,6 +386,31 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 				"assigning Role \"$role\" to user \"$user->{'DN'}\" for Group \"$group\" in VO \"$name\"";
 			}
 		}
+	}
+
+	# 5. Set attribute values
+	# first delete unwanted
+	my @attributes_deleted;
+	foreach $attribute (@attributesToDelete) {
+		push (@attributes_deleted, $attribute) if effectCall "voms-admin --nousercert --vo \Q$name\E delete-user-attribute \Q$attribute->{'DN'}\E \Q$attribute->{'CA'}\E \Q$attribute->{'name'}\E",
+		"deleting Attribute \"$attribute->{'name'}\" for user \"$attribute->{'DN'}\" in VO \"$name\"";
+	}
+	# then set new ones
+	foreach $attribute (@attributesToSet) {
+		push (@attributes_current, $attribute) if effectCall "voms-admin --nousercert --vo \Q$name\E set-user-attribute \Q$attribute->{'DN'}\E \Q$attribute->{'CA'}\E \Q$attribute->{'name'}\E \Q$attribute->{'value'}\E",
+		"setting Attribute \"$attribute->{'name'}\" to value \"$attribute->{'value'}\" for user \"$attribute->{'DN'}\" in VO \"$name\"";
+
+	}
+
+	my @attributes_existing = array_minus_deep( @attributes_current, @attributes_deleted );
+	if( open( my $of, ">", "$attributeStatusFile" ) ) {
+		my $xml = {attributes => {attribute => \@attributes_existing} };
+		XMLout($xml, KeepRoot => 1, NoAttr => 1,  OutputFile => $of );
+		close( $of );
+	}
+	else {
+		syslog LOG_ERR, "Failed storing attribute status for VO \"$name\" in file $attributeStatusFile";
+		print STDERR "Failed storing attribute status for VO \"$name\" in file $attributeStatusFile\n";
 	}
 }
 

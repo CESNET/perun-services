@@ -141,7 +141,7 @@ for my $vo (keys %$struc) {
 $struc = {'vo' => [ values %$struc ] };
 
 
-my $fileName = "$DIRECTORY/voms_dirac";
+my $fileName = "$DIRECTORY/voms";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 binmode FILE, ":utf8";
 print FILE XMLout($struc, RootName => 'vos', NoAttr => 1);

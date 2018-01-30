@@ -1,1 +1,1 @@
-perun-slave-base, libcpanel-json-xs-perl,libxml-simple-perl,libarray-utils-perl
+perun-slave-base, perun-slave-process-voms (>=3.1.8), libcpanel-json-xs-perl,libxml-simple-perl,libarray-utils-perl
