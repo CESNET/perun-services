@@ -1,0 +1,60 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+our $SERVICE_NAME = "o365_contacts_export";
+our $PROTOCOL_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_USER_LOGIN_MU;                          *A_USER_LOGIN_MU =                         \'urn:perun:user:attribute-def:def:login-namespace:mu';
+our $A_MEMBER_O365_EMAIL_ADDRESSES;            *A_MEMBER_O365_EMAIL_ADDRESSES =           \'urn:perun:member:attribute-def:def:o365EmailAddresses:mu';
+our $A_FACILITY_O365_ALLOWED_DOMAINS;          *A_FACILITY_O365_ALLOWED_DOMAINS =         \'urn:perun:facility:attribute-def:def:o365ContactExportAllowedDomains';
+
+#open file
+my $file_name = "$DIRECTORY/$::SERVICE_NAME";
+open FILE,">$file_name" or die "Cannot open $file_name: $! \n";
+
+my %facilityAttributes = attributesToHash $data->getAttributes;
+my %allowedDomains = @{$facilityAttributes{$A_FACILITY_O365_ALLOWED_DOMAINS}};
+
+my $memberDataByLogin;
+my @resourcesData = $data->getChildElements;
+foreach my $resourceData (@resourcesData) {
+	my @membersData = $resourceData->getChildElements;
+
+	foreach my $memberData (@membersData) {
+		my %memberAttributes = attributesToHash $memberData->getAttributes;
+		my $login = $memberAttributes{$A_USER_LOGIN_MU};
+		my @emailAddresses = @{$memberAttributes{$A_MEMBER_O365_EMAIL_ADDRESSES}};
+
+		my @allowedEmails = ();
+		foreach my $email (@emailAddresses) {
+			my $emailDomain = $email;
+			$emailDomain =~ s/^.*@//g;
+			if($allowedDomains{$emailDomain}) {
+				push @allowedEmails, $email;
+			}
+		}
+
+		@allowedEmails = uniqList @allowedEmails, @{$memberDataByLogin->{$login}};
+		$memberDataByLogin->{$login} = \@allowedEmails;
+	}
+}
+
+#print data to file
+foreach my $login (keys %$memberDataByLogin) {
+	foreach my $email (@{$memberDataByLogin->{$login}}) {
+		print FILE $login . ',' . $email . "\n";
+	}
+}
+
+close(FILE);
+#####################################################
+perunServicesInit::finalize;
