@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="o365_life_cycle_manager_mu"
+
+. generic_send
