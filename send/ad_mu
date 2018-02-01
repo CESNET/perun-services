@@ -1,0 +1,1502 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use DBI;
+use Data::Dumper;
+use File::Path qw(make_path);
+use Switch;
+use MIME::Lite;
+use Net::LDAPS;
+use Net::LDAP::Entry;
+use Net::LDAP::Message;
+use Net::LDAP::LDIF;
+use Net::LDAP::Control::Paged;
+use Net::LDAP::Constant qw( LDAP_CONTROL_PAGED );
+use Time::Piece;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
+# Import shared AD library
+use ADConnector;
+use ScriptLock;
+
+sub process_add_user;
+sub process_update_user;
+sub process_ous;
+sub process_groups;
+sub process_groups_members;
+sub process_licenses_groups;
+
+sub load_cached_students;
+sub load_users_relations;
+sub load_users_licenses;
+sub ping_password_setter;
+sub load_waiting_for_removal;
+sub store_waiting_for_removal;
+sub shouldMove;
+sub fill_from_ad;
+sub add_to_license_group;
+sub remove_from_license_group;
+sub write_active_users;
+sub load_available_license_groups;
+sub update_cloudExtensionAttribute2;
+sub sendMail;
+sub loadMailTexts;
+sub load_manual_employees;
+sub write_active_students_from_last_run;
+sub load_active_students_from_last_run;
+
+# define service
+my $service_name = "ad_mu";
+
+ldap_log($service_name, "-- Propagation of $service_name service started.");
+END { ldap_log($service_name, "-- Propagation of $service_name service finished."); };
+
+# if set all mail notifications about relation change are sent to this address !!
+my $debugMailAddress;
+my $mailsSubjects; # $mailsSubjects->{mailType} = "Subject";
+my $mailsMessages; # $mailsMessages->{mailType} = "Message";
+# load notification texts
+loadMailTexts();
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+
+# BASE DN
+open my $file, '<', "$service_files_dir/baseDN";
+my $base_dn = <$file>;
+chomp($base_dn);
+close $file;
+
+# BASE DN for Groups
+open my $file_g, '<', "$service_files_dir/baseDNGroups";
+my $base_dn_groups = <$file_g>;
+chomp($base_dn_groups);
+close $file_g;
+
+# propagation destination
+my $namespace = $ARGV[1];
+chomp($namespace);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespace);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# init configuration
+my @conf = init_config($namespace);
+my $ldap_location = resolve_pdc($conf[0]);
+my $ldap = ldap_connect($ldap_location);
+
+# bind
+ldap_bind($ldap, $conf[1], $conf[2]);
+
+# filter
+my $filter = '(objectClass=person)';
+my $filter_groups = '(objectClass=group)';
+my $filter_ou = '(objectClass=organizationalunit)';
+
+my $employeeDN = "CN=O365Lic_Employee_group.muni.cz,OU=licenses," . $base_dn_groups;
+my $studentDN = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups;
+my $alumniDN = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $base_dn_groups;
+
+# log counters
+my $counter_add = 0;
+my $counter_updated = 0;
+my $counter_disabled = 0;
+my $counter_fail = 0;
+my $counter_add_ous = 0;
+my $counter_fail_ous = 0;
+my $counter_group_add = 0;
+my $counter_group_remove = 0;
+my $counter_group_updated = 0;
+my $counter_group_failed = 0;
+
+# load all data
+my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
+
+# load normal user entries
+my @ad_entries = load_ad($ldap, $base_dn, $filter, ['displayName','cn','sn','givenName','mail','samAccountName','userPrincipalName','userAccountControl','ProxyAddresses','MailNickName','msDS-cloudExtensionAttribute1','msDS-cloudExtensionAttribute3']);
+
+my %ad_entries_map = ();
+my %perun_entries_map = ();
+
+foreach my $ad_entry (@ad_entries) {
+	my $login = $ad_entry->get_value('samAccountName');
+	$ad_entries_map{ $login } = $ad_entry;
+}
+foreach my $perun_entry (@perun_entries) {
+	my $login = $perun_entry->get_value('samAccountName');
+	$perun_entries_map{ $login } = $perun_entry;
+}
+
+# PROCESS USERS
+process_add_user();
+process_update_user();
+# we do not disable users, it's just removed from all groups by groups update
+
+# PROCESS OUs - GROUPS ARE PROCESSED BY EACH OU
+process_ous();
+
+# PROCESS LICENSE GROUPS
+
+# load perun state
+my $userRelations = load_users_relations(); # $userRelations->{$user_dn}->{ZAM|STU} = 1;
+my $userLicenses = load_users_licenses(); # $userLicenses->{$user_dn}->{licenseGroupName} = 1;
+my $manualEmployees = load_manual_employees(); # $manualEmployees->{$user_dn} = 1;
+
+# load local caches before processing license groups and also store all "students" back to file
+my $onceStudents = load_cached_students($userRelations); # $onceStudents->{$user_dn} = 1;
+my $activeStudentsFromLastRun = load_active_students_from_last_run(); # $activeStudentsFromLastRun->{$user_dn} = 1;
+
+# load waiting for removal
+my $waitingForRemoval = load_waiting_for_removal(); # $waitingForRemoval->{$user_dn}->{$group_dn}->{TIMESTAMP|14DAYS|2DAYS} = $timestamp or 0 | sent | sent;
+
+# process it
+process_licenses_groups();
+
+# disconnect
+ldap_unbind($ldap);
+
+# log results
+ldap_log($service_name, "Added: " . $counter_add . " entries.");
+ldap_log($service_name, "Updated: " . $counter_updated . " entries.");
+ldap_log($service_name, "Disabled: " . $counter_disabled . " entries.");
+ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
+ldap_log($service_name, "Group added: " . $counter_group_add . " entries.");
+ldap_log($service_name, "Group removed: " . $counter_group_remove . " entries.");
+ldap_log($service_name, "Group updated: " . $counter_group_updated . " entries.");
+ldap_log($service_name, "Group failed: " . $counter_group_failed . " entries.");
+
+# print results
+print "Added: " . $counter_add . " entries.\n";
+print "Updated: " . $counter_updated . " entries.\n";
+print "Disabled: " . $counter_disabled . " entries.\n";
+print "Failed: " . $counter_fail. " entries.\n";
+print "OU added: " . $counter_add_ous . " entries.\n";
+print "OU failed: " . $counter_fail_ous . " entries.\n";
+print "Group added: " . $counter_group_add . " entries.\n";
+print "Group removed: " . $counter_group_remove . " entries.\n";
+print "Group updated: " . $counter_group_updated . " entries.\n";
+print "Group failed: " . $counter_group_failed . " entries.\n";
+
+$lock->unlock();
+
+if ($counter_fail or $counter_fail_ous or $counter_group_failed) {
+	# some update of AD failed, tell it to the engine to re-schedule the service.
+	exit 1;
+}
+
+# END of main script
+
+###########################################
+#
+# Main processing functions
+#
+###########################################
+
+#
+# Add new user entries to AD
+#
+sub process_add_user() {
+
+	foreach my $perun_entry (@perun_entries) {
+
+		my $login = $perun_entry->get_value('samAccountName');
+
+		unless (exists $ad_entries_map{$login}) {
+
+			# Add new entry to AD
+			my $response = $perun_entry->update($ldap);
+			unless ($response->is_error()) {
+				# SUCCESS
+				ldap_log($service_name, "User added: " . $perun_entry->dn());
+				$counter_add++;
+				# tell IS to set Password to AD
+				ping_password_setter($login);
+			} else {
+				# FAIL
+				ldap_log($service_name, "User NOT added: " . $perun_entry->dn() . " | " . $response->error());
+				ldap_log($service_name, $perun_entry->ldif());
+				$counter_fail++;
+			}
+
+		}
+
+	}
+}
+
+#
+# Update existing entries in AD
+#
+sub process_update_user() {
+
+	foreach my $perun_entry (@perun_entries) {
+
+		if (exists $ad_entries_map{$perun_entry->get_value('samAccountName')}) {
+
+			my $ad_entry = $ad_entries_map{$perun_entry->get_value('samAccountName')};
+
+			# attrs without cn since it's part of DN to be updated
+			my @attrs = ('displayName','sn','givenName','mail','MailNickName','ProxyAddresses','msDS-cloudExtensionAttribute1','msDS-cloudExtensionAttribute3');
+			# stored log messages to check if entry should be updated
+			my @entry_changed = ();
+
+			# check each attribute
+			foreach my $attr (@attrs) {
+				if (compare_entry($ad_entry , $perun_entry , $attr) == 1) {
+					# store value for log
+					my @ad_val = $ad_entry->get_value($attr);
+					my @perun_val = $perun_entry->get_value($attr);
+					push(@entry_changed, "$attr | " . join(", ",sort(@ad_val)) .  " => " . join(", ",sort(@perun_val)));
+					# replace value
+					$ad_entry->replace(
+						$attr => \@perun_val
+					);
+				}
+			}
+
+			# we never touch UAC or move entry !!
+
+			if (@entry_changed) {
+				# Update entry in AD
+				my $response = $ad_entry->update($ldap);
+				unless ($response->is_error()) {
+					# SUCCESS
+					foreach my $log_message (@entry_changed) {
+						ldap_log($service_name, "User updated: " . $ad_entry->dn() . " | " . $log_message);
+					}
+					$counter_updated++;
+				} else {
+					# FAIL
+					ldap_log($service_name, "User NOT updated: " . $ad_entry->dn() . " | " . $response->error());
+					ldap_log($service_name, $ad_entry->ldif());
+					$counter_fail++;
+				}
+			}
+
+		}
+	}
+}
+
+#
+# Create new OUs and process groups per-each OU
+# (we allow ou=licenses to be created too)
+#
+sub process_ous() {
+
+	my @perun_ou_entries = load_perun($service_files_dir."/".$service_name."_ous.ldif");
+	my @ad_ou_entries = load_ad($ldap, $base_dn_groups, $filter_ou, ['ou']);
+
+	my %ad_ou_entries_map = ();
+	my %perun_ou_entries_map = ();
+
+	foreach my $ad_entry (@ad_ou_entries) {
+		my $ouName = $ad_entry->get_value('ou');
+		$ad_ou_entries_map{ $ouName } = $ad_entry;
+	}
+	foreach my $perun_entry (@perun_ou_entries) {
+		my $ouName = $perun_entry->get_value('ou');
+		$perun_ou_entries_map{ $ouName } = $perun_entry;
+	}
+
+	# ADD NEW OUs | UPDATE OUs
+
+	foreach my $perun_entry (@perun_ou_entries) {
+
+		my $ouName = $perun_entry->get_value('ou');
+
+		unless (exists $ad_ou_entries_map{$ouName}) {
+
+			# Add new entry to AD
+			my $response = $perun_entry->update($ldap);
+			unless ($response->is_error()) {
+				# SUCCESS
+				ldap_log($service_name, "OU added: " . $perun_entry->dn());
+				$counter_add_ous++;
+
+				# PROCESS OU GROUPS
+				process_groups($ouName);
+
+			} else {
+				# FAIL
+				ldap_log($service_name, "OU NOT added: " . $perun_entry->dn() . " | " . $response->error());
+				ldap_log($service_name, $perun_entry->ldif());
+				$counter_fail_ous++;
+			}
+
+		} else {
+
+			# OU already exist - update it's groups
+			process_groups($ouName);
+
+		}
+
+	}
+
+}
+
+#
+# Create and update GROUPS per OU
+# (we allow to create new groups in ou=licenses too)
+#
+sub process_groups() {
+
+	my $ouName = shift;
+
+	my @perun_entries_groups = load_perun($service_files_dir."/".$service_name."_groups_".$ouName.".ldif");
+	my @ad_entries_groups = load_ad($ldap, "OU=".$ouName.",".$base_dn_groups, $filter_groups,
+		[ 'cn', 'samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates' , 'ProxyAddresses', 'mail', 'extensionAttribute1']);
+
+	my %ad_entries_group_map = ();
+	my %perun_entries_group_map = ();
+
+	foreach my $ad_entry (@ad_entries_groups) {
+		my $cn = $ad_entry->get_value('cn');
+		$ad_entries_group_map{ $cn } = $ad_entry;
+	}
+	foreach my $perun_entry (@perun_entries_groups) {
+		my $cn = $perun_entry->get_value('cn');
+		$perun_entries_group_map{ $cn } = $perun_entry;
+	}
+
+	# ADD groups
+	foreach my $perun_entry (@perun_entries_groups) {
+
+		my $cn = $perun_entry->get_value('cn');
+		unless (exists $ad_entries_group_map{$cn}) {
+
+			# Add new entry to AD (including members!)
+			my $response = $perun_entry->update($ldap);
+			unless ($response->is_error()) {
+				# SUCCESS
+				ldap_log($service_name, "Group added: ".$perun_entry->dn());
+				$counter_group_add++;
+			} else {
+				# FAIL
+				ldap_log($service_name, "Group NOT added: ".$perun_entry->dn()." | ".$response->error());
+				ldap_log($service_name, $perun_entry->ldif());
+				$counter_group_failed++;
+			}
+
+		}
+	}
+
+	#
+	# WE UPDATE ALL GROUPS / REMOVE ONLY NORMAL/PART_LICENSES GROUPS
+	#
+
+	# UPDATE groups
+
+	foreach my $ad_entry (@ad_entries_groups) {
+		my $cn = $ad_entry->get_value('cn');
+		if (exists $perun_entries_group_map{$cn}) {
+
+			my $perun_entry = $perun_entries_group_map{$cn};
+
+			# attrs without cn!
+			my @attrs = ('samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates', 'ProxyAddresses', 'mail', 'extensionAttribute1');
+			# stored log messages to check if entry should be updated
+			my @entry_changed = ();
+
+			# check each attribute
+			foreach my $attr (@attrs) {
+				if (compare_entry($ad_entry, $perun_entry, $attr) == 1) {
+					# store value for log
+					my @ad_val = $ad_entry->get_value($attr);
+					my @perun_val = $perun_entry->get_value($attr);
+					push(@entry_changed, "$attr | ".join(", ", sort(@ad_val))." => ".join(", ", sort(@perun_val)));
+					# replace value
+					$ad_entry->replace(
+						$attr => \@perun_val
+					);
+				}
+			}
+
+			# we never touch UAC or move entry !!
+
+			if (@entry_changed) {
+				# Update entry in AD
+				my $response = $ad_entry->update($ldap);
+				unless ($response->is_error()) {
+					# SUCCESS
+					foreach my $log_message (@entry_changed) {
+						ldap_log($service_name, "Group updated: ".$ad_entry->dn()." | ".$log_message);
+					}
+					$counter_group_updated++;
+				} else {
+					# FAIL
+					ldap_log($service_name, "Group NOT updated: ".$ad_entry->dn()." | ".$response->error());
+					ldap_log($service_name, $ad_entry->ldif());
+					$counter_group_failed++;
+				}
+			}
+
+			#
+			# ONLY MEMBERS OF NORMAL GROUPS ARE PROCESSED IMMEDIATELLY
+			#
+			unless ($ouName eq "licenses") {
+				process_groups_members($perun_entry);
+			}
+
+		}
+	}
+
+	# REMOVE groups (empty group and don't delete it !!)
+
+	foreach my $ad_entry (@ad_entries_groups) {
+		my $cn = $ad_entry->get_value('cn');
+		unless (exists $perun_entries_group_map{$cn}) {
+
+			# Prevent clearing main license group Employee,Student,Alumni !!
+			unless (($ad_entry->dn() eq $employeeDN) or ($ad_entry->dn() eq $studentDN) or ($ad_entry->dn() eq $alumniDN)){
+
+				# clear members
+				my @empty_members = ();
+				$ad_entry->replace(
+					'member' => \@empty_members
+				);
+				# set this attribute to FALSE
+				$ad_entry->replace(
+					'extensionAttribute1' => 'FALSE'
+				);
+
+				my $response = $ldap->update($ad_entry);
+				unless ($response->is_error()) {
+					ldap_log($service_name, "Group emptied: ".$ad_entry->dn());
+					$counter_group_remove++;
+				} else {
+					ldap_log($service_name, "Group NOT emptied: ".$ad_entry->dn()." | ".$response->error());
+					ldap_log($service_name, $ad_entry->ldif());
+					$counter_group_failed++;
+				}
+			}
+
+		}
+	}
+
+}
+
+#
+# ADD and REMOVE group members
+# can be used only for normal groups !!, not for groups from "ou=licenses" !!
+#
+sub process_groups_members() {
+
+	my $perun_entry = shift;
+
+	my @per_val = $perun_entry->get_value('member');
+
+	# load members of a group from AD based on DN in Perun => Group must exists in AD
+	my @ad_val = load_group_members($ldap, $perun_entry->dn(), $filter_groups);
+
+	if ($? != 0) {
+		ldap_log($service_name, "Unable to load Perun group members from AD: " . $perun_entry->dn());
+		$counter_group_failed++;
+		return;
+	}
+
+	# sort to compare
+	my @sorted_ad_val = sort(@ad_val);
+	my @sorted_per_val = sort(@per_val);
+
+	# compare using smart-match (perl 5.10.1+)
+	unless(@sorted_ad_val ~~ @sorted_per_val) {
+
+		my %ad_val_map = map { $_ => 1 } @sorted_ad_val;
+		my %per_val_map = map { $_ => 1 } @sorted_per_val;
+
+		my @to_be_added;
+		my @to_be_removed;
+
+		# add members
+		foreach my $per_val_member (@sorted_per_val) {
+			unless (exists $ad_val_map{$per_val_member}) {
+				push (@to_be_added, $per_val_member);
+			}
+		}
+
+		# remove members
+		foreach my $ad_val_member (@sorted_ad_val) {
+			unless (exists $per_val_map{$ad_val_member}) {
+				push (@to_be_removed, $ad_val_member);
+			}
+		}
+
+		# we must get reference to real group from AD in order to call "replace"
+		my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter_groups, scope => 'base' );
+		unless ($response_ad->is_error()) {
+			# SUCCESS
+			my $ad_entry = $response_ad->entry(0);
+
+			if (@to_be_added) {
+				$ad_entry->add(
+					'member' => \@to_be_added
+				);
+			}
+
+			if (@to_be_removed) {
+				$ad_entry->delete(
+					'member' => \@to_be_removed
+				);
+			}
+
+			# Update entry in AD
+			my $response = $ad_entry->update($ldap);
+
+			if ($response) {
+				unless ($response->is_error()) {
+					# SUCCESS (group updated)
+					$counter_group_updated++;
+					ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @to_be_added));
+					ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n",@to_be_removed));
+				} else {
+					# FAIL (to update group)
+					$counter_group_failed++;
+					ldap_log($service_name, "Group members NOT updated: " . $ad_entry->dn() . " | " . $response->error());
+					ldap_log($service_name, $ad_entry->ldif());
+				}
+			}
+		} else {
+			# FAIL (to get group from AD)
+			$counter_group_failed++;
+			ldap_log($service_name, "Group members NOT updated: " . $perun_entry->dn() . " | " . $response_ad->error());
+		}
+	}
+
+}
+
+
+
+
+
+#
+# Update groups from ou=licenses !!!
+#
+# Method asume, that they exists, since new OUs and Groups are added to AD during standard group processing.
+#
+# First it creates reflection of curent relations and licenses
+# Then it compares it with current AD state
+# Then it perform changes
+#
+sub process_licenses_groups() {
+
+	my $ouName = "licenses";
+
+	my @ad_entries_groups = load_ad($ldap, "OU=" . $ouName . "," . $base_dn_groups, $filter_groups, ['cn','displayName']);
+	my %ad_entries_group_map = ();
+
+	# store by DNs, will be easier for update logic
+	foreach my $ad_entry (@ad_entries_groups) {
+		my $dn = $ad_entry->dn();
+		$ad_entries_group_map{ $dn } = $ad_entry;
+	}
+
+	my $ad_state; # $ad_state->{group_dn}->{user_dn} = 1;
+	my $perun_state; # $perun_state->{group_dn}->{user_dn} = 1;
+
+	# AD state can be filled from AD
+	$ad_state = fill_from_ad(\%ad_entries_group_map);
+
+	# Perun state is resolved from combination of $userRelations, local cache and AD
+	#
+	# 1. ZAM (employee) - perun + all from AD ZAM, which are waiting for removal by cache
+	# 2. STU (student) - perun + all from AD STU, which are waiting for removal by cache - (minus) resolved employees from the first step
+	#                    + all within STU gracePeriod, which are not in currently resolved ZAM/STU.
+	# 3. ALUM (alumni) - all users of AD, which are not in currently resolved ZAM/STU and were in $onceStudents.
+	# 4. Based on resolved relation for each user, license sub-groups are set based on current user licenses ($userLicenses).
+
+	#
+	# 1. resolve EMPLOYEES
+	#
+	my $employees;
+	# add employeees from perun
+	foreach my $user_dn (keys %{$userRelations}) {
+		if (defined $userRelations->{$user_dn}->{"ZAM"}) {
+			$employees->{$user_dn} = 1;
+		}
+	}
+	# add old employees from AD within grace period
+	foreach my $user_dn (keys %{$ad_state->{$employeeDN}}) {
+		unless (defined $employees->{$user_dn}) {
+			# IF NOT BETWEEN EMPLOYEES ALREADY - check and SET grace period
+			my $should_move = shouldMove($user_dn, $employeeDN);
+			unless ($should_move == 1) {
+				# keep old employee within 30 days grace period
+				$employees->{$user_dn} = 1;
+			}
+		}
+	}
+	$perun_state->{$employeeDN} = $employees;
+
+	#
+	# 2. resolve STUDENTS
+	#
+	my $students;
+
+	# add students from perun minus those, which were resolved as employees too !
+	foreach my $user_dn (keys %{$userRelations}) {
+		if (defined $userRelations->{$user_dn}->{"STU"} and !defined $employees->{$user_dn}) {
+			$students->{$user_dn} = 1;
+		}
+	}
+	# add old students from AD within grace period
+	foreach my $user_dn (keys %{$ad_state->{$studentDN}}) {
+		unless (defined $students->{$user_dn}) {
+			# IF NOT BETWEEN STUDENTS ALREADY - check and SET grace period
+			my $should_move = shouldMove($user_dn, $studentDN);
+			unless ($should_move == 1) {
+				# keep old student within 30 days grace period
+				$students->{$user_dn} = 1;
+			}
+		}
+	}
+	$perun_state->{$studentDN} = $students;
+
+	# add students, which are within STU gracePeriod but are no longer active students or employees
+
+	## set grace period to those, which were removed from active students based on local cache
+	foreach my $user_dn (keys %{$activeStudentsFromLastRun}) {
+		unless (defined $students->{$user_dn}) {
+			# IF NOT ACTIVE STUDENT - set grace period
+			shouldMove($user_dn, $studentDN);
+		}
+	}
+
+
+	# FIXME/TODO - kdy zpátky zapsat cache právě aktivních studentů ??? Na konci skriptu?
+	## resolve who to add based on grace period
+	## -> all within STU grace period, if not also employee or student-> put between students
+	my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d")->epoch;
+	foreach my $user_dn (keys %{$waitingForRemoval}) {
+		if (defined $waitingForRemoval->{$user_dn}) {
+			if (defined $waitingForRemoval->{$user_dn}->{$studentDN}) {
+				my $gracePeriod = $waitingForRemoval->{$user_dn}->{$studentDN}->{"TIMESTAMP"};
+				if (defined $gracePeriod and $gracePeriod > 0) {
+					if ($currentDate < $gracePeriod) {
+						# is within student grace period
+						unless (defined $employees->{$user_dn} and defined $students->{$user_dn}) {
+							# not employee or student -> put back to students in AD
+							$students->{$user_dn} = 1;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	#
+	# 3. resolve ALUMNI
+	#
+	my $alumni;
+
+	# get all AD users
+	my @current_ad_users = load_ad($ldap, $base_dn, $filter, ['cn']);
+	my %current_ad_users_map = map { $_->dn() => 1 } @current_ad_users;
+	# if not currently employee / student and was once student -> put to alumni
+	foreach my $user_dn (keys %current_ad_users_map) {
+		if ((!defined $employees->{$user_dn}) and (!defined $students->{$user_dn}) and (defined $onceStudents->{$user_dn})) {
+			$alumni->{$user_dn} = 1;
+		}
+	}
+	$perun_state->{$alumniDN} = $alumni;
+
+	# 4. Based on current relation, fill license groups
+
+	# 4.1. create key entries for all license possibilities
+	my @licGroups = load_available_license_groups();
+	foreach (@licGroups) {
+		$perun_state->{$_} = ();
+	}
+
+	# 4.2 fill some keys with members from Perun based on licenses "in use".
+	foreach my $user_dn (keys %{$userLicenses}) {
+
+		my $licenseGroups = $userLicenses->{$user_dn};
+
+		if (defined $employees->{$user_dn}) {
+			foreach my $licenseGroupName (keys %{$licenseGroups}) {
+				$perun_state->{"CN=O365Lic_Employee_".$licenseGroupName."_group.muni.cz,OU=licenses,".$base_dn_groups}->{$user_dn} = 1;
+			}
+		} elsif (defined $students->{$user_dn}) {
+			foreach my $licenseGroupName (keys %{$licenseGroups}) {
+				$perun_state->{"CN=O365Lic_Student_".$licenseGroupName."_group.muni.cz,OU=licenses,".$base_dn_groups}->{$user_dn} = 1;
+			}
+		}
+		# alumni doesn't have licenses
+
+	}
+
+	# TODO - Resolve which mail send based on relation changes - we will store calculated state as ".last" and compare next time.
+
+	# FIXME - send all mails and save mark for 14/2 days before expiration to $waitingForRemoval !!
+
+	# TODO - zapsat nový last stav peruna pro vyhodnocení mailů
+
+	# Store cache with updated grace periods and sent mails (14/2 days) so we do not sent mails twice or more times
+	#  - if store to cache fails - memory state is printed and script ends
+	store_waiting_for_removal($waitingForRemoval);
+
+	##
+	#
+	# HERE IS CURRENT AD AND PERUN STATE RESOLVED, WE CAN DIFF IT AND PERFORM ADD AND REMOVE TO GROUP MEMBERS
+	#
+	# If any of requests to AD fail, script dies and current "waiting_on_remove" is not saved.
+	##
+
+	add_to_license_group($ad_entries_group_map{$employeeDN}, $ad_state->{$employeeDN}, $perun_state->{$employeeDN});
+	add_to_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, $perun_state->{$studentDN});
+	add_to_license_group($ad_entries_group_map{$alumniDN}, $ad_state->{$alumniDN}, $perun_state->{$alumniDN});
+
+	remove_from_license_group($ad_entries_group_map{$employeeDN}, $ad_state->{$employeeDN}, $perun_state->{$employeeDN});
+	remove_from_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, $perun_state->{$studentDN});
+	remove_from_license_group($ad_entries_group_map{$alumniDN}, $ad_state->{$alumniDN}, $perun_state->{$alumniDN});
+
+	# process specific license groups
+	foreach my $group_dn (sort keys %{$perun_state}) {
+		unless (($group_dn eq $employeeDN) or ($group_dn eq $studentDN) or ($group_dn eq $alumniDN)) {
+			add_to_license_group($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, $perun_state->{$group_dn});
+			remove_from_license_group($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, $perun_state->{$group_dn});
+		}
+	}
+
+	# CLEAR local CACHE based on current relation from perun
+	# Can be done only after successfull update of AD, since we MUST NOT lose grace period info !!
+	foreach (keys %{$userRelations}) {
+		if (defined $userRelations->{$_}->{"ZAM"}) {
+			$waitingForRemoval->{$_}->{$employeeDN}->{"TIMESTAMP"} = 0;
+			$waitingForRemoval->{$_}->{$studentDN}->{"TIMESTAMP"} = 0;  # clear also students
+		} elsif (defined $userRelations->{$_}->{"STU"}) {
+			$waitingForRemoval->{$_}->{$studentDN}->{"TIMESTAMP"} = 0;
+			$waitingForRemoval->{$_}->{$employeeDN}->{"TIMESTAMP"} = 0; # clear also employees
+		}
+	}
+
+	# store changed chache again - if store to cache fails - memory state is printed and script ends.
+	store_waiting_for_removal($waitingForRemoval);
+
+	# store msDS-cloudExtensionAttribute2=TRUE for active persons
+	update_cloudExtensionAttribute2($employees, $students, $alumni);
+
+	# write active users for another O365 perun service
+	write_active_users($employees, $students, $alumni);
+
+}
+
+#
+# Add members to the license group - Compare keys of hashes and add missing members to the group in AD.
+#
+# 1. param - AD_ENTRY
+# 2. param - hash of current AD group members (user_dn=>1)
+# 3. param - hash of perun group members (user_dn=>1)
+#
+sub add_to_license_group() {
+
+	my $ad_entry = shift;
+	my $ad_members_state = shift;
+	my $perun_members_state = shift;
+
+	my @to_be_added;
+
+	foreach (keys %{$perun_members_state}) {
+		unless (defined $ad_members_state->{$_}) {
+			push (@to_be_added, $_);
+		}
+	}
+
+	@to_be_added = sort @to_be_added;
+
+	if (@to_be_added) {
+		$ad_entry->add(
+			'member' => \@to_be_added
+		);
+
+		# Update entry in AD
+		my $response = $ad_entry->update($ldap);
+
+		if ($response) {
+			unless ($response->is_error()) {
+				# SUCCESS (group updated)
+				$counter_group_updated++;
+				ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @to_be_added));
+			} else {
+				# FAIL (to update group)
+				$counter_group_failed++;
+				ldap_log($service_name, "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error());
+				ldap_log($service_name, $ad_entry->ldif());
+				die "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error();
+			}
+		}
+	}
+
+}
+
+#
+# Remove members from the license group - Compare keys of hashes and remove extra members from the group in AD.
+#
+# 1. param - AD_ENTRY
+# 2. param - hash of current AD group members (user_dn=>1)
+# 3. param - hash of perun group members (user_dn=>1)
+#
+sub remove_from_license_group() {
+
+	my $ad_entry = shift;
+	my $ad_members_state = shift;
+	my $perun_members_state = shift;
+
+	my @to_be_removed;
+
+	foreach (keys %{$ad_members_state}) {
+		unless (defined $perun_members_state->{$_}) {
+			push (@to_be_removed, $_);
+		}
+	}
+
+	@to_be_removed = sort @to_be_removed;
+
+	if (@to_be_removed) {
+		$ad_entry->delete(
+			'member' => \@to_be_removed
+		);
+
+		# Update entry in AD
+		my $response = $ad_entry->update($ldap);
+
+		if ($response) {
+			unless ($response->is_error()) {
+				# SUCCESS (group updated)
+				$counter_group_updated++;
+				ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n", @to_be_removed));
+
+				# For EMPLOYEE and STUDENTS groups, remove from cache
+				if (($ad_entry->dn() eq $employeeDN) or ($ad_entry->dn() eq $studentDN)) {
+					foreach (@to_be_removed) {
+						$waitingForRemoval->{$_}->{$ad_entry->dn()}->{"TIMESTAMP"} = 0;
+					}
+				}
+
+			} else {
+				# FAIL (to update group)
+				$counter_group_failed++;
+				ldap_log($service_name, "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error());
+				ldap_log($service_name, $ad_entry->ldif());
+				die "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error();
+			}
+		}
+	}
+
+}
+
+
+#
+# Ping IS that it must set password for user to AD
+#
+sub ping_password_setter() {
+
+	my $login = shift;
+
+	my $username;
+	my $password;
+	my $db_name;
+	my $table_name;
+
+	my $configPath = "/etc/perun/services/ad_mu/DB";
+	open FILE, $configPath or die "Could not open config file $configPath: $!";
+	while(my $line = <FILE>) {
+		if($line =~ /^username: .*/) {
+			$username = ($line =~ m/^username: (.*)$/)[0];
+		} elsif($line =~ /^password: .*/) {
+			$password = ($line =~ m/^password: (.*)$/)[0];
+		} elsif($line =~ /^tablename: .*/) {
+			$table_name = ($line =~ m/^tablename: (.*)$/)[0];
+		} elsif($line =~ /^dbname: .*/) {
+			$db_name = ($line =~ m/^dbname: (.*)$/)[0];
+		}
+	}
+
+	if(!defined($password) || !defined($username) || !defined($table_name) || !defined($db_name)) {
+		print "Can't get config data from config file.\n";
+		exit 14;
+	}
+
+	my $dbh = DBI->connect("dbi:Oracle:$db_name",$username, $password,{RaiseError=>1,AutoCommit=>0,LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+
+	my $changeExists = $dbh->prepare(qq{select 1 from $table_name where uin=?});
+	$changeExists->execute($login);
+
+	unless($changeExists->fetch) {
+
+		my $insert = $dbh->prepare(qq{INSERT INTO $table_name (uin, import_time) VALUES (?, sysdate)});
+		$insert->execute($login);
+
+	}
+
+	commit $dbh;
+	$dbh->disconnect();
+
+}
+
+
+#
+# Load current STU|ZAM users relations from Perun
+#
+# Returns hash like: $relations->{user_dn}->{STU|ZAM} = 1
+#
+sub load_users_relations() {
+
+	open FILE, '<', "$service_files_dir/userRelations" or die "Unable to load 'userRelations' sent from Perun.";
+	my @lines = <FILE>;
+	close FILE or die "Unable to close 'userRelations' sent from Perun.";
+	chomp(@lines);
+
+	my $relations; # $relations->{user_dn}->{STU|ZAM} = 1
+
+	# parse input like:
+	# $user_dn\trel1,rel2\n
+	# $user_dn2\trel1\n
+	foreach my $line (@lines) {
+
+		my @parts = split /\t/, $line;
+		my $login = $parts[0];
+
+		my @rel_parts = split /,/, $parts[1];
+		foreach my $rel_part (@rel_parts) {
+			$relations->{$login}->{$rel_part} = 1;
+		}
+
+	}
+
+	return $relations;
+
+}
+
+#
+# Load current users licenses state from Perun
+#
+# Returns hash like: $licenses->{$user_dn}->{licenseGroupName} = 1
+#
+sub load_users_licenses() {
+
+	open FILE, '<', "$service_files_dir/userLicenses" or die "Unable to load 'userLicenses' sent from Perun.";
+	my @lines = <FILE>;
+	close FILE or die "Unable to close 'userLicenses' sent from Perun.";
+	chomp(@lines);
+
+	my $licenses; # $licenses->{$user_dn}->{licenseGroupName} = 1
+
+	# parse input like:
+	# $user_dn\tlic1,lic2\n
+	# $user_dn2\tlic1\n
+	foreach my $line (@lines) {
+
+		my @parts = split /\t/, $line;
+		my $login = $parts[0];
+		my @lic_parts = split /,/, $parts[1];
+		foreach my $lic_part (@lic_parts) {
+			$licenses->{$login}->{$lic_part} = 1;
+		}
+
+	}
+
+	return $licenses;
+
+}
+
+#
+# Load persons, which were once students during their lifecycle at MU from ad_mu_students.cache file.
+# If backup file is empty, current state of AD (alumni+students) is added.
+# Current students are added to the hash
+#
+# 1. param $currentStudents  (hash of current users relations from Perun), those with STU relation are added to backup file.
+#
+sub load_cached_students() {
+
+	my $currentStudents = shift;
+
+	my @lines;
+
+	my $file_path = "ad_mu_students.cache";
+	open FILE, "<" . $file_path or die "Unable to load $file_path with cache of people, which were once students.";
+	@lines = <FILE>;
+	close FILE;
+
+	# remove new-line characters from the end of lines
+	chomp @lines;
+
+	# if cached file is empty, load from AD as current members of "O365Lic_Alumni" and "O365Lic_Student"
+	unless (@lines) {
+
+		my $dn = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $base_dn_groups;
+		my @alumni_members = load_group_members($ldap, $dn, $filter_groups);
+		if ($? != 0) {
+			ldap_log($service_name, "Unable to load group members from AD: " . $dn);
+			die "Cache file of 'once students' is empty and we were unable to load current state of AD to fill it for $dn";
+		} else {
+			push(@lines, @alumni_members);
+		}
+
+		my $dn2 = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups;
+		my @student_members = load_group_members($ldap, $dn2, $filter_groups);
+
+		if ($? != 0) {
+			ldap_log($service_name, "Unable to load group members from AD: " . $dn2);
+			die "Cache file of 'once students' is empty and we were unable to load current state of AD to fill it for $dn";
+		} else {
+			push(@lines, @student_members);
+		}
+
+	}
+
+	# convert to hash to remove duplicates
+	my %students = map { $_ => 1 } @lines;
+
+	# append current students
+	foreach my $login (keys %{$currentStudents}) {
+		if (defined $currentStudents->{$login}->{"STU"}) {
+			$students{$login} = 1;
+		}
+	}
+
+	# print back current state of "were students" to file
+	open FILE, ">" . $file_path or die "Unable to store $file_path with cache of people, which were once students.";
+	foreach (sort keys %students) {
+		print FILE $_ . "\n";
+	}
+	close FILE;
+
+	return \%students;
+
+}
+
+#
+# Load persons, which were active students during last propagation cycle. It's later used to determine,
+# start of a grace period for students, which were also employees
+#
+sub load_active_students_from_last_run() {
+
+	my @lines;
+
+	my $file_path = "ad_mu_students_active.cache";
+	open FILE, "<" . $file_path or die "Unable to load $file_path with cache of people, which were once students.";
+	@lines = <FILE>;
+	close FILE;
+
+	# remove new-line characters from the end of lines
+	chomp @lines;
+
+	# if cached file is empty, load from AD as current members of "O365Lic_Alumni" and "O365Lic_Student"
+	unless (@lines) {
+
+		my $dn2 = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups;
+		my @student_members = load_group_members($ldap, $dn2, $filter_groups);
+
+		if ($? != 0) {
+			ldap_log($service_name, "Unable to load group members from AD: " . $dn2);
+			die "Cache file of 'active students' is empty and we were unable to load current state of AD to fill it for $dn";
+		} else {
+			push(@lines, @student_members);
+		}
+
+	}
+
+	my %students = map { $_ => 1 } @lines;
+	return \%students;
+
+}
+
+#
+# Write list of persons, which are active students on MU
+#
+sub write_active_students_from_last_run() {
+
+	my $students = shift;
+
+	my $file_path = "ad_mu_students_active.cache";
+
+	# print back current state of "active students" to file
+	open FILE, ">" . $file_path or die "Unable to store $file_path with cache of people, which are active students.";
+	foreach (sort keys %{$students}) {
+		print FILE $_ . "\n";
+	}
+	close FILE;
+
+}
+
+#
+# Load hash of users waiting for removal from a group. Date of expected removal is stored for each user.
+# During processing, hash is modified (removed, set to 0, entries, which moves up in relation hierarchy).
+# $waitingForRemoval->{$user_dn}->{$group_dn}->{TIMESTAMP|14DAYS|2DAYS} = $timestamp|sent|sent
+#
+sub load_waiting_for_removal() {
+
+	open FILE, '<', "ad_mu_removal.cache" or die "Unable to load 'ad_mu_removal.cache' with employee/students license expirations.";
+	my @lines = <FILE>;
+	close FILE or die "Unable to close 'ad_mu_removal.cache' with employee/students license expirations.";
+	chomp(@lines);
+
+	my $remove; # waitingForRemoval->{login}->{licenseGroupName}->{TIMESTAMP|14DAYS|2DAYS} = $timestamp|sent|sent
+
+	# parse input like:
+	# $login\t$groupName\t$timestamp\t$14daysSent\t$2daysSent\n
+	# $login2\t$groupName\t$timestamp\t$14daysSent\t$2daysSent\n
+	foreach my $line (@lines) {
+		my @parts = split /\t/, $line;
+		$remove->{$parts[0]}->{$parts[1]}->{"TIMESTAMP"} = $parts[2];
+		if ($parts[3]) {
+			$remove->{$parts[0]}->{$parts[1]}->{"14DAYS"} = $parts[3];
+		}
+		if ($parts[4]) {
+			$remove->{$parts[0]}->{$parts[1]}->{"2DAYS"} = $parts[4];
+		}
+
+	}
+
+	return $remove;
+
+}
+
+#
+# Store passed hash of users to backup file like "user_dn \t group_dn \t timestamp \t 14daysSent \t 2daysSent" for each user, which should be removed
+# from relation group and moved to the lower level. Timestamp is a date of expected removal, then there are two flags about sent mail notifications.
+#
+sub store_waiting_for_removal() {
+
+	my $remove = shift;
+	my $file_path =  "ad_mu_removal.cache";
+	my $fail = 0;
+
+	# print back current state of "waiting for removal" to file
+	open FILE, ">" . $file_path or $fail = 1;
+	foreach (sort keys %{$remove}) {
+		my $login = $_;
+		foreach (sort keys %{$remove->{$login}}) {
+			if (defined $remove->{$login}->{$_}->{"TIMESTAMP"} and $remove->{$login}->{$_}->{"TIMESTAMP"} != 0) {
+				print FILE $login . "\t" . $_ . "\t" . $remove->{$login}->{$_}->{"TIMESTAMP"} . "\t" or $fail = 1;
+				if ($remove->{$login}->{$_}->{"14DAYS"} && length $remove->{$login}->{$_}->{"14DAYS"}) {
+					print FILE $remove->{$login}->{$_}->{"14DAYS"} or $fail = 1;
+				}
+				print FILE "\t" or $fail = 1;
+				if ($remove->{$login}->{$_}->{"2DAYS"} && length $remove->{$login}->{$_}->{"2DAYS"}) {
+					print FILE $remove->{$login}->{$_}->{"2DAYS"} or $fail = 1;
+				}
+				print FILE "\n" or $fail = 1;
+			}
+		}
+	}
+	close FILE or $fail = 1;
+
+	if ($fail == 1) {
+		# TODO - send mail to the admin - create permanent lock ???
+		ldap_log($service_name, "Unable to store CACHE of users waiting for removal (grace periods), dumping to STDOUT: " . Dumper($remove));
+		die "Unable to store CACHE of users waiting for removal (grace periods), dumping to STDOUT: " . Dumper($remove);
+	}
+
+}
+
+#
+# Determine, if user should be moved now to lower relation or kept in current relation
+# If user not present in a storage hash, add it with 150 days grace period
+# So the method should be called only for users, which perun wants to move.
+#
+# 1.param = user_dn
+# 2.param = group_dn
+#
+# Return 1 if should move to lower relation, 0 if should be kept in current relation
+#
+sub shouldMove() {
+
+	my $login = shift;
+	my $group = shift;
+
+	my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d");
+
+	my $timestamp;
+	if ($waitingForRemoval->{$login} and $waitingForRemoval->{$login}->{$group}){
+		$timestamp = $waitingForRemoval->{$login}->{$group}->{"TIMESTAMP"};
+	}
+
+	my $moveNow = 0;
+	if (defined $timestamp) {
+		$moveNow = ($timestamp < $currentDate->epoch) ? 1 : 0;
+	} else {
+		# we want to move user, but not now - add it 150 days grace period
+		$waitingForRemoval->{$login}->{$group}->{"TIMESTAMP"} = $currentDate->epoch + (150*24*60*60);
+	}
+
+	return $moveNow;
+
+}
+
+#
+# Return hash strucure of AD license groups like $ad_state->{group_dn}->{user_dn} = 1;
+# DIE the script if unable to load all data !!
+#
+sub fill_from_ad() {
+
+	my $ad_entries_group_map = shift;
+
+	my $ad_state;  # $ad_state->{group_dn}->{user_dn} = 1
+
+	# for each AD group, get members
+	foreach my $group_dn (sort keys %{$ad_entries_group_map}) {
+
+		# load members of a group from AD based on DN in Perun => Group must exists in AD
+		my @ad_val = load_group_members($ldap, $group_dn, $filter_groups);
+
+		if ($? != 0) {
+			ldap_log($service_name, "Unable to load Perun group members from AD: " . $group_dn);
+			die "Unable to load AD state to resolve license changes!";
+		}
+
+		foreach (@ad_val) {
+			$ad_state->{$group_dn}->{$_} = 1;
+		}
+
+	}
+
+	return $ad_state;
+
+}
+
+#
+# Get current state of Student, Employee and Alumni group members
+# and push this list to cache for another service
+#
+# 1. param - hash of employess (user_dn->1)
+# 2. param - hash of students (user_dn->1)
+# 3. param - hash of alumni (user_dn->1)
+#
+sub write_active_users() {
+
+	my $employees = shift;
+	my $students = shift;
+	my $alumni = shift;
+
+	my %active = map { $_ => 1 } keys %{$employees};
+	foreach (keys %{$students}) {
+		$active{$_} = 1
+	}
+	foreach (keys %{$alumni}) {
+		$active{$_} = 1
+	}
+
+	# Get facility ID
+	open my $fid_file, '<', "$service_files_dir/facilityId";
+	my $fid = <$fid_file>;
+	chomp($fid);
+	close $fid_file;
+
+	# 2. print logins (UCO) to file
+
+	my $file_path = "/var/cache/perun/services/$fid/o365_mu";
+	unless (-d $file_path) {
+		# create path if exists
+		make_path( $file_path );
+	}
+	my $file_name = "activeO365Users";
+
+	# print back current state of "waiting for removal" to file
+	open FILE, ">" . $file_path ."/". $file_name;
+	foreach (sort keys %active) {
+		if($_ =~ /^CN=([^,]*),/i) {
+			my $uco = ($_ =~ /^CN=([^,]*),/i)[0];
+			print FILE $uco . "\n";
+		}
+	}
+	close FILE;
+
+}
+
+
+#
+# Get current state of Student, Employee and Alumni group members
+# and push to user attribute msDS-cloudExtensionAttribute2 where
+# active users have "TRUE" and rest in AD has "FALSE".
+#
+# 1. param - hash of employess (user_dn->1)
+# 2. param - hash of students (user_dn->1)
+# 3. param - hash of alumni (user_dn->1)
+#
+sub update_cloudExtensionAttribute2() {
+
+	my $employees = shift;
+	my $students = shift;
+	my $alumni = shift;
+
+	my %active = map { $_ => 1 } keys %{$employees};
+	foreach (keys %{$students}) {
+		$active{$_} = 1
+	}
+	foreach (keys %{$alumni}) {
+		$active{$_} = 1
+	}
+
+	# load normal user entries
+	my @ad_persons = load_ad($ldap, $base_dn, $filter, ['cn','msDS-cloudExtensionAttribute2']);
+
+	foreach my $ad_entry (@ad_persons) {
+
+		my $ad_val = $ad_entry->get_value('msDS-cloudExtensionAttribute2') || "";
+		if ($active{$ad_entry->dn()}) {
+
+			unless ('TRUE' eq $ad_val) {
+
+				$ad_entry->replace(
+					'msDS-cloudExtensionAttribute2' => 'TRUE'
+				);
+
+				my $response = $ad_entry->update($ldap);
+
+				if ($response) {
+					unless ($response->is_error()) {
+						# SUCCESS (flag updated)
+						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag set: " . $ad_entry->dn() . " | 'TRUE'");
+					} else {
+						# FAIL (to update flag)
+						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag NOT set: " . $ad_entry->dn());
+						ldap_log($service_name, $ad_entry->ldif());
+						$counter_fail++;
+					}
+				}
+
+			}
+
+		} else {
+
+			unless ('FALSE' eq $ad_val) {
+
+				$ad_entry->replace(
+					'msDS-cloudExtensionAttribute2' => 'FALSE'
+				);
+
+				my $response = $ad_entry->update($ldap);
+
+				if ($response) {
+					unless ($response->is_error()) {
+						# SUCCESS (flag updated)
+						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag set: " . $ad_entry->dn() . " | 'FALSE'");
+					} else {
+						# FAIL (to update flag)
+						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag NOT set: " . $ad_entry->dn());
+						ldap_log($service_name, $ad_entry->ldif());
+						$counter_fail++;
+					}
+				}
+
+			}
+		}
+	}
+
+}
+
+#
+# Return array of partial license groups available in Perun, since
+# if they are empty, we can't compare state in perun with AD (they are not pushed in LDIF).
+#
+sub load_available_license_groups() {
+
+	open FILE, '<', "$service_files_dir/licGroupNames" or die "Unable to load '$service_files_dir/licGroupNames' with partial licenses available in perun.";
+	my @lines = <FILE>;
+	close FILE or die "Unable to close $service_files_dir/licGroupNames' with partial licenses available in perun.";
+	chomp(@lines);
+	return @lines;
+
+}
+
+#
+# Send mail specified by notification type to passed mail address.
+#
+# 1.param Notification type
+# 2.param To mail address
+#
+sub sendMail() {
+
+	my $notifyType = shift;
+	my $to = shift;
+
+	if (defined $debugMailAddress) {
+		$to = $debugMailAddress;
+		# FIXME - KDYŽ BUDE DEBUG do zprávy přidat, kam to mělo původně jít
+	}
+	# FIXME - set proper mail addresses
+	my $from = "perun\@censet.cz";
+	my $reply = "perun\@censet.cz";
+
+	my $subject = $mailsSubjects->{$notifyType};
+	my $message = $mailsMessages->{$notifyType};
+
+	my $mail = MIME::Lite->new(
+		From     => $from,
+		To       => $to,
+		Reply-To => $reply,
+			Subject  => $subject,
+			Data     => $message
+	);
+
+	$mail->send;
+
+}
+
+#
+# Load pre-defined text for mail notifications
+#
+sub loadMailTexts() {
+
+	# fill subjects
+
+	# FIXME - "ALUM_TO_EMPLOYEE_MANUAL" je v podstatě "EMPLOYEE_GRACE_CANCEL_FROM_NA/ALUM" - tedy v zásadě, je nutné notifikovat, že běh grace periody byl ukončen ??
+	# FIXME   Nestačí říct, že licence byla přidělena ?
+
+	$mailsSubjects->{"NA_TO_EMPLOYEE"} = "Byla Vám přidělena zaměstnanecká licence";
+	$mailsSubjects->{"NA_TO_STUDENT"} = "Byla Vám přidělena studentská licence";
+	$mailsSubjects->{"NA_TO_EMPLOYEE_MANUAL"} = "Byla Vám ručně přidělena zaměstnanecká licence";
+	$mailsSubjects->{"ALUM_TO_EMPLOYEE"} = "Byla Vám přidělena zaměstnanecká licence";
+	$mailsSubjects->{"ALUM_TO_STUDENT"} = "Byla Vám přidělena studentská licence";
+	$mailsSubjects->{"ALUM_TO_EMPLOYEE_MANUAL"} = "Byla Vám ručně přidělena zaměstnanecká licence";
+	$mailsSubjects->{"EMPLOYEE_GRACE_TO_NA"} = "Vaše zaměstnanecká licence brzy vyprší";
+	$mailsSubjects->{"EMPLOYEE_GRACE_TO_ALUM"} = "Vaše zaměstnanecká licence brzy vyprší";
+	$mailsSubjects->{"STUDENT_GRACE_TO_ALUM"} = "Vaše studentská licence brzy vyprší";
+	$mailsSubjects->{"EMPLOYEE_GRACE_CANCEL_FROM_NA"} = "Vaše zaměstnanecká licence byla obnovena";
+	$mailsSubjects->{"EMPLOYEE_GRACE_CANCEL_FROM_ALUM"} = "Vaše zaměstnanecká licence byla obnovena";
+	$mailsSubjects->{"STUDENT_GRACE_CANCEL_FROM_ALUM"} = "Vaše studentská licence byla obnovena";
+
+	# fill message body
+
+	$mailsMessages->{"NA_TO_EMPLOYEE"} = "Byla Vám přidělena zaměstnanecká licence v O365.";
+	$mailsMessages->{"NA_TO_STUDENT"} = "Byla Vám přidělena studentská licence v O365.";
+	$mailsMessages->{"NA_TO_EMPLOYEE_MANUAL"} = "Byla Vám ručně přidělena zaměstnanecká licence v O365 s platností do XX.YY.ZZZZ.";
+	$mailsMessages->{"ALUM_TO_EMPLOYEE"} = "Byla Vám přidělena zaměstnanecká licence v O365.";
+	$mailsMessages->{"ALUM_TO_STUDENT"} = "Byla Vám přidělena studentská licence v O365.";
+	$mailsMessages->{"ALUM_TO_EMPLOYEE_MANUAL"} = "Byla Vám ručně přidělena zaměstnanecká licence v O365 s platností do XX.YY.ZZZZ.";
+	$mailsMessages->{"EMPLOYEE_GRACE_TO_NA"} = "Vaše zaměstnanecká licence vyprší XX.YY.ZZZZ.";
+	$mailsMessages->{"EMPLOYEE_GRACE_TO_ALUM"} = "Vaše zaměstnanecká licence vyprší XX.YY.ZZZZ a dostanete absolventskou.";
+	$mailsMessages->{"STUDENT_GRACE_TO_ALUM"} = "Vaše studentská licence vyprší XX.YY.ZZZZ a dostanete absolventskou.";
+	$mailsMessages->{"EMPLOYEE_GRACE_CANCEL_FROM_NA"} = "Vaše zaměstnanecká licence byla obnovena.";
+	$mailsMessages->{"EMPLOYEE_GRACE_CANCEL_FROM_ALUM"} = "Vaše zaměstnanecká licence byla obnovena.";
+	$mailsMessages->{"STUDENT_GRACE_CANCEL_FROM_ALUM"} = "Vaše studentská licence byla obnovena.";
+}
+
+#
+# Load hash of users manually set to employees with their expiration
+#
+sub load_manual_employees() {
+
+	open FILE, '<', "$service_files_dir/manualEmployees" or die "Unable to load '$service_files_dir/manualEmployees' with manual employees expirations.";
+	my @lines = <FILE>;
+	close FILE or die "Unable to close $service_files_dir/manualEmployees' with manual employees expirations.";
+	chomp(@lines);
+
+	my $manEmp; # $manEmp->{DN} = timestamp
+	# parse input like:
+	# $dn\t$timestamp\n
+	# $dn2\t$timestamp\n
+	foreach my $line (@lines) {
+		my @parts = split /\t/, $line;
+		$manEmp->{$parts[0]} = {$parts[1]};
+	}
+
+	return $manEmp;
+
+}
