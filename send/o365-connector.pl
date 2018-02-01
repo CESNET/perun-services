@@ -7,8 +7,11 @@ use Getopt::Long qw(:config no_ignore_case);
 use LWP::UserAgent;
 use HTTP::Request;
 use HTTP::Headers;
+use MIME::Base64;
+use URI;
 use JSON;
 use Data::Dumper;
+use POSIX qw(strftime);
 
 #We want to have data in UTF8 on output
 binmode STDOUT, ':utf8';
@@ -40,7 +43,7 @@ local $Data::Dumper::Useqq = 1;
 our $DEBUG=0;
 #Maximum time to wait on server response (after that it tries the same time to get result)
 #Time to get result is 2xMAX_WAIT_SEC sec
-our $MAX_WAIT_SEC=15;
+our $MAX_WAIT_SEC=30;
 our $MAX_WAIT_MSEC = $MAX_WAIT_SEC * 1000;
 
 #Mandatory settings to be able to call server as authorized user
@@ -165,15 +168,11 @@ while(my $line = <FILE>) {
 		$PASSWORD = ($line =~ /^password: (.*)$/)[0];
 	} elsif($line =~ /^url: .*/) {
 		$BASIC_URL = ($line =~ /^url: (.*)$/)[0];
-	} elsif($line =~ /^host: .*/) {
-		$HOST = ($line =~ /^host: (.*)$/)[0];
-	} elsif($line =~ /^port: .*/) {
-		$PORT = ($line =~ /^port: (.*)$/)[0];
 	}
 }
 
 #Check mandatory configuration
-if(!defined($PASSWORD) || !defined($USERNAME) || !defined($BASIC_URL) || !defined($HOST) || !defined($PORT)) {
+if(!defined($PASSWORD) || !defined($USERNAME) || !defined($BASIC_URL)) {
 	diePretty ( $ERROR_CANNOT_FOUND_CONFIGURATION, "Path to find: $configPath \n" );
 }
 
@@ -602,6 +601,7 @@ sub startSession {
 		if($urlToRepeat eq $URL) {
 			#Problem with soft error
 			if($DEBUG>0) { print "Need to repeat calling because of soft error: $urlToRepeat\n"; }
+			sleep 1;
 			$urlToRepeat = callServer( $urlToRepeat, $USED_TYPE, \%content );
 		} else {
 			#Problem with executing state
@@ -610,7 +610,6 @@ sub startSession {
 			$urlToRepeat = callServer( $urlToRepeat, $TYPE_GET, {} );
 		}
 		$waitingInSec++;
-		sleep 1;
 	}
 
 	my $result = resolveOutputByCommandName ( $finalJsonOutput );
@@ -679,15 +678,24 @@ sub createConnection {
 	my $type = shift;
 	my $content = shift;
 
-	my $address = $HOST . ":" . $PORT;
-	my $domain = $HOST;
+	my $uri = URI->new($url);
+	my $host = $uri->host;
+	my $port = $uri->port;
+
+	my $address = $host . ":" . $port;
+	my $domain = $host;
 
 	my $headers = HTTP::Headers->new;
 	$headers->header('Content-Type' => 'application/json');
 	$headers->header('Accept' => 'application/json,text/json');
 	$headers->header('MUNI-WAITTIME' => $MAX_WAIT_MSEC );
 
+	#Authorization Header (possible substitution for credentials in User Agent)
+	#my $autorizationInBase64 = encode_base64($USERNAME . ':' . $PASSWORD);
+	#$headers->header('Authorization' => 'Basic ' . $autorizationInBase64);
+
 	my $ua = LWP::UserAgent->new;
+	print("CREDENTIALS: $address, $domain\n");
 	$ua->credentials( $address, $domain, $USERNAME, $PASSWORD );
 	my $request = HTTP::Request->new( $type, $url, $headers, $content );
 	return $ua->request($request);
@@ -712,7 +720,6 @@ sub checkServerResponse {
 	if ($response->is_success) {
 		$responseJson = JSON->new->utf8->decode( $response->content );
 		$CHECK_URL = $responseJson->{'checkURL'};
-		$HOST = $responseJson->{'host'};
 	} else {
 		my $responseInfo = $response->status_line . "\n" . $response->decoded_content . "\n";
 		diePretty( $ERROR_ISS_COM_PROBLEM, $responseInfo );
@@ -762,7 +769,6 @@ sub printJsonOutput {
 	print "RESPONSE:\n";
 	print "------------------------------------------\n";
 	print "COMMAND   = " . $actualCommand . "\n";
-	print "HOST      = " . $HOST . "\n";
 	print "BASIC_URL = " . $BASIC_URL . "\n";
 	print "CHECK_URL = " . $CHECK_URL . "\n";
 	print "URL       = " . $URL . "\n";
@@ -869,11 +875,12 @@ sub resolveStatusOfCall {
 sub diePretty {
 	my $errorMessage = shift;
 	my $moreErrorInfo = shift;
+	my $datestring = strftime "%D %H:%M:%S \n", localtime;
 	my $rowDelimeter = "------------------------------------------------------------------------\n";
 	my $status =       "               STATUS = ERROR\n";
 	my $forCommand = "INPUT COMMAND: " . $inputCommand . "\n";
 
-	$errorMessage = "\n" . $rowDelimeter . $status . $rowDelimeter . $errorMessage . $rowDelimeter . $moreErrorInfo  . $rowDelimeter . $forCommand . $rowDelimeter . "\n";
+	$errorMessage = "\n" . $rowDelimeter . $status . $rowDelimeter . $datestring . $errorMessage . $rowDelimeter . $moreErrorInfo  . $rowDelimeter . $forCommand . $rowDelimeter . "\n";
 
 	die $errorMessage;
 }
