@@ -1,0 +1,17 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use Storable qw(store_fd);
+
+local $::PROTOCOL_VERSION = "3.0.0";
+
+perunServicesInit::init;
+
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = &$::GET_DATA_METHOD;
+
+store_fd $data, *STDOUT;
+
+perunServicesInit::finalize;
