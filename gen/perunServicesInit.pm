@@ -29,29 +29,29 @@ our $DATA_TYPE = {
 	$DATA_TYPE_WITH_VOS => sub {getDataWithVos(@_)},
 };
 
-#die at the very end of skript when any warning occured during executing
+#die at the very end of script when any warning occur during executing
 our $DIE_AT_END=0;
 $SIG{__WARN__} = sub { $DIE_AT_END=1; warn @_; };
-END { if($DIE_AT_END) { die "Died because of warning(s) occured during procesing.\n"; } };
+END { if($DIE_AT_END) { die "Died because of warning(s) occur during processing.\n"; } };
 
 my ($agent, $service, $facility, $servicesAgent, $directory, $tmp_directory, $tmp_directory_destination, $getData_directory, $local_data);
 
-# Prepare direactory for file which will be generated
+# Prepare directory for file which will be generated
 # Create VERSION file in this directory. This file contains protocol version
-# 
-# This method REQUIRE acess to $::SERVICE_NAME and $::PROTOCOL_VERSION
-# this can be achieved by folowing lines in your main script: (for example)
+#
+# This method REQUIRE access to $::SERVICE_NAME and $::PROTOCOL_VERSION
+# this can be achieved by following lines in your main script: (for example)
 #     local $::SERVICE_NAME = "passwd";
 #     local $::PROTOCOL_VERSION = "3.0.0";
 sub init {
 
-	unless(defined $::SERVICE_NAME) { die; }
-	unless(defined $::PROTOCOL_VERSION) {die;}
-
 	my ($facilityId, $facilityName, $local_data_file, $serviceName, $getDataType);
-	GetOptions ("facilityId|f=i" => \$facilityId, "facilityName|F=s" => \$facilityName, "data|d=s" => \$local_data_file, "serviceName|s=s" => \$serviceName, "getDataType|t=s" => \$getDataType) or die; 
+	GetOptions ("facilityId|f=i" => \$facilityId, "facilityName|F=s" => \$facilityName, "data|d=s" => \$local_data_file, "serviceName|s=s" => \$serviceName, "getDataType|t=s" => \$getDataType) or die;
 	# serviceName is way how to specify service from argument, use it instead local SERVICE_NAME if set
 	if(defined $serviceName) { $::SERVICE_NAME = $serviceName; }
+
+	unless(defined $::SERVICE_NAME) { die; }
+	unless(defined $::PROTOCOL_VERSION) {die;}
 
 	# some services support variable getData method type, default is hierarchical
 	# if service does not support this variable behavior, then it does not care about this setting
