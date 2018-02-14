@@ -1,0 +1,65 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use JSON::XS;
+use utf8;
+
+local $::SERVICE_NAME = "firewall";
+local $::PROTOCOL_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_USER_IP_ADDRESSES;        *A_USER_IP_ADDRESSES =        \'urn:perun:user:attribute-def:def:IPAddresses';
+our $A_RESOURCE_FIREWALL_RULES;  *A_RESOURCE_FIREWALL_RULES =  \'urn:perun:resource:attribute-def:def:firewallRules';
+
+my $addressesByRules = {};
+my @resourcesData = $data->getChildElements;
+foreach my $resourceData (@resourcesData) {
+	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
+	my $firewallRules = $resourceAttributes{$A_RESOURCE_FIREWALL_RULES};
+
+	#skip resources without rules
+	next unless($firewallRules);
+
+	my @membersData = $resourceData->getChildElements;
+	for my $memberData (@membersData) {
+		my %memberAttributes = attributesToHash $memberData->getAttributes;
+		my $IPAddresses = $memberAttributes{$A_USER_IP_ADDRESSES};
+
+		#skip users without IP addresses
+		next unless($IPAddresses);
+
+		foreach my $firewallRule (@$firewallRules) {
+			foreach my $IPAddress (@$IPAddresses) {
+				$addressesByRules->{$firewallRule}->{$IPAddress} = 1;
+			}
+		}
+	}
+}
+
+# PREPARE DATA TO JSON
+my @rules;
+foreach my $firewallRule (sort keys %$addressesByRules) {
+	my $rule = {};
+	$rule->{"rule"} = $firewallRule;
+	my @IPAddresses = sort keys %{$addressesByRules->{$firewallRule}};
+	$rule->{"allowedIPs"} = \@IPAddresses;
+	push @rules, $rule;
+}
+my %rulesFinal = ();
+$rulesFinal{'rules'} = \@rules;
+
+# PRINT DATA TO JSON FILE
+my $file = "$DIRECTORY/$::SERVICE_NAME.json";
+open FILE,">$file" or die "Cannot open $file: $! \n";
+binmode(FILE);
+print FILE JSON::XS->new->utf8->pretty->encode(\%rulesFinal);
+close (FILE) or die "Cannot close $file: $! \n";
+
+perunServicesInit::finalize;
