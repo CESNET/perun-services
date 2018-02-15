@@ -149,7 +149,7 @@ sub readProperties {
 		close (INI);
 	}
 	else {
-		syslog LOG_WARN, "Could not open config file \"$path\". No way to read VO properties";
+		syslog LOG_WARNING, "Could not open config file \"$path\". No way to read VO properties";
 		print STDERR "Could not open config file \"$path\". No way to read VO properties\n";
 	}
 	return %properties;
