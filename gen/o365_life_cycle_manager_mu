@@ -22,7 +22,9 @@ sub processUsers;
 
 #Headers
 my $idHeader = "id";
+my $memberIdHeader = "memberId";
 my $loginHeader = "login";
+my $o365EmailAddressesHeader = "o365EmailAddresses";
 my $emailAddressesHeader = "emailAddresses";
 my $o365AccountExtensionHeader = "o365AccountExtension";
 my $relationsTypesHeader = "relationTypes";
@@ -30,6 +32,7 @@ my $relationsTypesHeader = "relationTypes";
 #Constants
 
 our $A_MEMBER_ID;                  *A_MEMBER_ID =                   \'urn:perun:member:attribute-def:core:id';
+our $A_USER_ID;                    *A_USER_ID =                     \'urn:perun:user:attribute-def:core:id';
 our $A_USER_LOGIN_MU;              *A_USER_LOGIN_MU =               \'urn:perun:user:attribute-def:def:login-namespace:mu';
 our $A_RESOURCE_RELATION_TYPE;     *A_RESOURCE_RELATION_TYPE =      \'urn:perun:resource:attribute-def:def:relationType';
 our $A_MEMBER_O365_EMAIL_ADDRS_MU; *A_MEMBER_O365_EMAIL_ADDRS_MU =  \'urn:perun:member:attribute-def:def:o365EmailAddresses:mu';
@@ -51,14 +54,16 @@ foreach my $resourceData ($data->getChildElements) {
 # PREPARE USERSDATA TO JSON
 my @users;
 foreach my $id (sort keys %$userStruc) {
-        my $user = {};
-        $user->{$idHeader} = $id;
-        $user->{$loginHeader} = $userStruc->{$id}->{$loginHeader};
-        $user->{$emailAddressesHeader} = $userStruc->{$id}->{$emailAddressesHeader};
-        $user->{$o365AccountExtensionHeader} = $userStruc->{$id}->{$o365AccountExtensionHeader};
-        $user->{$relationsTypesHeader} = $userStruc->{$id}->{$relationsTypesHeader};
+	my $user = {};
+	$user->{$idHeader} = $id * 1;
+	$user->{$memberIdHeader} = $userStruc->{$id}->{$memberIdHeader};
+	$user->{$loginHeader} = $userStruc->{$id}->{$loginHeader};
+	$user->{$o365EmailAddressesHeader} = $userStruc->{$id}->{$o365EmailAddressesHeader};
+	$user->{$emailAddressesHeader} = $userStruc->{$id}->{$emailAddressesHeader};
+	$user->{$o365AccountExtensionHeader} = $userStruc->{$id}->{$o365AccountExtensionHeader};
+	$user->{$relationsTypesHeader} = $userStruc->{$id}->{$relationsTypesHeader};
 
-        push @users, $user;
+	push @users, $user;
 }
 my %usersFinal = ();
 $usersFinal{'users'} = \@users;
@@ -79,21 +84,28 @@ sub processUsers {
 	my ($relationType, $memberData) = @_;
 
 	my %memberAttributes = attributesToHash $memberData->getAttributes;
-	my $id = $memberAttributes{$A_MEMBER_ID};
+	my $id = $memberAttributes{$A_USER_ID};
 
-  if (exists $userStruc->{$id}) {
+	if (exists $userStruc->{$id}) {
 		if($relationType) {
 			my @relations = uniqList ($relationType, @{$userStruc->{$id}->{$relationsTypesHeader}});
 			$userStruc->{$id}->{$relationsTypesHeader} = \@relations;
 		}
-  } else {
+	} else {
+		my $memberId = $memberAttributes{$A_MEMBER_ID};
 		my $login = $memberAttributes{$A_USER_LOGIN_MU};
-		my $emailAddresses = $memberAttributes{$A_MEMBER_O365_EMAIL_ADDRS_MU};
+		my $o365EmailAddresses = $memberAttributes{$A_MEMBER_O365_EMAIL_ADDRS_MU};
 		my $o365AccExtension = $memberAttributes{$A_USER_FACILITY_O365_ACC_EXT};
 
-    $userStruc->{$id}->{$loginHeader} = $login;
-    $userStruc->{$id}->{$emailAddressesHeader} = $emailAddresses;
-    $userStruc->{$id}->{$o365AccountExtensionHeader} = $o365AccExtension;
+		$userStruc->{$id}->{$memberIdHeader} = $memberId;
+		$userStruc->{$id}->{$loginHeader} = $login;
+		$userStruc->{$id}->{$o365EmailAddressesHeader} = $o365EmailAddresses;
+		$userStruc->{$id}->{$o365AccountExtensionHeader} = $o365AccExtension;
+		
+		#TODO: this is just temporary settings and will be replaced soon 
+		my @emailAddresses = @$o365EmailAddresses;
+		push @emailAddresses, $login . '@test.cz';
+		$userStruc->{$id}->{$emailAddressesHeader} = \@emailAddresses;
 
 		#relations
 		my @relations = ();
@@ -101,5 +113,5 @@ sub processUsers {
 			push @relations, $relationType;
 		}
 		$userStruc->{$id}->{$relationsTypesHeader} = \@relations;
-  }
+	}
 }
