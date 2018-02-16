@@ -141,16 +141,10 @@ sub processMember {
 	my $UCO = $memberAttributes{$A_UF_LOGIN};
 
 	my $disableForward = $memberAttributes{$A_UF_DISABLE_MAIL_FORWARD};
-	my $mailForward;
-	#If forwarding is disabled, return empty value for mail forward
-	unless($disableForward) {
-		#if mail for forwarding is not empty, use its value, in other case use default value
-		if($mailForward) {
-			$mailForward = $memberAttributes{$A_UF_O365_MAIL_FORWARD};
-		} else {
-			$mailForward = $UCO . $DEFAULT_FORWARDING_DOMAIN;
-		}
-	}
+
+	#if mail forward is not set use the default value unless forwarding is disabled for that user
+	my $mailForward = $memberAttributes{$A_UF_O365_MAIL_FORWARD} || $UCO . $DEFAULT_FORWARDING_DOMAIN unless $disableForward;
+
 	my $archive = $memberAttributes{$A_UF_O365_ARCHIVE};
 	my $storeAndForward = $memberAttributes{$A_UF_O365_STORE_AND_FORWARD};
 
