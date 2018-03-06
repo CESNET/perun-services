@@ -1,0 +1,5 @@
+perun-slave-process-o365-contacts-export (3.0.0) stable; urgency=low
+
+  * Package for exporting Perun managed o365 emails
+
+ -- Michal Stava <stavamichal@gmail.com>  Tue, 27 Feb 2018 10:07:00 +0100
