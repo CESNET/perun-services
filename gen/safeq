@@ -86,6 +86,9 @@ foreach my $id (sort keys %costcentersById) {
 ## role: rolename=student, ou=roles, o=ysoftsafeq
 ## billingcode: billincode=bc1, ou=billingcodes, o=ysoftsafeq
 ## prepaid: FALSE
+
+my %allChipNumbers;  #used for consistency check - each chip number should belong to only one user
+
 foreach my $login (sort keys %$usersByLogin) {
 	my $attributes = $usersByLogin->{$login};
 
@@ -100,6 +103,10 @@ foreach my $login (sort keys %$usersByLogin) {
 	print FILE "homedir:: ", encode_base64('\\\\nfs' . ($attributes->{$A_USER_LOGIN} % 7 + 1) . '.ucn.muni.cz\\profiles\\' . $attributes->{$A_USER_LOGIN});
 
 	foreach my $chipNumber (@{$attributes->{$A_USER_CHIP_NUM}}) {
+		if($allChipNumbers{$chipNumber}) {
+			warn "Same chip number shared by more users. Logins of users: " . $login . ", " . $allChipNumbers{$chipNumber} . "\n";
+		}
+		$allChipNumbers{$chipNumber} = $login;
 		print FILE "card: ", $chipNumber, "\n";
 	}
 
