@@ -111,10 +111,10 @@ my $insertedVzt = 0;
 my $deletedVzt = 0;
 my $foundAndSkippedVzt = 0;
 my $foundAndUpdatedVzt = 0;
-my $dc2_inserted = 0;
-my $dc2_foundAndUpdated = 0;
-my $dc2_foundAndSkipped = 0;
-my $dc2_deleted = 0;
+my $vema_inserted = 0;
+my $vema_foundAndUpdated = 0;
+my $vema_foundAndSkipped = 0;
+my $vema_deleted = 0;
 my $kos_inserted = 0;
 my $kos_foundAndUpdated = 0;
 my $kos_foundAndSkipped = 0;
@@ -434,7 +434,7 @@ foreach my $uco (sort keys $dataByKey) {
 
 }
 
-# delete vztah of unwanted persons (for simplicity of other scripts (KOS/DC2 to IFIS) we delete vztah of any type !!
+# delete vztah of unwanted persons (for simplicity of other scripts (KOS/VEMA to IFIS) we delete vztah of any type !!
 my $ary_ref_vzt = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null});
 my @ucos_vzt = @$ary_ref_vzt;
 foreach my $uco (@ucos_vzt) {
@@ -454,25 +454,25 @@ $contactsAreEquals->finish();
 $vztahExists->finish();
 
 #
-# process relations from dc2
+# process relations from VEMA
 #
 
-my $dc2_data = load_dc2();
+my $vema_data = load_vema();
 
-foreach my $key (sort keys %$dc2_data) {
+foreach my $key (sort keys %$vema_data) {
 
-	my $OSB_ID = $dc2_data->{$key}->{'OSB_ID'}; # OSB_ID = UCO
-	my $NS = $dc2_data->{$key}->{'NS'};
+	my $OSB_ID = $vema_data->{$key}->{'OSB_ID'}; # OSB_ID = UCO
+	my $NS = $vema_data->{$key}->{'NS'};
 	my $TYP_VZTAHU = "ZAM";
-	my $DRUH_VZTAHU = $dc2_data->{$key}->{'VZTAH_STATUS_NAZEV'};
-	my $VZTAH_CISLO = $key;
-	my $VZTAH_OD = $dc2_data->{$key}->{'VZTAH_OD'};
-	my $VZTAH_DO = $dc2_data->{$key}->{'VZTAH_DO'};
-	my $KARTA_IDENT = $dc2_data->{$key}->{'KARTA_IDENT'};
-	my $EXT_ID = $key; # same as VZTAH_CISLO
+	my $DRUH_VZTAHU = $vema_data->{$key}->{'VZTAH_STATUS_NAZEV'};
+	my $VZTAH_CISLO = $vema_data->{$key}->{'VZ_CISLO'};
+	my $VZTAH_OD = $vema_data->{$key}->{'VZTAH_OD'};
+	my $VZTAH_DO = $vema_data->{$key}->{'VZTAH_DO'};
+	my $KARTA_IDENT = $vema_data->{$key}->{'KARTA_IDENT'};
+	my $EXT_ID = $vema_data->{$key}->{'VZ_CISLO'}; # same as VZ_CISLO
 
 	# To resolve "HLAVNI" vztah
-	my $VZTAH_STATUS_CISLO = $dc2_data->{$key}->{'VZTAH_STATUS_CISLO'};
+	my $VZTAH_STATUS_CISLO = $vema_data->{$key}->{'VZTAH_STATUS_CISLO'};
 
 	#If osb_id or typ_vztahu are undef, skip it.
 	if ((!defined($OSB_ID)) || (!defined($TYP_VZTAHU))) {
@@ -539,19 +539,19 @@ foreach my $key (sort keys %$dc2_data) {
 			$updatePerson->execute($NS, $DRUH_VZTAHU, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $OSB_ID, $VZTAH_CISLO, $TYP_VZTAHU);
 			handleAkt($OSB_ID, 'VZTAHY');
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
-			$dc2_foundAndUpdated++;
+			$vema_foundAndUpdated++;
 
 		} else {
 
 			if($DEBUG == 1) { print "SKIP RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
-			$dc2_foundAndSkipped++;
+			$vema_foundAndSkipped++;
 
 		}
 
 	} else {
 
 		if($DEBUG == 1) { print "INSERT NEW RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
-		$dc2_inserted++;
+		$vema_inserted++;
 		#We will insert new record to output database (IFIS)
 		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, NS, TYP_VZTAHU, DRUH_VZTAHU, VZTAH_CISLO, OD, DO_, KARTA_IDENT, EXT_ID) VALUES (?,?,?,?,?,?,?,?,?)});
 		$insertPerson->execute($OSB_ID, $NS, $TYP_VZTAHU, $DRUH_VZTAHU, $VZTAH_CISLO, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID);
@@ -563,23 +563,24 @@ foreach my $key (sort keys %$dc2_data) {
 
 # Delete unwanted relations of ZAM type
 
-my $deleteVztah_dc2 = $dbh->prepare(qq{DELETE FROM $tableNameVzt where VZTAH_CISLO=? and TYP_VZTAHU='ZAM'});
-my $existingVztah_dc2 = $dbh->prepare(qq{select VZTAH_CISLO, OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null and TYP_VZTAHU='ZAM'});
-$existingVztah_dc2->execute();
-while(my $row = $existingVztah_dc2->fetchrow_hashref()) {
+my $deleteVztah_vema = $dbh->prepare(qq{DELETE FROM $tableNameVzt where OSB_ID=? and VZTAH_CISLO=? and TYP_VZTAHU='ZAM'});
+my $existingVztah_vema = $dbh->prepare(qq{select VZTAH_CISLO, OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null and TYP_VZTAHU='ZAM'});
+$existingVztah_vema->execute();
+while(my $row = $existingVztah_vema->fetchrow_hashref()) {
 	my $VZTAH_CISLO = $row->{VZTAH_CISLO};
 	my $UCO = $row->{OSB_ID};
-	unless (exists $dc2_data->{$VZTAH_CISLO}) {
-		# ZAM vztah is not in DC2 source, remove from IFIS.
-		if ($DEBUG == 1) { print "DELETE VZTAH RECORD CISLO_VZTAHU: $VZTAH_CISLO / ZAM\n"; }
-		$deleteVztah_dc2->execute($VZTAH_CISLO);
-		$dc2_deleted++;
+	## check same key as provided by vema
+	unless (exists $vema_data->{$UCO . "_" . $VZTAH_CISLO}) {
+		# ZAM vztah is not in VEMA source, remove from IFIS.
+		if ($DEBUG == 1) { print "DELETE VZTAH RECORD CISLO_VZTAHU: $UCO"."_"."$VZTAH_CISLO / ZAM\n"; }
+		$deleteVztah_vema->execute($UCO, $VZTAH_CISLO);
+		$vema_deleted++;
 		handleAkt($UCO, 'VZTAHY');
 	}
 }
 
 # close opened select handler
-$existingVztah_dc2->finish();
+$existingVztah_vema->finish();
 
 #
 # ROCESS RELATIONS FROM KOS
@@ -772,7 +773,8 @@ for my $UCO (sort keys %$dataByKey) {
 
 		for my $key (sort keys %$existingVztah) {
 			if ($existingVztah->{$key}->{"TYP_VZTAHU"} eq "ZAM") {
-				my $vztah_status_cislo = $dc2_data->{$existingVztah->{$key}->{"VZTAH_CISLO"}}->{"VZTAH_STATUS_CISLO"};
+				# use same KEY as VEMA to address unique VZTAH: OSB_ID + VZTAH_CISLO
+				my $vztah_status_cislo = $vema_data->{$existingVztah->{$key}->{'OSB_ID'} . "_" . $existingVztah->{$key}->{"VZTAH_CISLO"}}->{"VZTAH_STATUS_CISLO"};
 				if (exists $priority1{$vztah_status_cislo}) {
 
 					if (exists $priorityMap->{1}) {
@@ -944,10 +946,10 @@ print "Vztah (ext) skiped:   \t$foundAndSkippedVzt\n";
 print "Vztah (ext) updated:  \t$foundAndUpdatedVzt\n";
 print "Vztah (any) deleted:  \t$deletedVzt\n";
 print "---------------------------------------\n";
-print "Vztah (zam) inserted: \t$dc2_inserted\n";
-print "Vztah (zam) skiped:   \t$dc2_foundAndSkipped\n";
-print "Vztah (zam) updated:  \t$dc2_foundAndUpdated\n";
-print "Vztah (zam) deleted:  \t$dc2_deleted\n";
+print "Vztah (zam) inserted: \t$vema_inserted\n";
+print "Vztah (zam) skiped:   \t$vema_foundAndSkipped\n";
+print "Vztah (zam) updated:  \t$vema_foundAndUpdated\n";
+print "Vztah (zam) deleted:  \t$vema_deleted\n";
 print "---------------------------------------\n";
 print "Vztah (stu) inserted: \t$kos_inserted\n";
 print "Vztah (stu) skiped:   \t$kos_foundAndSkipped\n";

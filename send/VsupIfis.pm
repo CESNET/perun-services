@@ -1,7 +1,7 @@
 package VsupIfis;
 use Exporter 'import';
 @ISA = ('Exporter');
-@EXPORT = qw(load_kos load_dc2);
+@EXPORT = qw(load_kos load_vema);
 
 use strict;
 use warnings FATAL => 'all';
@@ -88,9 +88,9 @@ sub load_kos() {
 #
 # Load map of users relations from DC2
 #
-sub load_dc2() {
+sub load_vema() {
 
-	my $config = init_config("dc2.conf");
+	my $config = init_config("vema.conf");
 
 	my $hostname = $config->{"hostname"};
 	my $port = $config->{"port"};
@@ -102,27 +102,28 @@ sub load_dc2() {
 	$dbh->do("alter session set nls_date_format='YYYY-MM-DD HH24:MI:SS'");
 
 	# Select query for input database (DC2) - internal/external teachers with valid relation
-	my $sth = $dbh->prepare(qq{SELECT UCO, VZTAH_CISLO, NS, VZTAH_STATUS_NAZEV, OD, DO,
-	CASE WHEN (VZTAH_STATUS_CISLO in (1,2,4,5,7,8,9,10,16,17,21) AND VZTAH_FUNKCE_CISLO in (1,2,3,4,5,52))
+	my $sth = $dbh->prepare(qq{SELECT UCO, VZ_CISLO, NS, VZ_S_N, OD, DO_,
+	CASE WHEN (VZ_S_C in (101) AND VZ_F_C in (1,2,3,4,5,52))
 		THEN 'ITIC'
 	ELSE null
 	END as KARTA_IDENT,
-	VZTAH_STATUS_CISLO
-	FROM PAM2IDM_VZTAHY
-	WHERE (DO >= SYSDATE OR DO is NULL)});
+	VZ_S_C
+	FROM PAMIDMVZ
+	WHERE (DO_ >= SYSDATE OR DO_ is NULL) and UCO is not null});
 	$sth->execute();
 
 	# Structure to store data from input database (DC2)
 	my $inputData = {};
 	while(my $row = $sth->fetchrow_hashref()) {
-		my $key = $row->{VZTAH_CISLO};
+		my $key = $row->{UCO} . "_" . $row->{VZ_CISLO};
 		$inputData->{$key}->{'OSB_ID'} = $row->{UCO};
-		$inputData->{$key}->{'VZTAH_STATUS_NAZEV'} = $row->{VZTAH_STATUS_NAZEV};
+		$inputData->{$key}->{'VZ_CISLO'} = $row->{VZ_CISLO};
+		$inputData->{$key}->{'VZTAH_STATUS_NAZEV'} = ($row->{VZ_S_N}) ? substr($row->{VZ_S_N}, 0, 35) : undef;
 		$inputData->{$key}->{'NS'} = $row->{NS};
 		$inputData->{$key}->{'VZTAH_OD'} = $row->{OD};
-		$inputData->{$key}->{'VZTAH_DO'} = $row->{DO};
+		$inputData->{$key}->{'VZTAH_DO'} = $row->{DO_};
 		$inputData->{$key}->{'KARTA_IDENT'} = $row->{KARTA_IDENT};
-		$inputData->{$key}->{'VZTAH_STATUS_CISLO'} = $row->{VZTAH_STATUS_CISLO};
+		$inputData->{$key}->{'VZTAH_STATUS_CISLO'} = $row->{VZ_S_C};
 	}
 
 	# Disconnect from input database (KOS)

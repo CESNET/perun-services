@@ -8,8 +8,8 @@ use ScriptLock;
 
 my $username;
 my $password;
-my $tableName_ID = 'idmpamid';
-my $tableName_SPJ = 'idmpamsp';
+my $tableName_ID = 'PRISTUPY';
+my $tableName_SPJ = 'SPOJENI';
 
 # define service
 my $service_name = "vsup_vema";
@@ -78,9 +78,11 @@ foreach my $osbId (sort keys $dataByOsbId) {
 	my $LOGIN = $dataByOsbId->{$osbId}->{'LOGIN'};
 	my $EMAIL = $dataByOsbId->{$osbId}->{'EMAIL'};
 
-	# PROCESS ID TABLE - LOGIN
+	# PROCESS TABLE VEMA_PERUN.PRISTUPY
 
-	my $personExists = $dbh->prepare(qq{select 1 from $tableName_ID where OSB_ID=?});
+	# NEVER-EVER DELETE, JUST INSERT
+
+	my $personExists = $dbh->prepare(qq{select 1 from $tableName_ID where OSCIS=?});
 	$personExists->execute($osbId);
 
 	if($personExists->fetch) {
@@ -94,55 +96,49 @@ foreach my $osbId (sort keys $dataByOsbId) {
 		if($DEBUG == 1) { print "INSERT NEW RECORD: $osbId\n"; }
 		$inserted++;
 
-		# FIXME - column ZAPL - start of validity will be set to now()
-		# FIXME - column KOPL - we will probably set end of validity, if user is missing from export or we know last date of relation on VŠUP
-
 		# we will do insert
-		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName_ID (OSB_ID, UCO, ZAPL, TYP_PROP, KOD, ZMENENO) VALUES (?,?,sysdate,?,?,sysdate)});
-		$insertPerson->execute($osbId, $UCO, 'vmauth', $LOGIN);
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName_ID (OSCIS, TYPPROP, ZAPL, KOD) VALUES (?,?,sysdate,?)});
+		$insertPerson->execute($osbId, 'vmauth', $LOGIN);
 
 	}
 
-	# TODO - process KOPL or remove entries ?
+	# PROCESS TABLE VEMA_PERUN.SPOJENI - UCO (we never update or remove UCO)
 
-	# PROCESS SPJ TABLE - UCO (we never update or remove UCO)
-
-	my $ucoExists = $dbh->prepare(qq{select 1 from $tableName_SPJ where OSB_ID=? and CISSP=? and TYPSP=? and KOD=?});
+	my $ucoExists = $dbh->prepare(qq{select 1 from $tableName_SPJ where OSCIS=? and CISSP=? and TYPSP=? and KOD=?});
 	$ucoExists->execute($osbId, 99, 'UCO', $UCO);
 
 	if($ucoExists->fetch) {
 		if($DEBUG == 1) { print "FIND: $osbId\n"; }
-		# for now we never update existing entry
+		# we never update existing entry
 		if($DEBUG == 1) { print "SKIP RECORD: $osbId\n"; }
 		$foundAndSkipped_SPJ++;
-
 	} else {
 
 		if($DEBUG == 1) { print "INSERT NEW SPJ_UCO RECORD: $osbId\n"; }
 		$inserted_SPJ++;
 
 		# we will do insert
-		my $insertUco = $dbh->prepare(qq{INSERT INTO $tableName_SPJ (OSB_ID, UCO, CISSP, TYPSP, KOD, ZMENENO) VALUES (?,?,?,?,?,sysdate)});
-		$insertUco->execute($osbId, $UCO, 99, 'UCO', $UCO);
+		my $insertUco = $dbh->prepare(qq{INSERT INTO $tableName_SPJ (OSCIS, CISSP, TYPSP, KOD) VALUES (?,?,?,?)});
+		$insertUco->execute($osbId, 99, 'UCO', $UCO);
 
 	}
 
-	# PROCESS SPJ TABLE - EMAIL (we can update EMAIL, we never remove)
+	# PROCESS TABLE VEMA_PERUN.SPOJENI - EMAIL (we can update EMAIL, we never remove)
 
-	my $emailExist = $dbh->prepare(qq{select 1 from $tableName_SPJ where OSB_ID=? and CISSP=? and TYPSP=?});
+	my $emailExist = $dbh->prepare(qq{select 1 from $tableName_SPJ where OSCIS=? and CISSP=? and TYPSP=?});
 	$emailExist->execute($osbId, 1, 'e-mail');
 
 	if($emailExist->fetch) {
 		if($DEBUG == 1) { print "FIND: $osbId\n"; }
 
 		# we need to know if these two records are without changes, if yes, skip them
-		my $recordAreEquals = $dbh->prepare(qq{SELECT 1 from $tableName_SPJ where OSB_ID=? and CISSP=? and TYPSP=? and KOD=?});
+		my $recordAreEquals = $dbh->prepare(qq{SELECT 1 from $tableName_SPJ where OSCIS=? and CISSP=? and TYPSP=? and KOD=?});
 		$recordAreEquals->execute($osbId, 1, 'e-mail', $EMAIL);
 
 		if(!$recordAreEquals->fetch) {
 
-			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName_SPJ SET KOD=?, ZMENENO=sysdate WHERE OSB_ID=? and UCO=? and CISSP=? and TYPSP=?});
-			$updatePerson->execute($EMAIL, $osbId, $UCO, 1, 'e-mail');
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName_SPJ SET KOD=? WHERE OSCIS=? and CISSP=? and TYPSP=?});
+			$updatePerson->execute($EMAIL, $osbId, 1, 'e-mail');
 			if($DEBUG == 1) { print "UPDATING EXISTING SPJ_EMAIL RECORD: $osbId\n"; }
 			$foundAndUpdated_SPJ++;
 
@@ -159,8 +155,8 @@ foreach my $osbId (sort keys $dataByOsbId) {
 		$inserted_SPJ++;
 
 		# we will do insert
-		my $insertEmail = $dbh->prepare(qq{INSERT INTO $tableName_SPJ (OSB_ID, UCO, CISSP, TYPSP, KOD, ZMENENO) VALUES (?,?,?,?,?,sysdate)});
-		$insertEmail->execute($osbId, $UCO, 1, 'e-mail', $EMAIL);
+		my $insertEmail = $dbh->prepare(qq{INSERT INTO $tableName_SPJ (OSCIS, CISSP, TYPSP, KOD) VALUES (?,?,?,?)});
+		$insertEmail->execute($osbId, 1, 'e-mail', $EMAIL);
 
 	}
 
