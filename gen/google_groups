@@ -14,17 +14,23 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $data      = perunServicesInit::getDataWithGroups;
 
 #Constants
-our $A_FACILITY_GOOGLE_NAMESPACE;		*A_FACILITY_GOOGLE_NAMESPACE =			\'urn:perun:facility:attribute-def:def:googleGroupNameNamespace';
-our $A_GROUP_RESOURCE_GOOGLE_GROUP_NAME;	*A_GROUP_RESOURCE_GOOGLE_GROUP_NAME =		\'urn:perun:group_resource:attribute-def:virt:googleGroupName';
-our $A_USER_GOOGLE_NAMESPACE;			*A_USER_GOOGLE_NAMESPACE =			\'urn:perun:user:attribute-def:virt:logins-namespace:google';
+our $A_FACILITY_GOOGLE_NAMESPACE;         *A_FACILITY_GOOGLE_NAMESPACE =          \'urn:perun:facility:attribute-def:def:googleGroupNameNamespace';
+our $A_GROUP_RESOURCE_GOOGLE_GROUP_NAME;  *A_GROUP_RESOURCE_GOOGLE_GROUP_NAME =   \'urn:perun:group_resource:attribute-def:virt:googleGroupName';
+our $A_USER_GOOGLE_NAMESPACE;             *A_USER_GOOGLE_NAMESPACE =              \'urn:perun:user:attribute-def:virt:logins-namespace:google';
+our $A_USER_GOOGLE_MAILS;                 *A_USER_GOOGLE_MAILS =                  \'urn:perun:user:attribute-def:virt:mails-namespace:google';
+our $A_RESOURCE_GOOGLE_TEAM_DRIVE;        *A_RESOURCE_GOOGLE_TEAM_DRIVE =         \'urn:perun:resource:attribute-def:def:googleTeamDriveName';
 
-#Global data structure
+#Global data structures
 our $groupStruc = {};
+our $teamDriveStruc = {};
 
 my %facilityAttributes = attributesToHash $data->getAttributes;
 my $domainName = $facilityAttributes{$A_FACILITY_GOOGLE_NAMESPACE};
 
 foreach my $resourceData ( $data->getChildElements ) {
+	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
+	my $googleTeamDriveName = $resourceAttributes{$A_RESOURCE_GOOGLE_TEAM_DRIVE};
+
 	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements){
 		my %groupAttributes = attributesToHash $groupData->getAttributes;
 		my $membersElement = ($groupData->getChildElements)[1];
@@ -42,6 +48,14 @@ foreach my $resourceData ( $data->getChildElements ) {
 					foreach my $member(@logins){
 						unless(exists $groupStruc->{$groupName}->{$member}) {
 							$groupStruc->{$groupName}->{$member} = {};
+						}
+					}
+					#process team drive for this user only if drive name has been set and google mails of this user has been obtained
+					my @mails = @{$memberAttributes{$A_USER_GOOGLE_MAILS} || []};
+					if($googleTeamDriveName && @mails) {
+						foreach my $mail(@mails){
+							#Add every google mail to team drive struc
+							$teamDriveStruc->{$googleTeamDriveName}->{$mail} = 1;
 						}
 					}
 				}
@@ -72,5 +86,13 @@ my $fileNameDomain = $DIRECTORY . "google_groups_domain";
 open FILE, ">$fileNameDomain" or die "Cannot open $fileNameDomain: $! \n";
 print FILE $domainName;
 close(FILE) or die "Cannot close $fileNameDomain: $! \n";
+
+#generate file with all team drives
+my $fileTeamDrives = "$DIRECTORY/$::SERVICE_NAME" . "_team_drives.csv";
+open FILE, ">$fileTeamDrives" or die "Cannot open $fileTeamDrives: $! \n";
+foreach my $teamDriveName (sort keys %$teamDriveStruc) {
+	print FILE $teamDriveName, "; ", join(',', sort keys %{$teamDriveStruc->{$teamDriveName}}), "\n";
+}
+close(FILE) or die "Cannot close $fileTeamDrives: $! \n";
 
 perunServicesInit::finalize;

@@ -14,3 +14,6 @@ LOGBACK='-Dlogback.configurationFile=/etc/perun/logback-google-groups.xml'
 
 # manage groups
 java $LOGBACK -jar $JAR `cat "$SERVICE_FILES_DIR"/google_groups_domain` "groups" "$SERVICE_FILES_DIR/google_groups_groups.csv" || exit 1;
+
+#manage drives
+java $LOGBACK -jar $JAR `cat "$SERVICE_FILES_DIR"/google_groups_domain` "teamDrives" "$SERVICE_FILES_DIR/google_groups_team_drives.csv" || exit 1;
