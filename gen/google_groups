@@ -35,28 +35,31 @@ foreach my $resourceData ( $data->getChildElements ) {
 		my %groupAttributes = attributesToHash $groupData->getAttributes;
 		my $membersElement = ($groupData->getChildElements)[1];
 
+		my $groupName = "";
 		if($groupAttributes{$A_GROUP_RESOURCE_GOOGLE_GROUP_NAME}) {
-			my $groupName = $groupAttributes{$A_GROUP_RESOURCE_GOOGLE_GROUP_NAME} . "@" . $domainName;
+			$groupName = $groupAttributes{$A_GROUP_RESOURCE_GOOGLE_GROUP_NAME} . "@" . $domainName;
+		}
 
-			foreach my $memberData($membersElement->getChildElements) {
-				my %memberAttributes = attributesToHash $memberData->getAttributes;
-				my @logins = @{$memberAttributes{$A_USER_GOOGLE_NAMESPACE}};
+		foreach my $memberData($membersElement->getChildElements) {
+			my %memberAttributes = attributesToHash $memberData->getAttributes;
+			my @logins = @{$memberAttributes{$A_USER_GOOGLE_NAMESPACE}};
+			my @mails = @{$memberAttributes{$A_USER_GOOGLE_MAILS}};
 
-				# skip users without google login, might happen, when user removes his UserExtSource
-				# since google login is virtual attribute calculated from Google IdP UES.
-				if (@logins) {
+			# skip users without google login, might happen, when user removes his UserExtSource
+			# since google login is virtual attribute calculated from Google IdP UES.
+			if (@logins) {
+				if($groupName) {
 					foreach my $member(@logins){
 						unless(exists $groupStruc->{$groupName}->{$member}) {
 							$groupStruc->{$groupName}->{$member} = {};
 						}
 					}
-					#process team drive for this user only if drive name has been set and google mails of this user has been obtained
-					my @mails = @{$memberAttributes{$A_USER_GOOGLE_MAILS} || []};
-					if($googleTeamDriveName && @mails) {
-						foreach my $mail(@mails){
-							#Add every google mail to team drive struc
-							$teamDriveStruc->{$googleTeamDriveName}->{$mail} = 1;
-						}
+				}
+				#process team drive for this user only if drive name has been set and google mails of this user has been obtained
+				if($googleTeamDriveName && @mails) {
+					foreach my $mail(@mails){
+						#Add every google mail to team drive struc
+						$teamDriveStruc->{$googleTeamDriveName}->{$mail} = 1;
 					}
 				}
 			}
