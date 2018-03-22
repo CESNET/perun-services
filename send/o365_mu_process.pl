@@ -33,6 +33,7 @@ my $FILE_GROUPS_LOCK :shared;
 
 #number of worker threads
 my $THREAD_COUNT = 10;
+our $GLOBAL_RETURN_CODE=0;
 
 #constants for jobs 
 my $OPERATION = "operation";
@@ -217,7 +218,7 @@ close FILE_GROUPS_CACHE or die "Could not close file $newGroupsCache: $!\n";;
 copy( $newUsersCache, $lastStateOfUsersFilename );
 copy( $newGroupsCache, $lastStateOfGroupsFilename );
 
-exit 0;
+exit $GLOBAL_RETURN_CODE;
 
 #---------------------------------SUBS------------------------------------
 
@@ -231,6 +232,7 @@ sub startThreads {
 #Sub to process one job from queue of jobs
 sub processTasks {
 	my $running = 1;
+	my $returnCode = 0;
 	while($running) {
 		my $job = $jobQueue->dequeue;
 
@@ -239,13 +241,18 @@ sub processTasks {
 		} else {
 			#do the job
 			if($job->{$OPERATION} =~ $OPERATION_GROUP) {
-				processGroup( $job->{$ARGUMENT} , $job->{$OPERATION} );
+				$returnCode = processGroup( $job->{$ARGUMENT} , $job->{$OPERATION} );
 			} elsif ($job->{$OPERATION} =~ $OPERATION_USER) {
-				processUser( $job->{$ARGUMENT} , $job->{$OPERATION} );
+				$returnCode = processUser( $job->{$ARGUMENT} , $job->{$OPERATION} );
 			} else {
 				print "ERROR - UNKNOWN OPERATION: " . $job->{$OPERATION} . " was skipped!\n";
+				$returnCode = 1;
 			}
 		}
+	}
+	#if return code is not null, set global return code of whole o365_mu_process
+	if(!$returnCode) {
+		$GLOBAL_RETURN_CODE=1;
 	}
 }
 
@@ -278,7 +285,7 @@ sub processGroup {
 		`$command`;
 		if($?) { 
 			print "CHANGE GROUP N-EQ: " . $groupObject->{$AD_GROUP_NAME_TEXT} . " - ERROR\n";
-			return 0; 
+			return 1; 
 		}
 		{
 			lock $FILE_GROUPS_LOCK;
@@ -294,6 +301,7 @@ sub processGroup {
 		if($DEBUG) { print "CHANGE GROUP EQ: " . $groupObject->{$AD_GROUP_NAME_TEXT} . " - OK\n" };
 	} else {
 		print "ERROR - UNKNOWN OPERATION: " . $localOperation . " was skipped for group " . $groupObject->{$AD_GROUP_NAME_TEXT} . "\n";
+		return 1;
 	}
 	
 	return 0;
@@ -314,7 +322,7 @@ sub processUser {
 		`$command`;
 		if($?) {
 			print "CHANGE USER N-EQ: " . $userObject->{$UPN_TEXT} . " - ERROR\n"; 
-			return 0; 
+			return 1; 
 		}
 		{
 			lock $FILE_USERS_LOCK;
@@ -330,6 +338,7 @@ sub processUser {
 		if($DEBUG) { print "CHANGE USER EQ: " . $userObject->{$UPN_TEXT} . " - OK\n"; }
 	} else {
 		print "ERROR - UNKNOWN OPERATION: " . $localOperation . " was skipped for user " . $userObject->{$UPN_TEXT} . "\n";
+		return 1;
 	}
 
 	return 0;
@@ -349,7 +358,13 @@ sub readDataAboutUsers {
 			$domain = $UPN;
 			$domain =~ s/^.*@//;
 		}
-	
+
+		#If UPN is from any reason empty, set global return code to 1 and skip this user
+		unless($UPN) { 
+			print "ERROR - Can't find UPN for user in $pathToFile for line '$line'\n";
+			$GLOBAL_RETURN_CODE = 1;
+			next;
+		}
 		$usersStruc->{$UPN}->{$UPN_TEXT} = $UPN;
 		$usersStruc->{$UPN}->{$FORWARDING_SMTP_ADDRESS_TEXT} = $parts[1];
 		$usersStruc->{$UPN}->{$ARCHIVE_TEXT} = $parts[2];
@@ -369,6 +384,12 @@ sub readDataAboutActiveUsers {
 	open FILE, $pathToFile or die "Could not open file with active users $pathToFile: $!\n";
 	while(my $line = <FILE>) {
 		chomp( $line );
+		#If ID is from any reason empty, set global return code to 1 and skip this user
+		unless($line) { 
+			print "ERROR - Can't find ID of active user in $pathToFile for line '$line'\n";
+			$GLOBAL_RETURN_CODE = 1;
+			next;
+		}
 		my $id = $line . "@" . $domain;
 		$activeUsersStruc->{$id} = 1;
 	}
@@ -390,6 +411,13 @@ sub readDataAboutGroups {
 		my @emails = ();
 		if($parts[1]) { @emails = split / /, $parts[1]; }
 	
+		#If groupADName is from any reason empty, set global return code to 1 and skip this group
+		unless($line) { 
+			print "ERROR - Can't find AD name of group in $pathToFile for line '$line'\n";
+			$GLOBAL_RETURN_CODE = 1;
+			next;
+		}
+
 		$groupsStruc->{$groupADName}->{$AD_GROUP_NAME_TEXT} = $groupADName;
 		$groupsStruc->{$groupADName}->{$SEND_AS_TEXT} = \@emails;
 		$groupsStruc->{$groupADName}->{$PLAIN_TEXT_OBJECT_TEXT} = $line;
