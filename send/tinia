@@ -51,7 +51,7 @@ function create_lock {
 		fi
 	else
 		# lock file exists, check for existence of concurrent process
-		if ps | grep "$SERVICE_NAME" | sed 's/^\([0-9]\+\).*/\1/' | grep "\(^\| \)`cat $LOCK_PIDFILE`\( \|$\)"; then
+		if ps ax | grep "$SERVICE_NAME" | sed 's/^\([0-9]\+\).*/\1/' | grep "\(^\| \)`cat $LOCK_PIDFILE`\( \|$\)"; then
 		# concurrent process is running - this skript must terminate
 			echo "Concuret process tinia_process is running" >&2
 			exit 249
