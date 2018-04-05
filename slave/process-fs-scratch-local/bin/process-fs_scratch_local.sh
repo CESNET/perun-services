@@ -30,21 +30,22 @@ function process {
 
 	# lines contains login\tUID\tGID\t...
 	while IFS=`echo -e "\t"` read LOGIN U_UID U_GID SOFT_QUOTA_DATA HARD_QUOTA_DATA SOFT_QUOTA_FILES HARD_QUOTA_FILES; do
+		SCRATCH_DIR="${SCRATCH_MOUNTPOINT}/${LOGIN}"
 
-		if [ ! -d "${SCRATCH_MOUNTPOINT}/${LOGIN}" ]; then
-			catch_error E_CANNOT_CREATE_DIR  mkdir "${SCRATCH_MOUNTPOINT}/${LOGIN}"
-
-			catch_error E_CANNOT_SET_OWNERSHIP chown "${U_UID}":"${U_GID}" "${SCRATCH_MOUNTPOINT}/${LOGIN}"
-			catch_error E_CANNOT_SET_PERMISSIONS chmod "${UMASK}" "${SCRATCH_MOUNTPOINT}/${LOGIN}"
-
-			# Set quota
-			# setquota name block-softlimit block-hardlimit inode-softlimit inode-hardlimit filesystem
-			#      if [ -x /usr/sbin/setquota ]; then
-			#        # Get $QUOTA_FS
-			#        /usr/sbin/setquota $U_UID $SOFT_QUOTA_DATA $HARD_QUOTA_DATA $SOFT_QUOTA_FILES $HARD_QUOTA_FILES $QUOTA_FS
-			#      fi
-
+		if [ ! -d "${SCRATCH_DIR}" ]; then
+			catch_error E_CANNOT_CREATE_DIR  mkdir "${SCRATCH_DIR}"
 			log_msg I_DIR_CREATED
 		fi
+
+		if [ ! "`find ${SCRATCH_DIR} -uid ${U_UID} -gid ${U_GID}`" ]; then
+			catch_error E_CANNOT_SET_OWNERSHIP chown ${U_UID}:${U_GID} "${SCRATCH_DIR}"
+			log_debug "Ownership of ${SCRATCH_DIR} was set to ${U_UID}:${U_GID}"
+		fi
+
+		if [ ! "`find ${SCRATCH_DIR} -perm ${UMASK}`" ]; then
+			catch_error E_CANNOT_SET_PERMISSIONS chmod "${UMASK}" "${SCRATCH_DIR}"
+			log_debug "Permissions on ${SCRATCH_DIR} were set to ${UMASK}"
+		fi
+
 	done < "${FROM_PERUN}"
 }
