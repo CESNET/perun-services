@@ -25,7 +25,7 @@ function process {
 		HOME_DIR=`echo "${line}" | awk '{ print $1 };'`
 		PRINCIPALS=`echo "${line}" | sed -e 's/^[^\t]*[\t]//'`
 		K5LOGIN="${HOME_DIR}/.k5login"
-	
+
 		#set home dir of user as current working directory
 		catch_error E_DIR_NOT_EXISTS cd "${HOME_DIR}"
 
@@ -65,7 +65,7 @@ function process {
 		# Setup ownership, the k5login temp file will have the same owner and group as user's home directory
 		F_USER=`ls -ld "${HOME_DIR}" | awk '{ print $3; }'`
 		F_GROUP=`ls -ld "${HOME_DIR}" | awk '{ print $4; }'`
-		catch_error E_CHANGE_OWNER chown ${F_USER}.${F_GROUP} "${TMP_K5LOGIN}"
+		catch_error E_CHANGE_OWNER chown ${F_USER}:${F_GROUP} "${TMP_K5LOGIN}"
 
 		F_USER_REAL=`ls -l "${TMP_K5LOGIN}" | awk '{ print $3; }'`
 		F_GROUP_REAL=`ls -l "${TMP_K5LOGIN}" | awk '{ print $4; }'`
@@ -78,7 +78,7 @@ function process {
 
 		#if something to add, create or update k5login
 		catch_error E_K5LOGIN_NOT_UPDATED diff_mv "${TMP_K5LOGIN}" "${K5LOGIN}"
-		
+
 		#log info about operation (update or create)
 		if [ ${K5LOGIN_EXISTS} == true ]; then
 			log_msg I_K5LOGIN_UPDATED

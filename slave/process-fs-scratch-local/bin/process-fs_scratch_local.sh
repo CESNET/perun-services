@@ -34,7 +34,7 @@ function process {
 		if [ ! -d "${SCRATCH_MOUNTPOINT}/${LOGIN}" ]; then
 			catch_error E_CANNOT_CREATE_DIR  mkdir "${SCRATCH_MOUNTPOINT}/${LOGIN}"
 
-			catch_error E_CANNOT_SET_OWNERSHIP chown "${U_UID}"."${U_GID}" "${SCRATCH_MOUNTPOINT}/${LOGIN}"
+			catch_error E_CANNOT_SET_OWNERSHIP chown "${U_UID}":"${U_GID}" "${SCRATCH_MOUNTPOINT}/${LOGIN}"
 			catch_error E_CANNOT_SET_PERMISSIONS chmod "${UMASK}" "${SCRATCH_MOUNTPOINT}/${LOGIN}"
 
 			# Set quota
