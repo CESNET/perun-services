@@ -45,7 +45,7 @@ function process {
 		if [ ! -d "${SCRATCH_DIR}" ]; then
 
 			catch_error E_CANNOT_CREATE_DIR mkdir "${SCRATCH_DIR}"
-			catch_error E_CANNOT_SET_OWNERSHIP chown "${U_UID}"."${U_GID}" "${SCRATCH_DIR}"
+			catch_error E_CANNOT_SET_OWNERSHIP chown "${U_UID}":"${U_GID}" "${SCRATCH_DIR}"
 			catch_error E_CANNOT_SET_PERMISSIONS chmod "$UMASK" "${SCRATCH_DIR}"
 
 			log_msg I_DIR_CREATED

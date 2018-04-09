@@ -1,9 +1,16 @@
+perun-slave-process-fs-home (3.1.6) stable; urgency=medium
+
+  * Use colon instead of dot when performing chown
+    as coreutils suggests.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 9 Apr 2018 10:20:00 +0100
+
 perun-slave-process-fs-home (3.1.5) stable; urgency=high
 
   * When creating home from skeletal directory, there was a problem with wrong
     behavior of 'cp -r' command. When temporary directory was already created,
     it copied not only files from skel dir, but the whole skel dir to the new
-    home directory. Now it creates new directory from the skel dir if such 
+    home directory. Now it creates new directory from the skel dir if such
     exists and also preserve all ACLs and links there.
 
  -- Michal Stava <stavamichal@gmail.com>  Wed, 06 Dec 2017 08:55:00 +0100

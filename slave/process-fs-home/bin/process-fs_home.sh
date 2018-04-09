@@ -35,7 +35,7 @@ function process {
 			QUOTA_ENABLED=0
 		fi
 	fi
-	
+
 	if [ "${QUOTA_ENABLED}" -gt 0 ]; then
 		if [ ! -z "${SET_QUOTA_PROGRAM}" ]; then
 			if [ -x "${SET_QUOTA_PROGRAM}" ]; then
@@ -74,7 +74,7 @@ function process {
 	while IFS=`echo -e "\t"` read U_HOME_MNT_POINT U_LOGNAME U_UID U_GID SOFT_QUOTA_DATA HARD_QUOTA_DATA SOFT_QUOTA_FILES HARD_QUOTA_FILES USER_STATUS USER_GROUPS REST_OF_LINE; do
 		HOME_DIR="${U_HOME_MNT_POINT}/${U_LOGNAME}"
 		TMP_DIR=`mktemp -d --tmpdir="${U_HOME_MNT_POINT}" "tmp-perun-fs_home-${U_LOGNAME}.XXXX"`
-		if [ "$?" -ne 0 ]; then 
+		if [ "$?" -ne 0 ]; then
 			log_msg  E_CANNOT_CREATE_TEMP
 		fi
 		#set this temp directory for remove when script ends (if still exists)
@@ -91,7 +91,7 @@ function process {
 				catch_error E_CANNOT_CREATE_TMP_HOME_DIR mkdir "$TMP_HOME_DIR"
 			fi
 
-			catch_error E_CANNOT_SET_OWNERSHIP chown -R "${U_UID}"."${U_GID}" "${TMP_HOME_DIR}"
+			catch_error E_CANNOT_SET_OWNERSHIP chown -R "${U_UID}":"${U_GID}" "${TMP_HOME_DIR}"
 			catch_error E_CANNOT_SET_PERMISSIONS chmod "$UMASK" "${TMP_HOME_DIR}"
 
 			catch_error E_CANNOT_MOVE_TEMP mv "${TMP_HOME_DIR}" "${HOME_DIR}"

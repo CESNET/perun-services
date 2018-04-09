@@ -1,7 +1,14 @@
+perun-slave-process-k5login (3.1.4) stable; urgency=medium
+
+  * Use colon instead of dot when performing chown
+    as coreutils suggests.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 9 Apr 2018 10:20:00 +0100
+
 perun-slave-process-k5login (3.1.3) stable; urgency=medium
 
   * Use temporary file for k5login in home of each user, add data from Perun
-    to it and then move it atomically. The reason for this change is to 
+    to it and then move it atomically. The reason for this change is to
     overcome problems on distributed filesystems.
 
  -- Michal Stava <stavamichal@gmail.com>  Wed, 15 Mar 2017 14:35:00 +0100
