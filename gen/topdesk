@@ -25,16 +25,16 @@ our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:
 our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
 
 
-our $userStruc =        {};
+our $userStruc = {};
 
-my $fileUsers =         $DIRECTORY . $SERVICE_NAME ".csv";
+my $fileUsers = $DIRECTORY . $SERVICE_NAME ".csv";
 
 my @resourcesData = $data->getChildElements;
 foreach my $rData (@resourcesData) {
-        my @membersData = $rData->getChildElements;
-        foreach my $mData (@membersData) {
-                processUsers $mData;
-        }
+	my @membersData = $rData->getChildElements;
+	foreach my $mData (@membersData) {
+		processUsers $mData;
+	}
 }
 
 # USERS: first_name last_name login e-mail eppns
@@ -50,21 +50,21 @@ print FILE_USERS "Surname;First Name(s);Initials;Prefixes;Title;Gender;Language;
 foreach my $login (sort keys %$userStruc) {
 
 	if ($userStruc->{$login}->{$A_USER_LASTNAME}) {
-                print FILE_USERS "$userStruc->{$login}->{$A_USER_LASTNAME}";
-        }
+		print FILE_USERS "$userStruc->{$login}->{$A_USER_LASTNAME}";
+	}
 	print FILE_USERS ";";
-        if ($userStruc->{$login}->{$A_USER_FIRSTNAME}) {
-                print FILE_USERS "$userStruc->{$login}->{$A_USER_FIRSTNAME}";
-        }
+	if ($userStruc->{$login}->{$A_USER_FIRSTNAME}) {
+		print FILE_USERS "$userStruc->{$login}->{$A_USER_FIRSTNAME}";
+	}
 	print FILE_USERS ";";
-        if ($userStruc->{$login}->{$A_USER_LASTNAME} && $userStruc->{$login}->{$A_USER_FIRSTNAME}) {
-                print FILE_USERS substr($userStruc->{$login}->{$A_USER_FIRSTNAME}, 0, 1) . substr($userStruc->{$login}->{$A_USER_LASTNAME}, 0, 1);
-        }
+	if ($userStruc->{$login}->{$A_USER_LASTNAME} && $userStruc->{$login}->{$A_USER_FIRSTNAME}) {
+		print FILE_USERS substr($userStruc->{$login}->{$A_USER_FIRSTNAME}, 0, 1) . substr($userStruc->{$login}->{$A_USER_LASTNAME}, 0, 1);
+	}
 	print FILE_USERS ";";
-        print FILE_USERS ";;;;ELIXIR-AAI-USER;;;;;;;;;";
-        print FILE_USERS "$userStruc->{$login}->{$A_USER_EMAIL};";
-        print FILE_USERS "$login;$login;$login;";
-        print FILE_USERS ";;ELIXIR\n";
+	print FILE_USERS ";;;;ELIXIR-AAI-USER;;;;;;;;;";
+	print FILE_USERS "$userStruc->{$login}->{$A_USER_EMAIL};";
+	print FILE_USERS "$login;$login;$login;";
+	print FILE_USERS ";;ELIXIR\n";
 }
 
 close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
@@ -78,18 +78,18 @@ perunServicesInit::finalize;
 
 ## creates structure for users.csv file
 sub processUsers {
-        my ($memberData) = @_;
+	my ($memberData) = @_;
 
-        my %memberAttributes = attributesToHash $memberData->getAttributes;
+	my %memberAttributes = attributesToHash $memberData->getAttributes;
 
-        if ($memberAttributes{$A_USER_STATUS} eq $STATUS_VALID) {
-                my $firstName =        $memberAttributes{$A_USER_FIRSTNAME};
-                my $lastName =         $memberAttributes{$A_USER_LASTNAME};
-                my $login =            $memberAttributes{$A_USER_LOGIN};
-                my $email =            $memberAttributes{$A_USER_EMAIL};
+	if ($memberAttributes{$A_USER_STATUS} eq $STATUS_VALID) {
+		my $firstName =        $memberAttributes{$A_USER_FIRSTNAME};
+		my $lastName =         $memberAttributes{$A_USER_LASTNAME};
+		my $login =            $memberAttributes{$A_USER_LOGIN};
+		my $email =            $memberAttributes{$A_USER_EMAIL};
 
-                $userStruc->{$login}->{$A_USER_FIRSTNAME} =  $firstName;
-                $userStruc->{$login}->{$A_USER_LASTNAME} =   $lastName;
-                $userStruc->{$login}->{$A_USER_EMAIL} =      $email;
-        }
+		$userStruc->{$login}->{$A_USER_FIRSTNAME} =  $firstName;
+		$userStruc->{$login}->{$A_USER_LASTNAME} =   $lastName;
+		$userStruc->{$login}->{$A_USER_EMAIL} =      $email;
+	}
 }
