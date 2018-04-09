@@ -469,10 +469,6 @@ foreach my $key (sort keys %$vema_data) {
 	my $VZTAH_OD = $vema_data->{$key}->{'VZTAH_OD'};
 	my $VZTAH_DO = $vema_data->{$key}->{'VZTAH_DO'};
 	my $KARTA_IDENT = $vema_data->{$key}->{'KARTA_IDENT'};
-	my $EXT_ID = $vema_data->{$key}->{'VZ_CISLO'}; # same as VZ_CISLO
-
-	# To resolve "HLAVNI" vztah
-	my $VZTAH_STATUS_CISLO = $vema_data->{$key}->{'VZTAH_STATUS_CISLO'};
 
 	#If osb_id or typ_vztahu are undef, skip it.
 	if ((!defined($OSB_ID)) || (!defined($TYP_VZTAHU))) {
@@ -483,6 +479,9 @@ foreach my $key (sort keys %$vema_data) {
 	unless (exists $dataByKey->{$OSB_ID}) {
 		next;
 	}
+
+	# fill EXT_ID only is OSB_ID exists (concat would cause error) - hence only if not skipped
+	my $EXT_ID = $vema_data->{$key}->{'OSB_ID'} . "_" . $vema_data->{$key}->{'VZ_CISLO'}; # concat of OSB_ID + _ + VZ_CISLO
 
 	#Check if record already exists in output database (IFIS)
 	my $personExists = $dbh->prepare(qq{select 1 from $tableNameVzt where OSB_ID=? AND TYP_VZTAHU=? AND VZTAH_CISLO=?});
@@ -685,8 +684,8 @@ foreach my $key (sort keys %$kos_data) {
 
 		if(!$recordAreEquals->fetch) {
 
-			my $updatePerson = $dbh->prepare(qq{UPDATE $tableNameVzt SET NS=? , DRUH_VZTAHU=? , STU_FORMA=? , STUD_STAV=? , STU_PROGR=? , OD=? , DO_=? , KARTA_IDENT=? WHERE OSB_ID=? AND VZTAH_CISLO=? AND TYP_VZTAHU=?});
-			$updatePerson->execute($NS, $DRUH_VZTAHU, $STU_FORMA, $STUD_STAV, $STU_PROGR, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $OSB_ID, $VZTAH_CISLO, $TYP_VZTAHU);
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableNameVzt SET NS=? , DRUH_VZTAHU=? , STU_FORMA=? , STUD_STAV=? , STU_PROGR=? , OD=? , DO_=? , KARTA_IDENT=? , EXT_ID=? WHERE OSB_ID=? AND VZTAH_CISLO=? AND TYP_VZTAHU=?});
+			$updatePerson->execute($NS, $DRUH_VZTAHU, $STU_FORMA, $STUD_STAV, $STU_PROGR, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID, $OSB_ID, $VZTAH_CISLO, $TYP_VZTAHU);
 			handleAkt($OSB_ID, 'VZTAHY');
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
 			$kos_foundAndUpdated++;
