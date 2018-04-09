@@ -83,13 +83,6 @@ sub processUsers {
 	my %memberAttributes = attributesToHash $memberData->getAttributes;
 
 	if ($memberAttributes{$A_USER_STATUS} eq $STATUS_VALID) {
-		my $firstName =        $memberAttributes{$A_USER_FIRSTNAME};
-		my $lastName =         $memberAttributes{$A_USER_LASTNAME};
-		my $login =            $memberAttributes{$A_USER_LOGIN};
-		my $email =            $memberAttributes{$A_USER_EMAIL};
-
-		$userStruc->{$login}->{$A_USER_FIRSTNAME} =  $firstName;
-		$userStruc->{$login}->{$A_USER_LASTNAME} =   $lastName;
-		$userStruc->{$login}->{$A_USER_EMAIL} =      $email;
+		$userStruc->{$memberAttributes{$A_USER_LOGIN}} = \%memberAttributes;
 	}
 }
