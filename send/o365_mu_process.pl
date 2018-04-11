@@ -60,6 +60,7 @@ my $pathToServiceFile;
 my $serviceName;
 my $domain = "";
 my $o365ConnectorFile = "./o365-connector.pl";
+my $returnCode=0;
 
 #get options from input of script
 GetOptions ("instanceName|i=s" => \$instanceName, "pathToServiceFile|p=s" => \$pathToServiceFile, "serviceName|s=s" => \$serviceName);
@@ -217,7 +218,7 @@ close FILE_GROUPS_CACHE or die "Could not close file $newGroupsCache: $!\n";;
 copy( $newUsersCache, $lastStateOfUsersFilename );
 copy( $newGroupsCache, $lastStateOfGroupsFilename );
 
-exit 0;
+return $returnCode;
 
 #---------------------------------SUBS------------------------------------
 
@@ -231,6 +232,7 @@ sub startThreads {
 #Sub to process one job from queue of jobs
 sub processTasks {
 	my $running = 1;
+	my $sucess = 1;
 	while($running) {
 		my $job = $jobQueue->dequeue;
 
@@ -239,13 +241,19 @@ sub processTasks {
 		} else {
 			#do the job
 			if($job->{$OPERATION} =~ $OPERATION_GROUP) {
-				processGroup( $job->{$ARGUMENT} , $job->{$OPERATION} );
+				$sucess = processGroup( $job->{$ARGUMENT} , $job->{$OPERATION} );
 			} elsif ($job->{$OPERATION} =~ $OPERATION_USER) {
-				processUser( $job->{$ARGUMENT} , $job->{$OPERATION} );
+				$sucess = processUser( $job->{$ARGUMENT} , $job->{$OPERATION} );
 			} else {
 				print "ERROR - UNKNOWN OPERATION: " . $job->{$OPERATION} . " was skipped!\n";
+				$sucess = 0;
 			}
 		}
+	}
+
+	#if this process is not success, set return code for script to not 0
+	unless($sucess) {
+		$returnCode=1;
 	}
 }
 
@@ -294,9 +302,10 @@ sub processGroup {
 		if($DEBUG) { print "CHANGE GROUP EQ: " . $groupObject->{$AD_GROUP_NAME_TEXT} . " - OK\n" };
 	} else {
 		print "ERROR - UNKNOWN OPERATION: " . $localOperation . " was skipped for group " . $groupObject->{$AD_GROUP_NAME_TEXT} . "\n";
+		return 0;
 	}
 	
-	return 0;
+	return 1;
 }
 
 #Sub to process user with O365 connector and if success, add him to the cache file
@@ -330,9 +339,10 @@ sub processUser {
 		if($DEBUG) { print "CHANGE USER EQ: " . $userObject->{$UPN_TEXT} . " - OK\n"; }
 	} else {
 		print "ERROR - UNKNOWN OPERATION: " . $localOperation . " was skipped for user " . $userObject->{$UPN_TEXT} . "\n";
+		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 #Sub to read data about users from file and convert it to perl hash
@@ -349,7 +359,13 @@ sub readDataAboutUsers {
 			$domain = $UPN;
 			$domain =~ s/^.*@//;
 		}
-	
+
+		#If UPN is from any reason empty, set global return code to 1 and skip this user
+		unless($UPN) { 
+			print "ERROR - Can't find UPN for user in $pathToFile for line '$line'\n";
+			$returnCode = 1;
+			next;
+		}
 		$usersStruc->{$UPN}->{$UPN_TEXT} = $UPN;
 		$usersStruc->{$UPN}->{$FORWARDING_SMTP_ADDRESS_TEXT} = $parts[1];
 		$usersStruc->{$UPN}->{$ARCHIVE_TEXT} = $parts[2];
@@ -369,6 +385,12 @@ sub readDataAboutActiveUsers {
 	open FILE, $pathToFile or die "Could not open file with active users $pathToFile: $!\n";
 	while(my $line = <FILE>) {
 		chomp( $line );
+		#If ID is from any reason empty, set global return code to 1 and skip this user
+		unless($line) { 
+			print "ERROR - Can't find ID of active user in $pathToFile for line '$line'\n";
+			$returnCode = 1;
+			next;
+		}
 		my $id = $line . "@" . $domain;
 		$activeUsersStruc->{$id} = 1;
 	}
@@ -390,6 +412,13 @@ sub readDataAboutGroups {
 		my @emails = ();
 		if($parts[1]) { @emails = split / /, $parts[1]; }
 	
+		#If groupADName is from any reason empty, set global return code to 1 and skip this group
+		unless($line) { 
+			print "ERROR - Can't find AD name of group in $pathToFile for line '$line'\n";
+			$returnCode = 1;
+			next;
+		}
+
 		$groupsStruc->{$groupADName}->{$AD_GROUP_NAME_TEXT} = $groupADName;
 		$groupsStruc->{$groupADName}->{$SEND_AS_TEXT} = \@emails;
 		$groupsStruc->{$groupADName}->{$PLAIN_TEXT_OBJECT_TEXT} = $line;
