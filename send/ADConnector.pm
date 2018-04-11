@@ -233,7 +233,7 @@ sub load_perun($){
 			ldap_log('ad_connection', "Error read Perun ldif:  " . $entry->get_value('cn') . " | " . $ldif->error());
 		} else {
 			# push valid entry
-			push(@perun_entries, $entry) if (defined $entry and $entry->get_value('cn'));
+			push(@perun_entries, $entry) if (defined $entry and ($entry->get_value('cn') or $entry->get_value('ou')));
 		}
 	}
 
@@ -277,7 +277,7 @@ sub load_ad($$$$) {
 
 		for my $entry ($mesg->entries) {
 			# store only valid entry from AD
-			push(@ad_entries,$entry) if ($entry->get_value('cn'));
+			push(@ad_entries,$entry) if ($entry->get_value('cn') or $entry->get_value('ou'));
 		}
 
 		# Paging Control
