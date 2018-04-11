@@ -33,7 +33,6 @@ my $FILE_GROUPS_LOCK :shared;
 
 #number of worker threads
 my $THREAD_COUNT = 10;
-our $GLOBAL_RETURN_CODE=0;
 
 #constants for jobs 
 my $OPERATION = "operation";
@@ -61,6 +60,7 @@ my $pathToServiceFile;
 my $serviceName;
 my $domain = "";
 my $o365ConnectorFile = "./o365-connector.pl";
+my $returnCode=0;
 
 #get options from input of script
 GetOptions ("instanceName|i=s" => \$instanceName, "pathToServiceFile|p=s" => \$pathToServiceFile, "serviceName|s=s" => \$serviceName);
@@ -218,7 +218,7 @@ close FILE_GROUPS_CACHE or die "Could not close file $newGroupsCache: $!\n";;
 copy( $newUsersCache, $lastStateOfUsersFilename );
 copy( $newGroupsCache, $lastStateOfGroupsFilename );
 
-exit $GLOBAL_RETURN_CODE;
+return $returnCode;
 
 #---------------------------------SUBS------------------------------------
 
@@ -232,7 +232,7 @@ sub startThreads {
 #Sub to process one job from queue of jobs
 sub processTasks {
 	my $running = 1;
-	my $returnCode = 0;
+	my $sucess = 1;
 	while($running) {
 		my $job = $jobQueue->dequeue;
 
@@ -241,18 +241,19 @@ sub processTasks {
 		} else {
 			#do the job
 			if($job->{$OPERATION} =~ $OPERATION_GROUP) {
-				$returnCode = processGroup( $job->{$ARGUMENT} , $job->{$OPERATION} );
+				$sucess = processGroup( $job->{$ARGUMENT} , $job->{$OPERATION} );
 			} elsif ($job->{$OPERATION} =~ $OPERATION_USER) {
-				$returnCode = processUser( $job->{$ARGUMENT} , $job->{$OPERATION} );
+				$sucess = processUser( $job->{$ARGUMENT} , $job->{$OPERATION} );
 			} else {
 				print "ERROR - UNKNOWN OPERATION: " . $job->{$OPERATION} . " was skipped!\n";
-				$returnCode = 1;
+				$sucess = 0;
 			}
 		}
 	}
-	#if return code is not null, set global return code of whole o365_mu_process
-	if(!$returnCode) {
-		$GLOBAL_RETURN_CODE=1;
+
+	#if this process is not success, set return code for script to not 0
+	unless($sucess) {
+		$returnCode=1;
 	}
 }
 
@@ -285,7 +286,7 @@ sub processGroup {
 		`$command`;
 		if($?) { 
 			print "CHANGE GROUP N-EQ: " . $groupObject->{$AD_GROUP_NAME_TEXT} . " - ERROR\n";
-			return 1; 
+			return 0; 
 		}
 		{
 			lock $FILE_GROUPS_LOCK;
@@ -301,10 +302,10 @@ sub processGroup {
 		if($DEBUG) { print "CHANGE GROUP EQ: " . $groupObject->{$AD_GROUP_NAME_TEXT} . " - OK\n" };
 	} else {
 		print "ERROR - UNKNOWN OPERATION: " . $localOperation . " was skipped for group " . $groupObject->{$AD_GROUP_NAME_TEXT} . "\n";
-		return 1;
+		return 0;
 	}
 	
-	return 0;
+	return 1;
 }
 
 #Sub to process user with O365 connector and if success, add him to the cache file
@@ -322,7 +323,7 @@ sub processUser {
 		`$command`;
 		if($?) {
 			print "CHANGE USER N-EQ: " . $userObject->{$UPN_TEXT} . " - ERROR\n"; 
-			return 1; 
+			return 0; 
 		}
 		{
 			lock $FILE_USERS_LOCK;
@@ -338,10 +339,10 @@ sub processUser {
 		if($DEBUG) { print "CHANGE USER EQ: " . $userObject->{$UPN_TEXT} . " - OK\n"; }
 	} else {
 		print "ERROR - UNKNOWN OPERATION: " . $localOperation . " was skipped for user " . $userObject->{$UPN_TEXT} . "\n";
-		return 1;
+		return 0;
 	}
 
-	return 0;
+	return 1;
 }
 
 #Sub to read data about users from file and convert it to perl hash
@@ -362,7 +363,7 @@ sub readDataAboutUsers {
 		#If UPN is from any reason empty, set global return code to 1 and skip this user
 		unless($UPN) { 
 			print "ERROR - Can't find UPN for user in $pathToFile for line '$line'\n";
-			$GLOBAL_RETURN_CODE = 1;
+			$returnCode = 1;
 			next;
 		}
 		$usersStruc->{$UPN}->{$UPN_TEXT} = $UPN;
@@ -387,7 +388,7 @@ sub readDataAboutActiveUsers {
 		#If ID is from any reason empty, set global return code to 1 and skip this user
 		unless($line) { 
 			print "ERROR - Can't find ID of active user in $pathToFile for line '$line'\n";
-			$GLOBAL_RETURN_CODE = 1;
+			$returnCode = 1;
 			next;
 		}
 		my $id = $line . "@" . $domain;
@@ -414,7 +415,7 @@ sub readDataAboutGroups {
 		#If groupADName is from any reason empty, set global return code to 1 and skip this group
 		unless($line) { 
 			print "ERROR - Can't find AD name of group in $pathToFile for line '$line'\n";
-			$GLOBAL_RETURN_CODE = 1;
+			$returnCode = 1;
 			next;
 		}
 
