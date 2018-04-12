@@ -20,8 +20,8 @@ our $A_USER_MAIL;       *A_USER_MAIL =         \'urn:perun:user:attribute-def:de
 our $A_USER_CERT_DNS;   *A_USER_CERT_DNS =     \'urn:perun:user:attribute-def:virt:userCertDNs';
 our $A_USER_STATUS;     *A_USER_STATUS =       \'urn:perun:member:attribute-def:core:status';
 our $A_R_VOMS_ROLES;    *A_R_VOMS_ROLES =      \'urn:perun:resource:attribute-def:def:vomsRoles';
-our $A_G_VOMS_GR_NAME;  *A_G_VOMS_GR_NAME =    \'urn:perun:group:attribute-def:def:vomsGroupName';
-our $A_G_VOMS_ROLES;    *A_G_VOMS_ROLES =      \'urn:perun:group:attribute-def:def:vomsRoles';
+our $A_GR_VOMS_GR_NAME; *A_GR_VOMS_GR_NAME =   \'urn:perun:group_resource:attribute-def:def:vomsGroupName';
+our $A_GR_VOMS_ROLES;   *A_GR_VOMS_ROLES =     \'urn:perun:group_resource:attribute-def:def:vomsRoles';
 our $STATUS_VALID;      *STATUS_VALID =        \'VALID';
 
 my $struc = {};
@@ -42,9 +42,9 @@ foreach my $resourceData ($data->getChildElements) {
 	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
 		my %groupAttributes = attributesToHash $groupData->getAttributes;
 		#get vomsGroupNameIfExists
-		my $vomsGroupName = $groupAttributes{$A_G_VOMS_GR_NAME};
+		my $vomsGroupName = $groupAttributes{$A_GR_VOMS_GR_NAME};
 		my @rolesInVoForGroup = ();
-		if(defined($groupAttributes{$A_G_VOMS_ROLES})) { @rolesInVoForGroup = @{$groupAttributes{$A_G_VOMS_ROLES}}; }
+		if(defined($groupAttributes{$A_GR_VOMS_ROLES})) { @rolesInVoForGroup = @{$groupAttributes{$A_GR_VOMS_ROLES}}; }
 
 		#group members one by one
 		foreach my $memberData (($groupData->getChildElements)[1]->getChildElements) {
