@@ -219,7 +219,7 @@ close FILE_GROUPS_CACHE or die "Could not close file $newGroupsCache: $!\n";;
 copy( $newUsersCache, $lastStateOfUsersFilename );
 copy( $newGroupsCache, $lastStateOfGroupsFilename );
 
-return $returnCode;
+exit $returnCode;
 
 #---------------------------------SUBS------------------------------------
 
