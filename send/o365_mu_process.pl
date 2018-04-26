@@ -50,6 +50,7 @@ my $UPN_TEXT = "upn";
 my $DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT = "deliverToMailBoxAndForward";
 my $FORWARDING_SMTP_ADDRESS_TEXT = "forwardingSmtpAdress";
 my $ARCHIVE_TEXT = "archive";
+my $EMAIL_ADDRESSES_TEXT = "emailAddresses";
 my $PLAIN_TEXT_OBJECT_TEXT = "plainTextObject";
 my $AD_GROUP_NAME_TEXT = "adGroupName";
 my $SEND_AS_TEXT = "sendAs";
@@ -314,7 +315,7 @@ sub processUser {
 	my $localOperation = shift;
 
 	if( $localOperation eq $OPERATION_USER_CHANGED ) {
-		my $command = $o365ConnectorFile . " -s " . shellEscape($serviceName)  . " -S " . shellEscape($instanceName) . " -c Set-MuniMailBox " . " -i " . shellEscape($userObject->{$UPN_TEXT}) . " -a " . shellEscape($userObject->{$ARCHIVE_TEXT}) . " -d " . shellEscape($userObject->{$DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT});
+		my $command = $o365ConnectorFile . " -s " . shellEscape($serviceName)  . " -S " . shellEscape($instanceName) . " -c Set-MuniMailBox " . " -i " . shellEscape($userObject->{$UPN_TEXT}) . " -a " . shellEscape($userObject->{$ARCHIVE_TEXT}) . " -d " . shellEscape($userObject->{$DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT}) . " -e " . shellEscape($userObject->{$EMAIL_ADDRESSES_TEXT});
 		if($userObject->{$FORWARDING_SMTP_ADDRESS_TEXT}) {
 			$command = $command . " -f " . shellEscape $userObject->{$FORWARDING_SMTP_ADDRESS_TEXT};
 		}
@@ -370,6 +371,7 @@ sub readDataAboutUsers {
 		$usersStruc->{$UPN}->{$FORWARDING_SMTP_ADDRESS_TEXT} = $parts[1];
 		$usersStruc->{$UPN}->{$ARCHIVE_TEXT} = $parts[2];
 		$usersStruc->{$UPN}->{$DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT} = $parts[3];
+		$usersStruc->{$UPN}->{$EMAIL_ADDRESSES_TEXT} = $parts[4];
 		$usersStruc->{$UPN}->{$PLAIN_TEXT_OBJECT_TEXT} = $line ;
 	}
 	close FILE or die "Could not close file $pathToFile: $!\n";

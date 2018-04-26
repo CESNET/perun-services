@@ -34,7 +34,7 @@ local $Data::Dumper::Useqq = 1;
 ./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniMailbox" -i 396462@mandragora.muni.cz
 ./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniSharebox" -i jan@izydorczyk.cz
 ./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniGroup" -i test-lab-crocs@mandragora.onmicrosoft.com -t 255920@mandragora.muni.cz 465818@mandragora.muni.cz
-./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniMailBox" -i 396462@mandragora.muni.cz -a 1 -d 0 -f slavek@ics.muni.cz
+./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniMailBox" -i 396462@mandragora.muni.cz -a 1 -d 0 -f slavek@ics.muni.cz -e slavek@ics.muni.cz,123456@muni.cz
 ./o365-connector.pl -s o365_mu -S prodMU -c "Test-MuniError" -i soft
 =cut
 
@@ -105,7 +105,7 @@ Return help + exit 1 if help is needed.
 Return STDOUT + exit 0 if everything is ok.
 Return STDERR + exit >0 if error happens.
 Available commands with mandatory options:
- --command "$COMMAND_SET_MAILBOX" -i "emailOfMailbox" -a 1|0 -d 1|0 -f "email"
+ --command "$COMMAND_SET_MAILBOX" -i "emailOfMailbox" -a 1|0 -d 1|0 -f "email"|-e "email1,email2,email3"
  --command "$COMMAND_SET_GROUP" -i "nameOfGroup" -t contact1 contact2 ...
  --command "$COMMAND_PING_EMAIL" -i "emailToPing"
  --command "$COMMAND_GET_CONTACT" -i "nameOfContact"
@@ -125,6 +125,7 @@ SetMailbox mandatory options:
  --archiving   | -a enable or disable archiving, values 1=enable, 0=disable, disabled by default
  --delivering  | -d enable or disable delivering to mailbox, values 1=enable, 0=disable, disabled by default
  --forwarding  | -f forward to email address for mailing list
+ --emails      | -e string represenation of list of email addresses comma separated
 SetGroup mandatory options:
  --contacts    | -t list of contacts to be able to send email as group\n
 };
@@ -137,7 +138,7 @@ SetGroup mandatory options:
 #Get parameters of script and assign them to variables
 my $inputCommand = $0;
 foreach my $argument (@ARGV) { $inputCommand .= " " . $argument; }
-my ($service, $server, $argIdent, $argCommand, $argArch, $argDeliv, $argForw, @argContacts);
+my ($service, $server, $argIdent, $argCommand, $argArch, $argDeliv, $argForw, $argEmailAddresses, @argContacts);
 GetOptions("help|h"	=> sub {
 		print help;
 		exit 1;
@@ -149,6 +150,7 @@ GetOptions("help|h"	=> sub {
 	"archiving|a=i"   => \$argArch,
 	"delivering|d=i"  => \$argDeliv,
 	"forwarding|f=s"  => \$argForw,
+	"emails|e=s"      => \$argEmailAddresses,
 	'contacts|t=s@{1,}' => \@argContacts ) || die help;
 
 #Check existence of mandatory parameters
@@ -180,7 +182,7 @@ if(!defined($PASSWORD) || !defined($USERNAME) || !defined($BASIC_URL)) {
 if($argCommand eq $COMMAND_SET_MAILBOX) {
 	unless (defined $argArch) { $argArch = 0; }
 	unless (defined $argDeliv) { $argDeliv = 0; }
-	setMailbox ( $COMMAND_STATUS_SET, undef, $argIdent, $argDeliv, $argArch, $argForw );
+	setMailbox ( $COMMAND_STATUS_SET, undef, $argIdent, $argDeliv, $argArch, $argForw, $argEmailAddresses );
 } elsif ($argCommand eq $COMMAND_SET_GROUP) {
 	setGroup ( $COMMAND_STATUS_SET, undef, $argIdent, \@argContacts);
 } elsif ($argCommand eq $COMMAND_PING_EMAIL) {
@@ -266,6 +268,7 @@ sub setGroup {
 # deliverToMailbox - if delivering is set to true or false
 # archive          - if archiving is set to true or false
 # forwardTo        - address for forwaring all emails to
+# emailAddreses    - list of all registered email addresses of user separated by comma
 #-----------------------
 #Returns: void with exit status 0 = OK, error with exit status > 0 = not OK
 #-----------------------
@@ -279,6 +282,7 @@ sub setMailbox {
 	my $deliverToMailbox = shift;
 	my $archive = shift;
 	my $forwardTo = shift;
+	my $emailAddreses = shift;
 
 	if(defined($jsonOutput->{"ErrorType"})) {
 		diePretty ( $ERROR_O365_OR_PS_ERROR , "Some HARD internal message error in method call -> " . $jsonOutput->{"ErrorMessage"} . "\n" );
@@ -293,6 +297,7 @@ sub setMailbox {
 		$content{'forwardingSmtpAddress'} = $forwardTo ? $forwardTo : JSON::null;
 		$content{'deliverToMailboxAndForward'} = $deliverToMailbox ? JSON::true : JSON::false;
 		$content{'archive'} = $archive ? JSON::true : JSON::false;
+		$content{'emailaddresses'} = $emailAddreses;
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
 		if($jsonOutput->{'Status'} eq 'OK') {
