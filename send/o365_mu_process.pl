@@ -28,8 +28,14 @@ sub shellEscape($);
 my $DEBUG=0;
 
 #file locks for groups and users
-my $FILE_USERS_LOCK :shared;
-my $FILE_GROUPS_LOCK :shared;
+my $USERS_LOCK :shared;
+my $GROUPS_LOCK :shared;
+
+#arrays of users and groups
+my @allUsers = ();
+share(@allUsers);
+my @allGroups = ();
+share(@allGroups);
 
 #number of worker threads
 my $THREAD_COUNT = 10;
@@ -213,6 +219,15 @@ foreach my $key (keys %$newGroupsStruc) {
 #wait for all threads to finish
 waitForThreads;
 
+#write all records to files
+foreach my $userRecord (@allUsers) {
+	print FILE_USERS_CACHE $userRecord . "\n";
+}
+
+foreach my $groupRecord (@allGroups) {
+	print FILE_GROUPS_CACHE $groupRecord . "\n";
+}
+
 #copy new cache files to place with old cache files
 close FILE_USERS_CACHE or die "Could not close file $newUsersCache: $!\n";
 close FILE_GROUPS_CACHE or die "Could not close file $newGroupsCache: $!\n";;
@@ -290,15 +305,15 @@ sub processGroup {
 			return 0; 
 		}
 		{
-			lock $FILE_GROUPS_LOCK;
-			print FILE_GROUPS_CACHE $groupObject->{$PLAIN_TEXT_OBJECT_TEXT} . "\n";
+			lock $GROUPS_LOCK;
+			push @allGroups, $groupObject->{$PLAIN_TEXT_OBJECT_TEXT};
 		}
 		if($DEBUG) { print "CHANGE GROUP N-EQ: " . $groupObject->{$AD_GROUP_NAME_TEXT} . " - OK\n" };
 	} elsif( $localOperation eq $OPERATION_GROUP_NOT_CHANGED ) {
 		if($DEBUG) { print "CHANGE GROUP EQ: " . $groupObject->{$AD_GROUP_NAME_TEXT} . " - STARTED\n"; }
 		{
-			lock $FILE_GROUPS_LOCK;
-			print FILE_GROUPS_CACHE $groupObject->{$PLAIN_TEXT_OBJECT_TEXT} . "\n";
+			lock $GROUPS_LOCK;
+			push @allGroups, $groupObject->{$PLAIN_TEXT_OBJECT_TEXT};
 		}
 		if($DEBUG) { print "CHANGE GROUP EQ: " . $groupObject->{$AD_GROUP_NAME_TEXT} . " - OK\n" };
 	} else {
@@ -327,15 +342,15 @@ sub processUser {
 			return 0; 
 		}
 		{
-			lock $FILE_USERS_LOCK;
-			print FILE_USERS_CACHE $userObject->{$PLAIN_TEXT_OBJECT_TEXT} . "\n";
+			lock $USERS_LOCK;
+			push @allUsers, $userObject->{$PLAIN_TEXT_OBJECT_TEXT};
 		}
 		if($DEBUG) { print "CHANGE USER N-EQ: " . $userObject->{$UPN_TEXT} . " - OK\n"; }
 	} elsif( $localOperation eq $OPERATION_USER_NOT_CHANGED ) {
 		if($DEBUG) { print "CHANGE USER EQ: " . $userObject->{$UPN_TEXT} . " - STARTED\n"; }
 		{
-			lock $FILE_USERS_LOCK;
-			print FILE_USERS_CACHE $userObject->{$PLAIN_TEXT_OBJECT_TEXT} . "\n";
+			lock $USERS_LOCK;
+			push @allUsers, $userObject->{$PLAIN_TEXT_OBJECT_TEXT};
 		}
 		if($DEBUG) { print "CHANGE USER EQ: " . $userObject->{$UPN_TEXT} . " - OK\n"; }
 	} else {
