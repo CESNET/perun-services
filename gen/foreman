@@ -1,0 +1,87 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+
+our $SERVICE_NAME = basename($0);
+our $PROTOCOL_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_USER_LOGIN;                   *A_USER_LOGIN =                  \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_USER_FIRSTNAME;               *A_USER_FIRSTNAME =              \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LASTNAME;                *A_USER_LASTNAME =               \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_MAIL;                    *A_USER_MAIL =                   \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_RESOURCE_VO_SHORTNAME;        *A_RESOURCE_VO_SHORTNAME =       \'urn:perun:resource:attribute-def:virt:voShortName';
+our $A_RESOURCE_FOREMAN_GROUP_NAME;  *A_RESOURCE_FOREMAN_GROUP_NAME = \'urn:perun:resource:attribute-def:def:foremanGroupName';
+our $A_RESOURCE_IS_ADMIN_GROUP;      *A_RESOURCE_IS_ADMIN_GROUP =     \'urn:perun:resource:attribute-def:def:isForemanAdminGroup';
+
+my $FIRST_NAME_HEADER = "firstName";
+my $LAST_NAME_HEADER = "lastName";
+my $EMAIL_HEADER = "email";
+my $GROUPS_HEADER = "groups";
+my $ORGANIZATIONS_HEADER = "organizations";
+my $IS_ADMIN_GROUP_HEADER = "isAdminGroup";
+
+my $usersByLogin = {};
+
+#####################################
+my %facilityAttributes = attributesToHash $data->getAttributes;
+
+my @resourcesData = $data->getChildElements;
+foreach my $rData (@resourcesData) {
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my $resourceGroupName = $resourceAttributes{$A_RESOURCE_FOREMAN_GROUP_NAME};
+	my $resourceIsAdminGroup = $resourceAttributes{$A_RESOURCE_IS_ADMIN_GROUP};
+	my $resourceVoShortName = $resourceAttributes{$A_RESOURCE_VO_SHORTNAME};
+
+	my @membersData = $rData->getChildElements;
+	foreach my $mData (@membersData) {
+		my %memberAttributes = attributesToHash $mData->getAttributes;
+
+		my $login = $memberAttributes{$A_USER_LOGIN};
+		die "Login can't be empty!" unless $login;
+
+		my $firstName = $memberAttributes{$A_USER_FIRSTNAME};
+		my $lastName = $memberAttributes{$A_USER_LASTNAME};
+		my $email = $memberAttributes{$A_USER_MAIL};
+
+		unless($usersByLogin->{$login}) {
+			$usersByLogin->{$login}->{$FIRST_NAME_HEADER} = $firstName;
+			$usersByLogin->{$login}->{$LAST_NAME_HEADER} = $lastName;
+			$usersByLogin->{$login}->{$EMAIL_HEADER} = $email;
+		}
+
+		$usersByLogin->{$login}->{$GROUPS_HEADER}->{$resourceGroupName} = 1 if $resourceGroupName;
+		$usersByLogin->{$login}->{$ORGANIZATIONS_HEADER}->{$resourceVoShortName} = 1;
+		if($resourceIsAdminGroup) {
+			$usersByLogin->{$login}->{$IS_ADMIN_GROUP_HEADER} = 1;
+		}
+	}
+}
+
+my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+foreach my $login (keys %$usersByLogin) {
+	print FILE $login . "\t";
+	print FILE $usersByLogin->{$login}->{$FIRST_NAME_HEADER} . "\t";
+	print FILE $usersByLogin->{$login}->{$LAST_NAME_HEADER} . "\t";
+	print FILE $usersByLogin->{$login}->{$EMAIL_HEADER} . "\t";
+	if($usersByLogin->{$login}->{$GROUPS_HEADER}) {
+		print FILE join(',', keys $usersByLogin->{$login}->{$GROUPS_HEADER});
+	} 
+	print FILE "\t";
+	print FILE join(',', keys $usersByLogin->{$login}->{$ORGANIZATIONS_HEADER}) . "\t";
+	print FILE $usersByLogin->{$login}->{$IS_ADMIN_GROUP_HEADER} ? "1" : "0";
+	print FILE "\n";
+}
+close FILE or die "Cannot close $fileName: $! \n";
+
+#####################################################
+perunServicesInit::finalize;

@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="foreman"
+
+. generic_send
