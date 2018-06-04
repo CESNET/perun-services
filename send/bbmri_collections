@@ -31,12 +31,22 @@ GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @$GROUP_FILE -u `echo $DESTINATIO
 timeout -k $TIMEOUT_KILL $TIMEOUT $USER_TRANSPORT_COMMAND
 # Catch errors
 ERR_CODE=$?
-echo "Communcation with the peer ends with return code: $ERR_CODE" >&2
+#Error code 124 means - timeouted
+if [ $ERR_CODE -e 124 ]; then
+	echo "Communication with the peer was timeouted with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
+else
+	echo "Communcation with the peer ends with return code: $ERR_CODE" >&2
+fi
 
 # HTTP Request with timeout for GROUPS
 timeout -k $TIMEOUT_KILL $TIMEOUT $GROUP_TRANSPORT_COMMAND
 # Catch errors
 ERR_CODE=$?
-echo "Communcation with the peer ends with return code: $ERR_CODE" >&2
+#Error code 124 means - timeouted
+if [ $ERR_CODE -e 124 ]; then
+  echo "Communication with the peer was timeouted with return code: $ERR_CODE" >&2
+else
+	echo "Communcation with the peer ends with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
+fi
 
 exit $ERR_CODE
