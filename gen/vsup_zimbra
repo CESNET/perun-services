@@ -216,6 +216,9 @@ sub getStatus() {
 		return 'active';
 	}
 
+	# Add time 23:59:59 to the date, since we want accounts to be active on the last day
+	$latest_expiration = $latest_expiration + 86399;
+
 	if ($latest_expiration > $currentDate->epoch) {
 		return 'active';
 	}
