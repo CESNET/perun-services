@@ -62,6 +62,7 @@ my $facilityIdFileName = "$DIRECTORY/$::SERVICE_NAME-facilityId";
 
 #save data about users as user per line
 open FILE, ">$usersFileName" or die "Cannot open $usersFileName: $! \n";
+binmode FILE, ":utf8";
 foreach my $UCO (sort keys %$users) {
 	print FILE $users->{$UCO}->{'UPN'} . "\t" . $users->{$UCO}->{'mailForward'} . "\t" . $users->{$UCO}->{'archive'} . "\t" . $users->{$UCO}->{'storeAndForward'} . "\t" . $users->{$UCO}->{'emailAddresses'} .  "\n";
 }
@@ -69,6 +70,7 @@ close(FILE) or die "Cannot close $usersFileName: $! \n";
 
 #save data about groups as group per line
 open FILE, ">$groupsFileName" or die "Cannot open $groupsFileName: $! \n";
+binmode FILE, ":utf8";
 foreach my $adName (sort keys %$groups) {
 	my $contacts = join " ", sort keys %{$groups->{$adName}};
 	unless($contacts) { $contacts = ""; }
