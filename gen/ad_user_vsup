@@ -270,6 +270,9 @@ sub calculateExpiration() {
 		$result = $latest_expiration;
 	}
 
+	# Add time 23:59:59 to the date, since we want accounts to be active on the last day
+	$result = $result + 86399;
+
 	# add seconds before 1.1.1970 since Windows epoch starts at 1601-01-01T00:00:00Z
 	$result = $result + 11644473600;
 	# convert seconds to 100-nano seconds (hundreds of nano seconds)
