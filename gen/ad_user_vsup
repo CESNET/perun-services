@@ -241,9 +241,7 @@ sub calculateExpiration() {
 
 	# sort all expirations
 	my @sorted_expirations = sort { $a <=> $b } @expirations;
-
 	my $latest_expiration = $sorted_expirations[$#sorted_expirations];
-	my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d");
 
 	my $result;
 
@@ -252,14 +250,10 @@ sub calculateExpiration() {
 		return 0;
 	}
 
-	if ($latest_expiration > $currentDate->epoch) {
-
-		# case expiration "never" = 1.1.4000
-		if ($latest_expiration == Time::Piece->strptime("4000-01-01","%Y-%m-%d")->epoch) {
-			# return without specified expiration date
-			return 0;
-		}
-
+	# case expiration "never" = 1.1.4000
+	if ($latest_expiration == Time::Piece->strptime("4000-01-01","%Y-%m-%d")->epoch) {
+		# return without specified expiration date
+		return 0;
 	}
 
 	# (will) expire by studies - add 7 days grace period
