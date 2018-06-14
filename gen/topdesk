@@ -27,7 +27,7 @@ our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
 
 our $userStruc = {};
 
-my $fileUsers = $DIRECTORY . $SERVICE_NAME ".csv";
+my $fileUsers = $DIRECTORY . $::SERVICE_NAME . ".csv";
 
 my @resourcesData = $data->getChildElements;
 foreach my $rData (@resourcesData) {
