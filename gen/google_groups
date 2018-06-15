@@ -14,7 +14,7 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $data      = perunServicesInit::getDataWithGroups;
 
 #Constants
-our $A_FACILITY_GOOGLE_NAMESPACE;         *A_FACILITY_GOOGLE_NAMESPACE =          \'urn:perun:facility:attribute-def:def:googleGroupNameNamespace';
+our $A_FACILITY_GOOGLE_DOMAIN;            *A_FACILITY_GOOGLE_DOMAIN =             \'urn:perun:facility:attribute-def:def:googleGroupsDomain';
 our $A_GROUP_RESOURCE_GOOGLE_GROUP_NAME;  *A_GROUP_RESOURCE_GOOGLE_GROUP_NAME =   \'urn:perun:group_resource:attribute-def:virt:googleGroupName';
 our $A_USER_GOOGLE_NAMESPACE;             *A_USER_GOOGLE_NAMESPACE =              \'urn:perun:user:attribute-def:virt:logins-namespace:google';
 our $A_USER_GOOGLE_MAILS;                 *A_USER_GOOGLE_MAILS =                  \'urn:perun:user:attribute-def:virt:mails-namespace:google';
@@ -25,7 +25,7 @@ our $groupStruc = {};
 our $teamDriveStruc = {};
 
 my %facilityAttributes = attributesToHash $data->getAttributes;
-my $domainName = $facilityAttributes{$A_FACILITY_GOOGLE_NAMESPACE};
+my $domainName = $facilityAttributes{$A_FACILITY_GOOGLE_DOMAIN};
 
 foreach my $resourceData ( $data->getChildElements ) {
 	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
