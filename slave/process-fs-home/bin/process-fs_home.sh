@@ -70,20 +70,22 @@ function process {
 		done
 	fi
 
+	TMP_DIR_BASIC_NAME='tmp-perun-fs_home-'
 	# lines contains homeMountPoint\tlogin\tUID\tGID\t...
 	while IFS=`echo -e "\t"` read U_HOME_MNT_POINT U_LOGNAME U_UID U_GID SOFT_QUOTA_DATA HARD_QUOTA_DATA SOFT_QUOTA_FILES HARD_QUOTA_FILES USER_STATUS USER_GROUPS REST_OF_LINE; do
 		HOME_DIR="${U_HOME_MNT_POINT}/${U_LOGNAME}"
-		TMP_DIR=`mktemp -d --tmpdir="${U_HOME_MNT_POINT}" "tmp-perun-fs_home-${U_LOGNAME}.XXXX"`
-		if [ "$?" -ne 0 ]; then
-			log_msg  E_CANNOT_CREATE_TEMP
-		fi
-		#set this temp directory for remove when script ends (if still exists)
-		add_on_exit "rm -rf ${TMP_DIR}"
-		TMP_HOME_DIR="${TMP_DIR}/${U_LOGNAME}"
 
 		run_mid_hooks
 
 		if [ ! -d "${HOME_DIR}" ]; then
+
+			TMP_DIR=`mktemp -d --tmpdir="${U_HOME_MNT_POINT}" "${TMP_DIR_BASIC_NAME}${U_LOGNAME}.XXXX"`
+			if [ "$?" -ne 0 ]; then
+				log_msg  E_CANNOT_CREATE_TEMP
+			fi
+			#set this temp directory for remove when script ends (if still exists)
+			add_on_exit "rm -rf ${TMP_DIR}"
+			TMP_HOME_DIR="${TMP_DIR}/${U_LOGNAME}"
 
 			if [ -n "$SKEL_DIR" ]; then
 				catch_error E_CANNOT_COPY_SKEL cp -ar "$SKEL_DIR" "$TMP_HOME_DIR"
