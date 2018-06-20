@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PROTOCOL_VERSION='3.0.0'
+PROTOCOL_VERSION='3.1.0'
 
 
 function process {
@@ -12,9 +12,7 @@ function process {
 	I_PREVIOUSLY_ADDED_USERS_CHANGED=(0 '${PREVIOUSLY_ADDED_USERS} updated')
 	I_PREVIOUSLY_ADDED_USERS_NOT_CHANGED=(0 '${PREVIOUSLY_ADDED_USERS} has not changed')
 
-
-	E_GROUP_WRONG_MIN_GID=(51 'Invalid min_gid parameter')
-	E_GROUP_WRONG_MAX_GID=(52 'Invalid max_gid parameter')
+	E_GROUP_WRONG_GID_RANGES=(51 'Cannot read from the gid ranges file: ${GID_RANGES_FILE}')
 	E_GROUP_MERGE=(53 'Error during group file merge')
 	E_GROUP_DUPLICATES=(54 'Group names in group file are not uniq: ${DUPLICATE_GROUP_NAMES}')
 	#E_GROUP_NO_ROOT=(55 'Missing group "root"')
@@ -29,10 +27,11 @@ function process {
 	NOW_ADDED_USERS="${WORK_DIR}/group-nfs4.perun-added-system-users"
 	#NEW_GROUP="/etc/passwd.new" # file must be on same mountpoint for atomic switch
 	NEW_GROUP="${WORK_DIR}/group.new"
-	MIN_PERUN_GID=`head -n 1 "${WORK_DIR}/min_gid"`
-	MAX_PERUN_GID=`head -n 1 "${WORK_DIR}/max_gid"`
-	[ "${MIN_PERUN_GID}" -gt 0 ] || log_msg E_GROUP_WRONG_MIN_GID
-	[ "${MAX_PERUN_GID}" -gt 0 ] || log_msg E_GROUP_WRONG_MAX_GID
+	
+	GID_RANGES_FILE="${WORK_DIR}/gid_ranges"
+	if [ ! -r "${GID_RANGES_FILE}" ]; then
+		log_msg E_GROUP_WRONG_GID_RANGES
+	fi
 
 	create_lock
 
@@ -57,6 +56,29 @@ function process {
 	local $, = ":";
 	local $\ = "\n";
 
+	sub isGIDInAllowedRanges {
+		my $ranges = shift;
+		my $gid = shift;
+		foreach my $minimum (sort { $a <=> $b } keys %$ranges) {
+			my $maximum = $ranges->{$minimum};
+			if($gid >= $minimum && $gid <= $maximum) {
+				return 1;
+			}
+		}
+		return 0;
+	}
+
+	#Export valid gids from file to hash
+	my %validGids;
+	open FILE, "'$GID_RANGES_FILE'" or die "Cannot open '$GID_RANGES_FILE': $! \n";
+	while (my $row = <FILE>) {
+		chomp $row;
+		my @parts = split "-", $row;
+		my $minimum =  $parts[0];
+		my $maximum =  $parts[1];
+		$validGids{$minimum} = $maximum;
+	}
+	close(FILE) or die "Cannot close '$GID_RANGES_FILE': $! \n";
 
 	my %groups;
 	my %gids;
@@ -65,7 +87,7 @@ function process {
 	chomp;
 	next unless $_; #skip empty lines
 	my ($group, $password, $gid, $users) = split ":";
-	next unless ($gid < '$MIN_PERUN_GID' || $gid > '$MAX_PERUN_GID');
+	next if isGIDInAllowedRanges(\%validGids, $gid);
 	my %users = map {$_ => 1 }  split ",", $users;
 	if(defined $groups{$group}) { die "Duplicate group name: $group\n"; }
 		if(defined $gids{$gid}) { die "Duplicate group GID: $gid\n"; }
@@ -110,7 +132,7 @@ function process {
 				users => \%users
 			};
 			$gids{$gid} = 1;
-			if ($gid < '$MIN_PERUN_GID' || $gid > '$MAX_PERUN_GID') {
+			unless ( isGIDInAllowedRanges(\%validGids, $gid) ) {
 				my @addUsers = keys %users;
 				print NOW_ADDED $group, $password, $gid, "@addUsers";
 			}
