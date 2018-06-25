@@ -224,7 +224,7 @@ sub getStatus() {
 	}
 
 	# (will) expire by studies - add 14 days grace period
-	if ($expirationKosTime and ($latest_expiration == $expirationKosTime->epoch)) {
+	if ($expirationKosTime and ($latest_expiration == $expirationKosTime->epoch + 86399)) {
 
 		# within 14 days grace period - still active
 		if (($latest_expiration + (14*24*60*60)) > $currentDate->epoch) {
