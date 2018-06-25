@@ -221,7 +221,7 @@ perunServicesInit::finalize;
 # Returns Windows FILETIME timestamp of users account expiration
 # - in case of expiration on 1.1.4000 -> Zero is returned as "expiration = never".
 # - in case of any other exact date, pick the largest (future). If it comes from study system (KOS),
-#   add 7 days grace period.
+#   add 14 days grace period.
 #
 sub calculateExpiration() {
 
