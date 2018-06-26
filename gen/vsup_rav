@@ -4,6 +4,9 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
+use Time::Piece;
+
+sub calculateExpiration;
 
 local $::SERVICE_NAME = "vsup_rav";
 local $::PROTOCOL_VERSION = "3.0.0";
@@ -28,6 +31,9 @@ our $A_CARD_BARCODES;  *A_CARD_BARCODES = \'urn:perun:user:attribute-def:def:car
 our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:cardCodes';
 our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
 our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
+our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:expirationKos';
+our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
+our $A_EXPIRATION_MANUAL;  *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
 
 # GATHER USERS
 my $users;  # $users->{$uco}->{ATTR} = $attrValue;
@@ -60,6 +66,10 @@ foreach my $user (($data->getChildElements)[1]->getChildElements) {
 	} else {
 		$users->{$uco}->{$A_CARD_CHIP_NUMBERS} = '';
 	}
+
+	# calculate expiration
+	$users->{$uco}->{"EXPIRATION"} = calculateExpiration($uAttributes{$A_EXPIRATION_KOS}, $uAttributes{$A_EXPIRATION_DC2}, $uAttributes{$A_EXPIRATION_MANUAL}) || '';
+
 }
 
 #
@@ -75,9 +85,55 @@ for my $uco (@keys) {
 	# print attributes, which are never empty
 	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{$A_VSUP_MAIL} . "\t" . $users->{$uco}->{$A_FIRST_NAME}
 			. "\t" . $users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_TITLE_AFTER}
-			. "\t" . $users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_CARD_BARCODES} . "\t" . $users->{$uco}->{$A_CARD_CHIP_NUMBERS} . "\n";
+			. "\t" . $users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_CARD_BARCODES} . "\t" . $users->{$uco}->{$A_CARD_CHIP_NUMBERS}
+			. "\t" . $users->{$uco}->{"EXPIRATION"} . "\n";
 }
 
 close(FILE);
 
 perunServicesInit::finalize;
+
+#
+# Calculate later from three expiration dates on VŠUP.
+#
+# 1. param - expiration in KOS (studies)
+# 2. param - expiration in DC2 (employees)
+# 3. param - manually set expiration
+#
+# - in case of expiration on 1.1.4000 -> undef is returned as "expiration = never".
+# - in case of any other exact date, pick the largest (future).
+#
+sub calculateExpiration() {
+
+	# read input
+	my $expirationKos = shift;
+	my $expirationDc2 = shift;
+	my $expirationMan = shift;
+	# parse to time or undef
+	my $expirationKosTime = ($expirationKos) ? Time::Piece->strptime($expirationKos,"%Y-%m-%d") : undef;
+	my $expirationDc2Time = ($expirationDc2) ? Time::Piece->strptime($expirationDc2,"%Y-%m-%d") : undef;
+	my $expirationManTime = ($expirationMan) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
+
+	my @expirations = ();
+	if (defined $expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
+	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
+	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
+
+	# sort all expirations
+	my @sorted_expirations = sort { $a <=> $b } @expirations;
+	my $latest_expiration = $sorted_expirations[$#sorted_expirations];
+
+	if (!defined $expirationKos and !defined $expirationDc2 and !defined $expirationMan) {
+		# if no expiration set in source data - take as "never"
+		return undef;
+	}
+
+	# case expiration "never" = 1.1.4000
+	if ($latest_expiration == Time::Piece->strptime("4000-01-01","%Y-%m-%d")->epoch) {
+		# return without specified expiration date
+		return undef;
+	}
+
+	return localtime($latest_expiration)->ymd;
+
+}
