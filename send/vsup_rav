@@ -54,6 +54,7 @@ my $dataByUco = {};
 open FILE, $service_file or die "Could not open $service_file: $!";
 while(my $line = <FILE>) {
 	my @parts = split /\t/, $line;
+	chomp(@parts);
 	$dataByUco->{$parts[0]}->{'LOGIN'} = $parts[1];
 	$dataByUco->{$parts[0]}->{'EMAIL'} = $parts[2];
 	$dataByUco->{$parts[0]}->{'FIRST_NAME'} = (($parts[3] ne '') ? $parts[3] : undef);
@@ -63,6 +64,7 @@ while(my $line = <FILE>) {
 	$dataByUco->{$parts[0]}->{'PHONE'} = (($parts[7] ne '') ? $parts[7] : undef);
 	$dataByUco->{$parts[0]}->{'CARD_BARCODE'} = (($parts[8] ne '') ? $parts[8] : undef);
 	$dataByUco->{$parts[0]}->{'CARD_CHIP_NUMBER'} = (($parts[9] ne '') ? $parts[9] : undef);
+	$dataByUco->{$parts[0]}->{'EXPIRATION'} = (($parts[10] ne '') ? $parts[10] : undef);
 }
 close FILE;
 
@@ -72,28 +74,118 @@ my $DEBUG=0;
 
 #statistic and information variables
 my $inserted = 0;
-my $deleted = 0;
+my $foundAndUpdated = 0;
+my $foundAndSkipped = 0;
 
-$deleted += $dbh->do("DELETE FROM $tableName");
-
-#update and insert new
+# for each incoming UCO
 foreach my $uco (sort keys $dataByUco) {
 
+	my $JMENO = $dataByUco->{$uco}->{'FIRST_NAME'};
+	my $PRIJMENI = $dataByUco->{$uco}->{'LAST_NAME'};
 	my $LOGIN = $dataByUco->{$uco}->{'LOGIN'};
 	my $EMAIL = $dataByUco->{$uco}->{'EMAIL'};
-	my $TITLE_BEFORE = $dataByUco->{$uco}->{'TITLE_BEFORE'};
-	my $FIRST_NAME = $dataByUco->{$uco}->{'FIRST_NAME'};
-	my $LAST_NAME = $dataByUco->{$uco}->{'LAST_NAME'};
-	my $TITLE_AFTER = $dataByUco->{$uco}->{'TITLE_AFTER'};
-	my $PHONE = $dataByUco->{$uco}->{'PHONE'};
-	my $CARD_BARCODE = $dataByUco->{$uco}->{'CARD_BARCODE'};
-	my $CARD_CHIP_NUMBER = $dataByUco->{$uco}->{'CARD_CHIP_NUMBER'};
+	my $TITUL_PRED = $dataByUco->{$uco}->{'TITLE_BEFORE'};
+	my $TITUL_ZA = $dataByUco->{$uco}->{'TITLE_AFTER'};
+	my $TELEFON = $dataByUco->{$uco}->{'PHONE'};
+	my $IDCARD_BARCODE = $dataByUco->{$uco}->{'CARD_BARCODE'};
+	my $IDCARD_CHIP = $dataByUco->{$uco}->{'CARD_CHIP_NUMBER'};
+	my $PLATNOST_DO = $dataByUco->{$uco}->{'EXPIRATION'};
 
-	if($DEBUG == 1) { print "INSERT NEW RECORD: $uco\n"; }
-	$inserted++;
-	# we will do insert
-	my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, JMENO, PRIJMENI, TITUL_PRED, TITUL_ZA, EMAIL, TELEFON, IDCARD_CHIP, IDCARD_BARCODE, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,NOW())});
-	$insertPerson->execute($uco, $LOGIN, $FIRST_NAME, $LAST_NAME, $TITLE_BEFORE, $TITLE_AFTER, $EMAIL, $PHONE, $CARD_CHIP_NUMBER, $CARD_BARCODE);
+	# check if person exists in RAV
+	my $personExists = $dbh->prepare(qq{select 1 from $tableName where UCO=?});
+	$personExists->execute($uco);
+
+	if($personExists->fetch) {
+
+		if($DEBUG == 1) { print "FIND: $uco\n"; }
+
+		# we need to know if these two records are without changes, if yes, skip them
+
+		my $select = "SELECT 1 from $tableName where UCO=? and LOGIN=?";
+		my @params = ($uco, $LOGIN);
+
+		if ($JMENO) {
+			$select = $select . " and JMENO=?";
+			push(@params, $JMENO);
+		} else {
+			$select = $select . " and JMENO is NULL";
+		}
+		if ($PRIJMENI) {
+			$select = $select . " and PRIJMENI=?";
+			push(@params, $PRIJMENI);
+		} else {
+			$select = $select . " and PRIJMENI is NULL";
+		}
+		if ($TITUL_PRED) {
+			$select = $select . " and TITUL_PRED=?";
+			push(@params, $TITUL_PRED);
+		} else {
+			$select = $select . " and TITUL_PRED is NULL";
+		}
+		if ($TITUL_ZA) {
+			$select = $select . " and TITUL_ZA=?";
+			push(@params, $TITUL_ZA);
+		} else {
+			$select = $select . " and TITUL_ZA is NULL";
+		}
+		if ($EMAIL) {
+			$select = $select . " and EMAIL=?";
+			push(@params, $EMAIL);
+		} else {
+			$select = $select . " and EMAIL is NULL";
+		}
+		if ($TELEFON) {
+			$select = $select . " and TELEFON=?";
+			push(@params, $TELEFON);
+		} else {
+			$select = $select . " and TELEFON is NULL";
+		}
+		if ($IDCARD_CHIP) {
+			$select = $select . " and IDCARD_CHIP=?";
+			push(@params, $IDCARD_CHIP);
+		} else {
+			$select = $select . " and IDCARD_CHIP is NULL";
+		}
+		if ($IDCARD_BARCODE) {
+			$select = $select . " and IDCARD_BARCODE=?";
+			push(@params, $IDCARD_BARCODE);
+		} else {
+			$select = $select . " and IDCARD_BARCODE is NULL";
+		}
+		if ($PLATNOST_DO) {
+			$select = $select . " and PLATNOST_DO=?";
+			push(@params, $PLATNOST_DO);
+		} else {
+			$select = $select . " and PLATNOST_DO is NULL";
+		}
+
+		my $recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
+
+		if(!$recordAreEquals->fetch) {
+
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET JMENO=? , PRIJMENI=? , TITUL_PRED=? , TITUL_ZA=? , EMAIL=? , TELEFON=? , IDCARD_CHIP=? , IDCARD_BARCODE=? , PLATNOST_DO=? WHERE UCO=?});
+			$updatePerson->execute($JMENO, $PRIJMENI, $TITUL_PRED, $TITUL_ZA, $EMAIL, $TELEFON, $IDCARD_CHIP , $IDCARD_BARCODE, $PLATNOST_DO, $uco);
+			if($DEBUG == 1) { print "UPDATING EXISTING PERSON: $uco\n"; }
+			$foundAndUpdated++;
+
+		} else {
+
+			if($DEBUG == 1) { print "SKIP PERSON: $uco\n"; }
+			$foundAndSkipped++;
+
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW PERSON: $uco\n"; }
+		$inserted++;
+		# we will do insert
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, JMENO, PRIJMENI, TITUL_PRED, TITUL_ZA, EMAIL, TELEFON, IDCARD_CHIP, IDCARD_BARCODE, PLATNOST_DO) VALUES (?,?,?,?,?,?,?,?,?,?,?)});
+		$insertPerson->execute($uco, $LOGIN, $JMENO, $PRIJMENI, $TITUL_PRED, $TITUL_ZA, $EMAIL, $TELEFON, $IDCARD_CHIP, $IDCARD_BARCODE, $PLATNOST_DO);
+
+	}
+
 }
 
 commit $dbh;
@@ -102,7 +194,8 @@ $dbh->disconnect();
 # print info about operations
 print "=======================================\n";
 print "Inserted:\t$inserted\n";
-print "Deleted:\t$deleted (old rows)\n";
+print "Updated:\t$foundAndUpdated\n";
+print "Skipped:\t$foundAndSkipped\n";
 print "=======================================\n";
 
 $lock->unlock();
