@@ -387,6 +387,7 @@ my $filter_ou = '(objectClass=organizationalunit)';
 
 my $employeeDN = "CN=O365Lic_Employee_group.muni.cz,OU=licenses," . $base_dn_groups;
 my $studentDN = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups;
+my $student2DN = "CN=O365Lic_Student2_group.muni.cz,OU=licenses," . $base_dn_groups;
 my $alumniDN = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $base_dn_groups;
 
 # log counters
@@ -749,7 +750,7 @@ sub process_groups() {
 		unless (exists $perun_entries_group_map{$cn}) {
 
 			# Prevent clearing main license group Employee,Student,Alumni !!
-			unless (($ad_entry->dn() eq $employeeDN) or ($ad_entry->dn() eq $studentDN) or ($ad_entry->dn() eq $alumniDN)){
+			unless (($ad_entry->dn() eq $employeeDN) or ($ad_entry->dn() eq $studentDN) or ($ad_entry->dn() eq $alumniDN) or ($ad_entry->dn() eq $student2DN)){
 
 				# clear members
 				my @empty_members = ();
@@ -1006,17 +1007,35 @@ saveStoredUserStates;
 	# If any of requests to AD fail, script dies and current "waiting_on_remove" is not saved.
 	##
 
+	# Any group cannot have more than 49999 members. For Masaryk university, it might happen only for students license group. In that case we split members between 2 groups
+	
+	my @studentsIndexes = sort keys %$students;
+
+	my $upperBound = scalar @studentsIndexes <= 49999-1 ? scalar @studentsIndexes -1 : 49999-1; 
+
+	my %studentsFirstPart = ();
+	my %studentsSecondPart = ();
+	if(scalar @studentsIndexes > 0) {
+		@studentsFirstPart{@studentsIndexes[0..$upperBound]} = @{$students}{@studentsIndexes[0..$upperBound]};
+	}
+	if($upperBound < $#studentsIndexes) {
+		@studentsSecondPart{@studentsIndexes[$upperBound+1..$#studentsIndexes]} = @{$students}{@studentsIndexes[$upperBound+1..$#studentsIndexes]};
+	}
+
 	add_to_license_group($ad_entries_group_map{$employeeDN}, $ad_state->{$employeeDN}, $employees);
-	add_to_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, $students);
 	add_to_license_group($ad_entries_group_map{$alumniDN}, $ad_state->{$alumniDN}, $alumni);
+	add_to_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, \%studentsFirstPart);
+	add_to_license_group($ad_entries_group_map{$student2DN}, $ad_state->{$student2DN}, \%studentsSecondPart);
+
 
 	remove_from_license_group($ad_entries_group_map{$employeeDN}, $ad_state->{$employeeDN}, $employees);
-	remove_from_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, $students);
 	remove_from_license_group($ad_entries_group_map{$alumniDN}, $ad_state->{$alumniDN}, $alumni);
+	remove_from_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, \%studentsFirstPart);
+	remove_from_license_group($ad_entries_group_map{$student2DN}, $ad_state->{$student2DN}, \%studentsSecondPart);
 
 	# process specific license groups
 	foreach my $group_dn (sort keys %{$perun_state}) {
-		unless (($group_dn eq $employeeDN) or ($group_dn eq $studentDN) or ($group_dn eq $alumniDN)) {
+		unless (($group_dn eq $employeeDN) or ($group_dn eq $studentDN) or ($group_dn eq $alumniDN) or ($group_dn eq $student2DN)) {
 			add_to_license_group($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, $perun_state->{$group_dn});
 			remove_from_license_group($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, $perun_state->{$group_dn});
 		}
