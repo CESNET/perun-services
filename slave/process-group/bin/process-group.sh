@@ -116,7 +116,7 @@ function process {
 
 
 	open NOW_ADDED, ">", "'$NOW_ADDED_USERS'" or die "Cant open '$NOW_ADDED_USERS': $!";
-	open FROM_PERUN, shift @ARGV || die "Missing argument." or die "Cant open '$NOW_ADDED_USERS': $!";
+	open FROM_PERUN, shift @ARGV || die "Missing argument." or die "Cant open '$FROM_PERUN': $!";
 	while(<FROM_PERUN>) {
 		chomp;
 		next unless $_; #skip empty lines
