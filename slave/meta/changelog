@@ -1,3 +1,25 @@
+perun-slave-full (3.1.3) stable; urgency=low
+
+  * Add new services as dependencies of this meta package:
+    perun-slave-process-apache-shibboleth,
+    perun-slave-process-coffeeroom,
+    perun-slave-process-eduroam-block,
+    perun-slave-process-freeipa,
+    perun-slave-process-hadoop-hbase,
+    perun-slave-process-hadoop-hdfs,
+    perun-slave-process-kypo-portal,
+    perun-slave-process-mailman-vsup,
+    perun-slave-process-o365,
+    perun-slave-process-o365-contacts-export,
+    perun-slave-process-operations-portal-egi,
+    perun-slave-process-pakiti,
+    perun-slave-process-sshkeys-generic,
+    perun-slave-process-voms-dirac,
+    perun-slave-process-vsup-zimbra,
+    perun-slave-process-vsup-zimbra-aliases
+
+ -- Michal Stava <stavamichal@gmail.com>  Fri, 29 Jun 2018 10:00:00 +0200
+
 perun-slave-full (3.1.2) stable; urgency=low
 
   * Change path from /etc/perun/process-{service}.d/ to /etc/perun/{service}.d
