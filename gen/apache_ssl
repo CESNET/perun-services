@@ -41,7 +41,7 @@ foreach my $rData ($data->getChildElements) {
 	my $pathFile = "$authzFileDir/path";
 
 	open FILE,">$pathFile" or die "Cannot open $pathFile: $!";
-	print FILE $resourceAttributes{$A_R_APACHE_AUTHZ_FILE};
+	print FILE $resourceAttributes{$A_R_APACHE_AUTHZ_FILE}, "\n";
 	close FILE or die "Cannot close $pathFile: $!";
 
 	my $authzFile = "$authzFileDir/authz";
@@ -63,6 +63,7 @@ foreach my $rData ($data->getChildElements) {
 		s/\\x/\\\\x/g foreach @output;  #replace \x with \\x  (escape unicode chars)
 		print FILE "SSLRequire \\\n";
 		print FILE join " \\\n|| ", @output;
+		print FILE "\n";
 	}
 
 	close(FILE) or die "Cannot close $authzFile: $!";
