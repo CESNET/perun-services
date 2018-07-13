@@ -76,7 +76,7 @@ for my $login (@logins) {
 	my $mail = $users->{$login}->{$A_MAIL};
 	my $o = $users->{$login}->{$A_O};
 	my $eppns = $users->{$login}->{$A_EPPNS};
-	my $groups = join('#' , sort keys $userGroups->{$login});
+	my $groups = join('#' , sort keys %{$userGroups->{$login}});
 
 	if (defined $o and length $o) {
 
