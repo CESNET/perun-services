@@ -87,7 +87,7 @@ foreach my $rData (@resourcesData) {
 	}
 }
 
-foreach my $chipNumber (sort keys $dataByChip) {
+foreach my $chipNumber (sort keys %{$dataByChip}) {
 	print FILE $chipNumber . "\t";
 	print FILE $dataByChip->{$chipNumber}->{$FIRSTNAME} . "\t";
 	print FILE $dataByChip->{$chipNumber}->{$LASTNAME} . "\t";
@@ -95,7 +95,7 @@ foreach my $chipNumber (sort keys $dataByChip) {
 	print FILE $dataByChip->{$chipNumber}->{$TYPE} . "\t";
 	print FILE $dataByChip->{$chipNumber}->{$GOLD} . "\t";
 	print FILE $dataByChip->{$chipNumber}->{$ARMING} . "\t";
-	print FILE join(',',keys $dataByChip->{$chipNumber}->{$ACC_GROUPS}) . "\n";
+	print FILE join(',',keys %{$dataByChip->{$chipNumber}->{$ACC_GROUPS}}) . "\n";
 }
 
 close (FILE);
