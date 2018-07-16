@@ -90,7 +90,7 @@ my $foundAndUpdated = 0;
 my $inserted = 0;
 
 #update and insert new
-foreach my $key (sort keys $dataByKeys) {
+foreach my $key (sort keys %$dataByKeys) {
 
 	my $UCO = $dataByKeys->{$key}->{'UCO'};
 	my $OSB_ID = $dataByKeys->{$key}->{'OSB_ID'};

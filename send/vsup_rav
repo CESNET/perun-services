@@ -78,7 +78,7 @@ my $foundAndUpdated = 0;
 my $foundAndSkipped = 0;
 
 # for each incoming UCO
-foreach my $uco (sort keys $dataByUco) {
+foreach my $uco (sort keys %$dataByUco) {
 
 	my $JMENO = $dataByUco->{$uco}->{'FIRST_NAME'};
 	my $PRIJMENI = $dataByUco->{$uco}->{'LAST_NAME'};

@@ -108,7 +108,7 @@ my $deleted = 0;
 
 #update and insert new or updated chips
 my @allChipsArray = ();
-foreach my $chipNumber (sort keys $dataByChip) {
+foreach my $chipNumber (sort keys %$dataByChip) {
 	my $firstName = $dataByChip->{$chipNumber}->{$FIRSTNAME};
 	my $lastName = $dataByChip->{$chipNumber}->{$LASTNAME};
 	my $UIN = $dataByChip->{$chipNumber}->{$LOGIN};

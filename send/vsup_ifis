@@ -127,7 +127,7 @@ my $insertAkt = $dbh->prepare(qq{INSERT INTO $tableNameAkt (OSB_ID, KDYZAP, OBJ,
 # HANDLE PERSONS
 #
 
-foreach my $uco (sort keys $dataByKey) {
+foreach my $uco (sort keys %$dataByKey) {
 
 	my $OS_CISLO = $dataByKey->{$uco}->{'OS_CISLO'};
 	my $TYP_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
@@ -273,7 +273,7 @@ my $addressAreEquals = $dbh->prepare(qq{SELECT 1 FROM $tableNameAdr WHERE ULICE=
 my $updateAdr = $dbh->prepare(qq{UPDATE $tableNameAdr SET ULICE=?, MST_NAZEV=?, PSC=?, ZME_ID=?, VAD_TYP_OSB=? WHERE OSB_ID=?});
 my $deleteAdr = $dbh->prepare(qq{DELETE FROM $tableNameAdr where OSB_ID=?});
 
-foreach my $uco (sort keys $dataByKey) {
+foreach my $uco (sort keys %$dataByKey) {
 
 	my $ULICE = $dataByKey->{$uco}->{'ULICE'};
 	my $MST_NAZEV = $dataByKey->{$uco}->{'MST_NAZEV'};
@@ -344,7 +344,7 @@ my $contactsAreEquals = $dbh->prepare(qq{SELECT 1 FROM $tableNameSpj WHERE SPJ_T
 my $updateContact = $dbh->prepare(qq{UPDATE $tableNameSpj SET SPJ_CISLO=? WHERE SPJ_TYP=? and OSB_ID=?});
 my $deleteContact = $dbh->prepare(qq{DELETE FROM $tableNameSpj where SPJ_TYP=? and OSB_ID=?});
 
-foreach my $uco (sort keys $dataByKey) {
+foreach my $uco (sort keys %$dataByKey) {
 
 	my $EMAIL = $dataByKey->{$uco}->{'EMAIL'};
 	my $BANK_ACCOUNT = $dataByKey->{$uco}->{'BANK_ACCOUNT'};
@@ -380,7 +380,7 @@ my $insertVztah = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, TYP_VZTAHU
 my $updateVztah = $dbh->prepare(qq{UPDATE $tableNameVzt SET KARTA_IDENT=? WHERE TYP_VZTAHU=? and DRUH_VZTAHU=? and OSB_ID=?});
 my $deleteVztah = $dbh->prepare(qq{DELETE FROM $tableNameVzt where OSB_ID=?});
 
-foreach my $uco (sort keys $dataByKey) {
+foreach my $uco (sort keys %$dataByKey) {
 
 	my $TYP_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
 	unless ($TYP_VZTAHU eq "Externista - pedagog") {
