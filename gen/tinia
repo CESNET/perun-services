@@ -95,7 +95,7 @@ foreach my $chipNumber (sort keys %{$dataByChip}) {
 	print FILE $dataByChip->{$chipNumber}->{$TYPE} . "\t";
 	print FILE $dataByChip->{$chipNumber}->{$GOLD} . "\t";
 	print FILE $dataByChip->{$chipNumber}->{$ARMING} . "\t";
-	print FILE join(',',keys %{$dataByChip->{$chipNumber}->{$ACC_GROUPS}}) . "\n";
+	print FILE join(',',sort keys %{$dataByChip->{$chipNumber}->{$ACC_GROUPS}}) . "\n";
 }
 
 close (FILE);
