@@ -86,7 +86,7 @@ my $foundAndUpdated = 0;
 my $inserted = 0;
 
 #update and insert new
-foreach my $uco (sort keys $dataByUco) {
+foreach my $uco (sort keys %$dataByUco) {
 
 	my $LOGIN = $dataByUco->{$uco}->{'LOGIN'};
 	my $EMAIL = $dataByUco->{$uco}->{'EMAIL'};
@@ -271,7 +271,7 @@ if (length $elements) {
 # delete invalid CAO relations for kept people
 
 for my $UCO (sort keys %{$cao}) {
-	my @keptCaos = sort keys $cao->{$UCO};
+	my @keptCaos = sort keys %{$cao->{$UCO}};
 	my $kept = join('","',@keptCaos);
 	$kept = '"'.$kept.'"';
 	if($DEBUG == 1) { print "DELETED FOR $UCO NOT IN ($kept)\n"; }

@@ -72,7 +72,7 @@ my $foundAndUpdated_SPJ = 0;
 my $inserted_SPJ = 0;
 
 #update and insert new
-foreach my $osbId (sort keys $dataByOsbId) {
+foreach my $osbId (sort keys %$dataByOsbId) {
 
 	my $UCO = $dataByOsbId->{$osbId}->{'UCO'};
 	my $LOGIN = $dataByOsbId->{$osbId}->{'LOGIN'};

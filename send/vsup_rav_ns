@@ -70,11 +70,11 @@ my $deleted = 0;
 $deleted += $dbh->do("DELETE FROM $tableName");
 
 #update and insert new
-foreach my $NS_KOD (sort keys $dataByNs) {
+foreach my $NS_KOD (sort keys %$dataByNs) {
 
 	my $NS_NAZEV = $dataByNs->{$NS_KOD}->{'NAME'};
 
-	foreach my $UCO (sort keys $dataByNs->{$NS_KOD}->{'USERS'}) {
+	foreach my $UCO (sort keys %{$dataByNs->{$NS_KOD}->{'USERS'}}) {
 
 		if($DEBUG == 1) { print "INSERT NEW RECORD: ".$NS_KOD." ".$NS_NAZEV." ".$UCO."\n"; }
 		$inserted++;

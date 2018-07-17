@@ -82,7 +82,7 @@ my $deleted = 0;
 $deleted += $dbh->do("DELETE FROM $tableName");
 
 #update and insert new
-foreach my $uco (sort keys $dataByUco) {
+foreach my $uco (sort keys %$dataByUco) {
 
 	my $LOGIN = $dataByUco->{$uco}->{'LOGIN'};
 	my $EMAIL = $dataByUco->{$uco}->{'EMAIL'};
