@@ -86,9 +86,15 @@ foreach my $rData ($data->getChildElements) {
 			# prefer ZAM over anything
 			$users->{$uco}->{'TYPE'} = $relationType;
 			$users->{$uco}->{'COS'} = '0603cf86-f917-4448-bb34-57dd11a2c381';
+		} elsif ($relationType eq "PED") {
+			# prefer active PED before STU or EXPIRED or not yet set
+			if ((!defined $users->{$uco}->{'TYPE'}) || $users->{$uco}->{'TYPE'} ne 'ZAM') {
+				$users->{$uco}->{'TYPE'} = $relationType;
+				$users->{$uco}->{'COS'} = 'e3c33612-98c2-4c53-8b67-80ac1b133546';
+			}
 		} elsif ($relationType eq "STU") {
 			# prefer active STU if is also EXPIRED or not yet set
-			if ((!defined $users->{$uco}->{'TYPE'}) || $users->{$uco}->{'TYPE'} eq 'EXPIRED') {
+			if ((!defined $users->{$uco}->{'TYPE'}) || (($users->{$uco}->{'TYPE'} ne 'ZAM') && ($users->{$uco}->{'TYPE'} ne 'PED'))) {
 				$users->{$uco}->{'TYPE'} = $relationType;
 				$users->{$uco}->{'COS'} = 'e00428a1-0c00-11d9-836a-000d93afea2a';
 			}
@@ -97,6 +103,22 @@ foreach my $rData ($data->getChildElements) {
 			unless ($users->{$uco}->{'TYPE'}) {
 				$users->{$uco}->{'TYPE'} = $relationType;
 				$users->{$uco}->{'COS'} = 'e00428a1-0c00-11d9-836a-000d93afea2a';
+			}
+		} elsif ($relationType eq "GEN") {
+			# CAN'T OVERLAP WITH ANOTHER
+			unless ($users->{$uco}->{'TYPE'}) {
+				$users->{$uco}->{'TYPE'} = $relationType;
+				$users->{$uco}->{'COS'} = 'e69e98ba-e16b-4bdd-bc2c-0ae5e697337d';
+			} else {
+				die "User: '$uAttributes{$A_LOGIN}' was both GENERIC type and $users->{$uco}->{'TYPE'} type.";
+			}
+		} elsif ($relationType eq "MML") {
+			# CAN'T OVERLAP WITH ANOTHER
+			unless ($users->{$uco}->{'TYPE'}) {
+				$users->{$uco}->{'TYPE'} = $relationType;
+				$users->{$uco}->{'COS'} = '867a2875-136f-40be-ab8-751658db0300';
+			} else {
+				die "User: '$uAttributes{$A_LOGIN}' was both MAILMAN-LIST type and $users->{$uco}->{'TYPE'} type.";
 			}
 		}
 
