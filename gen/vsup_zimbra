@@ -116,7 +116,7 @@ foreach my $rData ($data->getChildElements) {
 			# CAN'T OVERLAP WITH ANOTHER
 			unless ($users->{$uco}->{'TYPE'}) {
 				$users->{$uco}->{'TYPE'} = $relationType;
-				$users->{$uco}->{'COS'} = '867a2875-136f-40be-ab8-751658db0300';
+				$users->{$uco}->{'COS'} = '867a2875-136f-40be-aab8-751658db0300';
 			} else {
 				die "User: '$uAttributes{$A_LOGIN}' was both MAILMAN-LIST type and $users->{$uco}->{'TYPE'} type.";
 			}
