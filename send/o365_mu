@@ -120,10 +120,6 @@ $EXECSCRIPT -i $INSTANCE_NAME -p $TMP_HOSTNAME_DIR -s $SERVICE_NAME
 ERRORCODE=$?
 if [ $ERRORCODE -ne 0 ]; then
 	echo "Process exit with error" >&2
-	exit $ERRORCODE
 fi
 
-ERR_CODE=$?
-echo "Slave script ends with return code: $ERR_CODE" >&2
-
-exit $ERR_CODE
+exit $ERRORCODE
