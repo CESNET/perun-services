@@ -18,9 +18,11 @@ sub startThreads;
 sub processTasks;
 sub processGroup;
 sub processUser;
+sub processResourceMail;
 sub readDataAboutUsers;
 sub readDataAboutActiveUsers;
 sub readDataAboutGroups;
+sub readDataAboutResourceMails;
 sub readFacilityId;
 sub shellEscape($);
 
@@ -30,12 +32,15 @@ my $DEBUG=0;
 #file locks for groups and users
 my $USERS_LOCK :shared;
 my $GROUPS_LOCK :shared;
+my $RESOURCE_MAILS_LOCK :shared;
 
 #arrays of users and groups
 my @allUsers = ();
 share(@allUsers);
 my @allGroups = ();
 share(@allGroups);
+my @allResourceMails = ();
+share(@allResourceMails);
 
 #number of worker threads
 my $THREAD_COUNT = 10;
@@ -48,6 +53,9 @@ my $OPERATION_USER_NOT_CHANGED = $OPERATION_USER . "-NOT_CHANGED";
 my $OPERATION_GROUP = "group";
 my $OPERATION_GROUP_CHANGED = $OPERATION_GROUP . "-CHANGED";
 my $OPERATION_GROUP_NOT_CHANGED = $OPERATION_GROUP . "-NOT_CHANGED";
+my $OPERATION_RESOURCE_MAIL = "resourceMail";
+my $OPERATION_RESOURCE_MAIL_CHANGED = $OPERATION_RESOURCE_MAIL . "-CHANGED";
+my $OPERATION_RESOURCE_MAIL_NOT_CHANGED = $OPERATION_RESOURCE_MAIL . "-NOT_CHANGED";
 my $OPERATION_END = "end"; #signal end of the operation
 my $ARGUMENT = "argument";
 
@@ -60,6 +68,33 @@ my $EMAIL_ADDRESSES_TEXT = "emailAddresses";
 my $PLAIN_TEXT_OBJECT_TEXT = "plainTextObject";
 my $AD_GROUP_NAME_TEXT = "adGroupName";
 my $SEND_AS_TEXT = "sendAs";
+my $RES_NAME_TEXT = "RES_NAME";
+my $RES_ALIAS_TEXT = "RES_ALIAS";
+my $RES_EMAIL_ADDRESES_TEXT = "RES_EMAIL_ADDRESES";
+my $RES_DISPLAY_NAME_TEXT = "RES_DISPLAY_NAME";
+my $RES_TYPE_TEXT = "RES_TYPE";
+my $RES_CAPACITY_TEXT = "RES_CAPACITY";
+my $RES_ADDITIONAL_RESPONSE_TEXT = "RES_ADDITIONAL_RESPONSE";
+my $RES_EXT_MEETING_MSG_TEXT = "RES_EXT_MEETING_MSG";
+my $RES_ALLOW_CONFLICTS_TEXT = "RES_ALLOW_CONFLICTS";
+my $RES_BOOKING_WINDOW_TEXT = "RES_BOOKING_WINDOW";
+my $RES_PERCENTAGE_ALLOWED_TEXT = "RES_PERCENTAGE_ALLOWED";
+my $RES_ENFORCE_SCHED_HORIZON_TEXT = "RES_ENFORCE_SCHED_HORIZON";
+my $RES_MAX_CONFLICT_INSTANCES_TEXT = "RES_MAX_CONFLICT_INSTANCES";
+my $RES_MAX_DURATION_TEXT = "RES_MAX_DURATION";
+my $RES_SCHED_DURING_WORK_HOURS_TEXT = "RES_SCHED_DURING_WORK_HOURS";
+my $RES_ALL_BOOK_IN_POLICY_TEXT = "RES_ALL_BOOK_IN_POLICY";
+my $RES_ALL_REQ_IN_POLICY_TEXT = "RES_ALL_REQ_IN_POLICY";
+my $RES_ALL_REQ_OUT_OF_POLICY_TEXT = "RES_ALL_REQ_OUT_OF_POLICY";
+my $RES_WORKDAYS_TEXT = "RES_WORKDAYS";
+my $RES_WORKING_HOURS_START_TIME_TEXT = "RES_WORKING_HOURS_START_TIME";
+my $RES_WORKING_HOURS_END_TIME_TEXT = "RES_WORKING_HOURS_END_TIME";
+my $RES_ALLOW_RECURRING_MEETINGS_TEXT = "RES_ALLOW_RECURRING_MEETINGS";
+my $RES_ADD_ADDITIONAL_RESPONSE_TEXT = "RES_ADD_ADDITIONAL_RESPONSE";
+my $RES_DELEGATES_TEXT = "RES_DELEGATES";
+my $RES_BOOK_IN_POLICY_TEXT = "RES_BOOK_IN_POLICY";
+my $RES_REQUEST_IN_POLICY_TEXT = "RES_REQUEST_IN_POLICY";
+my $RES_REQUEST_OUT_OF_POLICY_TEXT = "RES_REQUEST_OUT_OF_POLICY";
 
 #needed global variables and constants for this script
 my $instanceName;
@@ -106,6 +141,13 @@ if(! -f $groupsDataFilename) {
 	exit 14;
 }
 
+#resource-mails data filename from perun need to exists (even if it is empty)
+my $resourceMailsDataFilename = "$pathToServiceFile/$serviceName-resource-mails";
+if(! -f $resourceMailsDataFilename) {
+	print "ERROR - Missing service file with data about resource mails.\n";
+	exit 14;
+}
+
 #file with facility id from gen (can't be empty)
 my $facilityIdFilename = "$pathToServiceFile/$serviceName-facilityId";
 if(! -f $facilityIdFilename) {
@@ -126,6 +168,7 @@ if(@$err) {
 }
 my $lastStateOfUsersFilename = $cacheDir . "o365_mu-users";
 my $lastStateOfGroupsFilename = $cacheDir . "o365_mu-groups";
+my $lastStateOfResourceMailsFilename = $cacheDir . "o365_mu-resource-mails";
 
 #file with active users need to exists
 my $pathToActiveUsersFile = $basicCacheDir . "activeO365Users";
@@ -140,6 +183,9 @@ my $newUsersStruc = readDataAboutUsers $usersDataFilename;
 
 #read new data about groups from PERUN
 my $newGroupsStruc = readDataAboutGroups $groupsDataFilename;
+
+#read new data about resource mails from PERUN
+my $newResourceMailsStruc = readDataAboutResourceMails $resourceMailsDataFilename;
 
 #Read active users from file
 my $activeUsers = readDataAboutActiveUsers $pathToActiveUsersFile;
@@ -156,11 +202,19 @@ if( -f $lastStateOfGroupsFilename) {
 	$lastGroupsStruc = readDataAboutGroups $lastStateOfGroupsFilename;
 }
 
+#Read data (cache) about last state of resource mails
+my $lastResourceMailsStruc = {};
+if( -f $lastStateOfResourceMailsFilename) {
+	$lastResourceMailsStruc = readDataAboutResourceMails $lastStateOfResourceMailsFilename;
+}
+
 #prepare new cache files
 my $newUsersCache = new File::Temp( UNLINK => 1 );
 my $newGroupsCache = new File::Temp( UNLINK => 1 );
+my $newResourceMailsCache = new File::Temp( UNLINK => 1 ); 
 open FILE_USERS_CACHE, ">$newUsersCache" or die "Could not open file with new cache of users data $newUsersCache: $!\n";
-open FILE_GROUPS_CACHE, ">$newGroupsCache" or die "Could not open file with new cache of users data $newGroupsCache: $!\n";
+open FILE_GROUPS_CACHE, ">$newGroupsCache" or die "Could not open file with new cache of groups data $newGroupsCache: $!\n";
+open FILE_RESOURCE_MAILS_CACHE, ">$newResourceMailsCache" or die "Could not open file with new cache of resource mails data $newResourceMailsCache: $!\n";
 
 #prepare threads for work jobs
 my $jobQueue = Thread::Queue->new();
@@ -217,10 +271,33 @@ foreach my $key (keys %$newGroupsStruc) {
 	$jobQueue->enqueue($job);
 }
 
+#create and submit jobs for working with resource-mail's objects
+foreach my $key (keys %$newResourceMailsStruc) {
+	my $newResourceMail = $newResourceMailsStruc->{$key};
+	my $oldResourceMail = $lastResourceMailsStruc->{$key};
+
+	my $job;
+	unless($oldResourceMail) {
+		#resource-mail is new, add it
+		$job = { $OPERATION => $OPERATION_RESOURCE_MAIL_CHANGED, $ARGUMENT => $newResourceMail };
+	} else {
+		if($newResourceMail->{$PLAIN_TEXT_OBJECT_TEXT} eq $oldResourceMail->{$PLAIN_TEXT_OBJECT_TEXT}) {
+			#resource-mail exists and it is equals, just write it's data to the cache file
+			$job = { $OPERATION => $OPERATION_RESOURCE_MAIL_NOT_CHANGED, $ARGUMENT => $newResourceMail };
+		} else {
+			#resource-mail eixsts but it is different, modifyit (add and modify operation is the same there)
+			$job = { $OPERATION => $OPERATION_RESOURCE_MAIL_CHANGED, $ARGUMENT => $newResourceMail };
+		}
+	}
+	#add job to the queue to process it by threads
+	$jobQueue->enqueue($job);
+}
+
 #wait for all threads to finish
 waitForThreads;
 
 #write all records to files
+#IMPORTANT: there is no need for locks, because there is only 1 main thread in this part of code
 foreach my $userRecord (@allUsers) {
 	print FILE_USERS_CACHE $userRecord . "\n";
 }
@@ -229,11 +306,17 @@ foreach my $groupRecord (@allGroups) {
 	print FILE_GROUPS_CACHE $groupRecord . "\n";
 }
 
+foreach my $resourceMailRecord (@allResourceMails) {
+	print FILE_RESOURCE_MAILS_CACHE $resourceMailRecord . "\n";
+}
+
 #copy new cache files to place with old cache files
 close FILE_USERS_CACHE or die "Could not close file $newUsersCache: $!\n";
-close FILE_GROUPS_CACHE or die "Could not close file $newGroupsCache: $!\n";;
+close FILE_GROUPS_CACHE or die "Could not close file $newGroupsCache: $!\n";
+close FILE_RESOURCE_MAILS_CACHE or die "Could not close file $newResourceMailsCache: $!\n";
 copy( $newUsersCache, $lastStateOfUsersFilename );
 copy( $newGroupsCache, $lastStateOfGroupsFilename );
+copy( $newResourceMailsCache, $lastStateOfResourceMailsFilename );
 
 exit $returnCode;
 
@@ -261,6 +344,8 @@ sub processTasks {
 				$sucess = processGroup( $job->{$ARGUMENT} , $job->{$OPERATION} );
 			} elsif ($job->{$OPERATION} =~ $OPERATION_USER) {
 				$sucess = processUser( $job->{$ARGUMENT} , $job->{$OPERATION} );
+			} elsif ($job->{$OPERATION} =~ $OPERATION_RESOURCE_MAIL) {
+				$sucess = processResourceMail( $job->{$ARGUMENT}, $job->{$OPERATION} );
 			} else {
 				print "ERROR - UNKNOWN OPERATION: " . $job->{$OPERATION} . " was skipped!\n";
 				$sucess = 0;
@@ -287,7 +372,7 @@ sub waitForThreads {
 	}
 }
 
-#Sub to process group with O365 connector and if success, add him to the cache file
+#Sub to process group with O365 connector and if success, add it to the cache file
 sub processGroup {
 	my $groupObject = shift;
 	my $localOperation = shift;
@@ -324,6 +409,74 @@ sub processGroup {
 	
 	return 1;
 }
+
+#Sub to process resource-mail with O365 connector and if success, add it to the cache file
+sub processResourceMail {
+	my $resourceMailObject = shift;
+	my $localOperation = shift;
+
+	if( $localOperation eq $OPERATION_RESOURCE_MAIL_CHANGED ) {
+
+		my $command = $o365ConnectorFile . " -s " . shellEscape($serviceName) . " -S " . shellEscape($instanceName) . " -c Set-MuniResource" . " -i " . shellEscape $resourceMailObject->{$RES_NAME_TEXT};
+		if($resourceMailObject->{$RES_ALIAS_TEXT}) { $command = $command . " -A " . shellEscape $resourceMailObject->{$RES_ALIAS_TEXT}; }
+		my $emailAddresses = join " ", map { shellEscape $_ } @{$resourceMailObject->{$RES_EMAIL_ADDRESES_TEXT}};
+		if($emailAddresses) { $command = $command . " -B " . $emailAddresses };
+		if($resourceMailObject->{$RES_DISPLAY_NAME_TEXT}) { $command = $command . " -C " . shellEscape $resourceMailObject->{$RES_DISPLAY_NAME_TEXT}; }
+		if($resourceMailObject->{$RES_TYPE_TEXT}) { $command = $command . " -D " . shellEscape $resourceMailObject->{$RES_TYPE_TEXT}; }
+		if($resourceMailObject->{$RES_CAPACITY_TEXT}) { $command = $command . " -E " . shellEscape $resourceMailObject->{$RES_CAPACITY_TEXT}; }
+		if($resourceMailObject->{$RES_ADDITIONAL_RESPONSE_TEXT}) { $command = $command . " -F " . shellEscape $resourceMailObject->{$RES_ADDITIONAL_RESPONSE_TEXT}; }
+		if($resourceMailObject->{$RES_EXT_MEETING_MSG_TEXT}) { $command = $command . " -G " . shellEscape $resourceMailObject->{$RES_EXT_MEETING_MSG_TEXT}; }
+		if($resourceMailObject->{$RES_ALLOW_CONFLICTS_TEXT}) { $command = $command . " -H " . shellEscape $resourceMailObject->{$RES_ALLOW_CONFLICTS_TEXT}; }
+		if($resourceMailObject->{$RES_BOOKING_WINDOW_TEXT}) { $command = $command . " -I " . shellEscape $resourceMailObject->{$RES_BOOKING_WINDOW_TEXT}; }
+		if($resourceMailObject->{$RES_PERCENTAGE_ALLOWED_TEXT}) { $command = $command . " -J " . shellEscape $resourceMailObject->{$RES_PERCENTAGE_ALLOWED_TEXT}; }
+		if($resourceMailObject->{$RES_ENFORCE_SCHED_HORIZON_TEXT}) { $command = $command . " -K " . shellEscape $resourceMailObject->{$RES_ENFORCE_SCHED_HORIZON_TEXT}; }
+		if($resourceMailObject->{$RES_MAX_CONFLICT_INSTANCES_TEXT}) { $command = $command . " -L " . shellEscape $resourceMailObject->{$RES_MAX_CONFLICT_INSTANCES_TEXT}; }
+		if($resourceMailObject->{$RES_MAX_DURATION_TEXT}) { $command = $command . " -M " . shellEscape $resourceMailObject->{$RES_MAX_DURATION_TEXT}; }
+		if($resourceMailObject->{$RES_SCHED_DURING_WORK_HOURS_TEXT}) { $command = $command . " -N " . shellEscape $resourceMailObject->{$RES_SCHED_DURING_WORK_HOURS_TEXT}; }
+		if($resourceMailObject->{$RES_ALL_BOOK_IN_POLICY_TEXT}) { $command = $command . " -O " . shellEscape $resourceMailObject->{$RES_ALL_BOOK_IN_POLICY_TEXT}; }
+		if($resourceMailObject->{$RES_ALL_REQ_IN_POLICY_TEXT}) { $command = $command . " -P " . shellEscape $resourceMailObject->{$RES_ALL_REQ_IN_POLICY_TEXT}; }
+		if($resourceMailObject->{$RES_ALL_REQ_OUT_OF_POLICY_TEXT}) { $command = $command . " -Q " . shellEscape $resourceMailObject->{$RES_ALL_REQ_OUT_OF_POLICY_TEXT}; }
+		my $workingDays = join " ", map { shellEscape $_ } @{$resourceMailObject->{$RES_WORKDAYS_TEXT}};
+		if($workingDays) { $command = $command . " -R " . $workingDays; }
+		if($resourceMailObject->{$RES_WORKING_HOURS_START_TIME_TEXT}) { $command = $command . " -T " . shellEscape $resourceMailObject->{$RES_WORKING_HOURS_START_TIME_TEXT}; }
+		if($resourceMailObject->{$RES_WORKING_HOURS_END_TIME_TEXT}) { $command = $command . " -U " . shellEscape $resourceMailObject->{$RES_WORKING_HOURS_END_TIME_TEXT}; }
+		if($resourceMailObject->{$RES_ALLOW_RECURRING_MEETINGS_TEXT}) { $command = $command . " -V " . shellEscape $resourceMailObject->{$RES_ALLOW_RECURRING_MEETINGS_TEXT}; }
+		if($resourceMailObject->{$RES_ADD_ADDITIONAL_RESPONSE_TEXT}) { $command = $command . " -X " . shellEscape $resourceMailObject->{$RES_ADD_ADDITIONAL_RESPONSE_TEXT}; }
+		my $delegates = join " ", map { shellEscape $_ } @{$resourceMailObject->{$RES_DELEGATES_TEXT}};
+		if($delegates) { $command = $command . " -Y " . $delegates; }
+		my $bookInPolicy = join " ", map { shellEscape $_ } @{$resourceMailObject->{$RES_BOOK_IN_POLICY_TEXT}};
+		if($bookInPolicy) { $command = $command . " -Z " . $bookInPolicy; }
+		my $reqInPolicy = join " ", map { shellEscape $_ } @{$resourceMailObject->{$RES_REQUEST_IN_POLICY_TEXT}};
+		if($reqInPolicy) { $command = $command . " -x " . $reqInPolicy; }
+		my $reqOutOfPolicy = join " ", map { shellEscape $_ } @{$resourceMailObject->{$RES_REQUEST_OUT_OF_POLICY_TEXT}};
+		if($reqOutOfPolicy) { $command = $command . " -y " . $reqOutOfPolicy; }
+		
+		if($DEBUG) { print "CHANGE RESOURCE-MAIL N-EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - STARTED\n"; }
+		`$command`;
+		if($?) { 
+			print "CHANGE RESOURCE-MAIL N-EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - ERROR\n";
+			return 0; 
+		}
+		{
+			lock $RESOURCE_MAILS_LOCK;
+			push @allResourceMails, $resourceMailObject->{$PLAIN_TEXT_OBJECT_TEXT};
+		}
+		if($DEBUG) { print "CHANGE RESOURCE-MAIL N-EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - OK\n" };
+	} elsif( $localOperation eq $OPERATION_RESOURCE_MAIL_NOT_CHANGED ) {
+		if($DEBUG) { print "CHANGE RESOURCE-MAIL EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - STARTED\n"; }
+		{
+			lock $RESOURCE_MAILS_LOCK;
+			push @allResourceMails, $resourceMailObject->{$PLAIN_TEXT_OBJECT_TEXT};
+		}
+		if($DEBUG) { print "CHANGE RESOURCE-MAIL EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - OK\n" };
+	} else {
+		print "ERROR - UNKNOWN OPERATION: " . $localOperation . " was skipped for resource-mail " . $resourceMailObject->{$RES_NAME_TEXT} . "\n";
+		return 0;
+	}
+	
+	return 1;
+}
+
 
 #Sub to process user with O365 connector and if success, add him to the cache file
 sub processUser {
@@ -444,6 +597,91 @@ sub readDataAboutGroups {
 	close FILE or die "Could not close file $pathToFile: $!\n";
 
 	return $groupsStruc;
+}
+
+#Sub to read data about resource-mails from file and convert it to perl hash
+sub readDataAboutResourceMails {
+	my $pathToFile = shift;
+
+	my $resourceMailsStruc = {};
+	open FILE, $pathToFile or die "Could not open file with resource-mails data from perun $pathToFile: $!\n";
+
+	while(my $line = <FILE>) {
+		chomp( $line );
+		my @parts = split /\t/, $line;
+		my $resourceMailName = $parts[0];
+		my $resourceAlias = $parts[1];
+		my @resourceEmails = ();
+		if($parts[2]) { @resourceEmails = split / /, $parts[2]; }
+		my $resourceDisplayName = $parts[3];
+		my $resourceType = $parts[4];
+		my $resourceCapacity = $parts[5];
+		my $resourceAdditionalResponse = $parts[6];
+		my $resourceExtMeetingMsg = $parts[7];
+		my $resourceAllowConflicts = $parts[8];
+		my $resourceBookingWindow = $parts[9];
+		my $resourcePercentageAllowed = $parts[10];
+		my $resourceEnforceSchedHorizon = $parts[11];
+		my $resourceMaxConflictInstances = $parts[12];
+		my $resourceMaxDuration = $parts[13];
+		my $resourceSchedDuringWorkHours = $parts[14];
+		my $resourceAllBookInPolicy = $parts[15];
+		my $resourceAllReqInPolicy = $parts[16];
+		my $resourceAllReqOutOfPolicy = $parts[17];
+		my @resourceWorkdays = ();
+		if($parts[18]) { @resourceWorkdays = split / /, $parts[18]; }
+		my $resourceWorkingHoursStartTime = $parts[19];
+		my $resourceWorkingHoursEndTime = $parts[20];
+		my $resourceAllowRecurringMeetings = $parts[21];
+		my $resourceAddAdditionalResponse = $parts[22];
+		my @resourceDelegates = ();
+		if($parts[23]) { @resourceDelegates = split / /, $parts[23]; }
+		my @resourceBookInPolicy = ();
+		if($parts[24]) { @resourceBookInPolicy = split / /, $parts[24]; }
+		my @resourceRequestInPolicy = ();
+		if($parts[25]) { @resourceRequestInPolicy = split / /, $parts[25]; }
+		my @resourceRequestOutOfPolicy = ();
+		if($parts[26]) { @resourceRequestOutOfPolicy = split / /, $parts[26]; }
+
+		#if resource-mail name is from any reason empty, set global return code to 1 and skip this resource-mail
+		unless($line) {
+			print "ERROR - Can't find name of resource-mail in $pathToFile for line '$line'\n";
+			$returnCode = 1;
+			next;
+		}
+
+		$resourceMailsStruc->{$resourceMailName}->{$RES_NAME_TEXT} = $resourceMailName;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_ALIAS_TEXT} = $resourceAlias;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_EMAIL_ADDRESES_TEXT} = \@resourceEmails;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_DISPLAY_NAME_TEXT} = $resourceDisplayName;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_TYPE_TEXT} = $resourceType;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_CAPACITY_TEXT} = $resourceCapacity;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_ADDITIONAL_RESPONSE_TEXT} = $resourceAdditionalResponse;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_EXT_MEETING_MSG_TEXT} = $resourceExtMeetingMsg;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_ALLOW_CONFLICTS_TEXT} = $resourceAllowConflicts;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_BOOKING_WINDOW_TEXT} = $resourceBookingWindow;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_PERCENTAGE_ALLOWED_TEXT} = $resourcePercentageAllowed;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_ENFORCE_SCHED_HORIZON_TEXT} = $resourceEnforceSchedHorizon;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_MAX_CONFLICT_INSTANCES_TEXT} = $resourceMaxConflictInstances;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_MAX_DURATION_TEXT} = $resourceMaxDuration;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_SCHED_DURING_WORK_HOURS_TEXT} = $resourceSchedDuringWorkHours;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_ALL_BOOK_IN_POLICY_TEXT} = $resourceAllBookInPolicy;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_ALL_REQ_IN_POLICY_TEXT} = $resourceAllReqInPolicy;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_ALL_REQ_OUT_OF_POLICY_TEXT} = $resourceAllReqOutOfPolicy;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_WORKDAYS_TEXT} = \@resourceWorkdays;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_WORKING_HOURS_START_TIME_TEXT} = $resourceWorkingHoursStartTime;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_WORKING_HOURS_END_TIME_TEXT} = $resourceWorkingHoursEndTime;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_ALLOW_RECURRING_MEETINGS_TEXT} = $resourceAllowRecurringMeetings;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_ADD_ADDITIONAL_RESPONSE_TEXT} = $resourceAddAdditionalResponse;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_DELEGATES_TEXT} = \@resourceDelegates;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_BOOK_IN_POLICY_TEXT} = \@resourceBookInPolicy;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_REQUEST_IN_POLICY_TEXT} = \@resourceRequestInPolicy;
+		$resourceMailsStruc->{$resourceMailName}->{$RES_REQUEST_OUT_OF_POLICY_TEXT} = \@resourceRequestOutOfPolicy;
+		$resourceMailsStruc->{$resourceMailName}->{$PLAIN_TEXT_OBJECT_TEXT} = $line;
+	}
+	close FILE or die "Could not close file $pathToFile: $!\n";
+
+	return $resourceMailsStruc;
 }
 
 #Sub to read data about facility id from file

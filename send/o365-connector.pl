@@ -16,6 +16,8 @@ use POSIX qw(strftime);
 #We want to have data in UTF8 on output
 binmode STDOUT, ':utf8';
 
+sub shellEscape($);
+
 #This also set Data Dumper to UTF8
 local $Data::Dumper::Useqq = 1;
 { no warnings 'redefine';
@@ -34,6 +36,7 @@ local $Data::Dumper::Useqq = 1;
 ./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniMailbox" -i 396462@mandragora.muni.cz
 ./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniSharebox" -i jan@izydorczyk.cz
 ./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniGroup" -i test-lab-crocs@mandragora.onmicrosoft.com -t 255920@mandragora.muni.cz 465818@mandragora.muni.cz
+./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniResourceMail" -i nameOfResource -A alias -B 255920@mandragora.muni.cz 465818@mandragora.muni.cz -C displayName -D Room
 ./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniMailBox" -i 396462@mandragora.muni.cz -a 1 -d 0 -f slavek@ics.muni.cz -e slavek@ics.muni.cz,123456@muni.cz
 ./o365-connector.pl -s o365_mu -S prodMU -c "Test-MuniError" -i soft
 =cut
@@ -87,6 +90,7 @@ our $COMMAND_GET_MAILBOX = "Get-MuniMailbox";
 our $COMMAND_GET_SHAREBOX = "Get-MuniSharebox";
 our $COMMAND_SET_GROUP = "Set-MuniGroup";
 our $COMMAND_SET_MAILBOX = "Set-MuniMailBox";
+our $COMMAND_SET_RESOURCE = "Set-MuniResource";
 our $COMMAND_TEST_MUNI_ERROR = "Test-MuniError";
 #Basic content of every call
 our %content = ();
@@ -105,8 +109,9 @@ Return help + exit 1 if help is needed.
 Return STDOUT + exit 0 if everything is ok.
 Return STDERR + exit >0 if error happens.
 Available commands with mandatory options:
- --command "$COMMAND_SET_MAILBOX" -i "emailOfMailbox" -a 1|0 -d 1|0 -f "email"|-e "email1,email2,email3"
+ --command "$COMMAND_SET_MAILBOX" -i "emailOfMailbox" -a 1|0 -d 1|0 -f "email" -e "email1,email2,email3"
  --command "$COMMAND_SET_GROUP" -i "nameOfGroup" -t contact1 contact2 ...
+ --command "$COMMAND_SET_RESOURCE" -i "nameOfResourceMail" -A "alias" -B email1 email2 email3 -C "display name" -D "type" 
  --command "$COMMAND_PING_EMAIL" -i "emailToPing"
  --command "$COMMAND_GET_CONTACT" -i "nameOfContact"
  --command "$COMMAND_GET_GROUP" -i "nameOfGroup"
@@ -127,7 +132,35 @@ SetMailbox mandatory options:
  --forwarding  | -f forward to email address for mailing list
  --emails      | -e string represenation of list of email addresses comma separated
 SetGroup mandatory options:
- --contacts    | -t list of contacts to be able to send email as group\n
+ --contacts    | -t list of contacts to be able to send email as group
+SetResourceMail mandatory options:
+ --alias                | -A text alias
+ --emails               | -B list of emails space separated
+ --displayName          | -C text display name
+ --type                 | -D text type
+SetResourceMail optional options:
+ --capacity             | -E text number of capacity
+ --additionalResponse   | -F text of additional response
+ --extMeetingMsg        | -G if processing of external meeting message is enabled, values 1=enable, 0=disable, disable by default
+ --allowConflicts       | -H if conflicts are allowed, values 1=enable, 0=disable, disable by default
+ --bookingWindow        | -I text number of booking window in days
+ --percentageAllowed    | -J text number allowed percentage
+ --enforceSchedHorizon  | -K if schedule horizon should be enforced, values 1=enable, 0=disable, disable by default
+ --maxConflictInstances | -L text number of instances in conflict
+ --maxDuration          | -M text number of maximal duration in minutes
+ --schedDuringWorkHours | -N if schedule should be only during working hours, values 1=enable, 0=disable, disable by default
+ --allBookInPolicy      | -O if resource-mail support book in policy for everybody, values 1=enable, 0=disable, disable by default
+ --allReqInPolicy       | -P if resource-mail support request in policy for everybody, values 1=enable, 0=disable, disable by default
+ --allReqOutOfPolicy    | -Q if resource-mail support request out of policy for everybody, values 1=enable, 0=disable, disable by default
+ --workingDays          | -R list of working days space separated
+ --workingHoursStart    | -T text time when work starts
+ --workingHoursEnd      | -U text time when work ends
+ --allowRecurMeetings   | -V if recurring meetings are allowed, values 1=enable, 0=disable, disable by default
+ --addAdditionalResp    | -X if additional response should be added, values 1=enable, 0=disable, disable by default
+ --delegates            | -Y list of UPNs space separated
+ --bookInPolicy         | -Z list of UPNs space separated
+ --requestInPolicy      | -x list of UPNs space separated
+ --requestOutOfPolicy   | -y list of UPNs space separated\n
 };
 }
 
@@ -137,21 +170,54 @@ SetGroup mandatory options:
 
 #Get parameters of script and assign them to variables
 my $inputCommand = $0;
-foreach my $argument (@ARGV) { $inputCommand .= " " . $argument; }
-my ($service, $server, $argIdent, $argCommand, $argArch, $argDeliv, $argForw, $argEmailAddresses, @argContacts);
+foreach my $argument (@ARGV) { $inputCommand .= " " . ($argument =~ /^-/ ? $argument : shellEscape $argument); }
+#foreach my $argument (@ARGV) { $inputCommand .= " " . $argument; }
+my ($service, $server, $argIdent, $argCommand, $argArch, $argDeliv, $argForw, $argEmailAddresses, @argContacts, $argResAlias, @argResEmails,
+ $argResDisplayName, $argResType, $argResCapacity, $argResAdditionalResponse, $argResExtMeetingMsg, $argResAllowConflicts, $argResBookingWindow,
+ $argResPercentageAllowed, $argResEnforceSchedHorizon, $argResMaxConflictInstances, $argResMaxDuration, $argResSchedDuringWorkHours,
+ $argResAllBookInPolicy, $argResAllRequestInPolicy, $argResAllReqOutOfPolicy, @argResWorkingDays, $argResWorkingHoursStart, $argResWorkingHoursEnd, 
+ $argResAllowRecurMeetings, $argResAddAdditionalResp, @argResDelegates, @argResBookInPolicy, @argResRequestInPolicy, @argResRequestOutOfPolicy);
+
 GetOptions("help|h"	=> sub {
 		print help;
 		exit 1;
 	},
-	"service|s=s"     => \$service,
-	"server|S=s"      => \$server,
-	"command|c=s"     => \$argCommand,
-	"identifier|i=s"  => \$argIdent,
-	"archiving|a=i"   => \$argArch,
-	"delivering|d=i"  => \$argDeliv,
-	"forwarding|f=s"  => \$argForw,
-	"emails|e=s"      => \$argEmailAddresses,
-	'contacts|t=s@{1,}' => \@argContacts ) || die help;
+	"service|s=s"                => \$service,
+	"server|S=s"                 => \$server,
+	"command|c=s"                => \$argCommand,
+	"identifier|i=s"             => \$argIdent,
+	"archiving|a=i"              => \$argArch,
+	"delivering|d=i"             => \$argDeliv,
+	"forwarding|f=s"             => \$argForw,
+	"emails|e=s"                 => \$argEmailAddresses,
+	'contacts|t=s@{1,}'          => \@argContacts,
+	"alias|A=s"                  => \$argResAlias,
+	'emails|B=s@{1,}'            => \@argResEmails,
+	"displayName|C=s"            => \$argResDisplayName,
+	"type|D=s"                   => \$argResType,
+	"capacity|E=i"               => \$argResCapacity,
+	"additionalResponse|F=s"     => \$argResAdditionalResponse,
+	"extMeetingMsg|G=i"          => \$argResExtMeetingMsg,
+	"allowConflicts|H=i"         => \$argResAllowConflicts,
+	"bookingWindow|I=i"          => \$argResBookingWindow,
+	"percentageAllowed|J=i"      => \$argResPercentageAllowed,
+	"enforceSchedHorizon|K=i"    => \$argResEnforceSchedHorizon,
+	"maxConflictInstances|L=i"   => \$argResMaxConflictInstances,
+	"maxDuration|M=i"            => \$argResMaxDuration,
+	"schedDuringWorkHours|N=i"   => \$argResSchedDuringWorkHours,
+	"allBookInPolicy|O=i"        => \$argResAllBookInPolicy,
+	"allReqInPolicy|P=i"         => \$argResAllRequestInPolicy,
+	"allReqOutOfPolicy|Q=i"      => \$argResAllReqOutOfPolicy,
+	'workingDays|R=s@{1,}'       => \@argResWorkingDays,
+	"workingHoursStart|T=s"      => \$argResWorkingHoursStart,
+	"workingHoursEnd|U=s"        => \$argResWorkingHoursEnd,
+	"allowRecurMeetings|V=i"     => \$argResAllowRecurMeetings,
+	"addAdditionalResp|X=i"      => \$argResAddAdditionalResp,
+	'delegates|Y=s{1,}'          => \@argResDelegates,
+	'bookInPolicy|Z=s{1,}'       => \@argResBookInPolicy,
+	'requestInPolicy|x=s{1,}'    => \@argResRequestInPolicy,
+	'requestOutOfPolicy|y=s{1,}' => \@argResRequestOutOfPolicy
+) || die help;
 
 #Check existence of mandatory parameters
 unless (defined $service) { diePretty ( $ERROR_MISSING_PARAMETER, "Service is required parameter\n" ); }
@@ -185,6 +251,13 @@ if($argCommand eq $COMMAND_SET_MAILBOX) {
 	setMailbox ( $COMMAND_STATUS_SET, undef, $argIdent, $argDeliv, $argArch, $argForw, $argEmailAddresses );
 } elsif ($argCommand eq $COMMAND_SET_GROUP) {
 	setGroup ( $COMMAND_STATUS_SET, undef, $argIdent, \@argContacts);
+} elsif ($argCommand eq $COMMAND_SET_RESOURCE) {
+	setResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent, $argResAlias, \@argResEmails, $argResDisplayName, $argResType,
+	 $argResCapacity, $argResAdditionalResponse, $argResExtMeetingMsg, $argResAllowConflicts, $argResBookingWindow,
+	 $argResPercentageAllowed, $argResEnforceSchedHorizon, $argResMaxConflictInstances, $argResMaxDuration, $argResSchedDuringWorkHours,
+	 $argResAllBookInPolicy, $argResAllRequestInPolicy, $argResAllReqOutOfPolicy, \@argResWorkingDays, $argResWorkingHoursStart,
+	 $argResWorkingHoursEnd, $argResAllowRecurMeetings, $argResAddAdditionalResp, \@argResDelegates, \@argResBookInPolicy,
+	 \@argResRequestInPolicy, \@argResRequestOutOfPolicy);
 } elsif ($argCommand eq $COMMAND_PING_EMAIL) {
 	pingEmail ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_GET_CONTACT) {
@@ -213,6 +286,115 @@ exit 0;
 #-------------------------------------------------------------------------
 #------------------------------COMMAND-SUBS-------------------------------
 #-------------------------------------------------------------------------
+setResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent, $argResAlias, \@argResEmails, $argResDisplayName, $argResType,
+	 $argResCapacity, $argResAdditionalResponse, $argResExtMeetingMsg, $argResAllowConflicts, $argResBookingWindow,
+	 $argResPercentageAllowed, $argResEnforceSchedHorizon, $argResMaxConflictInstances, $argResMaxDuration, $argResSchedDuringWorkHours,
+	 $argResAllBookInPolicy, $argResAllRequestInPolicy, $argResAllReqOutOfPolicy, \@argResWorkingDays, $argResWorkingHoursStart,
+	 $argResWorkingHoursEnd, $argResAllowRecurMeetings, $argResAddAdditionalResp, \@argResDelegates, \@argResBookInPolicy,
+	 \@argResRequestInPolicy, \@argResRequestOutOfPolicy);
+
+#Name:
+# setResourceMail
+#-----------------------
+#Parameters: 
+# status           - status of command, do we want to set this command or resolve it
+# jsonOutput       - json output from the server as hash in perl, undef if there is no such output yet
+# resourceMailName - identifier of resource mail  in o365
+# ...             - other optional arguments as alias, description, emails etc.
+#-----------------------
+#Returns: void with exit status 0 = OK, error with exit status > 0 = not OK
+#-----------------------
+#Description: 
+# For existing resource-mail in o365 set all possible attributes
+#-----------------------
+sub setResourceMail {
+	my $status = shift;
+	my $jsonOutput = shift;
+	my $resName = shift;
+	my $resAlias = shift;
+	my $resEmails = shift;
+	my $resDisplayName = shift;
+	my $resType = shift;
+	my $resCapacity = shift;
+	my $resAdditionalResponse = shift;
+	my $resExtMeetingMsg = shift;
+	my $resAllowConflicts = shift;
+	my $resBookingWindow = shift;
+	my $resPercentageAllowed = shift;
+	my $resEnforceSchedHorizon = shift;
+	my $resMaxConflictsInstances = shift;
+	my $resMaxDuration = shift;
+	my $resSchedDuringWorkHours = shift;
+	my $resAllBookInPolicy = shift;
+	my $resAllRequestInPolicy = shift;
+	my $resAllRequestOutOfPolicy = shift;
+	my $resWorkingDays = shift;
+	my $resWorkingHoursStart = shift;
+	my $resWorkingHoursEnd = shift;
+	my $resAllowRecurMeetings = shift;
+	my $resAddAdditionalResp = shift;
+	my $resDelegates = shift;
+	my $resBookInPolicy = shift;
+	my $resRequestInPolicy = shift;
+	my $resRequestOutOfPolicy = shift;
+
+	if(defined($jsonOutput->{"ErrorType"})) {
+		diePretty ( $ERROR_O365_OR_PS_ERROR , "Some HARD internal message error in method call -> " . $jsonOutput->{"ErrorMessage"} . "\n" );
+	}
+
+	if($status eq $COMMAND_STATUS_SET) {
+		$actualCommand = $COMMAND_SET_RESOURCE;
+		unless($resName) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty resource-mail name object!\n"); }
+		unless($resAlias) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty resource-mail alias object!\n"); }
+		unless($resDisplayName) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty resource-mail display name object!\n"); }
+		unless($resType) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty resource-mail type object!\n"); }
+		unless(scalar(@$resEmails)) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty resource-mail emails object!\n"); }
+
+		$URL = $BASIC_URL . $actualCommand . "/";
+		$USED_TYPE = $TYPE_POST;
+
+		#mandatory attributes
+		$content{'Name'} = $resName;
+		$content{'Alias'} = $resAlias;
+		$content{'EmailAddresses'} = $resEmails;
+		$content{'DisplayName'} = $resDisplayName;
+		$content{'Type'} = $resType;
+
+		#optional attributes
+		if($resCapacity) { $content{'ResourceCapacity'} = $resCapacity; }
+		if($resAdditionalResponse) { $content{'AdditionalResponse'} = $resAdditionalResponse; }
+		$content{'ProcessExternalMeetingMessages'} = $resExtMeetingMsg ? JSON::true : JSON::false;
+		$content{'AllowConflicts'} = $resAllowConflicts ? JSON::true : JSON::false;
+		if($resBookingWindow) { $content{'BookingWindowInDays'} = $resBookingWindow; }
+		if($resPercentageAllowed) { $content{'ConflictPercentageAllowed'} = $resPercentageAllowed; }
+		$content{'EnforceSchedulingHorizon'} = $resEnforceSchedHorizon ? JSON::true : JSON::false;
+		if($resMaxConflictsInstances) { $content{'MaximumConflictInstances'} = $resMaxConflictsInstances; }
+		if($resMaxDuration) { $content{'MaximumDurationInMinutes'} = $resMaxDuration; }
+		$content{'ScheduleOnlyDuringWorkHours'} = $resSchedDuringWorkHours ? JSON::true : JSON::false;
+		$content{'AllBookInPolicy'} = $resAllBookInPolicy ? JSON::true : JSON::false;
+		$content{'AllRequestInPolicy'} = $resAllRequestInPolicy ? JSON::true : JSON::false;
+		$content{'AllRequestOutOfPolicy'} = $resAllRequestOutOfPolicy ? JSON::true : JSON::false;
+		$content{'Workdays'} = scalar(@$resWorkingDays) ? $resWorkingDays : JSON::null;
+		if($resWorkingHoursStart) { $content{'WorkingHoursStartTime'} = $resWorkingHoursStart; }
+		if($resWorkingHoursEnd) { $content{'WorkingHoursEndTime'} = $resWorkingHoursEnd; }
+		$content{'AllowRecurringMeetings'} = $resAllowRecurMeetings ? JSON::true : JSON::false;
+		$content{'AddAdditionalResponse'} = $resAddAdditionalResp ? JSON::true : JSON::false;
+		$content{'ResourceDelegates'} = scalar(@$resDelegates) ? $resDelegates : JSON::null;
+		$content{'BookInPolicy'} = scalar(@$resBookInPolicy) ? $resBookInPolicy : JSON::null;
+		$content{'RequestInPolicy'} = scalar(@$resRequestInPolicy) ? $resRequestInPolicy : JSON::null;
+		$content{'RequestOutOfPolicy'} = scalar(@$resRequestOutOfPolicy) ? $resRequestOutOfPolicy : JSON::null;
+
+		return 1;
+	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
+		if($jsonOutput->{'Status'} eq 'OK') {
+			return 0;
+		} else {
+			diePretty ( $ERROR_SET_METHOD_END_WITH_NOOK, "Status of output is: " . $jsonOutput->{'Status'} . "\n" );
+		}
+	} else {
+		diePretty ( $ERROR_UNSUPPORTED_COMMAND_STATUS, "Unsupported status $status\n" );
+	}
+}
 
 #Name:
 # setGroup
@@ -700,7 +882,6 @@ sub createConnection {
 	#$headers->header('Authorization' => 'Basic ' . $autorizationInBase64);
 
 	my $ua = LWP::UserAgent->new;
-	print("CREDENTIALS: $address, $domain\n");
 	$ua->credentials( $address, $domain, $USERNAME, $PASSWORD );
 	my $request = HTTP::Request->new( $type, $url, $headers, $content );
 	return $ua->request($request);
@@ -921,9 +1102,20 @@ sub resolveOutputByCommandName {
 		return setGroup ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_SET_MAILBOX) {
 		return setMailbox ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
+	} elsif ($actualCommand eq $COMMAND_SET_RESOURCE) {
+		return setResourceMail ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_TEST_MUNI_ERROR) {
 		return testMuniError ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} else {
 		diePretty( $ERROR_UNSUPPORTED_COMMAND, "Command with number $actualCommand not known.\n" );
 	}
+}
+
+#Escape all shell special characters from input
+sub shellEscape($) {
+	$_ = shift;
+	
+	s/([-!\@\#\$\^&\*\(\)\{\}\[\]\\\/+=\.\<\>\?;:"',`\|%\s])/\\$1/g;
+
+	$_;
 }
