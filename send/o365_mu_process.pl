@@ -67,7 +67,8 @@ my $pathToServiceFile;
 my $serviceName;
 my $domain = "";
 my $o365ConnectorFile = "./o365-connector.pl";
-my $returnCode=0;
+my $returnCode :shared;
+$returnCode = 0;
 
 #get options from input of script
 GetOptions ("instanceName|i=s" => \$instanceName, "pathToServiceFile|p=s" => \$pathToServiceFile, "serviceName|s=s" => \$serviceName);
