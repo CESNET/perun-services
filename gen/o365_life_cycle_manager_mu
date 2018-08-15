@@ -6,7 +6,7 @@ use perunServicesInit;
 use perunServicesUtils;
 use Perun::Agent;
 use open qw/:std :utf8/;
-use JSON::XS;
+use JSON;
 use utf8;
 
 local $::SERVICE_NAME = "o365_life_cycle_manager_mu";
@@ -27,6 +27,7 @@ my $loginHeader = "login";
 my $o365EmailAddressesHeader = "o365EmailAddresses";
 my $emailAddressesHeader = "emailAddresses";
 my $o365AccountExtensionHeader = "o365AccountExtension";
+my $allumniAccountDisabledHeader = "allumniAccountDisabled";
 my $relationsTypesHeader = "relationTypes";
 
 #Constants
@@ -37,6 +38,7 @@ our $A_USER_LOGIN_MU;              *A_USER_LOGIN_MU =               \'urn:perun:
 our $A_RESOURCE_RELATION_TYPE;     *A_RESOURCE_RELATION_TYPE =      \'urn:perun:resource:attribute-def:def:relationType';
 our $A_MEMBER_O365_EMAIL_ADDRS_MU; *A_MEMBER_O365_EMAIL_ADDRS_MU =  \'urn:perun:member:attribute-def:def:o365EmailAddresses:mu';
 our $A_USER_FACILITY_O365_ACC_EXT; *A_USER_FACILITY_O365_ACC_EXT =  \'urn:perun:user_facility:attribute-def:def:o365AccountExtension';
+our $A_USER_FACILITY_ACC_DISABLED; *A_USER_FACILITY_ACC_DISABLED =  \'urn:perun:user_facility:attribute-def:def:allumniAccountDisabled';
 
 my $userStruc = {};
 
@@ -62,6 +64,7 @@ foreach my $id (sort keys %$userStruc) {
 	$user->{$emailAddressesHeader} = $userStruc->{$id}->{$emailAddressesHeader};
 	$user->{$o365AccountExtensionHeader} = $userStruc->{$id}->{$o365AccountExtensionHeader};
 	$user->{$relationsTypesHeader} = $userStruc->{$id}->{$relationsTypesHeader};
+	$user->{$allumniAccountDisabledHeader} = $userStruc->{$id}->{$allumniAccountDisabledHeader};
 
 	push @users, $user;
 }
@@ -96,11 +99,13 @@ sub processUsers {
 		my $login = $memberAttributes{$A_USER_LOGIN_MU};
 		my $o365EmailAddresses = $memberAttributes{$A_MEMBER_O365_EMAIL_ADDRS_MU};
 		my $o365AccExtension = $memberAttributes{$A_USER_FACILITY_O365_ACC_EXT};
+		my $accountDisabled = $memberAttributes{$A_USER_FACILITY_ACC_DISABLED};
 
 		$userStruc->{$id}->{$memberIdHeader} = $memberId;
 		$userStruc->{$id}->{$loginHeader} = $login;
 		$userStruc->{$id}->{$o365EmailAddressesHeader} = $o365EmailAddresses;
 		$userStruc->{$id}->{$o365AccountExtensionHeader} = $o365AccExtension;
+		$userStruc->{$id}->{$allumniAccountDisabledHeader} = $accountDisabled ? JSON::true : JSON::false;
 		
 		#TODO: this is just temporary settings and will be replaced soon 
 		my @emailAddresses = @$o365EmailAddresses;
