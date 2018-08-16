@@ -1,0 +1,208 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Time::Piece;
+
+sub calculateExpiration;
+
+local $::SERVICE_NAME = "vsup_k4";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
+my $groupFileName = "$DIRECTORY/$::SERVICE_NAME"."_groups.csv";
+my $data = perunServicesInit::getHierarchicalData;
+
+# Constants
+our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
+our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
+our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
+our $A_GENDER;  *A_GENDER = \'urn:perun:user:attribute-def:def:gender';
+our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:expirationKos';
+our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
+our $A_EXPIRATION_MANUAL;  *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
+our $A_NAV;  *A_NAV = \'urn:perun:user:attribute-def:def:k4Nav';
+our $A_STALEAKT;  *A_STALEAKT = \'urn:perun:user:attribute-def:def:k4Staleakt';
+our $A_BLACKLISTED;  *A_BLACKLISTED = \'urn:perun:user_facility:attribute-def:virt:blacklisted';
+
+our $A_R_ID;  *A_R_ID = \'urn:perun:resource:attribute-def:def:k4GroupId';
+our $A_R_NAME;  *A_R_NAME = \'urn:perun:resource:attribute-def:def:k4GroupName';
+our $A_R_CODE;  *A_R_CODE = \'urn:perun:resource:attribute-def:def:k4GroupCode';
+our $A_R_PRIORITY;  *A_R_PRIORITY = \'urn:perun:resource:attribute-def:def:k4GroupPriority';
+
+# GATHER USERS
+my $users;  # $users->{$uco}->{ATTR} = $attrValue;
+# GATHER GROUPS
+my $groups; # $groups->{$id}->{name|code|priority|members} = $value;
+
+#
+# AGGREGATE DATA
+#
+# FOR EACH RESOURCE
+foreach my $rData ($data->getChildElements) {
+
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my $k4GroupId = $resourceAttributes{$A_R_ID};
+	my $k4GroupName = $resourceAttributes{$A_R_NAME};
+	my $k4GroupCode = $resourceAttributes{$A_R_CODE};
+	my $k4GroupPriority = $resourceAttributes{$A_R_PRIORITY};
+
+	if (exists $groups->{$k4GroupId}->{"code"}) {
+		if ($groups->{$k4GroupId}->{"code"} ne $k4GroupCode) {
+			die "K4 Group with $k4GroupId has different values for CODE: $k4GroupCode vs $groups->{$k4GroupId}->{'code'}";
+		}
+	} else {
+		$groups->{$k4GroupId}->{"code"} = $k4GroupCode;
+	}
+	if (exists $groups->{$k4GroupId}->{"name"}) {
+		if ($groups->{$k4GroupId}->{"name"} ne $k4GroupName) {
+			die "K4 Group with $k4GroupId has different values for NAME: $k4GroupName vs $groups->{$k4GroupId}->{'name'}";
+		}
+	} else {
+		$groups->{$k4GroupId}->{"name"} = $k4GroupName;
+	}
+	if (exists $groups->{$k4GroupId}->{"priority"}) {
+		if ($groups->{$k4GroupId}->{"priority"} ne $k4GroupPriority) {
+			die "K4 Group with $k4GroupId has different values for NAME: $k4GroupPriority vs $groups->{$k4GroupId}->{'priority'}";
+		}
+	} else {
+		$groups->{$k4GroupId}->{"priority"} = $k4GroupPriority;
+	}
+	unless (exists $groups->{$k4GroupId}->{"members"}) {
+		$groups->{$k4GroupId}->{"members"} = ();
+	}
+
+	my @membersData = $rData->getChildElements;
+
+	foreach my $member (@membersData) {
+
+		my %uAttributes = attributesToHash $member->getAttributes;
+
+		if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
+			# skip blacklisted users !security ban!
+			next;
+		}
+
+		my $key = $uAttributes{$A_UCO};
+
+		$users->{$key}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE}) ? substr($uAttributes{$A_TITLE_BEFORE}, 0, 15) : '';
+		$users->{$key}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
+		$users->{$key}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+		$users->{$key}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
+		$users->{$key}->{$A_NAV} = $uAttributes{$A_NAV} || '0';
+		$users->{$key}->{$A_STALEAKT} = $uAttributes{$A_STALEAKT} || '0';
+		$users->{$key}->{"EXPIRATION"} = calculateExpiration($uAttributes{$A_EXPIRATION_KOS}, $uAttributes{$A_EXPIRATION_DC2}, $uAttributes{$A_EXPIRATION_MANUAL});
+
+		push(@{$groups->{$k4GroupId}->{"members"}}, $key);
+
+	}
+
+}
+
+#
+# PRINT user data
+#
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+# FOR EACH USER ON FACILITY
+my @keys = sort keys %{$users};
+for my $key (@keys) {
+
+	# print attributes, which are never empty
+	print FILE $key . "\t" . $users->{$key}->{$A_TITLE_BEFORE} . "\t" .
+		$users->{$key}->{$A_FIRST_NAME} . "\t" . $users->{$key}->{$A_LAST_NAME} . "\t" .
+		$users->{$key}->{$A_GENDER} . "\t" . $users->{$key}->{$A_NAV} . "\t" . $users->{$key}->{$A_STALEAKT} . "\t" .
+		$users->{$key}->{"EXPIRATION"} . "\n";
+
+}
+
+close(FILE);
+
+#
+# PRINT group data
+#
+open FILE,">$groupFileName" or die "Cannot open $groupFileName: $! \n";
+binmode FILE, ":utf8";
+
+# FOR EACH GROUP ON FACILITY
+my @gKeys = sort keys %{$groups};
+for my $key (@gKeys) {
+
+	my $members = "";
+	if (defined $groups->{$key}->{"members"}) {
+		$members = join(",", sort @{$groups->{$key}->{"members"}});
+	}
+	print FILE $key . "\t" . $groups->{$key}->{"code"}. "\t" . $groups->{$key}->{"name"} .
+		"\t" . $groups->{$key}->{"priority"} . "\t" . $members . "\n";
+
+}
+
+close(FILE);
+
+perunServicesInit::finalize;
+
+#
+# Calculate later from three expiration dates based on users relations on VŠUP.
+#
+# 1. param - expiration in KOS (studies)
+# 2. param - expiration in DC2 (employees)
+# 3. param - manually set expiration
+#
+# Returns Unix timestamp of users account expiration
+# - in case of expiration on 1.1.4000 -> Zero is returned as "expiration = never".
+# - in case of any other exact date, pick the largest (future). If it comes from study system (KOS),
+#   add 14 days grace period.
+#
+sub calculateExpiration() {
+
+	# read input
+	my $expirationKos = shift;
+	my $expirationDc2 = shift;
+	my $expirationMan = shift;
+	# parse to time or undef
+	my $expirationKosTime = ($expirationKos) ? Time::Piece->strptime($expirationKos,"%Y-%m-%d") : undef;
+	my $expirationDc2Time = ($expirationDc2) ? Time::Piece->strptime($expirationDc2,"%Y-%m-%d") : undef;
+	my $expirationManTime = ($expirationMan) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
+
+	my @expirations = ();
+	if (defined $expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
+	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
+	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
+
+	# sort all expirations
+	my @sorted_expirations = sort { $a <=> $b } @expirations;
+	my $latest_expiration = $sorted_expirations[$#sorted_expirations];
+
+	my $result;
+
+	if (!defined $expirationKos and !defined $expirationDc2 and !defined $expirationMan) {
+		# if no expiration set in source data - take as "never"
+		return 0;
+	}
+
+	# case expiration "never" = 1.1.4000
+	if ($latest_expiration == Time::Piece->strptime("4000-01-01","%Y-%m-%d")->epoch) {
+		# return without specified expiration date
+		return 0;
+	}
+
+	# (will) expire by studies - add 14 days grace period
+	if ($expirationKosTime and ($latest_expiration == $expirationKosTime->epoch)) {
+		$result = $latest_expiration + (14*24*60*60);
+	} else {
+		# Expired by employment or manual - push exact date
+		$result = $latest_expiration;
+	}
+
+	return (localtime($result)->ymd() . " 23:59:59");
+
+}

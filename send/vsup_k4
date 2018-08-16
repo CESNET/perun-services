@@ -1,0 +1,436 @@
+#!/usr/bin/perl
+use strict;
+use warnings FATAL => 'all';
+use DBI;
+use DBI qw(:sql_types);
+use Getopt::Long qw(:config no_ignore_case);
+use Data::Dumper;
+use ScriptLock;
+binmode STDOUT, ":utf8";
+
+my $username;
+my $password;
+my $tableNameOsb = 'K4_OSB';
+my $tableNameSkup = 'K4_SKUP';
+my $tableNameOsSku = 'K4_OSSKU';
+
+# define service
+my $service_name = "vsup_k4";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+my $service_file = "$service_files_dir/$service_name.csv";
+my $service_group_file = "$service_files_dir/$service_name\_groups.csv";
+
+# propagation destination
+my $destination = $ARGV[1];
+chomp($destination);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $destination);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# parse destination
+my ($db_machine,$db_port,$db_name) = split(/:/, $destination);
+
+# load authz
+my $configPath = "/etc/perun/services/$service_name/$db_name";
+open FILE, $configPath or die "Could not open config file $configPath: $!";
+while(my $line = <FILE>) {
+	if($line =~ /^username: .*/) {
+		$username = ($line =~ m/^username: (.*)$/)[0];
+	} elsif($line =~ /^password: .*/) {
+		$password = ($line =~ m/^password: (.*)$/)[0];
+	}
+}
+
+if(!defined($password) || !defined($username)) {
+	print "Can't get config data from config file.\n";
+	exit 14;
+}
+
+#Main Structure
+my $users = {};
+my $groups = {};
+
+# read users
+open FILE, $service_file or die "Could not open $service_file: $!";
+binmode FILE, ":utf8";
+while(my $line = <FILE>) {
+	my @parts = split /\t/, $line;
+	chomp(@parts);
+	$users->{$parts[0]}->{'UCO'} = $parts[0];
+	$users->{$parts[0]}->{'TITLE'} = (($parts[1] ne '') ? $parts[1] : undef);
+	$users->{$parts[0]}->{'FIRST_NAME'} = (($parts[2] ne '') ? $parts[2] : undef);
+	$users->{$parts[0]}->{'LAST_NAME'} = (($parts[3] ne '') ? $parts[3] : undef);
+	$users->{$parts[0]}->{'GENDER'} = (($parts[4] ne '') ? $parts[4] : undef);
+	$users->{$parts[0]}->{'NAV'} = (($parts[5] ne '') ? $parts[5] : undef);
+	$users->{$parts[0]}->{'STALEAKT'} = (($parts[6] ne '') ? $parts[6] : undef);
+	$users->{$parts[0]}->{'EXPIRATION'} = (($parts[7] ne '') ? (($parts[7] eq '0') ? undef : $parts[7]) : undef);
+}
+close FILE;
+
+# read groups
+open FILE, $service_group_file or die "Could not open $service_group_file: $!";
+binmode FILE, ":utf8";
+while(my $line = <FILE>) {
+	my @parts = split /\t/, $line;
+	chomp(@parts);
+	$groups->{$parts[0]}->{'ID'} = $parts[0];
+	$groups->{$parts[0]}->{'CODE'} = (($parts[1] ne '') ? $parts[1] : undef);
+	$groups->{$parts[0]}->{'NAME'} = (($parts[2] ne '') ? $parts[2] : undef);
+	$groups->{$parts[0]}->{'PRIORITY'} = (($parts[3] ne '') ? $parts[3] : undef);
+	my $members = (($parts[4] ne '') ? $parts[4] : undef);
+	if (defined $members and length $members) {
+		my @tmp = split /,/ , $members;
+		# save array as reference or we will get size when read from structure instead of array itself
+		$groups->{$parts[0]}->{"MEMBERS"} = \@tmp;
+	} else {
+		$groups->{$parts[0]}->{"MEMBERS"} = undef;
+	}
+}
+close FILE;
+
+my $dbh = DBI->connect("dbi:Oracle://$db_machine:$db_port/$db_name", $username, $password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+
+my $DEBUG=0;
+
+#statistic and information variables
+my $foundAndSkippedPersons = 0;
+my $foundAndUpdatedPersons = 0;
+my $insertedPersons = 0;
+my $deletedPersons = 0;
+
+#
+# INSERT NEW PERSONS or UPDATE EXISTING PERSONS
+#
+foreach my $key (sort keys %$users) {
+
+	my $UCO = $users->{$key}->{'UCO'};
+	my $LAST_NAME = $users->{$key}->{'LAST_NAME'};
+	my $GENDER = $users->{$key}->{'GENDER'};
+	my $TITLE = $users->{$key}->{'TITLE'};
+	my $FIRST_NAME = $users->{$key}->{'FIRST_NAME'};
+	my $EXPIRATION = $users->{$key}->{'EXPIRATION'};
+	my $NAV = $users->{$key}->{'NAV'};
+	my $STALEAKT = $users->{$key}->{'STALEAKT'};
+
+	# There is
+	my $personExists = $dbh->prepare(qq{select 1 from $tableNameOsb where ID=?});
+	$personExists->execute($UCO);
+
+	if($personExists->fetch) {
+		if($DEBUG == 1) { print "FIND PERSON: $key\n"; }
+
+		# we need to know if these two records are without changes, if yes, skip them
+		my $recordAreEquals;
+
+		my $select = "SELECT 1 from $tableNameOsb where ID=? and PRIJMENI=? and POHLAVI=? and DEL=?";
+		my @params = ($UCO, $LAST_NAME, $GENDER, 0);
+
+		if ($TITLE) {
+			$select = $select . " and TITUL=?";
+			push(@params, $TITLE);
+		} else {
+			$select = $select . " and TITUL is NULL";
+		}
+
+		if ($FIRST_NAME) {
+			$select = $select . " and JMENO=?";
+			push(@params, $FIRST_NAME);
+		} else {
+			$select = $select . " and JMENO is NULL";
+		}
+
+		if ($EXPIRATION) {
+			$select = $select . " and DO_=TO_DATE(?,'YYYY-MM-DD HH24:MI:SS')";
+			push(@params, $EXPIRATION);
+		} else {
+			$select = $select . " and DO_ is NULL";
+		}
+
+		if (($NAV eq '0') or ($NAV eq '1')) {
+			$select = $select . " and NAV=?";
+			push(@params, $NAV);
+		} else {
+			$select = $select . " and NAV is NULL";
+		}
+
+		if (($STALEAKT eq '0') or ($STALEAKT eq '1')) {
+			$select = $select . " and NAV_STALEAKT=?";
+			push(@params, $STALEAKT);
+		} else {
+			$select = $select . " and NAV_STALEAKT is NULL";
+		}
+
+		$recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
+
+		if(!$recordAreEquals->fetch) {
+
+			# UPDATE PERSON
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableNameOsb SET PRIJMENI=? , POHLAVI=? , DEL=? , TITUL=? , JMENO=?, NAV=?, NAV_STALEAKT=? , DO_=TO_DATE(?,'YYYY-MM-DD HH24:MI:SS'), KDYZAP=sysdate WHERE ID=?});
+			$updatePerson->execute(
+				$LAST_NAME,
+				$GENDER,
+				0,
+				$TITLE,
+				$FIRST_NAME,
+				$NAV,
+				$STALEAKT,
+				$EXPIRATION,
+				$UCO);
+
+			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
+			$foundAndUpdatedPersons++;
+
+		} else {
+
+			# teachers - no change
+			if($DEBUG == 1) { print "SKIP RECORD: $key\n"; }
+			$foundAndSkippedPersons++;
+
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW RECORD: $key\n"; }
+		$insertedPersons++;
+		# we will do insert
+
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableNameOsb (ID, PRIJMENI, POHLAVI, TITUL, JMENO, NAV, NAV_STALEAKT, OD, DO_, KDYZAP, DEL) VALUES (?,?,?,?,?,?,?,sysdate,TO_DATE(?,'YYYY-MM-DD HH24:MI:SS'),sysdate,?)});
+		$insertPerson->execute($UCO, $LAST_NAME, $GENDER, $TITLE, $FIRST_NAME, $NAV, $STALEAKT, $EXPIRATION, 0);
+
+	}
+
+}
+
+#
+# SET deleted (DEL=1) flag to persons missing from Perun.
+#
+my $ary_ref = $dbh->selectcol_arrayref(qq{select distinct ID from $tableNameOsb where ID is not null});
+my @ucos = @$ary_ref;
+my $deletePerson = $dbh->prepare(qq{UPDATE $tableNameOsb SET DEL=? , KDYZAP=sysdate where ID=?});
+foreach my $uco (@ucos) {
+	unless (exists $users->{$uco}) {
+		if($DEBUG == 1) { print "DELETE PERSON: $uco\n"; }
+		$deletePerson->execute(1, $uco);
+		$deletedPersons++;
+	}
+}
+
+#statistic and information variables
+my $foundAndSkippedGroups = 0;
+my $foundAndUpdatedGroups = 0;
+my $insertedGroups = 0;
+my $deletedGroups = 0;
+
+my $addedGroupMembers = 0;
+my $undeletedGroupMembers = 0;
+my $updatedGroupMembers = 0;
+my $deletedGroupMembers = 0;
+
+#
+# INSERT NEW GROUPS or UPDATE EXISTING GROUPS
+#
+foreach my $key (sort keys %$groups) {
+
+	my $ID = $groups->{$key}->{'ID'};
+	my $CODE = $groups->{$key}->{'CODE'};
+	my $NAME = $groups->{$key}->{'NAME'};
+	my $PRIORITY = $groups->{$key}->{'PRIORITY'};
+	my @MEMBERS = @{$groups->{$key}->{'MEMBERS'}}; # dereference array
+
+	# There is
+	my $groupExists = $dbh->prepare(qq{select 1 from $tableNameSkup where ID=?});
+	$groupExists->execute($ID);
+
+	if($groupExists->fetch) {
+		if($DEBUG == 1) { print "FIND GROUP: $key\n"; }
+
+		# we need to know if these two records are without changes, if yes, skip them
+		my $recordAreEquals;
+
+		my $select = "SELECT 1 from $tableNameSkup where ID=? and KOD=? and DEL=?";
+		my @params = ($ID, $CODE, 0);
+
+		if ($NAME) {
+			$select = $select . " and NAZEV=?";
+			push(@params, $NAME);
+		} else {
+			$select = $select . " and NAZEV is NULL";
+		}
+
+		$recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
+
+		if(!$recordAreEquals->fetch) {
+
+			# UPDATE GROUPS
+			my $updateGroup = $dbh->prepare(qq{UPDATE $tableNameSkup SET NAZEV=? , KOD=? , DEL=? , KDYZAP=sysdate WHERE ID=?});
+			$updateGroup->execute(
+				$NAME,
+				$CODE,
+				0,
+				$ID);
+
+			if($DEBUG == 1) { print "UPDATING EXISTING GROUP: $key\n"; }
+			$foundAndUpdatedGroups++;
+
+		} else {
+
+			# teachers - no change
+			if($DEBUG == 1) { print "SKIP GROUP: $key\n"; }
+			$foundAndSkippedGroups++;
+
+		}
+
+		# set to 1 will update KDYZAP column on Group after all members changes are done
+		my $groupMembersModified = 0;
+
+		# Check all ACTIVE group members
+		my $ary_ref_curMem = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameOsSku where SKU_ID=$ID and DEL=0});
+		my @currentMembers = @$ary_ref_curMem;
+
+		my @sortedCurrentMembers = sort @currentMembers;
+		my @sortedNewMembers = sort @MEMBERS;
+
+		if (@sortedNewMembers ~~ @sortedCurrentMembers) {
+			if($DEBUG == 1) { print "GROUP MEMBERS HASN'T CHANGED: $ID\n"; }
+		} else {
+
+			my %cur_mem_map = map { $_ => 1 } @sortedCurrentMembers;
+			my %new_mem_map = map { $_ => 1 } @sortedNewMembers;
+
+			my @to_be_added;
+			my @to_be_removed;
+
+			# add members
+			foreach my $per_val_member (@sortedNewMembers) {
+				unless (exists $cur_mem_map{$per_val_member}) {
+					push (@to_be_added, $per_val_member);
+				}
+			}
+
+			# remove members
+			foreach my $cur_val_member (@sortedCurrentMembers) {
+				unless (exists $new_mem_map{$cur_val_member}) {
+					push (@to_be_removed, $cur_val_member);
+				}
+			}
+
+			if (@to_be_added) {
+
+				my $insertGroupMember = $dbh->prepare(qq{INSERT INTO $tableNameOsSku (SKU_ID, OSB_ID, PRIORITA, KDYZAP, DEL) VALUES (?,?,?,sysdate,?)});
+				my $updateGroupMembers = $dbh->prepare(qq{UPDATE $tableNameOsSku SET DEL=? , KDYZAP=sysdate WHERE OSB_ID=? and SKU_ID=?});
+				my $memberExists = $dbh->prepare(qq{SELECT 1 FROM $tableNameOsSku WHERE SKU_ID=? AND OSB_ID=?});
+				foreach my $member (@to_be_added) {
+					$memberExists->execute($ID, $member);
+					if(!$memberExists->fetch) {
+						# add new person
+						$insertGroupMember->execute($ID, $member, $PRIORITY, 0);
+						$addedGroupMembers++;
+					} else {
+						# undelete existing person
+						$updateGroupMembers->execute(0, $member, $ID);
+						$undeletedGroupMembers++;
+					}
+					$groupMembersModified = 1;
+				}
+			}
+
+			if (@to_be_removed) {
+				my $removeGroupMember = $dbh->prepare(qq{UPDATE $tableNameOsSku SET DEL=? , KDYZAP=sysdate WHERE OSB_ID=? and SKU_ID=?});
+				foreach my $member (@to_be_removed) {
+					# delete person (set del flag)
+					$removeGroupMember->execute(1, $member, $ID);
+					$deletedGroupMembers++;
+					$groupMembersModified = 1;
+				}
+			}
+
+		}
+
+		# set PRIORITY of all group members to current value (after all updates)
+		my $ary_ref_curMemPriority = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameOsSku where SKU_ID=$ID and PRIORITA != $PRIORITY});
+		my @toUpdatePriority = @$ary_ref_curMemPriority;
+		if (@toUpdatePriority >= 1) {
+			my $updateGroupMember = $dbh->prepare(qq{UPDATE $tableNameOsSku SET PRIORITA=? , KDYZAP=sysdate WHERE OSB_ID=? and SKU_ID=$ID});
+			foreach my $member (@toUpdatePriority) {
+				if($DEBUG == 1) { print "FIXING GROUP MEMBERS PRIORITY GID: $ID , OSB_ID: $member\n"; }
+				$updateGroupMember->execute($PRIORITY, $member);
+				$updatedGroupMembers++;
+				$groupMembersModified = 1;
+			}
+		}
+
+		# if we somehow changed members, we must updated changed flag on group
+		if ($groupMembersModified == 1) {
+			my $updateGroupFlag = $dbh->prepare(qq{UPDATE $tableNameSkup SET KDYZAP=sysdate WHERE ID=?});
+			$updateGroupFlag->execute($ID);
+		}
+
+	} else {
+
+		if($DEBUG == 1) { print "INSERT NEW GROUP: $key\n"; }
+		$insertedGroups++;
+		# we will do insert
+
+		my $insertGroup = $dbh->prepare(qq{INSERT INTO $tableNameSkup (ID, NAZEV, KOD, KDYZAP, DEL) VALUES (?,?,?,sysdate,?)});
+		$insertGroup->execute($ID, $NAME, $CODE, 0);
+
+		# add all members, should be all new
+		if (@MEMBERS >= 1) {
+			my $insertGroupMember = $dbh->prepare(qq{INSERT INTO $tableNameOsSku (SKU_ID, OSB_ID, PRIORITA, KDYZAP, DEL) VALUES (?,?,?,sysdate,?)});
+			foreach my $member (@MEMBERS) {
+				$insertGroupMember->execute($ID, $member, $PRIORITY, 0);
+				$addedGroupMembers++;
+			}
+		}
+
+	}
+
+}
+
+#
+# SET deleted (DEL=1) flag to groups and members missing from Perun.
+#
+my $ary_ref_groups = $dbh->selectcol_arrayref(qq{select distinct ID from $tableNameSkup where ID is not null});
+my @gids = @$ary_ref_groups;
+my $deleteGroups = $dbh->prepare(qq{UPDATE $tableNameSkup SET DEL=? , KDYZAP=sysdate where ID=?});
+foreach my $gid (@gids) {
+	unless (exists $groups->{$gid}) {
+		if($DEBUG == 1) { print "DELETE GROUP: $gid (including all members)\n"; }
+		$deleteGroups->execute(1, $gid);
+		$deletedGroups++;
+		# set all group members to deleted
+		my $deleteGroupMembers = $dbh->prepare(qq{UPDATE $tableNameOsSku SET DEL=? , KDYZAP=sysdate WHERE SKU_ID=?});
+		$deleteGroupMembers->execute(1, $gid);
+	}
+}
+
+commit $dbh;
+$dbh->disconnect();
+
+#Info about operations
+print "=======================================\n";
+print "Newly inserted persons:   \t$insertedPersons\n";
+print "Found and skipped persons: \t$foundAndSkippedPersons\n";
+print "Found and updated persons:\t$foundAndUpdatedPersons\n";
+print "Deleted persons:\t\t$deletedPersons\n";
+print "=======================================\n";
+print "Newly inserted groups:   \t$insertedGroups\n";
+print "Found and skipped groups: \t$foundAndSkippedGroups\n";
+print "Found and updated groups:\t$foundAndUpdatedGroups\n";
+print "Deleted groups:\t\t\t$deletedGroups\n";
+print "=======================================\n";
+print "Newly inserted group members:\t$addedGroupMembers\n";
+print "Deleted group members:\t\t$deletedGroupMembers\n";
+print "Undeleted group members:\t$undeletedGroupMembers\n";
+print "Fixed priority group members:\t$updatedGroupMembers\n";
+print "=======================================\n";
+
+$lock->unlock();
