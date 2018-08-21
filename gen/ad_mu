@@ -335,6 +335,10 @@ my $key3 = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $baseDNGroups;
 $groups->{"licenses"}->{$key3}->{$A_G_R_AD_NAME} = "O365Lic_Alumni";
 $groups->{"licenses"}->{$key3}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Alumni";
 
+my $key4 = "CN=O365Lic_Student2_group.muni.cz,OU=licenses," . $baseDNGroups;
+$groups->{"licenses"}->{$key4}->{$A_G_R_AD_NAME} = "O365Lic_Student2";
+$groups->{"licenses"}->{$key4}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Student2";
+
 ############################
 #
 # PRINT OUs LDIF
