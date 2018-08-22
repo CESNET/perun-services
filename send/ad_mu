@@ -762,7 +762,7 @@ sub process_groups() {
 					'extensionAttribute1' => 'FALSE'
 				);
 
-				my $response = $ldap->update($ad_entry);
+				my $response = $ad_entry->update($ldap);
 				unless ($response->is_error()) {
 					ldap_log($service_name, "Group emptied: ".$ad_entry->dn());
 					$counter_group_remove++;
