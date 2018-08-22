@@ -32,7 +32,7 @@ use Net::LDAP::Control::Paged;
 use Net::LDAP::Constant qw( LDAP_CONTROL_PAGED );
 use File::Copy;
 use Date::Calc qw/ Today Delta_Days Add_Delta_Days Date_to_Days /;
-use LockFile::Simple qw(lock trylock unlock);
+use LockFile::Simple;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 
@@ -368,8 +368,9 @@ my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespa
 ($lock->lock() == 1) or die "Unable to get lock, service propagation is already running or previous run failed.";
 
 # check for errors in last run - if there were an error this lock cannot be obtained
+my $lockManager = LockFile::Simple->make( -hold => 0);
 my $errorLockFile = "/var/lock/" . $facility_name . "_" . $service_name . "_" . $namespace . ".errorLock";
-lock($errorLockFile) || die "There were an error in previous run. Resolve the error and delete following file to continue: $errorLockFile \n";
+$lockManager->lock($errorLockFile) || die "There were an error in previous run. Resolve the error and delete following file to continue: $errorLockFile \n";
 
 
 # init configuration
@@ -478,7 +479,7 @@ print "Group updated: " . $counter_group_updated . " entries.\n";
 print "Group failed: " . $counter_group_failed . " entries.\n";
 
 $lock->unlock();
-unlock($errorLockFile);
+$lockManager->unlock($errorLockFile);
 
 if ($counter_fail or $counter_fail_ous or $counter_group_failed) {
 	# some update of AD failed, tell it to the engine to re-schedule the service.
