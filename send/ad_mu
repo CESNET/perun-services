@@ -368,7 +368,7 @@ my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespa
 ($lock->lock() == 1) or die "Unable to get lock, service propagation is already running or previous run failed.";
 
 # check for errors in last run - if there were an error this lock cannot be obtained
-my $lockManager = LockFile::Simple->make( -hold => 0);
+my $lockManager = LockFile::Simple->make( -hold => 0, -delay => 30, -max => 2);
 my $errorLockFile = "/var/lock/" . $facility_name . "_" . $service_name . "_" . $namespace . ".errorLock";
 $lockManager->lock($errorLockFile) || die "There were an error in previous run. Resolve the error and delete following file to continue: $errorLockFile \n";
 
