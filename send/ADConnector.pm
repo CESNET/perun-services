@@ -98,6 +98,7 @@ sub init_config($) {
 	my $filename = "/etc/perun/".$namespace.".ad";
 	unless (-e $filename) {
 		ldap_log('ad_connection', "Configuration file for namespace \"" . $namespace . "\" doesn't exist!");
+		print STDERR "Configuration file for namespace \"" . $namespace . "\" doesn't exist!";
 		exit 2; # login-namespace is not supported
 	}
 
@@ -128,17 +129,20 @@ sub resolve_pdc($) {
 		($protocol, $host, $port) = ($1, $2, $3);
 	} else {
 		ldap_log('ad_connection', "[AD] Ldap location in wrong format. Expected: protocol://host:port");
+		print STDERR "[AD] Ldap location in wrong format. Expected: protocol://host:port";
 		exit 1;
 	}
 	#Connect to primary domain controller
 	my $pdc_host = `host -t SRV _ldap._tcp.pdc._msdcs.$host`;
 	unless(defined $pdc_host) {
 		ldap_log('ad_connection', "[AD] Cannot get PDC host name. DNS query for SRV record returned $?");
+		print STDERR "[AD] Cannot get PDC host name. DNS query for SRV record returned $?";
 		exit 1;
 	}
 	chomp $pdc_host;
 	unless($pdc_host =~ s/^.* (.*).$/$1/) {
 		ldap_log('ad_connection', "[AD] Cannot get PDC host name. Returned $pdc_host");
+		print STDERR "[AD] Cannot get PDC host name. Returned $pdc_host";
 		exit 1;
 	}
 
@@ -176,6 +180,7 @@ sub ldap_bind($$$) {
 		ldap_log('ad_connection', "[AD] connected as: $ldap_user");
 	} else {
 		ldap_log('ad_connection', "[AD] can't connect to AD.");
+		print STDERR "[AD] can't connect to AD.";
 		exit 1;
 	}
 
