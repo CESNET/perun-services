@@ -76,6 +76,7 @@ my $MAIL_extendedGracePeriod =<<'END';
 Vážený uživateli,
 
 díky tomu, že jste se stal <<o365Role>> Masarykovy univerzity, Vám nadále zůstává plně k dispozici váš účet MS Office 365. Můžete tak využívat všech jeho dostupných nástrojů a funkcí.
+Dokumentaci a další informace najdete na it.muni.cz/office365. 
 
 V případě problémů či dotazů kontaktujte helpdesk@ics.muni.cz.
 Ústav výpočetní techniky MU
@@ -84,7 +85,7 @@ V případě problémů či dotazů kontaktujte helpdesk@ics.muni.cz.
 Dear user,
 
 thanks to becoming Masaryk University’s <<o365RoleEN>>, your MS Office 365 account stays at your disposal. Hence, you might continue using all of the tools and functions available.
-
+For further information, please visit it.muni.cz/office365. 
 In case of any problems or questions, please contact helpdesk@ics.muni.cz.
 Institute of Computer Science MU
 
@@ -105,6 +106,7 @@ Dear user,
 
 thanks to becoming Masaryk University’s <<o365RoleEN>>, your MS Office 365 alumni account has been extended. It allows you to use all functions and tools such as the internal communication network Yammer, applications for online editing of documents (Word, Excel, PowerPoint), tools for saving and sharing of documents (OneDrive, SharePoint) or for organising your work on projects (Planner) and many more.
 Manuals and descriptions of functions published at https://it.muni.cz/office365 might help you with working with these tools at the beginning.
+For further information, please visit it.muni.cz/office365. 
 In case of any problems or questions, please contact helpdesk@ics.muni.cz.
 Institute of Computer Science MU
 
