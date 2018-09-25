@@ -100,7 +100,7 @@ foreach my $login (sort keys %$usersByLogin) {
 	print FILE "lastname: ", checkAttributeValue($attributes->{$A_USER_LAST_NAME} || '(N/A)'), "\n";
 	print FILE "costcenter: costcenterno=", $attributes->{$A_USER_WORKPLACE_ID} || 100, ", ou=costcenters, o=ysoftsafeq", "\n";
 	print FILE "email: ", checkAttributeValue($attributes->{$A_USER_MAIL}), "\n";
-	print FILE "homedir:: ", encode_base64('\\\\nfs' . ($attributes->{$A_USER_LOGIN} % 7 + 1) . '.ucn.muni.cz\\profiles\\' . $attributes->{$A_USER_LOGIN});
+	print FILE "homedir:: ", encode_base64('\\\\ha-ntc.ics.muni.cz\\profiles\\' . $attributes->{$A_USER_LOGIN});
 
 	foreach my $chipNumber (@{$attributes->{$A_USER_CHIP_NUM}}) {
 		if($allChipNumbers{$chipNumber}) {
