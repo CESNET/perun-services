@@ -33,3 +33,4 @@ perun-slave-process-pkinit
 perun-slave-process-sshkeys
 perun-slave-process-sshkeys-root
 perun-slave-process-voms
+perun-slave-process-yubikey-root

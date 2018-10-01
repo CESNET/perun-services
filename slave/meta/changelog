@@ -1,3 +1,10 @@
+perun-slave-full (3.1.4) stable; urgency=low
+
+  * Add new service as dependency of this meta package:
+    perun-slave-process-yubikey-root
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 01 Oct 2018 10:40:00 +0200
+
 perun-slave-full (3.1.3) stable; urgency=low
 
   * Add new services as dependencies of this meta package:
@@ -23,9 +30,9 @@ perun-slave-full (3.1.3) stable; urgency=low
 perun-slave-full (3.1.2) stable; urgency=low
 
   * Change path from /etc/perun/process-{service}.d/ to /etc/perun/{service}.d
-  * Use also the old path for {service}.d (pre, mid, post) scripts. Old path 
-    is /opt/perun/bin/{service}.d/ and the new path is 
-    /etc/perun/{service}.d/. Same files in both paths has higher priority from 
+  * Use also the old path for {service}.d (pre, mid, post) scripts. Old path
+    is /opt/perun/bin/{service}.d/ and the new path is
+    /etc/perun/{service}.d/. Same files in both paths has higher priority from
     new path (take these).
 
  -- Michal Stava <stavamichal@gmail.com>  Thu, 07 Jan 2016 14:26:00 +0200
