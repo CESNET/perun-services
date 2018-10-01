@@ -1,0 +1,45 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+
+our $SERVICE_NAME = basename($0);
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
+
+#Constants
+our $A_YUBIKEYS;                      *A_YUBIKEYS =                     \'urn:perun:user:attribute-def:def:yubikeys';
+our $A_LOGIN;                        *A_LOGIN =                     \'urn:perun:user_facility:attribute-def:virt:login';
+
+my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
+
+my %yubikeys;
+
+my %facilityAttributes = attributesToHash $data->getAttributes;
+#####################################
+
+my @resourcesData = $data->getChildElements;
+foreach my $rData (@resourcesData) {
+	my %values;
+	my @membersData = $rData->getChildElements;
+	foreach my $mData (@membersData) {
+		my %memberAttributes = attributesToHash $mData->getAttributes;
+
+		$yubikeys {$memberAttributes{$A_LOGIN}} = $memberAttributes{$A_YUBIKEYS} if defined $memberAttributes{$A_YUBIKEYS};
+	}
+}
+
+####### output file ######################
+open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
+foreach my $login (sort keys %yubikeys) {
+	print SERVICE_FILE $login . ":" . join(":", @{$yubikeys{$login}}) . "\n";
+}
+close(SERVICE_FILE);
+#####################################################
+perunServicesInit::finalize;

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+#export DST_DIR="/etc/yubico"
+#export DST_FILE_NAME="authorized_yubikeys"
