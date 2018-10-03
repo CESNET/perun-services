@@ -99,13 +99,13 @@ sub init_config($) {
 	unless (-e $filename) {
 		ldap_log('ad_connection', "Configuration file for namespace \"" . $namespace . "\" doesn't exist!");
 		print STDERR "Configuration file for namespace \"" . $namespace . "\" doesn't exist!";
-		exit 2; # login-namespace is not supported
+		die "Configuration file for namespace \"" . $namespace . "\" doesn't exist!"; # login-namespace is not supported
 	}
 
 	# load configuration file
-	open FILE, "<" . $filename;
+	open FILE, "<" . $filename || die "Can't open configuration file for namespace '$namespace'.";
 	my @lines = <FILE>;
-	close FILE;
+	close FILE || die "Can't close configuration file for namespace '$namespace'.";
 
 	# remove new-line characters from the end of lines
 	chomp @lines;
@@ -130,20 +130,21 @@ sub resolve_pdc($) {
 	} else {
 		ldap_log('ad_connection', "[AD] Ldap location in wrong format. Expected: protocol://host:port");
 		print STDERR "[AD] Ldap location in wrong format. Expected: protocol://host:port";
-		exit 1;
+		die "[AD] Ldap location in wrong format. Expected: protocol://host:port";
 	}
 	#Connect to primary domain controller
 	my $pdc_host = `host -t SRV _ldap._tcp.pdc._msdcs.$host`;
 	unless(defined $pdc_host) {
-		ldap_log('ad_connection', "[AD] Cannot get PDC host name. DNS query for SRV record returned $?");
-		print STDERR "[AD] Cannot get PDC host name. DNS query for SRV record returned $?";
-		exit 1;
+		my $code = $?;
+		ldap_log('ad_connection', "[AD] Cannot get PDC host name. DNS query for SRV record returned $code");
+		print STDERR "[AD] Cannot get PDC host name. DNS query for SRV record returned $code";
+		die "[AD] Cannot get PDC host name. DNS query for SRV record returned $code";
 	}
 	chomp $pdc_host;
 	unless($pdc_host =~ s/^.* (.*).$/$1/) {
 		ldap_log('ad_connection', "[AD] Cannot get PDC host name. Returned $pdc_host");
 		print STDERR "[AD] Cannot get PDC host name. Returned $pdc_host";
-		exit 1;
+		die "[AD] Cannot get PDC host name. Returned $pdc_host";
 	}
 
 	return $protocol . $pdc_host . ":" . $port;
@@ -181,7 +182,7 @@ sub ldap_bind($$$) {
 	} else {
 		ldap_log('ad_connection', "[AD] can't connect to AD.");
 		print STDERR "[AD] can't connect to AD.";
-		exit 1;
+		die "[AD] can't connect to AD.";
 	}
 
 }
@@ -214,9 +215,9 @@ sub ldap_log($$) {
 	my $service = shift;
 	my $message = shift;
 
-	open(LOGFILE, ">>./logs/" . $service . ".log");
+	open(LOGFILE, ">>./logs/" . $service . ".log") || die "Can't open log file './logs/$service.log'.";
 	print LOGFILE (localtime(time) . ": " . $message . "\n");
-	close(LOGFILE);
+	close(LOGFILE) || die "Can't close log file './logs/$service.log'.";
 
 }
 
