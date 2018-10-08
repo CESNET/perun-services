@@ -1,3 +1,9 @@
+perun-slave-process-fs-project (3.1.5) stable; urgency=low
+
+  * fix typo in command setfacl - it expects path to the file or directory
+
+ -- Michal Stava <Michal.Stava@cesnet.cz>  Mon, 08 Oct 2018 14:07:00 +0200
+
 perun-slave-process-fs-project (3.1.4) stable; urgency=medium
 
   * Set permissions using setfacl and set group permissions as default.
