@@ -42,7 +42,7 @@ function process {
 					#If projectPaths are not same, set all not managed existing directories to nobady
 					for LINE in $EXISTING_DIRECTORIES; do
 						#Set permission to 2000 and owners to nobody:nogroup
-						setfacl --remove-all --remove-default
+						setfacl --remove-all --remove-default "$PREVIOUS_PROJECT_PATH"/"$LINE"
 						catch_error E_CANNOT_CHANGE_PERMISSIONS_TO_NOBODY chmod 2000 "$PREVIOUS_PROJECT_PATH"/"$LINE"
 						catch_error E_CANNOT_CHANGE_OWNER_TO_NOBODY chown nobody:nogroup "$PREVIOUS_PROJECT_PATH"/"$LINE"
 					done
@@ -119,7 +119,7 @@ function process {
 	#Need to do it for the last time when while ends
 	for LINE in $EXISTING_DIRECTORIES; do
 		#Set permission to 2000 and owners to nobody:nogroup
-		setfacl --remove-all --remove-default
+		setfacl --remove-all --remove-default "$PREVIOUS_PROJECT_PATH"/"$LINE"
 		catch_error E_CANNOT_CHANGE_PERMISSIONS_TO_NOBODY chmod 2000 "$PREVIOUS_PROJECT_PATH"/"$LINE"
 		catch_error E_CANNOT_CHANGE_OWNER_TO_NOBODY chown nobody:nogroup "$PREVIOUS_PROJECT_PATH"/"$LINE"
 	done
