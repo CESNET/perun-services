@@ -1,3 +1,10 @@
+perun-slave-process-fs-project (3.1.6) stable; urgency=high
+
+  * setfacl need to set also permissions for owner itself, not just user. 
+    This will prevent situation where owner can't access own directory.
+
+ -- Michal Stava <Michal.Stava@cesnet.cz>  Tue, 09 Oct 2018 14:10:00 +0200
+
 perun-slave-process-fs-project (3.1.5) stable; urgency=low
 
   * fix typo in command setfacl - it expects path to the file or directory

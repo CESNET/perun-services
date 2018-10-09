@@ -64,7 +64,7 @@ function process {
 			U_PERMISSION=`echo $PERMISSIONS | sed -e 's/^\(.\)\(.\)\(.\)$/\1/'`
 			G_PERMISSION=`echo $PERMISSIONS | sed -e 's/^\(.\)\(.\)\(.\)$/\2/'`
 			O_PERMISSION=`echo $PERMISSIONS | sed -e 's/^\(.\)\(.\)\(.\)$/\3/'`
-			setfacl --remove-all --remove-default --modify u:$OWNER:$U_PERMISSION,d:g:$GID:$G_PERMISSION,g:$GID:$G_PERMISSION,d:g::$G_PERMISSION,g::$G_PERMISSION,o:$O_PERMISSION "$PROJECT_PATH"/"$PROJECT_NAME"
+			setfacl --remove-all --remove-default --modify u::$U_PERMISSION,u:$OWNER:$U_PERMISSION,d:g:$GID:$G_PERMISSION,g:$GID:$G_PERMISSION,d:g::$G_PERMISSION,g::$G_PERMISSION,o:$O_PERMISSION "$PROJECT_PATH"/"$PROJECT_NAME"
 			chmod g+s "$PROJECT_PATH"/"$PROJECT_NAME"
 			catch_error E_CANNOT_CHANGE_OWNER chown "$OWNER":"$UNIX_GROUP_NAME" "$PROJECT_PATH"/"$PROJECT_NAME"
 
