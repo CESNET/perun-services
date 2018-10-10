@@ -83,5 +83,5 @@ else
 	rm "$FINAL"
 	echo No changes
 fi
-mv "$OLD_FILE" "$DESTINATION_DIR/backup-data-from-perun/safeq-content-$TIMESTAMP.ldif"
+cp "$INFILE" "$DESTINATION_DIR/backup-data-from-perun/safeq-content-$TIMESTAMP.ldif"
 cp "$INFILE" "$OLD_FILE"
