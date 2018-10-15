@@ -10,8 +10,8 @@ sub diffCSV;
 sub logCRM;
 
 my $service_name = "crm_ceitec";
-my $protocol_version = "3.0.0";
-my $script_version = "3.0.4";
+my $protocol_version = "3.1.0";
+my $script_version = "3.0.5";
 
 my $facility_name = $ARGV[0];
 chomp($facility_name);
@@ -66,6 +66,12 @@ foreach my $line (@diff) {
 		$command = $command . " --rgs \"$array[7]\"";
 	} else {
 		$command = $command . " --rgs \"\"";
+	}
+
+	if ($array[8]) {
+		$command = $command . " --alternativeLoginNames \"$array[8]\"";
+	} else {
+		$command = $command . " --alternativeLoginNames \"\"";
 	}
 
 	my $result = `$command`;

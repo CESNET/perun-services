@@ -7,8 +7,8 @@ use perunServicesInit;
 use perunServicesUtils;
 
 local $::SERVICE_NAME = "crm_ceitec";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.3";
+local $::PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.0.4";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -23,6 +23,7 @@ our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_EPPNS; *A_EPPNS = \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 our $A_O; *A_O = \'urn:perun:member:attribute-def:def:organization';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
+our $A_U_ALT_LOGINS; *A_U_ALT_LOGINS = \'urn:perun:user:attribute-def:virt:alternativeLoginNames';
 our $A_G_NAME; *A_G_NAME = \'urn:perun:group:attribute-def:core:name';
 
 # GATHER USERS
@@ -54,6 +55,7 @@ foreach my $rData ($data->getChildElements) {
 			$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
 			$users->{$login}->{$A_O} = $uAttributes{$A_O};
 			$users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
+			$users->{$login}->{$A_U_ALT_LOGINS} = $uAttributes{$A_U_ALT_LOGINS};
 			$userGroups->{$login}->{$gAttributes{$A_G_NAME}} = 1;
 
 		}
@@ -77,6 +79,8 @@ for my $login (@logins) {
 	my $o = $users->{$login}->{$A_O};
 	my $eppns = $users->{$login}->{$A_EPPNS};
 	my $groups = join('#' , sort keys %{$userGroups->{$login}});
+	my $list = $users->{$login}->{$A_U_ALT_LOGINS};
+	my $altLogins = join(',', sort @{$list});
 
 	if (defined $o and length $o) {
 
@@ -115,7 +119,7 @@ for my $login (@logins) {
 		print FILE 'CEITEC\\' . "$login;" . "$firstName;" . "$lastName;" . "$mail;" . ";;";
 	}
 
-	print FILE ";" . $groups . "\n";
+	print FILE ";" . $groups . ";". $altLogins . "\n";
 
 }
 
