@@ -20,7 +20,7 @@ our $A_USER_STATUS;          *A_USER_STATUS =         \'urn:perun:member:attribu
 our $A_GROUP_DESTINATIONS;   *A_GROUP_DESTINATIONS =  \'urn:perun:group:attribute-def:def:listOfDestinations';
 
 my $sortingFunction = getAttributeSorting($A_PRINCIPAL, 1);
-my %outputByDestination = ();
+my %outputByDestination = ('all' => undef);
 
 my @resourcesData = $data->getChildElements;
 foreach my $resourceData (@resourcesData) {
