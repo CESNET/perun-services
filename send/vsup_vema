@@ -82,8 +82,8 @@ foreach my $osbId (sort keys %$dataByOsbId) {
 
 	# NEVER-EVER DELETE, JUST INSERT
 
-	my $personExists = $dbh->prepare(qq{select 1 from $tableName_ID where OSCIS=?});
-	$personExists->execute($osbId);
+	my $personExists = $dbh->prepare(qq{select 1 from $tableName_ID where OSCIS=? and TYPPROP=?});
+	$personExists->execute($osbId, 'vmauth');
 
 	if($personExists->fetch) {
 		if($DEBUG == 1) { print "FIND: $osbId\n"; }
