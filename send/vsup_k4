@@ -69,7 +69,8 @@ while(my $line = <FILE>) {
 	$users->{$parts[0]}->{'GENDER'} = (($parts[4] ne '') ? $parts[4] : undef);
 	$users->{$parts[0]}->{'NAV'} = (($parts[5] ne '') ? $parts[5] : undef);
 	$users->{$parts[0]}->{'STALEAKT'} = (($parts[6] ne '') ? $parts[6] : undef);
-	$users->{$parts[0]}->{'EXPIRATION'} = (($parts[7] ne '') ? (($parts[7] eq '0') ? undef : $parts[7]) : undef);
+	$users->{$parts[0]}->{'IFISID'} = (($parts[7] ne '') ? $parts[7] : undef);
+	$users->{$parts[0]}->{'EXPIRATION'} = (($parts[8] ne '') ? (($parts[8] eq '0') ? undef : $parts[8]) : undef);
 }
 close FILE;
 
@@ -117,6 +118,7 @@ foreach my $key (sort keys %$users) {
 	my $EXPIRATION = $users->{$key}->{'EXPIRATION'};
 	my $NAV = $users->{$key}->{'NAV'};
 	my $STALEAKT = $users->{$key}->{'STALEAKT'};
+	my $IFISID =  $users->{$key}->{'IFISID'};
 
 	# There is
 	my $personExists = $dbh->prepare(qq{select 1 from $tableNameOsb where ID=?});
@@ -166,13 +168,20 @@ foreach my $key (sort keys %$users) {
 			$select = $select . " and NAV_STALEAKT is NULL";
 		}
 
+		if ($IFISID) {
+			$select = $select . " and OSB_ID_FIS=?";
+			push(@params, $IFISID);
+		} else {
+			$select = $select . " and OSB_ID_FIS is NULL";
+		}
+
 		$recordAreEquals = $dbh->prepare($select);
 		$recordAreEquals->execute(@params);
 
 		if(!$recordAreEquals->fetch) {
 
 			# UPDATE PERSON
-			my $updatePerson = $dbh->prepare(qq{UPDATE $tableNameOsb SET PRIJMENI=? , POHLAVI=? , DEL=? , TITUL=? , JMENO=?, NAV=?, NAV_STALEAKT=? , DO_=TO_DATE(?,'YYYY-MM-DD HH24:MI:SS'), KDYZAP=sysdate WHERE ID=?});
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableNameOsb SET PRIJMENI=? , POHLAVI=? , DEL=? , TITUL=? , JMENO=?, NAV=?, NAV_STALEAKT=? , DO_=TO_DATE(?,'YYYY-MM-DD HH24:MI:SS'), OSB_ID_FIS=?, KDYZAP=sysdate WHERE ID=?});
 			$updatePerson->execute(
 				$LAST_NAME,
 				$GENDER,
@@ -182,6 +191,7 @@ foreach my $key (sort keys %$users) {
 				$NAV,
 				$STALEAKT,
 				$EXPIRATION,
+				$IFISID,
 				$UCO);
 
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
@@ -201,8 +211,8 @@ foreach my $key (sort keys %$users) {
 		$insertedPersons++;
 		# we will do insert
 
-		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableNameOsb (ID, PRIJMENI, POHLAVI, TITUL, JMENO, NAV, NAV_STALEAKT, OD, DO_, KDYZAP, DEL) VALUES (?,?,?,?,?,?,?,sysdate,TO_DATE(?,'YYYY-MM-DD HH24:MI:SS'),sysdate,?)});
-		$insertPerson->execute($UCO, $LAST_NAME, $GENDER, $TITLE, $FIRST_NAME, $NAV, $STALEAKT, $EXPIRATION, 0);
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableNameOsb (ID, PRIJMENI, POHLAVI, TITUL, JMENO, NAV, NAV_STALEAKT, OD, DO_, OSB_ID_FIS, KDYZAP, DEL) VALUES (?,?,?,?,?,?,?,sysdate,TO_DATE(?,'YYYY-MM-DD HH24:MI:SS'),?,sysdate,?)});
+		$insertPerson->execute($UCO, $LAST_NAME, $GENDER, $TITLE, $FIRST_NAME, $NAV, $STALEAKT, $EXPIRATION, $IFISID, 0);
 
 	}
 
