@@ -39,6 +39,7 @@ local $Data::Dumper::Useqq = 1;
 ./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniResourceMail" -i nameOfResource -A alias -B 255920@mandragora.muni.cz 465818@mandragora.muni.cz -C displayName -D Room
 ./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniResources"
 ./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniResource" -i nameOfResource
+./o365-connector.pl -s o365_mu -S prodMU -c "Remove-MuniResource" -i nameOfResource
 ./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniMailBox" -i 396462@mandragora.muni.cz -a 1 -d 0 -f slavek@ics.muni.cz -e slavek@ics.muni.cz,123456@muni.cz
 ./o365-connector.pl -s o365_mu -S prodMU -c "Test-MuniError" -i soft
 =cut
@@ -61,6 +62,7 @@ our $HOST;
 our $PORT;
 our $TYPE_GET = 'GET';
 our $TYPE_POST = 'POST';
+our $TYPE_DELETE = 'DELETE';
 our $USED_TYPE = $TYPE_GET;
 
 #All possible exceptions
@@ -95,6 +97,7 @@ our $COMMAND_GET_RESOURCES = "Get-MuniResources";
 our $COMMAND_SET_GROUP = "Set-MuniGroup";
 our $COMMAND_SET_MAILBOX = "Set-MuniMailBox";
 our $COMMAND_SET_RESOURCE = "Set-MuniResource";
+our $COMMAND_REMOVE_RESOURCE = "Remove-MuniResource";
 our $COMMAND_TEST_MUNI_ERROR = "Test-MuniError";
 #Basic content of every call
 our %content = ();
@@ -124,6 +127,7 @@ Available commands with mandatory options:
  --command "$COMMAND_GET_SHAREBOX" -i "emailOfSharebox"
  --command "$COMMAND_GET_RESOURCE" -i "resourceName"
  --command "$COMMAND_GET_RESOURCES"
+ --command "$COMMAND_REMOVE_RESOURCE" -i "resourceName"
 ---------------------------------------------------------
 Other options:
  --help        | -h prints this help
@@ -280,6 +284,8 @@ if($argCommand eq $COMMAND_SET_MAILBOX) {
 	getResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_GET_RESOURCES) {
 	getResourceMails ( $COMMAND_STATUS_SET, undef);
+} elsif ($argCommand eq $COMMAND_REMOVE_RESOURCE) {
+	removeResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_TEST_MUNI_ERROR) {
 	testMuniError ( $COMMAND_STATUS_SET, undef, $argIdent);
 } else {
@@ -670,6 +676,7 @@ sub getResourceMail {
 
 	if($status eq $COMMAND_STATUS_SET) {
 		$actualCommand = $COMMAND_GET_RESOURCE;
+		unless($email) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To set command $actualCommand we need to have not empty resource email object!\n") };
 		$URL = $BASIC_URL . $actualCommand . "/$email/";
 		$USED_TYPE = $TYPE_GET;
 		return 1;
@@ -708,6 +715,42 @@ sub getResourceMails {
 		#url for getAllResources use the same as url for get one resource, for this reason we need to use different command in URL there
 		$URL = $BASIC_URL . $COMMAND_GET_RESOURCE . "/";
 		$USED_TYPE = $TYPE_GET;
+		return 1;
+	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
+		unless($jsonOutput) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To resolve command $actualCommand we need to have not empty JSON output object!\n") };
+		return $jsonOutput;	
+	} else {
+		diePretty ( $ERROR_UNSUPPORTED_COMMAND_STATUS, "Unsupported status $status\n" );
+	}
+}
+
+#Name:
+# removeResourceMail
+#-----------------------
+#Parameters: 
+# status     - status of command, do we want to set this command or resolve it
+# jsonOutput - json output from the server as hash in perl, undef if there is no such output yet
+# email      - identifier of email address in o365
+#-----------------------
+#Returns: JSON object with Status:OK, error otherwise
+#-----------------------
+#Description: 
+# Remove O365ResourceMail from O365 server by identifier (if exists).
+#-----------------------
+sub removeResourceMail {
+	my $status = shift;
+	my $jsonOutput = shift;
+	my $email = shift;
+
+	if(defined($jsonOutput->{"ErrorType"})) {
+		diePretty ( $ERROR_O365_OR_PS_ERROR , "Some HARD internal message error in method call -> " . $jsonOutput->{"ErrorMessage"} . "\n" )
+	}
+
+	if($status eq $COMMAND_STATUS_SET) {
+		$actualCommand = $COMMAND_REMOVE_RESOURCE;
+		unless($email) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To remove resource by command $actualCommand we need to have not empty resource email object!\n") };
+		$URL = $BASIC_URL . $actualCommand . "/$email/";
+		$USED_TYPE = $TYPE_DELETE;
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
 		unless($jsonOutput) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To resolve command $actualCommand we need to have not empty JSON output object!\n") };
@@ -1191,6 +1234,8 @@ sub resolveOutputByCommandName {
 		return setMailbox ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_SET_RESOURCE) {
 		return setResourceMail ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
+	} elsif ($actualCommand eq $COMMAND_REMOVE_RESOURCE) {
+		return removeResourceMail ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_TEST_MUNI_ERROR) {
 		return testMuniError ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} else {
