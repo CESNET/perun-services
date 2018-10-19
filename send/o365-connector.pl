@@ -37,14 +37,15 @@ local $Data::Dumper::Useqq = 1;
 ./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniSharebox" -i jan@izydorczyk.cz
 ./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniGroup" -i test-lab-crocs@mandragora.onmicrosoft.com -t 255920@mandragora.muni.cz 465818@mandragora.muni.cz
 ./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniResourceMail" -i nameOfResource -A alias -B 255920@mandragora.muni.cz 465818@mandragora.muni.cz -C displayName -D Room
-./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniResource"
+./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniResources"
+./o365-connector.pl -s o365_mu -S prodMU -c "Get-MuniResource" -i nameOfResource
 ./o365-connector.pl -s o365_mu -S prodMU -c "Set-MuniMailBox" -i 396462@mandragora.muni.cz -a 1 -d 0 -f slavek@ics.muni.cz -e slavek@ics.muni.cz,123456@muni.cz
 ./o365-connector.pl -s o365_mu -S prodMU -c "Test-MuniError" -i soft
 =cut
 
 #-----------------------------CONSTANTS------------------------------------
 #DEBUG has 3 levels (0 = no debug, 1 = some important debug messages, 2 = all debug messages)
-our $DEBUG=3;
+our $DEBUG=0;
 #Maximum time to wait on server response (after that it tries the same time to get result)
 #Time to get result is 2xMAX_WAIT_SEC sec
 our $MAX_WAIT_SEC=30;
@@ -89,7 +90,8 @@ our $COMMAND_GET_GROUP = "Get-MuniGroup";
 our $COMMAND_GET_O365_GROUP = "Get-MuniO365Group";
 our $COMMAND_GET_MAILBOX = "Get-MuniMailbox";
 our $COMMAND_GET_SHAREBOX = "Get-MuniSharebox";
-our $COMMAND_GET_RESOURCES = "Get-MuniResource";
+our $COMMAND_GET_RESOURCE = "Get-MuniResource";
+our $COMMAND_GET_RESOURCES = "Get-MuniResources";
 our $COMMAND_SET_GROUP = "Set-MuniGroup";
 our $COMMAND_SET_MAILBOX = "Set-MuniMailBox";
 our $COMMAND_SET_RESOURCE = "Set-MuniResource";
@@ -120,6 +122,7 @@ Available commands with mandatory options:
  --command "$COMMAND_GET_MAILBOX" -i "emailOfMailbox"
  --command "$COMMAND_GET_O365_GROUP" -i "nameOfGroup"
  --command "$COMMAND_GET_SHAREBOX" -i "emailOfSharebox"
+ --command "$COMMAND_GET_RESOURCE" -i "resourceName"
  --command "$COMMAND_GET_RESOURCES"
 ---------------------------------------------------------
 Other options:
@@ -273,6 +276,8 @@ if($argCommand eq $COMMAND_SET_MAILBOX) {
 	getO365Group ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_GET_SHAREBOX) {
 	getSharebox ( $COMMAND_STATUS_SET, undef, $argIdent);
+} elsif ($argCommand eq $COMMAND_GET_RESOURCE) {
+	getResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_GET_RESOURCES) {
 	getResourceMails ( $COMMAND_STATUS_SET, undef);
 } elsif ($argCommand eq $COMMAND_TEST_MUNI_ERROR) {
@@ -642,6 +647,41 @@ sub getO365Group {
 }
 
 #Name:
+# getResourceMail
+#-----------------------
+#Parameters: 
+# status     - status of command, do we want to set this command or resolve it
+# jsonOutput - json output from the server as hash in perl, undef if there is no such output yet
+# email      - identifier of email address in o365
+#-----------------------
+#Returns: JSON O365Resource object with specific parameters and exit status 0 = OK, error with exit status > 0 = not OK
+#-----------------------
+#Description: 
+# Get JSON object O365Resource.
+#-----------------------
+sub getResourceMail {
+	my $status = shift;
+	my $jsonOutput = shift;
+	my $email = shift;
+
+	if(defined($jsonOutput->{"ErrorType"})) {
+		diePretty ( $ERROR_O365_OR_PS_ERROR , "Some HARD internal message error in method call -> " . $jsonOutput->{"ErrorMessage"} . "\n" )
+	}
+
+	if($status eq $COMMAND_STATUS_SET) {
+		$actualCommand = $COMMAND_GET_RESOURCE;
+		$URL = $BASIC_URL . $actualCommand . "/$email/";
+		$USED_TYPE = $TYPE_GET;
+		return 1;
+	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
+		unless($jsonOutput) { diePretty ( $ERROR_MANDATORY_OBJECT_IS_EMPTY, "To resolve command $actualCommand we need to have not empty JSON output object!\n") };
+		return $jsonOutput;	
+	} else {
+		diePretty ( $ERROR_UNSUPPORTED_COMMAND_STATUS, "Unsupported status $status\n" );
+	}
+}
+
+#Name:
 # getResourceMails
 #-----------------------
 #Parameters: 
@@ -665,7 +705,8 @@ sub getResourceMails {
 
 	if($status eq $COMMAND_STATUS_SET) {
 		$actualCommand = $COMMAND_GET_RESOURCES;
-		$URL = $BASIC_URL . $actualCommand . "/";
+		#url for getAllResources use the same as url for get one resource, for this reason we need to use different command in URL there
+		$URL = $BASIC_URL . $COMMAND_GET_RESOURCE . "/";
 		$USED_TYPE = $TYPE_GET;
 		return 1;
 	} elsif ($status eq $COMMAND_STATUS_RESOLVE) {
@@ -1140,6 +1181,8 @@ sub resolveOutputByCommandName {
 		return getSharebox ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_GET_MAILBOX) {
 		return getMailbox ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
+	} elsif ($actualCommand eq $COMMAND_GET_RESOURCE) {
+		return getResourceMail ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_GET_RESOURCES) {
 		return getResourceMails ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_SET_GROUP) {
