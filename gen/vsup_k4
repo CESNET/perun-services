@@ -32,6 +32,8 @@ our $A_EXPIRATION_MANUAL;  *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def
 our $A_NAV;  *A_NAV = \'urn:perun:user:attribute-def:def:k4Nav';
 our $A_STALEAKT;  *A_STALEAKT = \'urn:perun:user:attribute-def:def:k4Staleakt';
 our $A_BLACKLISTED;  *A_BLACKLISTED = \'urn:perun:user_facility:attribute-def:virt:blacklisted';
+our $A_IFIS_ID;  *A_IFIS_ID = \'urn:perun:user:attribute-def:def:osbIdifis';
+
 
 our $A_R_ID;  *A_R_ID = \'urn:perun:resource:attribute-def:def:k4GroupId';
 our $A_R_NAME;  *A_R_NAME = \'urn:perun:resource:attribute-def:def:k4GroupName';
@@ -99,6 +101,7 @@ foreach my $rData ($data->getChildElements) {
 		$users->{$key}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
 		$users->{$key}->{$A_NAV} = $uAttributes{$A_NAV} || '0';
 		$users->{$key}->{$A_STALEAKT} = $uAttributes{$A_STALEAKT} || '0';
+		$users->{$key}->{$A_IFIS_ID} = $uAttributes{$A_IFIS_ID} || '';
 		$users->{$key}->{"EXPIRATION"} = calculateExpiration($uAttributes{$A_EXPIRATION_KOS}, $uAttributes{$A_EXPIRATION_DC2}, $uAttributes{$A_EXPIRATION_MANUAL});
 
 		push(@{$groups->{$k4GroupId}->{"members"}}, $key);
@@ -121,7 +124,7 @@ for my $key (@keys) {
 	print FILE $key . "\t" . $users->{$key}->{$A_TITLE_BEFORE} . "\t" .
 		$users->{$key}->{$A_FIRST_NAME} . "\t" . $users->{$key}->{$A_LAST_NAME} . "\t" .
 		$users->{$key}->{$A_GENDER} . "\t" . $users->{$key}->{$A_NAV} . "\t" . $users->{$key}->{$A_STALEAKT} . "\t" .
-		$users->{$key}->{"EXPIRATION"} . "\n";
+		$users->{$key}->{$A_IFIS_ID} . "\t" . $users->{$key}->{"EXPIRATION"} . "\n";
 
 }
 
