@@ -221,7 +221,7 @@ foreach my $key (sort keys %$users) {
 #
 # SET deleted (DEL=1) flag to persons missing from Perun.
 #
-my $ary_ref = $dbh->selectcol_arrayref(qq{select distinct ID from $tableNameOsb where ID is not null});
+my $ary_ref = $dbh->selectcol_arrayref(qq{select distinct ID from $tableNameOsb where ID is not null and DEL=0});
 my @ucos = @$ary_ref;
 my $deletePerson = $dbh->prepare(qq{UPDATE $tableNameOsb SET DEL=? , KDYZAP=sysdate where ID=?});
 foreach my $uco (@ucos) {
@@ -408,7 +408,7 @@ foreach my $key (sort keys %$groups) {
 #
 # SET deleted (DEL=1) flag to groups and members missing from Perun.
 #
-my $ary_ref_groups = $dbh->selectcol_arrayref(qq{select distinct ID from $tableNameSkup where ID is not null});
+my $ary_ref_groups = $dbh->selectcol_arrayref(qq{select distinct ID from $tableNameSkup where ID is not null and DEL=0});
 my @gids = @$ary_ref_groups;
 my $deleteGroups = $dbh->prepare(qq{UPDATE $tableNameSkup SET DEL=? , KDYZAP=sysdate where ID=?});
 foreach my $gid (@gids) {
