@@ -94,7 +94,7 @@ function add_on_exit()
 
 function log_msg {
 	CODE=`eval echo '${'$1'[0]}'`
-	TEXT=`eval echo '${'$1'[1]}'`
+	TEXT=`eval echo '${'$1'[1]}" ("$2")"'`
 	TEXT=`eval echo \"${TEXT}\"`	# expand variables in message
 	CODE=${CODE:=255}
 	TEXT=${TEXT:=Unknown error $1}
@@ -114,7 +114,7 @@ function log_msg {
 
 function log_msg_without_exit {
 	CODE=`eval echo '${'$1'[0]}'`
-	TEXT=`eval echo '${'$1'[1]}'`
+	TEXT=`eval echo '${'$1'[1]}" ("$2")"'`
 	TEXT=`eval echo \"${TEXT}\"`  # expand variables in message
 	CODE=${CODE:=255}
 	TEXT=${TEXT:=Unknown error $1}
@@ -143,7 +143,12 @@ function catch_error {
 	ERROR_NAME="$1"
 	shift
 
-	"$@" || log_msg ${ERROR_NAME}
+	exec 3>&1
+	ERR_TXT=`$@ 2>&1 1>&3`
+	ERR=$?
+	exec 3>&-
+	if [ "$ERR_TXT" ]; then echo "$ERR_TXT" >&2; fi
+	if [ $ERR -ne 0 ]; then log_msg ${ERROR_NAME} "${ERR_TXT}"; fi
 }
 
 function create_lock {
