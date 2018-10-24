@@ -1,3 +1,10 @@
+perun-slave-base (3.1.12) stable; urgency=low
+
+  * Extend process of loging errors,
+    now there is also an error from the command itself not just slave script error.
+
+ -- Peter Balcirak <peter.balcirak@gmail.com>  Wed, 24 Oct 2018 14:30:00 +0200
+
 perun-slave-base (3.1.11) stable; urgency=low
 
   * Extend log messages so they also contain information about time when they are created.
