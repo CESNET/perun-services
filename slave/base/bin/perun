@@ -34,6 +34,7 @@ fi
 umask 077
 
 ### Status codes
+I_STARTED=(0 'Service ${SERVICE} processing started')
 I_FINISHED=(0 'Service ${SERVICE} processing done')
 I_PROTOCOL_MINOR_DIFF=(0 'Difference in protocol minor version')
 I_SERVICE_DISABLED=(0 'Service ${SERVICE} is disabled')
@@ -97,14 +98,15 @@ function log_msg {
 	TEXT=`eval echo \"${TEXT}\"`	# expand variables in message
 	CODE=${CODE:=255}
 	TEXT=${TEXT:=Unknown error $1}
+	TIME=`date "+%H:%M:%S"`
 
 	if [ "${CODE}" -eq 0 ]; then
 		MSG="Info: ${TEXT}"
-		echo "${MSG}"
+		echo "${TIME} ${MSG}"
 		logger -t "${NAME}" -p daemon.info "${SERVICE}: ${MSG}" &>/dev/null
 	else
 		MSG="Error $1 (code=${CODE}): ${TEXT}"
-		echo "${MSG}" >&2
+		echo "${TIME} ${MSG}" >&2
 		logger -t "${NAME}" -p daemon.error "${SERVICE}: ${MSG}" &>/dev/null
 		exit "${CODE}"
 	fi
@@ -116,14 +118,15 @@ function log_msg_without_exit {
 	TEXT=`eval echo \"${TEXT}\"`  # expand variables in message
 	CODE=${CODE:=255}
 	TEXT=${TEXT:=Unknown error $1}
+	TIME=`date "+%H:%M:%S"`
 
 	if [ "${CODE}" -eq 0 ]; then
 		MSG="Info: ${TEXT}"
-		echo "${MSG}"
+		echo "${TIME} ${MSG}"
 		logger -t "${NAME}" -p daemon.info "${SERVICE}: ${MSG}" &>/dev/null
 	else
 		MSG="Error $1 (code=${CODE}): ${TEXT}"
-		echo "${MSG}" >&2
+		echo "${TIME} ${MSG}" >&2
 		logger -t "${NAME}" -p daemon.error "${SERVICE}: ${MSG}" &>/dev/null
 	fi
 }
@@ -382,6 +385,8 @@ FACILITY=`head -n 1 "${WORK_DIR}/FACILITY"`
 LOCK_FILE="${LOCK_DIR}/${NAME}-${SERVICE}.lock"
 LOCK_PIDFILE="$LOCK_FILE/pid"
 BACKUP_DIR="/var/tmp/perun/${SERVICE}/backup-state/"
+
+log_msg I_STARTED
 
 # export needed variables
 export PERUN_SERVICE=${SERVICE}
