@@ -12,7 +12,20 @@ function process {
 
 	VOLUMES_TO_RELEASE="" # release at the end of the script.  SYNTAX: volume:cell\nvol2:cel2\n
 
-	while IFS=`echo -e "\t"` read AFS_SERVER AFS_CELL AFS_PARTITION AFS_DEFAULT_USERS_REALM AFS_USERS_MOUNT_POINT AFS_USERS_VOLUME AFS_VOLUME USER_LOGIN USER_QUOTA TARGET_AFS_CELL; do
+	TABCHAR=`echo -ne '\t'`
+
+	while read -r LINE; do
+		[[ "$LINE" =~ (.*)$TABCHAR(.*)$TABCHAR(.*)$TABCHAR(.*)$TABCHAR(.*)$TABCHAR(.*)$TABCHAR(.*)$TABCHAR(.*)$TABCHAR(.*)$TABCHAR(.*) ]] || { echo "Bad input line" >&2; ERROR=1; continue;}
+		AFS_SERVER="${BASH_REMATCH[1]}"
+		AFS_CELL="${BASH_REMATCH[2]}"
+		AFS_PARTITION="${BASH_REMATCH[3]}"
+		AFS_DEFAULT_USERS_REALM="${BASH_REMATCH[4]}"
+		AFS_USERS_MOUNT_POINT="${BASH_REMATCH[5]}"
+		AFS_USERS_VOLUME="${BASH_REMATCH[6]}"
+		AFS_VOLUME="${BASH_REMATCH[7]}"
+		USER_LOGIN="${BASH_REMATCH[8]}"
+		USER_QUOTA="${BASH_REMATCH[9]}"
+		TARGET_AFS_CELL="${BASH_REMATCH[10]}"
 
 		#pts listentries -users -cell "$AFS_CELL" | grep -q -F "$USER_LOGIN@$AFS_DEFAULT_USERS_REALM"
 		OUT=`pts examine -nameorid "$USER_LOGIN@$AFS_DEFAULT_USERS_REALM" -cell "$AFS_CELL" 2>&1 >/dev/null`
