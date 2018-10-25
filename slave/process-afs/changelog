@@ -1,3 +1,12 @@
+perun-slave-process-afs (3.1.6) stable; urgency=medium
+
+  * Fixed parsing of input file. Since some params can have empty
+    value (empty string) we must explicitly match line separated
+    by the tab char. Otherwise two consequent tab chars are
+    considered as a single one for IFS.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Thu, 25 Oct 2018 13:25:00 +0100
+
 perun-slave-process-afs (3.1.5) stable; urgency=low
 
   * Fixed quotation in a test of $TARGET_AFS_CELL variable.
