@@ -71,7 +71,12 @@ sub init {
 	} else {
 		unless(defined $facilityId) { die "ERROR: facilityId required"; }
 
-		$agent = Perun::Agent->new('jsonsimple');
+		my $jsonFormat = $::JSON_FORMAT || "jsonsimple";
+		unless($jsonFormat =~ /^json(simple)?$/) {
+			die 'Unsupported json format. Set $::JSON_FORMAT to any of supported formats. Only "json" and "jsonsimple" are supported.';
+		}
+
+ 		$agent = Perun::Agent->new($jsonFormat);
 		$servicesAgent = $agent->getServicesAgent;
 		my $facilitiesAgent = $agent->getFacilitiesAgent;
 		$service = $servicesAgent->getServiceByName( name => $::SERVICE_NAME);
