@@ -139,8 +139,8 @@ fi
 ERR_CODE=$?
 
 #Error code 124 means - timeouted
-if [ $ERR_CODE -e 124 ]; then
-	echo "Communication with slave script was timeouted with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
+if [ $ERR_CODE -eq 124 ]; then
+	echo "Communication with slave script was timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
 else
 	echo "Communication with slave script ends with return code: $ERR_CODE" >&2
 fi
