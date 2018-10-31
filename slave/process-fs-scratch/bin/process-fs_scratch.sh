@@ -42,13 +42,20 @@ function process {
 	# lines contains login\tUID\tGID\t...
 	while IFS=`echo -e "\t"` read U_SCRATCH_MNT_POINT U_LOGNAME U_UID U_GID SOFT_QUOTA_DATA HARD_QUOTA_DATA SOFT_QUOTA_FILES HARD_QUOTA_FILES USER_STATUS; do
 		SCRATCH_DIR="${U_SCRATCH_MNT_POINT}/${U_LOGNAME}"
+
 		if [ ! -d "${SCRATCH_DIR}" ]; then
-
-			catch_error E_CANNOT_CREATE_DIR mkdir "${SCRATCH_DIR}"
-			catch_error E_CANNOT_SET_OWNERSHIP chown "${U_UID}":"${U_GID}" "${SCRATCH_DIR}"
-			catch_error E_CANNOT_SET_PERMISSIONS chmod "$UMASK" "${SCRATCH_DIR}"
-
+			catch_error E_CANNOT_CREATE_DIR  mkdir "${SCRATCH_DIR}"
 			log_msg I_DIR_CREATED
+		fi
+
+		if [ "`stat -L -c '%u:%g' ${SCRATCH_DIR}`" != "${U_UID}:${U_GID}" ]; then
+			catch_error E_CANNOT_SET_OWNERSHIP chown ${U_UID}:${U_GID} "${SCRATCH_DIR}"
+			log_debug "Ownership of ${SCRATCH_DIR} was set to ${U_UID}:${U_GID}"
+		fi
+
+		if [ "`stat -L -c '%a' ${SCRATCH_DIR}`" != "${UMASK}" ]; then
+			catch_error E_CANNOT_SET_PERMISSIONS chmod "${UMASK}" "${SCRATCH_DIR}"
+			log_debug "Permissions on ${SCRATCH_DIR} were set to ${UMASK}"
 		fi
 
 		if [ "$SET_QUOTA_ENABLED" ]; then
