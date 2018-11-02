@@ -37,6 +37,7 @@ our $A_UF_LOGIN;                             *A_UF_LOGIN =                      
 our $A_UF_O365_MAIL_FORWARD;                 *A_UF_O365_MAIL_FORWARD =                 \'urn:perun:user_facility:attribute-def:def:o365MailForward';
 our $A_UF_O365_ARCHIVE;                      *A_UF_O365_ARCHIVE =                      \'urn:perun:user_facility:attribute-def:def:o365MailInPlaceArchive';
 our $A_UF_O365_STORE_AND_FORWARD;            *A_UF_O365_STORE_AND_FORWARD =            \'urn:perun:user_facility:attribute-def:def:o365MailStoreAndForward';
+our $A_UF_O365_LICENCE;                      *A_UF_O365_LICENCE =                      \'urn:perun:user_facility:attribute-def:def:o365Licence';
 our $A_R_IS_FOR_O365_GROUP;                  *A_R_IS_FOR_O365_GROUP =                  \'urn:perun:resource:attribute-def:def:isForO365Group';
 our $A_F_ID;                                 *A_F_ID =                                 \'urn:perun:facility:attribute-def:core:id';
 our $A_R_O365_RES_NAME;                      *A_R_O365_RES_NAME =                      \'urn:perun:resource:attribute-def:def:o365ResourceName';
@@ -108,6 +109,7 @@ our $DEFAULT_FORWARDING_DOMAIN = '@mo.muni.cz';
 #-------------------------------------------------------------------------
 
 our $users = {};
+our $skippedUsers = {};
 our $groups = {};
 our $resourceMails = {};
 
@@ -265,6 +267,14 @@ sub processResourceMember {
 
 		my $UCO = $memberAttributes{$A_UF_LOGIN};
 		my $disableForward = $memberAttributes{$A_UF_DISABLE_MAIL_FORWARD};
+		my $licence = $memberAttributes{$A_UF_O365_LICENCE};
+		
+		#if member has no licence, skip him
+		unless($licence) {
+			$skippedUsers->{$UCO} = 1;
+			print "SKIP-FOR_RESOURCE: $UCO\n";
+			return;
+		}
 
 		#if mail forward is not set use the default value unless forwarding is disabled for that user
 		my $mailForward = $memberAttributes{$A_UF_O365_MAIL_FORWARD} || $UCO . $DEFAULT_FORWARDING_DOMAIN unless $disableForward;
@@ -311,8 +321,14 @@ sub processGroupMember {
 	my $memberData = shift;
 	my $groupADName = shift;
 
+
 	my %memberAttributes = attributesToHash $memberData->getAttributes;
 	my $UCO = $memberAttributes{$A_UF_LOGIN};
+	#skipped user which has no licence
+	if($skippedUsers->{$UCO}) {
+		print "SKIP-FOR_GROUP: $UCO\n";
+		return;
+	}
 	my $UPN = $users->{$UCO}->{$UPN_TEXT};
 	my $sendAsGroup = $memberAttributes{$A_MR_O365_SEND_AS};
 	if($sendAsGroup) { $groups->{$groupADName}->{$UPN} = 1; }

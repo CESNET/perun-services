@@ -182,7 +182,6 @@ SetResourceMail optional options:
 #Get parameters of script and assign them to variables
 my $inputCommand = $0;
 foreach my $argument (@ARGV) { $inputCommand .= " " . ($argument =~ /^-/ ? $argument : shellEscape $argument); }
-#foreach my $argument (@ARGV) { $inputCommand .= " " . $argument; }
 my ($service, $server, $argIdent, $argCommand, $argArch, $argDeliv, $argForw, $argEmailAddresses, @argContacts, $argResAlias, @argResEmails,
  $argResDisplayName, $argResType, $argResCapacity, $argResAdditionalResponse, $argResExtMeetingMsg, $argResAllowConflicts, $argResBookingWindow,
  $argResPercentageAllowed, $argResEnforceSchedHorizon, $argResMaxConflictInstances, $argResMaxDuration, $argResSchedDuringWorkHours,
@@ -302,12 +301,6 @@ exit 0;
 #-------------------------------------------------------------------------
 #------------------------------COMMAND-SUBS-------------------------------
 #-------------------------------------------------------------------------
-setResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent, $argResAlias, \@argResEmails, $argResDisplayName, $argResType,
-	 $argResCapacity, $argResAdditionalResponse, $argResExtMeetingMsg, $argResAllowConflicts, $argResBookingWindow,
-	 $argResPercentageAllowed, $argResEnforceSchedHorizon, $argResMaxConflictInstances, $argResMaxDuration, $argResSchedDuringWorkHours,
-	 $argResAllBookInPolicy, $argResAllRequestInPolicy, $argResAllReqOutOfPolicy, \@argResWorkingDays, $argResWorkingHoursStart,
-	 $argResWorkingHoursEnd, $argResAllowRecurMeetings, $argResAddAdditionalResp, \@argResDelegates, \@argResBookInPolicy,
-	 \@argResRequestInPolicy, \@argResRequestOutOfPolicy);
 
 #Name:
 # setResourceMail
@@ -706,8 +699,8 @@ sub getResourceMails {
 
 	if(ref $jsonOutput eq ref {}) {
 		if(defined($jsonOutput->{"ErrorType"})) {
-	    diePretty ( $ERROR_O365_OR_PS_ERROR , "Some HARD internal message error in method call -> " . $jsonOutput->{"ErrorMessage"} . "\n" )
-	  }
+			diePretty ( $ERROR_O365_OR_PS_ERROR , "Some HARD internal message error in method call -> " . $jsonOutput->{"ErrorMessage"} . "\n" )
+		}
 	}
 
 	if($status eq $COMMAND_STATUS_SET) {

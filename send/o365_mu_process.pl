@@ -11,8 +11,10 @@ use File::Temp qw/ tempfile tempdir /;
 use File::Copy;
 use File::Path qw(make_path);
 use Data::Dumper;
+use JSON qw( decode_json );
 
 #predefined subs
+sub waitForSynchronize;
 sub waitForThreads;
 sub startThreads;
 sub processTasks;
@@ -23,7 +25,9 @@ sub readDataAboutUsers;
 sub readDataAboutActiveUsers;
 sub readDataAboutGroups;
 sub readDataAboutResourceMails;
+sub readDataAboutResourceMailsFromO365Proxy;
 sub readFacilityId;
+sub barrierWait;
 sub shellEscape($);
 
 #DEBUG = 0 means no debug, DEBUG>0 means print other messages
@@ -32,15 +36,16 @@ my $DEBUG=0;
 #file locks for groups and users
 my $USERS_LOCK :shared;
 my $GROUPS_LOCK :shared;
-my $RESOURCE_MAILS_LOCK :shared;
+my $BARRIER_LOCK :shared;
+
+#thread barrier counter
+my $barrierCounter :shared = 0; #guarded by $BARRIER_LOCK
 
 #arrays of users and groups
 my @allUsers = ();
 share(@allUsers);
 my @allGroups = ();
 share(@allGroups);
-my @allResourceMails = ();
-share(@allResourceMails);
 
 #number of worker threads
 my $THREAD_COUNT = 10;
@@ -54,9 +59,10 @@ my $OPERATION_GROUP = "group";
 my $OPERATION_GROUP_CHANGED = $OPERATION_GROUP . "-CHANGED";
 my $OPERATION_GROUP_NOT_CHANGED = $OPERATION_GROUP . "-NOT_CHANGED";
 my $OPERATION_RESOURCE_MAIL = "resourceMail";
+my $OPERATION_RESOURCE_MAIL_REMOVED = $OPERATION_RESOURCE_MAIL . "-REMOVED";
 my $OPERATION_RESOURCE_MAIL_CHANGED = $OPERATION_RESOURCE_MAIL . "-CHANGED";
-my $OPERATION_RESOURCE_MAIL_NOT_CHANGED = $OPERATION_RESOURCE_MAIL . "-NOT_CHANGED";
 my $OPERATION_END = "end"; #signal end of the operation
+my $OPERATION_SYNC = "synchronize"; #signal to synchronize with other threads
 my $ARGUMENT = "argument";
 
 #text predefined constants to use
@@ -151,8 +157,8 @@ if(! -f $resourceMailsDataFilename) {
 #file with facility id from gen (can't be empty)
 my $facilityIdFilename = "$pathToServiceFile/$serviceName-facilityId";
 if(! -f $facilityIdFilename) {
-  print "ERORR - Missing file with facilit id.\n";
-  exit 15;
+	print "ERORR - Missing file with facilit id.\n";
+	exit 15;
 }
 
 #read facility id from file
@@ -168,7 +174,6 @@ if(@$err) {
 }
 my $lastStateOfUsersFilename = $cacheDir . "o365_mu-users";
 my $lastStateOfGroupsFilename = $cacheDir . "o365_mu-groups";
-my $lastStateOfResourceMailsFilename = $cacheDir . "o365_mu-resource-mails";
 
 #file with active users need to exists
 my $pathToActiveUsersFile = $basicCacheDir . "activeO365Users";
@@ -202,19 +207,15 @@ if( -f $lastStateOfGroupsFilename) {
 	$lastGroupsStruc = readDataAboutGroups $lastStateOfGroupsFilename;
 }
 
-#Read data (cache) about last state of resource mails
-my $lastResourceMailsStruc = {};
-if( -f $lastStateOfResourceMailsFilename) {
-	$lastResourceMailsStruc = readDataAboutResourceMails $lastStateOfResourceMailsFilename;
-}
+#read data about existing resources from o365 proxy
+my $lastResourceMailsStruc = readDataAboutResourceMailsFromO365Proxy;
+unless($lastResourceMailsStruc) { $lastResourceMailsStruc = {}; }
 
 #prepare new cache files
 my $newUsersCache = new File::Temp( UNLINK => 1 );
 my $newGroupsCache = new File::Temp( UNLINK => 1 );
-my $newResourceMailsCache = new File::Temp( UNLINK => 1 ); 
 open FILE_USERS_CACHE, ">$newUsersCache" or die "Could not open file with new cache of users data $newUsersCache: $!\n";
 open FILE_GROUPS_CACHE, ">$newGroupsCache" or die "Could not open file with new cache of groups data $newGroupsCache: $!\n";
-open FILE_RESOURCE_MAILS_CACHE, ">$newResourceMailsCache" or die "Could not open file with new cache of resource mails data $newResourceMailsCache: $!\n";
 
 #prepare threads for work jobs
 my $jobQueue = Thread::Queue->new();
@@ -245,6 +246,8 @@ foreach my $key (keys %$newUsersStruc) {
 	$jobQueue->enqueue($job);
 }
 
+waitForSynchronize;
+
 #create and submit jobs for working with group's objets
 foreach my $key (keys %$newGroupsStruc) {
 	my $newGroup = $newGroupsStruc->{$key};
@@ -271,26 +274,29 @@ foreach my $key (keys %$newGroupsStruc) {
 	$jobQueue->enqueue($job);
 }
 
+waitForSynchronize;
+
 #create and submit jobs for working with resource-mail's objects
 foreach my $key (keys %$newResourceMailsStruc) {
 	my $newResourceMail = $newResourceMailsStruc->{$key};
-	my $oldResourceMail = $lastResourceMailsStruc->{$key};
 
-	my $job;
-	unless($oldResourceMail) {
-		#resource-mail is new, add it
-		$job = { $OPERATION => $OPERATION_RESOURCE_MAIL_CHANGED, $ARGUMENT => $newResourceMail };
-	} else {
-		if($newResourceMail->{$PLAIN_TEXT_OBJECT_TEXT} eq $oldResourceMail->{$PLAIN_TEXT_OBJECT_TEXT}) {
-			#resource-mail exists and it is equals, just write it's data to the cache file
-			$job = { $OPERATION => $OPERATION_RESOURCE_MAIL_NOT_CHANGED, $ARGUMENT => $newResourceMail };
-		} else {
-			#resource-mail eixsts but it is different, modifyit (add and modify operation is the same there)
-			$job = { $OPERATION => $OPERATION_RESOURCE_MAIL_CHANGED, $ARGUMENT => $newResourceMail };
-		}
-	}
+	my $job = { $OPERATION => $OPERATION_RESOURCE_MAIL_CHANGED, $ARGUMENT => $newResourceMail };
+	
 	#add job to the queue to process it by threads
 	$jobQueue->enqueue($job);
+}
+
+waitForSynchronize;
+
+#we need to also remove not existing resource from o365 proxy
+foreach my $key (keys %$lastResourceMailsStruc) {
+	my $newResourceMail = $newResourceMailsStruc->{$key};
+	unless($newResourceMail) {
+		#resource mail no longer exists, we should remove it
+		my $job = { $OPERATION => $OPERATION_RESOURCE_MAIL_REMOVED, $ARGUMENT => $lastResourceMailsStruc->{$key} };
+		#add job to the queue to process it by threads
+		$jobQueue->enqueue($job);
+	}
 }
 
 #wait for all threads to finish
@@ -306,17 +312,11 @@ foreach my $groupRecord (@allGroups) {
 	print FILE_GROUPS_CACHE $groupRecord . "\n";
 }
 
-foreach my $resourceMailRecord (@allResourceMails) {
-	print FILE_RESOURCE_MAILS_CACHE $resourceMailRecord . "\n";
-}
-
 #copy new cache files to place with old cache files
 close FILE_USERS_CACHE or die "Could not close file $newUsersCache: $!\n";
 close FILE_GROUPS_CACHE or die "Could not close file $newGroupsCache: $!\n";
-close FILE_RESOURCE_MAILS_CACHE or die "Could not close file $newResourceMailsCache: $!\n";
 copy( $newUsersCache, $lastStateOfUsersFilename );
 copy( $newGroupsCache, $lastStateOfGroupsFilename );
-copy( $newResourceMailsCache, $lastStateOfResourceMailsFilename );
 
 exit $returnCode;
 
@@ -338,6 +338,8 @@ sub processTasks {
 
 		if($job->{$OPERATION} eq $OPERATION_END) {
 			$running = 0;
+		} elsif ($job->{$OPERATION} eq $OPERATION_SYNC) {
+			barrierWait();
 		} else {
 			#do the job
 			if($job->{$OPERATION} =~ $OPERATION_GROUP) {
@@ -351,15 +353,37 @@ sub processTasks {
 				$sucess = 0;
 			}
 		}
+		
+		#if this process is not success, set return code for script to not 0
+		unless($sucess) {
+			$returnCode=1;
+		}
 	}
 
-	#if this process is not success, set return code for script to not 0
-	unless($sucess) {
-		$returnCode=1;
+}
+
+#method to set barrier for threads
+sub barrierWait {
+	lock $BARRIER_LOCK;
+	$barrierCounter++;
+
+	if($barrierCounter == $THREAD_COUNT) {
+		$barrierCounter = 0;
+		cond_broadcast($BARRIER_LOCK);
+	} else {
+		cond_wait($BARRIER_LOCK);
 	}
 }
 
-#Sub to send end operation for every running thread
+#Sub to wait for every running thread and synchronize them
+sub waitForSynchronize {
+	#send special job to queue to signal that all threads should wait for others to synchronize
+	for(1 .. $THREAD_COUNT) {
+		$jobQueue->enqueue( { $OPERATION => $OPERATION_SYNC } );
+	}
+}
+
+#Sub to wait for every running thread and send terminate operation for all of them
 sub waitForThreads {
 	#send special job to queue to signal the thread to terminate
 	for(1 .. $THREAD_COUNT) {
@@ -451,24 +475,22 @@ sub processResourceMail {
 		my $reqOutOfPolicy = join " ", map { shellEscape $_ } @{$resourceMailObject->{$RES_REQUEST_OUT_OF_POLICY_TEXT}};
 		if($reqOutOfPolicy) { $command = $command . " -y " . $reqOutOfPolicy; }
 		
-		if($DEBUG) { print "CHANGE RESOURCE-MAIL N-EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - STARTED\n"; }
+		if($DEBUG) { print "CHANGE RESOURCE-MAIL: " . $resourceMailObject->{$RES_NAME_TEXT} . " - STARTED\n"; }
 		`$command`;
-		if($?) { 
-			print "CHANGE RESOURCE-MAIL N-EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - ERROR\n";
+		if($@) { 
+			print "CHANGE RESOURCE-MAIL: " . $resourceMailObject->{$RES_NAME_TEXT} . " - ERROR - $@\n";
 			return 0; 
 		}
-		{
-			lock $RESOURCE_MAILS_LOCK;
-			push @allResourceMails, $resourceMailObject->{$PLAIN_TEXT_OBJECT_TEXT};
+		if($DEBUG) { print "CHANGE RESOURCE-MAIL: " . $resourceMailObject->{$RES_NAME_TEXT} . " - OK\n" };
+	} elsif( $localOperation eq $OPERATION_RESOURCE_MAIL_REMOVED ) {
+		my $command = $o365ConnectorFile . " -s " . shellEscape($serviceName) . " -S " . shellEscape($instanceName) . " -c Remove-MuniResource" . " -i " . shellEscape $resourceMailObject->{$RES_NAME_TEXT};
+		if($DEBUG) { print "REMOVE RESOURCE-MAIL: " . $resourceMailObject->{$RES_NAME_TEXT} . " - STARTED\n"; }
+		`$command`;
+		if($?) { 
+			print "REMOVE RESOURCE-MAIL: " . $resourceMailObject->{$RES_NAME_TEXT} . " - ERROR\n";
+			return 0; 
 		}
-		if($DEBUG) { print "CHANGE RESOURCE-MAIL N-EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - OK\n" };
-	} elsif( $localOperation eq $OPERATION_RESOURCE_MAIL_NOT_CHANGED ) {
-		if($DEBUG) { print "CHANGE RESOURCE-MAIL EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - STARTED\n"; }
-		{
-			lock $RESOURCE_MAILS_LOCK;
-			push @allResourceMails, $resourceMailObject->{$PLAIN_TEXT_OBJECT_TEXT};
-		}
-		if($DEBUG) { print "CHANGE RESOURCE-MAIL EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - OK\n" };
+		if($DEBUG) { print "REMOVE RESOURCE-MAIL N-EQ: " . $resourceMailObject->{$RES_NAME_TEXT} . " - OK\n" };
 	} else {
 		print "ERROR - UNKNOWN OPERATION: " . $localOperation . " was skipped for resource-mail " . $resourceMailObject->{$RES_NAME_TEXT} . "\n";
 		return 0;
@@ -680,6 +702,30 @@ sub readDataAboutResourceMails {
 		$resourceMailsStruc->{$resourceMailName}->{$PLAIN_TEXT_OBJECT_TEXT} = $line;
 	}
 	close FILE or die "Could not close file $pathToFile: $!\n";
+
+	return $resourceMailsStruc;
+}
+
+#Sub to read data about existing resource from o365 proxy
+sub readDataAboutResourceMailsFromO365Proxy {
+	my $resourceMailsStruc = {};
+
+	my $command = $o365ConnectorFile . " -s " . shellEscape($serviceName)  . " -S " . shellEscape($instanceName) . " -c Get-MuniResources";
+	my $result = `$command`;
+	my $error = $?;
+	if($error) {
+		die "GET MUNI RESOURCES - ERROR with status code $error\n";
+	}
+
+	my $resourceStructureFromO365 = decode_json( $result );
+	
+	foreach my $resource (@$resourceStructureFromO365) {
+		my $resourceIdentity = $resource->{'Identity'};
+		#strip part after '@' from identity
+		$resourceIdentity =~ s/@.*//g;
+		$resourceMailsStruc->{$resourceIdentity} = $resource;
+		$resourceMailsStruc->{$resourceIdentity}->{$RES_NAME_TEXT} = $resourceIdentity;
+	}
 
 	return $resourceMailsStruc;
 }
