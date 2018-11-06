@@ -6,5 +6,5 @@ Build-Depends: #BUILD_DEPS#
 Standards-Version: #POLICY#
 
 Package: #PACKAGE#
-Architecture: any
+Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}
