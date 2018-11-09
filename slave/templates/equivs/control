@@ -5,6 +5,6 @@ Maintainer: ${NAME} <${EMAIL}>
 Standards-Version: 3.9.2
 
 Package: ${PACKAGE_NAME}
-Architecture: any
+Architecture: all
 Version: ${VERSION}
 Depends: ${DEPENDENCIES}

@@ -1,3 +1,9 @@
+perun-slave-process-fs-home (3.1.8) stable; urgency=medium
+
+  * Changed architecture to all
+
+ -- Martin Kuba <makub@ics.muni.cz>  Fri, 09 Nov 2018 15:32:48 +0100
+
 perun-slave-process-fs-home (3.1.7) stable; urgency=medium
 
   * minimalize creating TMP directories only for not existing home directories
