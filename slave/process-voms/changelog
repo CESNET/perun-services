@@ -1,3 +1,9 @@
+perun-slave-process-voms (3.1.12) stable; urgency=medium
+
+  * Changed architecture to all
+
+ -- Martin Kuba <makub@ics.muni.cz>  Fri, 09 Nov 2018 15:32:51 +0100
+
 perun-slave-process-voms (3.1.11) stable; urgency=high
 
   * fix typo in invalid level in command "syslog", for warning logs need to be

@@ -1,3 +1,9 @@
+perun-slave-full (3.1.5) stable; urgency=medium
+
+  * Changed architecture to all
+
+ -- Martin Kuba <makub@ics.muni.cz>  Fri, 09 Nov 2018 15:32:47 +0100
+
 perun-slave-full (3.1.4) stable; urgency=low
 
   * Add new service as dependency of this meta package:

@@ -1,3 +1,9 @@
+perun-slave-process-fs-scratch-local (3.1.6) stable; urgency=medium
+
+  * Changed architecture to all
+
+ -- Martin Kuba <makub@ics.muni.cz>  Fri, 09 Nov 2018 15:32:48 +0100
+
 perun-slave-process-fs-scratch-local (3.1.5) stable; urgency=low
 
   * Modify service behaviour to be able to recover from a failure

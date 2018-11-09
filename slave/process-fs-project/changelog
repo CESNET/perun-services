@@ -1,3 +1,9 @@
+perun-slave-process-fs-project (3.1.7) stable; urgency=medium
+
+  * Changed architecture to all
+
+ -- Martin Kuba <makub@ics.muni.cz>  Fri, 09 Nov 2018 15:32:48 +0100
+
 perun-slave-process-fs-project (3.1.6) stable; urgency=high
 
   * setfacl need to set also permissions for owner itself, not just user. 
