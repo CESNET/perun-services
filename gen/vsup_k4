@@ -7,6 +7,7 @@ use perunServicesUtils;
 use Time::Piece;
 
 sub calculateExpiration;
+sub isExpired;
 
 local $::SERVICE_NAME = "vsup_k4";
 local $::PROTOCOL_VERSION = "3.0.0";
@@ -16,7 +17,7 @@ perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
 my $groupFileName = "$DIRECTORY/$::SERVICE_NAME"."_groups.csv";
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getDataWithGroups;
 
 # Constants
 our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
@@ -33,7 +34,7 @@ our $A_NAV;  *A_NAV = \'urn:perun:user:attribute-def:def:k4Nav';
 our $A_STALEAKT;  *A_STALEAKT = \'urn:perun:user:attribute-def:def:k4Staleakt';
 our $A_BLACKLISTED;  *A_BLACKLISTED = \'urn:perun:user_facility:attribute-def:virt:blacklisted';
 our $A_IFIS_ID;  *A_IFIS_ID = \'urn:perun:user:attribute-def:def:osbIdifis';
-
+our $A_EXPIRED;  *A_EXPIRED = \'urn:perun:member_group:attribute-def:def:groupMembershipExpiration';
 
 our $A_R_ID;  *A_R_ID = \'urn:perun:resource:attribute-def:def:k4GroupId';
 our $A_R_NAME;  *A_R_NAME = \'urn:perun:resource:attribute-def:def:k4GroupName';
@@ -51,6 +52,7 @@ my $groups; # $groups->{$id}->{name|code|priority|members} = $value;
 # FOR EACH RESOURCE
 foreach my $rData ($data->getChildElements) {
 
+	# RESOURCE => GROUP in K4
 	my %resourceAttributes = attributesToHash $rData->getAttributes;
 	my $k4GroupId = $resourceAttributes{$A_R_ID};
 	my $k4GroupName = $resourceAttributes{$A_R_NAME};
@@ -82,29 +84,50 @@ foreach my $rData ($data->getChildElements) {
 		$groups->{$k4GroupId}->{"members"} = ();
 	}
 
-	my @membersData = $rData->getChildElements;
+	# GET MEMBERS FROM PERUN GROUPS TO DETERMINE EXPIRATION
+	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
 
-	foreach my $member (@membersData) {
+	foreach my $group (@groupsData) {
 
-		my %uAttributes = attributesToHash $member->getAttributes;
+		my @membersData = ($group->getChildElements)[1]->getChildElements;
+		foreach my $member (@membersData) {
 
-		if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
-			# skip blacklisted users !security ban!
-			next;
+			my %uAttributes = attributesToHash $member->getAttributes;
+
+			if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
+				# skip blacklisted users !security ban!
+				next;
+			}
+
+			my $key = $uAttributes{$A_UCO};
+
+			if (isExpired($uAttributes{$A_EXPIRED})) {
+				# skip expired members from group
+				next;
+			}
+
+			$users->{$key}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE}) ? substr($uAttributes{$A_TITLE_BEFORE}, 0, 15) : '';
+			$users->{$key}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
+			$users->{$key}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+			$users->{$key}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
+			$users->{$key}->{$A_NAV} = $uAttributes{$A_NAV} || '0';
+			$users->{$key}->{$A_STALEAKT} = $uAttributes{$A_STALEAKT} || '0';
+			$users->{$key}->{$A_IFIS_ID} = $uAttributes{$A_IFIS_ID} || '';
+			$users->{$key}->{"EXPIRATION"} = calculateExpiration($uAttributes{$A_EXPIRATION_KOS}, $uAttributes{$A_EXPIRATION_DC2}, $uAttributes{$A_EXPIRATION_MANUAL});
+
+			if (length $users->{$key}->{$A_FIRST_NAME} > 20) {
+				$users->{$key}->{$A_FIRST_NAME} = substr($uAttributes{$A_FIRST_NAME}, 0, 20);
+			}
+			if (length $users->{$key}->{$A_LAST_NAME} > 20) {
+				$users->{$key}->{$A_LAST_NAME} = substr($uAttributes{$A_LAST_NAME}, 0, 20);
+			}
+			if (length $users->{$key}->{$A_TITLE_BEFORE} > 15) {
+				$users->{$key}->{$A_TITLE_BEFORE} = substr($uAttributes{$A_TITLE_BEFORE}, 0, 15);
+			}
+
+			$groups->{$k4GroupId}->{"members"}->{$key} = 1;
+
 		}
-
-		my $key = $uAttributes{$A_UCO};
-
-		$users->{$key}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE}) ? substr($uAttributes{$A_TITLE_BEFORE}, 0, 15) : '';
-		$users->{$key}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
-		$users->{$key}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
-		$users->{$key}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
-		$users->{$key}->{$A_NAV} = $uAttributes{$A_NAV} || '0';
-		$users->{$key}->{$A_STALEAKT} = $uAttributes{$A_STALEAKT} || '0';
-		$users->{$key}->{$A_IFIS_ID} = $uAttributes{$A_IFIS_ID} || '';
-		$users->{$key}->{"EXPIRATION"} = calculateExpiration($uAttributes{$A_EXPIRATION_KOS}, $uAttributes{$A_EXPIRATION_DC2}, $uAttributes{$A_EXPIRATION_MANUAL});
-
-		push(@{$groups->{$k4GroupId}->{"members"}}, $key);
 
 	}
 
@@ -142,7 +165,7 @@ for my $key (@gKeys) {
 
 	my $members = "";
 	if (defined $groups->{$key}->{"members"}) {
-		$members = join(",", sort @{$groups->{$key}->{"members"}});
+		$members = join(",", sort keys %{$groups->{$key}->{"members"}});
 	}
 	print FILE $key . "\t" . $groups->{$key}->{"code"}. "\t" . $groups->{$key}->{"name"} .
 		"\t" . $groups->{$key}->{"priority"} . "\t" . $members . "\n";
@@ -207,5 +230,28 @@ sub calculateExpiration() {
 	}
 
 	return (localtime($result)->ymd() . " 23:59:59");
+
+}
+#
+# Check, if passed value is valid timestamp a decide, if it`s in a past or not.
+#
+sub isExpired() {
+
+	my $expiration = shift;
+	# no group expiration
+	unless (defined $expiration) { return 0; }
+
+	# Parse date
+	my $expirationTime = Time::Piece->strptime($expiration,"%Y-%m-%d");
+	# Add 23:59:59
+	$expirationTime = $expirationTime->epoch + 86399;
+	# current time
+	my $currentTime = localtime(time)->epoch;
+	# compare if user is expired in a group
+	if ($currentTime > $expirationTime) {
+		return 1;
+	} else {
+		return 0;
+	}
 
 }
