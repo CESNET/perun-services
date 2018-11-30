@@ -5,67 +5,100 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 use Perun::Agent;
+use Date::Calc qw\Delta_Days\;
 use open qw/:std :utf8/;
 use JSON;
 use utf8;
 
 local $::SERVICE_NAME = "o365_life_cycle_manager_mu";
-local $::PROTOCOL_VERSION = "1.0.0";
-my $SCRIPT_VERSION = "1.0.0";
+local $::PROTOCOL_VERSION = "1.1.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getDataWithGroups;
 
 #forward declaration
 sub processUsers;
 
 #Headers
-my $idHeader = "id";
+my $userIdHeader = "userId";
 my $memberIdHeader = "memberId";
-my $loginHeader = "login";
+my $loginHeader = "uco";
+my $affiliationsHeader = "affiliations";
+my $groupMembershipExpirationHeader = "groupMembershipExpiration";
 my $o365EmailAddressesHeader = "o365EmailAddresses";
-my $emailAddressesHeader = "emailAddresses";
-my $o365AccountExtensionHeader = "o365AccountExtension";
-my $allumniAccountDisabledHeader = "allumniAccountDisabled";
-my $relationsTypesHeader = "relationTypes";
+my $o365AllumniAccountEnabledHeader = "o365AllumniAccountEnabled";
+my $o365PrivilegedLicenceHeader = "o365PrivilegedLicence";
+my $eligibleForO365AlumniLicenceHeader = "eligibleForO365AlumniLicence";
+my $o365GracePeriodExpirationHeader = "o365GracePeriodExpiration"; 
 
 #Constants
+our $A_USER_ID;                       *A_USER_ID =                       \'urn:perun:user:attribute-def:core:id';
+our $A_MEMBER_ID;                     *A_MEMBER_ID =                     \'urn:perun:member:attribute-def:core:id';
+our $A_USER_LOGIN_MU;                 *A_USER_LOGIN_MU =                 \'urn:perun:user:attribute-def:def:login-namespace:mu';
+our $A_RESOURCE_AFFILIATIONS;         *A_RESOURCE_AFFILIATIONS =         \'urn:perun:resource:attribute-def:def:affiliation';
+our $A_GROUP_MEMBERSHIP_EXPIRATION;   *A_GROUP_MEMBERSHIP_EXPIRATION =   \'urn:perun:member_group:attribute-def:def:groupMembershipExpiration';
+our $A_MEMBER_O365_EMAIL_ADDRS_MU;    *A_MEMBER_O365_EMAIL_ADDRS_MU =    \'urn:perun:member:attribute-def:def:o365EmailAddresses:mu';
+our $A_USER_FAC_ALLUMNI_ACC_ENABLED;  *A_USER_FAC_ALLUMNI_ACC_ENABLED =  \'urn:perun:user_facility:attribute-def:def:eligibleForO365AlumniLicence';
+our $A_USER_FAC_PRIVILEGED_LICENCE;   *A_USER_FAC_PRIVILEGED_LICENCE =   \'urn:perun:user_facility:attribute-def:def:o365PrivilegedLicence';
+our $A_USER_FAC_ELIGIBLE_FOR_LICENCE; *A_USER_FAC_ELIGIBLE_FOR_LICENCE = \'urn:perun:user_facility:attribute-def:def:eligibleForO365AlumniLicence';
+our $A_USER_FAC_GRACE_PERIOD_EXP;     *A_USER_FAC_GRACE_PERIOD_EXP =     \'urn:perun:user_facility:attribute-def:def:o365GracePeriodExpiration';
 
-our $A_MEMBER_ID;                  *A_MEMBER_ID =                   \'urn:perun:member:attribute-def:core:id';
-our $A_USER_ID;                    *A_USER_ID =                     \'urn:perun:user:attribute-def:core:id';
-our $A_USER_LOGIN_MU;              *A_USER_LOGIN_MU =               \'urn:perun:user:attribute-def:def:login-namespace:mu';
-our $A_RESOURCE_RELATION_TYPE;     *A_RESOURCE_RELATION_TYPE =      \'urn:perun:resource:attribute-def:def:relationType';
-our $A_MEMBER_O365_EMAIL_ADDRS_MU; *A_MEMBER_O365_EMAIL_ADDRS_MU =  \'urn:perun:member:attribute-def:def:o365EmailAddresses:mu';
-our $A_USER_FACILITY_O365_ACC_EXT; *A_USER_FACILITY_O365_ACC_EXT =  \'urn:perun:user_facility:attribute-def:def:o365AccountExtension';
-our $A_USER_FACILITY_ACC_DISABLED; *A_USER_FACILITY_ACC_DISABLED =  \'urn:perun:user_facility:attribute-def:def:allumniAccountDisabled';
+#it defines UNLIMITED expiration for purpose of this gen script
+our $UNLIMITED_EXPIRATION = "UNLIMITED";
+#it defines specific affilation or resource where we need to process expiration in groups
+our $O365_GUEST_AFFILIATION = "o365guest";
 
 my $userStruc = {};
 
+#file to which we will export the data about users
 my $file = $DIRECTORY . "/data.json";
 
+#foreach resource in the structure
 foreach my $resourceData ($data->getChildElements) {
 	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
-	my $relationType = $resourceAttributes{$A_RESOURCE_RELATION_TYPE};
+	#defined affilation for whole resource
+	my $affiliation = $resourceAttributes{$A_RESOURCE_AFFILIATIONS};
 
-	foreach my $memberData ($resourceData->getChildElements) {
-		processUsers $relationType, $memberData;	
+	#for each group assigned to the resource
+	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
+		my $membersElement = ($groupData->getChildElements)[1];
+		
+		#and every member in such group
+		for my $memberData ($membersElement->getChildElements) {
+			my %memberAttributes = attributesToHash $memberData->getAttributes;
+			my $userId = $memberAttributes{$A_USER_ID};
+			my $expirationInGroup = $memberAttributes{$A_GROUP_MEMBERSHIP_EXPIRATION};
+
+			#process every member|group|resource combination one by one
+			processUsers $affiliation, $expirationInGroup, $memberData;	
+		}
 	}
 }
 
 # PREPARE USERSDATA TO JSON
 my @users;
-foreach my $id (sort keys %$userStruc) {
+foreach my $userId (sort keys %$userStruc) {
 	my $user = {};
-	$user->{$idHeader} = $id * 1;
-	$user->{$memberIdHeader} = $userStruc->{$id}->{$memberIdHeader};
-	$user->{$loginHeader} = $userStruc->{$id}->{$loginHeader};
-	$user->{$o365EmailAddressesHeader} = $userStruc->{$id}->{$o365EmailAddressesHeader};
-	$user->{$emailAddressesHeader} = $userStruc->{$id}->{$emailAddressesHeader};
-	$user->{$o365AccountExtensionHeader} = $userStruc->{$id}->{$o365AccountExtensionHeader};
-	$user->{$relationsTypesHeader} = $userStruc->{$id}->{$relationsTypesHeader};
-	$user->{$allumniAccountDisabledHeader} = $userStruc->{$id}->{$allumniAccountDisabledHeader};
-
+	#use *1 to force perl to use integer instead of strings
+	$user->{$userIdHeader} = $userId * 1;
+	$user->{$memberIdHeader} = $userStruc->{$userId}->{$memberIdHeader} * 1;
+	$user->{$loginHeader} = $userStruc->{$userId}->{$loginHeader};
+	$user->{$o365EmailAddressesHeader} = $userStruc->{$userId}->{$o365EmailAddressesHeader};
+	$user->{$affiliationsHeader} = $userStruc->{$userId}->{$affiliationsHeader};
+	$user->{$o365AllumniAccountEnabledHeader} = $userStruc->{$userId}->{$o365AllumniAccountEnabledHeader};
+	$user->{$o365PrivilegedLicenceHeader} = $userStruc->{$userId}->{$o365PrivilegedLicenceHeader};
+	$user->{$eligibleForO365AlumniLicenceHeader} = $userStruc->{$userId}->{$eligibleForO365AlumniLicenceHeader};
+	$user->{$o365GracePeriodExpirationHeader} = $userStruc->{$userId}->{$o365GracePeriodExpirationHeader};
+	my $groupExpiration = $userStruc->{$userId}->{$groupMembershipExpirationHeader};
+	#UNLIMITED expiration and not defined expirations are for purpose of JSON same => null
+	unless($groupExpiration) {
+		$user->{$groupMembershipExpirationHeader} = undef;
+	} elsif ($groupExpiration eq $UNLIMITED_EXPIRATION) {
+		$user->{$groupMembershipExpirationHeader} = undef;
+	} else {
+		$user->{$groupMembershipExpirationHeader} = $groupExpiration;
+	}
 	push @users, $user;
 }
 my %usersFinal = ();
@@ -84,39 +117,78 @@ perunServicesInit::finalize;
 ##############################################################################
 ## creates structure for users.json
 sub processUsers {
-	my ($relationType, $memberData) = @_;
+	my ($affiliation, $expirationInGroup, $memberData) = @_;
 
 	my %memberAttributes = attributesToHash $memberData->getAttributes;
-	my $id = $memberAttributes{$A_USER_ID};
+	my $userId = $memberAttributes{$A_USER_ID};
 
-	if (exists $userStruc->{$id}) {
-		if($relationType) {
-			my @relations = uniqList ($relationType, @{$userStruc->{$id}->{$relationsTypesHeader}});
-			$userStruc->{$id}->{$relationsTypesHeader} = \@relations;
+	#if user was already processed in another group, we can skip same attributes
+	if (exists $userStruc->{$userId}) {
+		#all these operations need to have defined affiliation
+		if($affiliation) {
+			my @affiliations = uniqList ($affiliation, @{$userStruc->{$userId}->{$affiliationsHeader}});
+			$userStruc->{$userId}->{$affiliationsHeader} = \@affiliations;
+
+			#we need to calculate expriration for guest resources
+			if($affiliation eq $O365_GUEST_AFFILIATION) {
+				my $lastDefinedExpiration = $userStruc->{$userId}->{$groupMembershipExpirationHeader};
+				#if this new expiration is empty, it means is unlimited and we can set it without any more checks
+				if(!$expirationInGroup) {
+					$userStruc->{$userId}->{$groupMembershipExpirationHeader} = $UNLIMITED_EXPIRATION;
+				#if new is not empty and last is empty, we can set a new one instead
+				} elsif (!$lastDefinedExpiration) {
+					$userStruc->{$userId}->{$groupMembershipExpirationHeader} = $expirationInGroup;
+				#if both are not empty, but last is unlimited, we can skip it, in other case we need to choose the biggest
+				#for example: 1.1.2001 > 1.1.2000
+				} elsif ($lastDefinedExpiration ne $UNLIMITED_EXPIRATION) {
+					my ($lastYear, $lastMonth, $lastDay) = unpack "A4xA2xA2", $lastDefinedExpiration;
+					my ($newYear, $newMonth, $newDay) = unpack "A4xA2xA2", $expirationInGroup;
+					my $diff = Delta_Days($lastYear, $lastMonth, $lastDay, $newYear, $newMonth, $newDay);
+					#change only if this new groupExpiration is bigger then the old one
+					if($diff>0) {
+						$userStruc->{$userId}->{$groupMembershipExpirationHeader} = $expirationInGroup;
+					}
+				}
+			}
 		}
+	#this is the first time user as occured in any processed group so we need to create a new full record
 	} else {
+		my $user = {};
 		my $memberId = $memberAttributes{$A_MEMBER_ID};
 		my $login = $memberAttributes{$A_USER_LOGIN_MU};
 		my $o365EmailAddresses = $memberAttributes{$A_MEMBER_O365_EMAIL_ADDRS_MU};
-		my $o365AccExtension = $memberAttributes{$A_USER_FACILITY_O365_ACC_EXT};
-		my $accountDisabled = $memberAttributes{$A_USER_FACILITY_ACC_DISABLED};
+		my $o365AllumniAccountEnabled = $memberAttributes{$A_USER_FAC_ALLUMNI_ACC_ENABLED};
+		my $o365GracePeriodExpiration = $memberAttributes{$A_USER_FAC_GRACE_PERIOD_EXP};
+		my $eligibleForO365AlumniLicence = $memberAttributes{$A_USER_FAC_ELIGIBLE_FOR_LICENCE};
+		my $o365PrivilegedLicence = $memberAttributes{$A_USER_FAC_PRIVILEGED_LICENCE};
 
-		$userStruc->{$id}->{$memberIdHeader} = $memberId;
-		$userStruc->{$id}->{$loginHeader} = $login;
-		$userStruc->{$id}->{$o365EmailAddressesHeader} = $o365EmailAddresses;
-		$userStruc->{$id}->{$o365AccountExtensionHeader} = $o365AccExtension;
-		$userStruc->{$id}->{$allumniAccountDisabledHeader} = $accountDisabled ? JSON::true : JSON::false;
-		
-		#TODO: this is just temporary settings and will be replaced soon 
-		my @emailAddresses = @$o365EmailAddresses;
-		push @emailAddresses, $login . '@test.cz';
-		$userStruc->{$id}->{$emailAddressesHeader} = \@emailAddresses;
+		$userStruc->{$userId}->{$memberIdHeader} = $memberId;
+		$userStruc->{$userId}->{$loginHeader} = $login;
+		$userStruc->{$userId}->{$o365EmailAddressesHeader} = $o365EmailAddresses;
+		$userStruc->{$userId}->{$o365AllumniAccountEnabledHeader} = $o365AllumniAccountEnabled ? JSON::true : JSON::false;
+		$userStruc->{$userId}->{$eligibleForO365AlumniLicenceHeader} = $eligibleForO365AlumniLicence ? JSON::true : JSON::false;
+		$userStruc->{$userId}->{$o365PrivilegedLicenceHeader} = $o365PrivilegedLicence ? JSON::true : JSON::false;
+		$userStruc->{$userId}->{$o365GracePeriodExpirationHeader} = $o365GracePeriodExpiration;
 
-		#relations
-		my @relations = ();
-		if($relationType) {
-			push @relations, $relationType;
+		#we need to set correct group expiration if affiliation is for guests
+		if($affiliation && $affiliation eq $O365_GUEST_AFFILIATION) {
+			#if expiration is not empty, we will set it as is
+			if($expirationInGroup) {
+				$userStruc->{$userId}->{$groupMembershipExpirationHeader} = $expirationInGroup;
+			#if expiration is empty, we will use constat instead to be able to recognize between undef and unlimited there
+			} else {
+				$userStruc->{$userId}->{$groupMembershipExpirationHeader} = $UNLIMITED_EXPIRATION;
+			}
+		#if this is not guest affiliation, we can set undef instead
+		} else {
+			$userStruc->{$userId}->{$groupMembershipExpirationHeader} = undef;
 		}
-		$userStruc->{$id}->{$relationsTypesHeader} = \@relations;
+
+		#affiliations need to be array, because one user can have more affiliations by resources
+		my @affiliations = ();
+		if($affiliation) {
+			push @affiliations, $affiliation;
+		}
+		$userStruc->{$userId}->{$affiliationsHeader} = \@affiliations;
 	}
 }
