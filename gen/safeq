@@ -99,7 +99,7 @@ foreach my $login (sort keys %$usersByLogin) {
 	print FILE "ldapauthdn:", checkBase64("cn=" . $login . ", ou=users, ou=mu, dc=ucn, dc=muni, dc=cz");
 	print FILE "firstname:", checkBase64($attributes->{$A_USER_FIRST_NAME} || '(N/A)');
 	print FILE "lastname:", checkBase64($attributes->{$A_USER_LAST_NAME} || '(N/A)');
-	print FILE "costcenter:", checkBase64("costcenterno=" . $attributes->{$A_USER_WORKPLACE_ID} || 100 . ", ou=costcenters, o=ysoftsafeq");
+	print FILE "costcenter:", checkBase64("costcenterno=" . ($attributes->{$A_USER_WORKPLACE_ID} || 100) . ", ou=costcenters, o=ysoftsafeq");
 	print FILE "email:", checkBase64($attributes->{$A_USER_MAIL});
 	print FILE "homedir:: ", encode_base64('\\\\ha-ntc.ics.muni.cz\\profiles\\' . $attributes->{$A_USER_LOGIN});
 
