@@ -10,7 +10,6 @@ use strict;
 use warnings;
 use utf8;
 use DBI;
-use Data::Dumper;
 use File::Path qw(make_path);
 use Switch;
 use MIME::Lite;
@@ -38,232 +37,6 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 binmode STDOUT, ":utf8";
 
-
-my $MAIL_newUser=<<'END';
-Vážený uživateli,
-
-pro snadnou on-line komunikaci a pohodlnější spolupráci využíváme na Masarykově univerzitě prostředí Microsoft Office 365.
-Založili jsme Vám v něm účet, díky kterému můžete využívat všechny funkce a nástroje, například interní komunikační síť Yammer, aplikace pro on-line úpravu dokumentů (Word, Excel, PowerPoint), nástroje pro ukládání a sdílení dokumentů (OneDrive, SharePoint), pro organizaci práce na projektech (Planner) a mnoho dalších.
-Ke všem se dostanete na adrese https://o365.muni.cz. Zde zadejte přihlašovací jméno učo@muni.cz a po přesměrování na stránku jednotného univerzitního přihlašování UČO a primární heslo.
-Začátky při práci s těmito nástroji vám usnadní návody a popisy funkcí, které najdete na https://it.muni.cz/office365.
-
-Účet Vám zaktivujeme do 12 hodin po obdržení této zprávy.
-
-Nyní vám přichází veškerá pošta do Informačního systému, její přesměrování však můžete nastavit v INETu na adrese https://inet.muni.cz/app/o365/user_overview.
-
-V případě problémů či dotazů kontaktujte helpdesk@ics.muni.cz.
-Ústav výpočetní techniky MU
--------------------------------------------------------------
-
-Dear user,
-in order to simplify on-line communication and cooperation, Masaryk University makes use of the Microsoft Office 365 online environment.
-We have set up an account in Office 365 for you, which allows you to use all functions and tools such as the internal communication network Yammer, applications for online editing of documents (Word, Excel, PowerPoint), tools for saving and sharing of documents (OneDrive, SharePoint) or for organising your work on projects (Planner) and many more.
-You might access all of the above at https://o365.muni.cz. Enter UČO@muni.cz as login and, after being redirected to university unified login page, UČO and primary password.
-Manuals and descriptions of functions published at https://it.muni.cz/office365 might help you with working with these tools at the beginning.
-
-Your account will be activated within 12 hours after receiving this message.
-
-You are receiving all your mail in the Information system at the moment, however, you might set up mail redirection in INET at https://inet.muni.cz/app/o365/user_overview.
-
-In case of any problems or questions, please contact helpdesk@ics.muni.cz.
-Institute of Computer Science MU
-
-END
-
-
-
-my $MAIL_extendedGracePeriod =<<'END';
-Vážený uživateli,
-
-díky tomu, že jste se stal <<o365Role>> Masarykovy univerzity, Vám nadále zůstává plně k dispozici váš účet MS Office 365. Můžete tak využívat všech jeho dostupných nástrojů a funkcí.
-Dokumentaci a další informace najdete na it.muni.cz/office365. 
-
-V případě problémů či dotazů kontaktujte helpdesk@ics.muni.cz.
-Ústav výpočetní techniky MU
--------------------------------------------------------------
-
-Dear user,
-
-thanks to becoming Masaryk University’s <<o365RoleEN>>, your MS Office 365 account stays at your disposal. Hence, you might continue using all of the tools and functions available.
-For further information, please visit it.muni.cz/office365. 
-In case of any problems or questions, please contact helpdesk@ics.muni.cz.
-Institute of Computer Science MU
-
-END
-
-
-my $MAIL_fromAlumniToActiveRole =<<'END';
-Vážený uživateli,
-
-díky tomu, že jste se stal <<o365Role>> Masarykovy univerzity, jsme Vám rozšířili váš absolventský účet MS Office 365. Můžete tak nyní plně využívat všechny jeho funkce a nástroje, například interní komunikační síť Yammer, aplikace pro on-line úpravu dokumentů (Word, Excel, PowerPoint), nástroje pro ukládání a sdílení dokumentů (OneDrive, SharePoint), pro organizaci práce na projektech (Planner) a mnoho dalších.
-Začátky při práci s těmito nástroji vám usnadní návody a popisy funkcí, které najdete na https://it.muni.cz/office365.
-
-V případě problémů či dotazů kontaktujte helpdesk@ics.muni.cz.
-Ústav výpočetní techniky MU
--------------------------------------------------------------
-
-Dear user,
-
-thanks to becoming Masaryk University’s <<o365RoleEN>>, your MS Office 365 alumni account has been extended. It allows you to use all functions and tools such as the internal communication network Yammer, applications for online editing of documents (Word, Excel, PowerPoint), tools for saving and sharing of documents (OneDrive, SharePoint) or for organising your work on projects (Planner) and many more.
-Manuals and descriptions of functions published at https://it.muni.cz/office365 might help you with working with these tools at the beginning.
-For further information, please visit it.muni.cz/office365. 
-In case of any problems or questions, please contact helpdesk@ics.muni.cz.
-Institute of Computer Science MU
-
-END
-
-my $MAIL_GPStartAlumni =<<'END';
-Vážený uživateli,
-vzhledem k tomu, že již nejste <<o365Role>>, dojde ke dni <<o365Expiration>> k převedení Vašeho účtu MS Office 365 na absolventský mód. Účet jako takový zůstane zachován, z nástrojů však budete mít k dispozici pouze poštu, kalendář, kontakty a úkoly.
-Pokud se do uplynutí lhůty stanete znovu zaměstnancem nebo studentem/studentem nebo zaměstnancem Masarykovy univerzity, nadále Vám zůstane k dispozici účet se všemi funkcemi, a to opět po dobu zaměstnaneckého poměru nebo studia.
-
-V případě nejasností se prosím obraťte na helpdesk@ics.muni.cz.
-Děkujeme za pochopení.
-Ústav výpočetní techniky MU
--------------------------------------------------------------
-
-Dear user,
-since you are no longer Masaryk University’s <<o365RoleEN>>, your MS Office 365 account will be transformed into alumni mode on <<o365Expiration>>. The account itself will be preserved, but its use will be limited only to mail, calendar, contacts, and tasks.
-In case you become Masaryk University’s employee or student again before the expiration date, the account will stay at your disposal with all functions until the study or working contract terminates again.
-In case of any issues, please contact helpdesk@ics.muni.cz.
-Thank you for understanding.
-Institute of Computer Science MU
-
-END
-
-my $MAIL_GPStartAlumni_allowExtension =<<'END';
-Vážený uživateli,
-vzhledem k tomu, že již nejste <<o365Role>>, dojde ke dni <<o365Expiration>> k převedení Vašeho účtu MS Office 365 na absolventský mód. Účet jako takový zůstane zachován, z nástrojů však budete mít k dispozici pouze poštu, kalendář, kontakty a úkoly.
-Pokud se do uplynutí lhůty stanete znovu zaměstnancem nebo studentem/studentem nebo zaměstnancem Masarykovy univerzity, nadále Vám zůstane k dispozici účet se všemi funkcemi, a to opět po dobu zaměstnaneckého poměru nebo studia.
-V odůvodněných případech můžete také požádat o prodloužení životnosti účtu na delší dobu či na neurčito své lokální správce IT – https://it.muni.cz/it-centra-na-muni.
-
-V případě nejasností se prosím obraťte na helpdesk@ics.muni.cz.
-Děkujeme za pochopení.
-Ústav výpočetní techniky MU
--------------------------------------------------------------
-
-Dear user,
-since you are no longer Masaryk University’s <<o365RoleEN>>, your MS Office 365 account will be transformed into alumni mode on <<o365Expiration>>. The account itself will be preserved, but its use will be limited only to mail, calendar, contacts, and tasks.
-In case you become Masaryk University’s employee or student again before the expiration date, the account will stay at your disposal with all functions until the study or working contract terminates again.
-In case of legitimate reasons, you might ask your local IT technicians (https://it.muni.cz/en/it-departments) to postpone the account’s termination or prolong its full use ad infinitum.
-
-In case of any issues, please contact helpdesk@ics.muni.cz.
-Thank you for understanding.
-Institute of Computer Science MU
-
-END
-
-
-my $MAIL_GPStartNonAlumni =<<'END';
-Vážený uživateli,
-vzhledem k tomu, že již nejste <<o365Role>>, dojde ke dni <<o365Expiration>> ke zrušení Vašeho účtu MS Office 365. Během této doby máte možnost si zálohovat svá data, o která byste nerad přišel.
-Pokud se do uplynutí lhůty stanete znovu zaměstnancem nebo studentem Masarykovy univerzity, nadále Vám zůstává k dispozici účet se všemi funkcemi, a to opět po dobu zaměstnaneckého poměru nebo studia.
-V odůvodněných případech můžete také požádat o prodloužení životnosti účtu na delší dobu či na neurčito své lokální správce IT – https://it.muni.cz/it-centra-na-muni.
-Po uplynutí lhůty se Vám účet zruší a pošta se přesměruje do ISu nebo na adresu, kterou si manuálně nastavíte v INETu na adrese https://inet.muni.cz/app/o365/user_overview.
-
-V případě nejasností se prosím obraťte na helpdesk@ics.muni.cz.
-Děkujeme za pochopení.
-Ústav výpočetní techniky MU
--------------------------------------------------------------
-
-Dear user,
-since you are no longer Masaryk University’s <<o365RoleEN>>, your MS Office 365 account will be terminated on <<o365Expiration>>. You should back up all data which you do not want to lose before this date.
-In case you become Masaryk University’s employee or student again before the expiration date, the account will stay at your disposal with all functions until the study or working contract terminates again.
-In case of legitimate reasons, you might ask your local IT technicians (https://it.muni.cz/en/it-departments) to postpone the account’s termination or prolong its full use ad infinitum.
-After the stated date, your account will be cancelled and your mail will be redirected to IS or another address, which might be set up manually in INET at https://inet.muni.cz/app/o365/user_overview.
-In case of any issues, please contact helpdesk@ics.muni.cz.
-Thank you for understanding.
-Institute of Computer Science MU
-
-END
-
-my $MAIL_GPReminderAlumni =<<'END';
-Vážený uživateli,
-jak jsme Vás dříve informovali, z důvodu ukončení <<o365RoleName>> dojde ke dni <<o365Expiration>> k převedení Vašeho účtu MS Office 365 na absolventský mód. Účet jako takový zůstane zachován, z nástrojů však budete mít k dispozici pouze poštu, kalendář, kontakty a úkoly.
-Pokud se do uplynutí lhůty stanete znovu zaměstnancem nebo studentem/studentem nebo zaměstnancem Masarykovy univerzity, nadále Vám zůstane k dispozici účet se všemi funkcemi, a to opět po dobu zaměstnaneckého poměru nebo studia.
-
-V případě nejasností se prosím obraťte na helpdesk@ics.muni.cz.
-Děkujeme za pochopení.
-Ústav výpočetní techniky MU
--------------------------------------------------------------
-
-Dear user,
-in connection to our previous email, due to the termination of your <<o365RoleNameEN>>, your MS Office 365 account will be transformed into alumni mode on <<o365Expiration>>. The account itself will be preserved, but its use will be limited only to mail, calendar, contacts, and tasks.
-In case you become Masaryk University’s employee or student again before the expiration date, the account will stay at your disposal with all functions until the study or working contract terminates again.
-
-In case of any issues, please contact helpdesk@ics.muni.cz.
-Thank you for understanding.
-Institute of Computer Science MU
-
-END
-
-my $MAIL_GPReminderAlumni_AllowExtension =<<'END';
-Vážený uživateli,
-jak jsme Vás dříve informovali, z důvodu ukončení <<o365RoleName>> dojde ke dni <<o365Expiration>> k převedení Vašeho účtu MS Office 365 na absolventský mód. Účet jako takový zůstane zachován, z nástrojů však budete mít k dispozici pouze poštu, kalendář, kontakty a úkoly.
-Pokud se do uplynutí lhůty stanete znovu zaměstnancem nebo studentem/studentem nebo zaměstnancem Masarykovy univerzity, nadále Vám zůstane k dispozici účet se všemi funkcemi, a to opět po dobu zaměstnaneckého poměru nebo studia.
-V odůvodněných případech můžete také požádat o prodloužení životnosti účtu na delší dobu či na neurčito své lokální správce IT – https://it.muni.cz/it-centra-na-muni.
-
-V případě nejasností se prosím obraťte na helpdesk@ics.muni.cz.
-Děkujeme za pochopení.
-Ústav výpočetní techniky MU
--------------------------------------------------------------
-
-Dear user,
-in connection to our previous email, due to the termination of your <<o365RoleNameEN>>, your MS Office 365 account will be transformed into alumni mode on <<o365Expiration>>. The account itself will be preserved, but its use will be limited only to mail, calendar, contacts, and tasks.
-In case you become Masaryk University’s employee or student again before the expiration date, the account will stay at your disposal with all functions until the study or working contract terminates again.
-In case of legitimate reasons, you might ask your local IT technicians (https://it.muni.cz/en/it-departments) to postpone the account’s termination or prolong its full use ad infinitum.
-
-In case of any issues, please contact helpdesk@ics.muni.cz.
-Thank you for understanding.
-Institute of Computer Science MU
-
-END
-
-my $MAIL_GPReminderNonAlumni =<<'END';
-Vážený uživateli,
-jak jsme Vás dříve informovali, z důvodu ukončení <<o365RoleName>> dojde ke dni <<o365Expiration>> ke zrušení Vašeho účtu MS Office 365. Do uplynutí této lhůty máte možnost si zálohovat svá data, o která byste nerad přišel.
-Pokud se během této doby znovu stanete zaměstnancem nebo studentem Masarykovy univerzity, nadále Vám zůstane k dispozici účet se všemi funkcemi, a to opět po dobu zaměstnaneckého poměru nebo studia.
-V odůvodněných případech můžete také požádat o prodloužení životnosti účtu na delší dobu či na neurčito své lokální správce IT – https://it.muni.cz/it-centra-na-muni.
-Po uplynutí lhůty se Vám účet zruší a pošta se přesměruje do ISu nebo na adresu, kterou si manuálně nastavíte v INETu na adrese https://inet.muni.cz/app/o365/user_overview.
-
-V případě nejasností se prosím obraťte na helpdesk@ics.muni.cz.
-Děkujeme za pochopení.
-Ústav výpočetní techniky MU
--------------------------------------------------------------
-
-Dear user,
-in connection to our previous email, due to the termination of your <<o365RoleNameEN>>, your MS Office 365 account will be cancelled on <<o365Expiration>>. You should back up all data which you do not want to lose before this date.
-In case you become Masaryk University’s employee or student again before the expiration date, the account will stay at your disposal with all functions until the study or working contract terminates again.
-In case of legitimate reasons, you might ask your local IT technicians (https://it.muni.cz/en/it-departments) to postpone the account’s termination or prolong its full use ad infinitum.
-After the stated date, your account will be cancelled and your mail will be redirected to IS or another address, which might be set up manually in INET at https://inet.muni.cz/app/o365/user_overview.
-
-In case of any issues, please contact helpdesk@ics.muni.cz.
-Thank you for understanding.
-Institute of Computer Science MU
-
-
-END
-
-
-my $MAIL_SUBSTITUTE_PLACEHOLDER_O365ROLE = '<<o365Role>>';
-my $MAIL_SUBSTITUTE_PLACEHOLDER_O365ROLE_EN = '<<o365RoleEN>>';
-my $MAIL_SUBSTITUTE_PLACEHOLDER_O365ROLE_NAME = '<<o365RoleName>>';
-my $MAIL_SUBSTITUTE_PLACEHOLDER_O365ROLE_NAME_EN = '<<o365RoleNameEN>>';
-my $MAIL_SUBSTITUTE_PLACEHOLDER_O365EXPIRATION = '<<o365Expiration>>';
-my $MAIL_SUBSTITUTE_O365ROLE_EMPLOYEE = "zaměstnancem";
-my $MAIL_SUBSTITUTE_O365ROLE_EMPLOYEE_EN = "employee";
-my $MAIL_SUBSTITUTE_O365ROLE_STUDENT = "studentem";
-my $MAIL_SUBSTITUTE_O365ROLE_STUDENT_EN = "student";
-my $MAIL_SUBSTITUTE_O365ROLE_MANUAL = "externím spolupracovníkem";
-my $MAIL_SUBSTITUTE_O365ROLE_MANUAL_EN = "external collaborator";
-my $MAIL_SUBSTITUTE_O365ROLE_NAME_EMPLOYEE = "zaměstnaneckého poměru";
-my $MAIL_SUBSTITUTE_O365ROLE_NAME_EMPLOYEE_EN = "employment contract";
-my $MAIL_SUBSTITUTE_O365ROLE_NAME_STUDENT = "studia";
-my $MAIL_SUBSTITUTE_O365ROLE_NAME_STUDENT_EN = "study";
-my $MAIL_SUBSTITUTE_O365ROLE_NAME_MANUAL = "externí spolupráce";
-my $MAIL_SUBSTITUTE_O365ROLE_NAME_MANUAL_EN = "external collaboration";
-
-
 # Import shared AD library
 use ADConnector;
 use ScriptLock;
@@ -275,26 +48,10 @@ sub process_groups;
 sub process_groups_members;
 sub process_licenses_groups;
 
-sub load_cached_students;
-sub load_users_relations;
-sub load_users_licenses;
 sub ping_password_setter;
-sub load_waiting_for_removal;
-sub shouldMove;
 sub fill_from_ad;
 sub add_to_license_group;
 sub remove_from_license_group;
-sub write_active_users;
-sub load_available_license_groups;
-sub update_cloudExtensionAttribute2;
-sub sendMail($$);
-sub loadMailTexts;
-sub load_manual_employees;
-sub write_active_students_from_last_run;
-sub load_active_students_from_last_run;
-
-sub saveStoredUserStates;
-sub loadUsersState;
 
 # define service
 my $service_name = "ad_mu";
@@ -304,46 +61,14 @@ END { ldap_log($service_name, "-- Propagation of $service_name service finished.
 
 
 my $R_NONE = 0x00;
-my $R_EMPLOYEE = 0x20;
-my $R_STUDENT = 0x10;
-my $GP_EMPLOYEE = 0x08;
-my $GP_STUDENT = 0x04;
-my $F_MANUAL = 0x02; #have manual extersion of an account but don't have employee role at the same time
-my $F_ALUMNI = 0x01;
-
-my $USER_STATE_SEPARATOR ="\t";
-my $USER_STATE_DATE_SEPARATOR ="-";
-my $USER_STATE_ROLES = "roles";
-my $USER_STATE_GP_EMPLOYEE = "GP-Employee";
-my $USER_STATE_GP_STUDENT = "GP-Student";
-my $USER_STATE_GP_NOTIFICATION_SENT = "GP-Notification-sent";
-my $USER_STATE_GP_NOTIFICATION_SENT_NONE = "0";
-my $USER_STATE_GP_NOTIFICATION_SENT_INICIAL = "1";
-my $USER_STATE_GP_NOTIFICATION_SENT_REMINDER = "2";
-
-my $GRACE_PERIOD_EXPIRATION = 301; #days
-my $GRACE_PERIOD_EXPIRATION_NOTIFICATION_DELTA_DAYS = 14; #days
 
 
 my $facility_name = $ARGV[0];
 chomp($facility_name);
 
-my $USER_STATE_FILE ="spool/$facility_name/ad_mu/userState";
-my $USER_STATE_TMP_FILE ="spool/$facility_name/ad_mu/userState.tmp";
-
-
 ## init and "global" variables
 
-my $userState; #state of all users 
-open USER_STATE_TMP_FILEHANDLE, ">", $USER_STATE_TMP_FILE or die "Cannot open $USER_STATE_TMP_FILE: $!";
-
 ## end - init
-
-
-
-# if set all mail notifications about relation change are sent to this address !!
-my $debugMailAddress;
-#my $debugMailAddress = 'roman.kruzik@muni.cz';
 
 # GEN folder location
 my $service_files_base_dir="../gen/spool";
@@ -374,7 +99,6 @@ my $lockManager = LockFile::Simple->make( -hold => 0, -delay => 30, -max => 2);
 my $errorLockFile = "/var/lock/" . $facility_name . "_" . $service_name . "_" . $namespace . ".errorLock";
 $lockManager->lock($errorLockFile) || die "There were an error in previous run. Resolve the error and delete following file to continue: $errorLockFile \n";
 
-
 # init configuration
 my @conf = init_config($namespace);
 my $ldap_location = resolve_pdc($conf[0]);
@@ -388,10 +112,13 @@ my $filter = '(objectClass=person)';
 my $filter_groups = '(objectClass=group)';
 my $filter_ou = '(objectClass=organizationalunit)';
 
-my $employeeDN = "CN=O365Lic_Employee_group.muni.cz,OU=licenses," . $base_dn_groups;
-my $studentDN = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups;
-my $student2DN = "CN=O365Lic_Student2_group.muni.cz,OU=licenses," . $base_dn_groups;
-my $alumniDN = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $base_dn_groups;
+my @licencesDN = ("CN=O365Lic_A3s_group.muni.cz,OU=licenses," . $base_dn_groups,
+		"CN=O365Lic_A3s-2_group.muni.cz,OU=licenses," . $base_dn_groups,
+		"CN=O365Lic_A3z_group.muni.cz,OU=licenses," . $base_dn_groups,
+		"CN=O365Lic_A1s_group.muni.cz,OU=licenses," . $base_dn_groups,
+		"CN=O365Lic_A1z_group.muni.cz,OU=licenses," . $base_dn_groups,
+		"CN=O365Lic_A1p_group.muni.cz,OU=licenses," . $base_dn_groups,
+		"CN=O365Lic_Abs_group.muni.cz,OU=licenses," . $base_dn_groups);
 
 # log counters
 my $counter_add = 0;
@@ -409,26 +136,20 @@ my $counter_group_failed = 0;
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
 
 # load normal user entries
-my @ad_entries = load_ad($ldap, $base_dn, $filter, ['displayName','cn','sn','givenName','mail','samAccountName','userPrincipalName','userAccountControl','ProxyAddresses','MailNickName','c', 'preferredLanguage', 'msDS-cloudExtensionAttribute1','msDS-cloudExtensionAttribute3', 'targetaddress']);
+
+my @ad_entries = load_ad($ldap, $base_dn, $filter, ['displayName','cn','sn','givenName','mail','samAccountName','userPrincipalName','userAccountControl','ProxyAddresses','MailNickName','c', 'preferredLanguage', 'msDS-cloudExtensionAttribute1', 'msDS-cloudExtensionAttribute2','msDS-cloudExtensionAttribute3', 'targetaddress']);
 
 my %ad_entries_map = ();
 my %perun_entries_map = ();
-my %mailAdresses = ();
-my %externalMailAddress = ();
 
 foreach my $ad_entry (@ad_entries) {
 	my $login = $ad_entry->get_value('samAccountName');
 	$ad_entries_map{ $login } = $ad_entry;
-	$mailAdresses{ $ad_entry->dn  } = $ad_entry->get_value("mail");
-	$externalMailAddress{ $ad_entry->dn  } = $ad_entry->get_value("targetaddress");
 }
 foreach my $perun_entry (@perun_entries) {
 	my $login = $perun_entry->get_value('samAccountName');
 	$perun_entries_map{ $login } = $perun_entry;
-	$mailAdresses{ $perun_entry->dn } = $perun_entry->get_value("mail");
-	$externalMailAddress{ $perun_entry->dn } = $perun_entry->get_value("targetaddress");
 }
-
 
 # PROCESS USERS
 process_add_user();
@@ -437,23 +158,6 @@ process_update_user();
 
 # PROCESS OUs - GROUPS ARE PROCESSED BY EACH OU
 process_ous();
-
-# PROCESS LICENSE GROUPS
-
-# load perun state
-my $userRelations = load_users_relations(); # $userRelations->{$user_dn}->{ZAM|STU} = 1;
-my $userLicenses = load_users_licenses(); # $userLicenses->{$user_dn}->{licenseGroupName} = 1;
-my $manualEmployees = load_manual_employees(); # $manualEmployees->{$user_dn} = 1;
-
-# load local caches before processing license groups and also store all "students" back to file
-#my $onceStudents = load_cached_students($userRelations); # $onceStudents->{$user_dn} = 1;
-#my $activeStudentsFromLastRun = load_active_students_from_last_run(); # $activeStudentsFromLastRun->{$user_dn} = 1;
-
-# load waiting for removal
-#my $waitingForRemoval = load_waiting_for_removal(); # $waitingForRemoval->{$user_dn}->{$group_dn}->{TIMESTAMP|14DAYS|2DAYS} = $timestamp or 0 | sent | sent;
-
-# process it
-process_licenses_groups();
 
 # disconnect
 ldap_unbind($ldap);
@@ -514,7 +218,7 @@ sub process_add_user() {
 				ldap_log($service_name, "User added: " . $perun_entry->dn());
 				$counter_add++;
 				# tell IS to set Password to AD
-				ping_password_setter($login);
+				#ping_password_setter($login);
 			} else {
 				# FAIL
 				ldap_log($service_name, "User NOT added: " . $perun_entry->dn() . " | " . $response->error());
@@ -531,7 +235,6 @@ sub process_add_user() {
 # Update existing entries in AD
 #
 sub process_update_user() {
-
 	foreach my $perun_entry (@perun_entries) {
 
 		if (exists $ad_entries_map{$perun_entry->get_value('samAccountName')}) {
@@ -539,7 +242,7 @@ sub process_update_user() {
 			my $ad_entry = $ad_entries_map{$perun_entry->get_value('samAccountName')};
 
 			# attrs without cn since it's part of DN to be updated
-			my @attrs = ('displayName','sn','givenName','mail','MailNickName','ProxyAddresses','c', 'preferredLanguage','msDS-cloudExtensionAttribute1','msDS-cloudExtensionAttribute3', 'targetaddress');
+			my @attrs = ('displayName','sn','givenName','mail','MailNickName','ProxyAddresses','c', 'preferredLanguage','msDS-cloudExtensionAttribute1', 'msDS-cloudExtensionAttribute2','msDS-cloudExtensionAttribute3', 'targetaddress');
 			# stored log messages to check if entry should be updated
 			my @entry_changed = ();
 
@@ -752,8 +455,9 @@ sub process_groups() {
 		my $cn = $ad_entry->get_value('cn');
 		unless (exists $perun_entries_group_map{$cn}) {
 
-			# Prevent clearing main license group Employee,Student,Alumni !!
-			unless (($ad_entry->dn() eq $employeeDN) or ($ad_entry->dn() eq $studentDN) or ($ad_entry->dn() eq $alumniDN) or ($ad_entry->dn() eq $student2DN)){
+			# Prevent clearing main license groups !!
+			# compare using smart-match (perl 5.10.1+)
+			unless ($ad_entry->dn() ~~ @licencesDN) {
 
 				# clear members
 				my @empty_members = ();
@@ -768,6 +472,7 @@ sub process_groups() {
 				my $response = $ad_entry->update($ldap);
 				unless ($response->is_error()) {
 					ldap_log($service_name, "Group emptied: ".$ad_entry->dn());
+
 					$counter_group_remove++;
 				} else {
 					ldap_log($service_name, "Group NOT emptied: ".$ad_entry->dn()." | ".$response->error());
@@ -777,6 +482,13 @@ sub process_groups() {
 			}
 
 		}
+	}
+
+	#
+	# Process groups from ou licenses separately
+	#
+	if ($ouName eq "licenses") {
+		process_licenses_groups(\%perun_entries_group_map);
 	}
 
 }
@@ -870,20 +582,14 @@ sub process_groups_members() {
 
 }
 
-
-
-
-
 #
 # Update groups from ou=licenses !!!
 #
 # Method asume, that they exists, since new OUs and Groups are added to AD during standard group processing.
 #
-# First it creates reflection of curent relations and licenses
-# Then it compares it with current AD state
-# Then it perform changes
-#
 sub process_licenses_groups() {
+
+	my $perun_entries = shift;
 
 	my $ouName = "licenses";
 
@@ -897,167 +603,37 @@ sub process_licenses_groups() {
 	}
 
 	my $ad_state; # $ad_state->{group_dn}->{user_dn} = 1;
-	my $perun_state; # $perun_state->{group_dn}->{user_dn} = 1;
 
 	# AD state can be filled from AD
 	$ad_state = fill_from_ad(\%ad_entries_group_map);
 
-
-
-
-## -- New code for user licences and notifications 
-
-#structure: $employees->{$userDN} = 1;
-my ($employees, $students, $alumni);
-
-$userState = loadUsersState;
-
-my %allUsers;
-$allUsers{$_} = 1 foreach keys %{$userRelations};
-$allUsers{$_} = 1 foreach keys %{$userState};
-
-
-foreach my $user (keys %allUsers) {
-
-	my $oldRoles = $userState->{$user}->{$USER_STATE_ROLES} || $R_NONE;
-	my $rolesFromPerun = $R_NONE;
-	$rolesFromPerun |= $R_EMPLOYEE if($userRelations->{$user}->{"ZAM"});
-	$rolesFromPerun |= $R_STUDENT if($userRelations->{$user}->{"STU"});
-	$rolesFromPerun |= $F_MANUAL if($manualEmployees->{$user});
-
-
-	my $gracePeriodRoles = computeGracePeriod($user, $oldRoles, $rolesFromPerun);
-	my $roles = $rolesFromPerun | $gracePeriodRoles;
-
-	#if user is or was student, add alumi flag
-	$roles |= $F_ALUMNI if($rolesFromPerun & $R_STUDENT || $oldRoles & $F_ALUMNI);
-
-
-
-
-	my $expiredGracePeriods = expireAndNotifyGracePeriods($user, $roles);
-	$roles &= ~$expiredGracePeriods;
-
-	my $emailTemplate = getEmailTemplateAndSetNotificationSentState($oldRoles, $roles, $user);
-	if($emailTemplate) {
-		$emailTemplate = substituteVariablesInEmailTemplate($emailTemplate, $user, $roles);
-
-		my $mailAddress = ( $oldRoles == $R_NONE ) ? $externalMailAddress{$user} : $mailAdresses{$user};
-		sendMail($emailTemplate, $mailAddress);
-	}
-
-
-	$userState->{$user}->{$USER_STATE_ROLES} = $roles;
-	#print "New roles: " . roleToString($roles) . "\n";
-	$userState = storeUserState($userState, $user);
-
-	my $o365Licence = getO365Licence($roles);
-	if($o365Licence & $R_EMPLOYEE) {
-		$employees->{$user} = 1;
-	} elsif ($o365Licence & $R_STUDENT) {
-		$students->{$user} = 1;
-	} elsif ($o365Licence & $F_ALUMNI) {
-		$alumni->{$user} = 1;
-	}
-
-}
-
-#store rest of users from $userState
-
-for my $user (keys %$userState) {
-	storeUserState($userState, $user);
-}
-
-saveStoredUserStates;
-
-
-## == END:  New code for user licences and notifications 
-
-
-
-	# 4. Based on current relation, fill license groups
-
-	# 4.1. create key entries for all license possibilities
-	my @licGroups = load_available_license_groups();
-	foreach (@licGroups) {
-		$perun_state->{$_} = ();
-	}
-
-	# 4.2 fill some keys with members from Perun based on licenses "in use".
-	foreach my $user_dn (keys %{$userLicenses}) {
-
-		my $licenseGroups = $userLicenses->{$user_dn};
-
-		if (defined $employees->{$user_dn}) {
-			foreach my $licenseGroupName (keys %{$licenseGroups}) {
-				$perun_state->{"CN=O365Lic_Employee_".$licenseGroupName."_group.muni.cz,OU=licenses,".$base_dn_groups}->{$user_dn} = 1;
-			}
-		} elsif (defined $students->{$user_dn}) {
-			foreach my $licenseGroupName (keys %{$licenseGroups}) {
-				$perun_state->{"CN=O365Lic_Student_".$licenseGroupName."_group.muni.cz,OU=licenses,".$base_dn_groups}->{$user_dn} = 1;
-			}
+	# add members to licence groups
+	foreach my $group_cn (sort keys %{$perun_entries}) {
+		if (defined $perun_entries->{$group_cn}->get_value('member')){
+			my $group_dn = $perun_entries->{$group_cn}->dn();
+			my @members =  $perun_entries->{$group_cn}->get_value('member');
+			add_to_license_group($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, \@members);
 		}
-		# alumni doesn't have licenses
-
 	}
-
-
-
-	##
-	#
-	# HERE IS CURRENT AD AND PERUN STATE RESOLVED, WE CAN DIFF IT AND PERFORM ADD AND REMOVE TO GROUP MEMBERS
-	#
-	# If any of requests to AD fail, script dies and current "waiting_on_remove" is not saved.
-	##
-
-	# Any group cannot have more than 49999 members. For Masaryk university, it might happen only for students license group. In that case we split members between 2 groups
+	# remove members from licence groups
+	foreach my $group_cn (sort keys %{$perun_entries}) {
+                my @members = ();
+                if (defined $perun_entries->{$group_cn}->get_value('member')){
+                        @members =  $perun_entries->{$group_cn}->get_value('member');
+                }
+                my $group_dn = $perun_entries->{$group_cn}->dn();
+                remove_from_license_group($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, \@members);
+        }
 	
-	my @studentsIndexes = sort keys %$students;
-
-	my $upperBound = scalar @studentsIndexes <= 49999-1 ? scalar @studentsIndexes -1 : 49999-1; 
-
-	my %studentsFirstPart = ();
-	my %studentsSecondPart = ();
-	if(scalar @studentsIndexes > 0) {
-		@studentsFirstPart{@studentsIndexes[0..$upperBound]} = @{$students}{@studentsIndexes[0..$upperBound]};
-	}
-	if($upperBound < $#studentsIndexes) {
-		@studentsSecondPart{@studentsIndexes[$upperBound+1..$#studentsIndexes]} = @{$students}{@studentsIndexes[$upperBound+1..$#studentsIndexes]};
-	}
-
-	add_to_license_group($ad_entries_group_map{$employeeDN}, $ad_state->{$employeeDN}, $employees);
-	add_to_license_group($ad_entries_group_map{$alumniDN}, $ad_state->{$alumniDN}, $alumni);
-	add_to_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, \%studentsFirstPart);
-	add_to_license_group($ad_entries_group_map{$student2DN}, $ad_state->{$student2DN}, \%studentsSecondPart);
-
-
-	remove_from_license_group($ad_entries_group_map{$employeeDN}, $ad_state->{$employeeDN}, $employees);
-	remove_from_license_group($ad_entries_group_map{$alumniDN}, $ad_state->{$alumniDN}, $alumni);
-	remove_from_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, \%studentsFirstPart);
-	remove_from_license_group($ad_entries_group_map{$student2DN}, $ad_state->{$student2DN}, \%studentsSecondPart);
-
-	# process specific license groups
-	foreach my $group_dn (sort keys %{$perun_state}) {
-		unless (($group_dn eq $employeeDN) or ($group_dn eq $studentDN) or ($group_dn eq $alumniDN) or ($group_dn eq $student2DN)) {
-			add_to_license_group($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, $perun_state->{$group_dn});
-			remove_from_license_group($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, $perun_state->{$group_dn});
-		}
-	}
-
-	# store msDS-cloudExtensionAttribute2=TRUE for active persons
-	update_cloudExtensionAttribute2($employees, $students, $alumni);
-
-	# write active users for another O365 perun service
-	write_active_users($employees, $students, $alumni);
-
 }
+
 
 #
-# Add members to the license group - Compare keys of hashes and add missing members to the group in AD.
+# Add members to the license group -Check if ad_members_state keys are in perun_members_state array and add missing members to the group in AD.
 #
 # 1. param - AD_ENTRY
 # 2. param - hash of current AD group members (user_dn=>1)
-# 3. param - hash of perun group members (user_dn=>1)
+# 3. param - array of perun group members
 #
 sub add_to_license_group() {
 
@@ -1067,7 +643,7 @@ sub add_to_license_group() {
 
 	my @to_be_added = ();
 
-	foreach (keys %{$perun_members_state}) {
+	foreach (@$perun_members_state) {
 		unless (defined $ad_members_state->{$_}) {
 			push (@to_be_added, $_);
 		}
@@ -1109,11 +685,11 @@ sub add_to_license_group() {
 }
 
 #
-# Remove members from the license group - Compare keys of hashes and remove extra members from the group in AD.
+# Remove members from the license group - Check if ad_members_state keys are in perun_members_state array and remove extra members from the group in AD.
 #
 # 1. param - AD_ENTRY
 # 2. param - hash of current AD group members (user_dn=>1)
-# 3. param - hash of perun group members (user_dn=>1)
+# 3. param - array of perun group members
 #
 sub remove_from_license_group() {
 
@@ -1124,8 +700,9 @@ sub remove_from_license_group() {
 	my @to_be_removed;
 
 	foreach (keys %{$ad_members_state}) {
-		unless (defined $perun_members_state->{$_}) {
-			push (@to_be_removed, $_);
+		# compare using smart-match (perl 5.10.1+)
+		unless ($_ ~~ $perun_members_state) {
+			push (@to_be_removed,$_);
 		}
 	}
 
@@ -1162,7 +739,7 @@ sub remove_from_license_group() {
 # Ping IS that it must set password for user to AD
 #
 sub ping_password_setter() {
-
+=pod
 	my $login = shift;
 
 	my $username;
@@ -1204,271 +781,13 @@ sub ping_password_setter() {
 
 	commit $dbh;
 	$dbh->disconnect();
-
-}
-
-
-#
-# Load current STU|ZAM users relations from Perun
-#
-# Returns hash like: $relations->{user_dn}->{STU|ZAM} = 1
-#
-sub load_users_relations() {
-
-	open FILE, '<', "$service_files_dir/userRelations" or die "Unable to load 'userRelations' sent from Perun.";
-	my @lines = <FILE>;
-	close FILE or die "Unable to close 'userRelations' sent from Perun.";
-	chomp(@lines);
-
-	my $relations; # $relations->{user_dn}->{STU|ZAM} = 1
-
-	# parse input like:
-	# $user_dn\trel1,rel2\n
-	# $user_dn2\trel1\n
-	foreach my $line (@lines) {
-
-		my @parts = split /\t/, $line;
-		my $login = $parts[0];
-
-		my @rel_parts = split /,/, $parts[1];
-		foreach my $rel_part (@rel_parts) {
-			$relations->{$login}->{$rel_part} = 1;
-		}
-
-	}
-
-	return $relations;
-
-}
-
-#
-# Load current users licenses state from Perun
-#
-# Returns hash like: $licenses->{$user_dn}->{licenseGroupName} = 1
-#
-sub load_users_licenses() {
-
-	open FILE, '<', "$service_files_dir/userLicenses" or die "Unable to load 'userLicenses' sent from Perun.";
-	my @lines = <FILE>;
-	close FILE or die "Unable to close 'userLicenses' sent from Perun.";
-	chomp(@lines);
-
-	my $licenses; # $licenses->{$user_dn}->{licenseGroupName} = 1
-
-	# parse input like:
-	# $user_dn\tlic1,lic2\n
-	# $user_dn2\tlic1\n
-	foreach my $line (@lines) {
-
-		my @parts = split /\t/, $line;
-		my $login = $parts[0];
-		my @lic_parts = split /,/, $parts[1];
-		foreach my $lic_part (@lic_parts) {
-			$licenses->{$login}->{$lic_part} = 1;
-		}
-
-	}
-
-	return $licenses;
-
-}
-
-#
-# Load persons, which were once students during their lifecycle at MU from ad_mu_students.cache file.
-# If backup file is empty, current state of AD (alumni+students) is added.
-# Current students are added to the hash
-#
-# 1. param $currentStudents  (hash of current users relations from Perun), those with STU relation are added to backup file.
-#
-sub load_cached_students() {
-
-	my $currentStudents = shift;
-
-	my @lines;
-
-	my $file_path = "ad_mu_students.cache";
-	open FILE, "<" . $file_path or die "Unable to load $file_path with cache of people, which were once students.";
-	@lines = <FILE>;
-	close FILE;
-
-	# remove new-line characters from the end of lines
-	chomp @lines;
-
-	# if cached file is empty, load from AD as current members of "O365Lic_Alumni" and "O365Lic_Student"
-	unless (@lines) {
-
-		my $dn = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $base_dn_groups;
-		my @alumni_members = load_group_members($ldap, $dn, $filter_groups);
-		if ($? != 0) {
-			ldap_log($service_name, "Unable to load group members from AD: " . $dn);
-			die "Cache file of 'once students' is empty and we were unable to load current state of AD to fill it for $dn";
-		} else {
-			push(@lines, @alumni_members);
-		}
-
-		my $dn2 = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups;
-		my @student_members = load_group_members($ldap, $dn2, $filter_groups);
-
-		if ($? != 0) {
-			ldap_log($service_name, "Unable to load group members from AD: " . $dn2);
-			die "Cache file of 'once students' is empty and we were unable to load current state of AD to fill it for $dn";
-		} else {
-			push(@lines, @student_members);
-		}
-
-	}
-
-	# convert to hash to remove duplicates
-	my %students = map { $_ => 1 } @lines;
-
-	# append current students
-	foreach my $login (keys %{$currentStudents}) {
-		if (defined $currentStudents->{$login}->{"STU"}) {
-			$students{$login} = 1;
-		}
-	}
-
-	# print back current state of "were students" to file
-	open FILE, ">" . $file_path or die "Unable to store $file_path with cache of people, which were once students.";
-	foreach (sort keys %students) {
-		print FILE $_ . "\n";
-	}
-	close FILE;
-
-	return \%students;
-
-}
-
-#
-# Load persons, which were active students during last propagation cycle. It's later used to determine,
-# start of a grace period for students, which were also employees
-#
-sub load_active_students_from_last_run() {
-
-	my @lines;
-
-	my $file_path = "ad_mu_students_active.cache";
-	open FILE, "<" . $file_path or die "Unable to load $file_path with cache of people, which were once students.";
-	@lines = <FILE>;
-	close FILE;
-
-	# remove new-line characters from the end of lines
-	chomp @lines;
-
-	# if cached file is empty, load from AD as current members of "O365Lic_Alumni" and "O365Lic_Student"
-	unless (@lines) {
-
-		my $dn2 = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_groups;
-		my @student_members = load_group_members($ldap, $dn2, $filter_groups);
-
-		if ($? != 0) {
-			ldap_log($service_name, "Unable to load group members from AD: " . $dn2);
-			die "Cache file of 'active students' is empty and we were unable to load current state of AD to fill it for $dn2";
-		} else {
-			push(@lines, @student_members);
-		}
-
-	}
-
-	my %students = map { $_ => 1 } @lines;
-	return \%students;
-
-}
-
-#
-# Write list of persons, which are active students on MU
-#
-sub write_active_students_from_last_run() {
-
-	my $students = shift;
-
-	my $file_path = "ad_mu_students_active.cache";
-
-	# print back current state of "active students" to file
-	open FILE, ">" . $file_path or die "Unable to store $file_path with cache of people, which are active students.";
-	foreach (sort keys %{$students}) {
-		print FILE $_ . "\n";
-	}
-	close FILE;
-
-}
-
-#
-# Load hash of users waiting for removal from a group. Date of expected removal is stored for each user.
-# During processing, hash is modified (removed, set to 0, entries, which moves up in relation hierarchy).
-# $waitingForRemoval->{$user_dn}->{$group_dn}->{TIMESTAMP|14DAYS|2DAYS} = $timestamp|sent|sent
-#
-sub load_waiting_for_removal() {
-
-	open FILE, '<', "ad_mu_removal.cache" or die "Unable to load 'ad_mu_removal.cache' with employee/students license expirations.";
-	my @lines = <FILE>;
-	close FILE or die "Unable to close 'ad_mu_removal.cache' with employee/students license expirations.";
-	chomp(@lines);
-
-	my $remove; # waitingForRemoval->{login}->{licenseGroupName}->{TIMESTAMP|14DAYS|2DAYS} = $timestamp|sent|sent
-
-	# parse input like:
-	# $login\t$groupName\t$timestamp\t$14daysSent\t$2daysSent\n
-	# $login2\t$groupName\t$timestamp\t$14daysSent\t$2daysSent\n
-	foreach my $line (@lines) {
-		my @parts = split /\t/, $line;
-		$remove->{$parts[0]}->{$parts[1]}->{"TIMESTAMP"} = $parts[2];
-		if ($parts[3]) {
-			$remove->{$parts[0]}->{$parts[1]}->{"14DAYS"} = $parts[3];
-		}
-		if ($parts[4]) {
-			$remove->{$parts[0]}->{$parts[1]}->{"2DAYS"} = $parts[4];
-		}
-
-	}
-
-	return $remove;
-
-}
-
-
-#
-# Determine, if user should be moved now to lower relation or kept in current relation
-# If user not present in a storage hash, add it with 150 days grace period
-# So the method should be called only for users, which perun wants to move.
-#
-# 1.param = user_dn
-# 2.param = group_dn
-#
-# Return 1 if should move to lower relation, 0 if should be kept in current relation
-#
-=c DELETE
-sub shouldMove() {
-
-	my $login = shift;
-	my $group = shift;
-
-	my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d");
-
-	my $timestamp;
-	if ($waitingForRemoval->{$login} and $waitingForRemoval->{$login}->{$group}){
-		$timestamp = $waitingForRemoval->{$login}->{$group}->{"TIMESTAMP"};
-	}
-
-	my $moveNow = 0;
-	if (defined $timestamp) {
-		$moveNow = ($timestamp < $currentDate->epoch) ? 1 : 0;
-	} else {
-		# we want to move user, but not now - add it 150 days grace period
-		$waitingForRemoval->{$login}->{$group}->{"TIMESTAMP"} = $currentDate->epoch + (150*24*60*60);
-	}
-
-	return $moveNow;
-
-}
 =cut
-
+}
 #
-# Return hash strucure of AD license groups like $ad_state->{group_dn}->{user_dn} = 1;
-# DIE the script if unable to load all data !!
+## Return hash strucure of AD license groups like $ad_state->{group_dn}->{user_dn} = 1;
+## DIE the script if unable to load all data !!
 #
 sub fill_from_ad() {
-
 	my $ad_entries_group_map = shift;
 
 	my $ad_state;  # $ad_state->{group_dn}->{user_dn} = 1
@@ -1478,538 +797,15 @@ sub fill_from_ad() {
 
 		# load members of a group from AD based on DN in Perun => Group must exists in AD
 		my @ad_val = load_group_members($ldap, $group_dn, $filter_groups);
-
 		if ($? != 0) {
 			ldap_log($service_name, "Unable to load Perun group members from AD: " . $group_dn);
 			die "Unable to load AD state to resolve license changes!";
 		}
-
 		foreach (@ad_val) {
 			$ad_state->{$group_dn}->{$_} = 1;
 		}
 
 	}
-
 	return $ad_state;
-
 }
 
-#
-# Get current state of Student, Employee and Alumni group members
-# and push this list to cache for another service
-#
-# 1. param - hash of employess (user_dn->1)
-# 2. param - hash of students (user_dn->1)
-# 3. param - hash of alumni (user_dn->1)
-#
-sub write_active_users() {
-
-	my $employees = shift;
-	my $students = shift;
-	my $alumni = shift;
-
-	my %active = map { $_ => 1 } keys %{$employees};
-	foreach (keys %{$students}) {
-		$active{$_} = 1
-	}
-	foreach (keys %{$alumni}) {
-		$active{$_} = 1
-	}
-
-	# Get facility ID
-	open my $fid_file, '<', "$service_files_dir/facilityId";
-	my $fid = <$fid_file>;
-	chomp($fid);
-	close $fid_file;
-
-	# 2. print logins (UCO) to file
-
-	my $file_path = "/var/cache/perun/services/$fid/o365_mu";
-	unless (-d $file_path) {
-		# create path if exists
-		make_path( $file_path );
-	}
-	my $file_name = "activeO365Users";
-
-	# print back current state of "waiting for removal" to file
-	open FILE, ">" . $file_path ."/". $file_name;
-	foreach (sort keys %active) {
-		if($_ =~ /^CN=([^,]*),/i) {
-			my $uco = ($_ =~ /^CN=([^,]*),/i)[0];
-			print FILE $uco . "\n";
-		}
-	}
-	close FILE;
-
-}
-
-
-#
-# Get current state of Student, Employee and Alumni group members
-# and push to user attribute msDS-cloudExtensionAttribute2 where
-# active users have "TRUE" and rest in AD has "FALSE".
-#
-# 1. param - hash of employess (user_dn->1)
-# 2. param - hash of students (user_dn->1)
-# 3. param - hash of alumni (user_dn->1)
-#
-sub update_cloudExtensionAttribute2() {
-
-	my $employees = shift;
-	my $students = shift;
-	my $alumni = shift;
-
-	my %active = map { $_ => 1 } keys %{$employees};
-	foreach (keys %{$students}) {
-		$active{$_} = 1
-	}
-	foreach (keys %{$alumni}) {
-		$active{$_} = 1
-	}
-
-	# load normal user entries
-	my @ad_persons = load_ad($ldap, $base_dn, $filter, ['cn','msDS-cloudExtensionAttribute2']);
-
-	foreach my $ad_entry (@ad_persons) {
-
-		my $ad_val = $ad_entry->get_value('msDS-cloudExtensionAttribute2') || "";
-		if ($active{$ad_entry->dn()}) {
-
-			unless ('TRUE' eq $ad_val) {
-
-				$ad_entry->replace(
-					'msDS-cloudExtensionAttribute2' => 'TRUE'
-				);
-
-				my $response = $ad_entry->update($ldap);
-
-				if ($response) {
-					unless ($response->is_error()) {
-						# SUCCESS (flag updated)
-						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag set: " . $ad_entry->dn() . " | 'TRUE'");
-					} else {
-						# FAIL (to update flag)
-						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag NOT set: " . $ad_entry->dn());
-						ldap_log($service_name, $ad_entry->ldif());
-						$counter_fail++;
-					}
-				}
-
-			}
-
-		} else {
-
-			unless ('FALSE' eq $ad_val) {
-
-				$ad_entry->replace(
-					'msDS-cloudExtensionAttribute2' => 'FALSE'
-				);
-
-				my $response = $ad_entry->update($ldap);
-
-				if ($response) {
-					unless ($response->is_error()) {
-						# SUCCESS (flag updated)
-						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag set: " . $ad_entry->dn() . " | 'FALSE'");
-					} else {
-						# FAIL (to update flag)
-						ldap_log($service_name, "msDS-cloudExtensionAttribute2 flag NOT set: " . $ad_entry->dn());
-						ldap_log($service_name, $ad_entry->ldif());
-						$counter_fail++;
-					}
-				}
-
-			}
-		}
-	}
-
-}
-
-#
-# Return array of partial license groups available in Perun, since
-# if they are empty, we can't compare state in perun with AD (they are not pushed in LDIF).
-#
-sub load_available_license_groups() {
-
-	open FILE, '<', "$service_files_dir/licGroupNames" or die "Unable to load '$service_files_dir/licGroupNames' with partial licenses available in perun.";
-	my @lines = <FILE>;
-	close FILE or die "Unable to close $service_files_dir/licGroupNames' with partial licenses available in perun.";
-	chomp(@lines);
-	return @lines;
-
-}
-
-#
-# Send mail specified by notification type to passed mail address.
-#
-# 1.param Notification type
-# 2.param To mail address
-#
-sub sendMail($$) {
-
-	my $message = shift;
-	my $to = shift;
-
-	if (defined $debugMailAddress) {
-		$message = "DEBUG - original TO: $to\n" . $message;
-		$to = $debugMailAddress;
-	}
-	my $from = "helpdesk\@ics.muni.cz";
-
-	my $subject = "O365 - Notifikace";
-
-	my $mail = MIME::Lite->new(
-		Type     => 'text/plain; charset=UTF-8',
-		From     => $from,
-		To       => $to,
-		Subject  => $subject,
-		Data     => $message
-	);
-
-	$mail->send;
-
-	print "Sending email message to: $to\n$message\n\n";
-}
-
-#
-# Load hash of users manually set to employees with their expiration
-#
-sub load_manual_employees() {
-
-	open FILE, '<', "$service_files_dir/manualEmployees" or die "Unable to load '$service_files_dir/manualEmployees' with manual employees expirations.";
-	my @lines = <FILE>;
-	close FILE or die "Unable to close $service_files_dir/manualEmployees' with manual employees expirations.";
-	chomp(@lines);
-
-	my $manEmp; # $manEmp->{DN} = timestamp
-	# parse input like:
-	# $dn\t$timestamp\n
-	# $dn2\t$timestamp\n
-	foreach my $line (@lines) {
-		my @parts = split /\t/, $line;
-		$manEmp->{$parts[0]} = $parts[1];
-	}
-
-	return $manEmp;
-
-}
-
-
-
-
-
-
-sub loadUsersState {
-	open FILE, $USER_STATE_FILE or die "Cannot open $USER_STATE_FILE: $!";
-	my $userState;
-
-	while(my $line = <FILE>) {
-		chomp($line);
-		my($user, $roles, $gracePeriodEmployee, $gracePeriodStudent, $gracePeriodNotificationSent) = split $USER_STATE_SEPARATOR, $line; 
-		$userState->{$user} = { $USER_STATE_ROLES => $roles,
-		                        $USER_STATE_GP_EMPLOYEE => $gracePeriodEmployee ? [ split($USER_STATE_DATE_SEPARATOR, $gracePeriodEmployee) ] : undef,
-		                        $USER_STATE_GP_STUDENT => $gracePeriodStudent ? [ split($USER_STATE_DATE_SEPARATOR, $gracePeriodStudent) ] : undef,
-		                        $USER_STATE_GP_NOTIFICATION_SENT => $gracePeriodNotificationSent,
-		                      }
-	}
-
-	close FILE or die "Cannot close $USER_STATE_FILE: $!";
-	return $userState;
-}
-
-sub storeUserState($$) {
-	my $userState = shift;
-	my $user = shift;
-
-	print USER_STATE_TMP_FILEHANDLE join($USER_STATE_SEPARATOR, ($user, 
-	                                                             $userState->{$user}->{$USER_STATE_ROLES}, 
-	                                                             ($userState->{$user}->{$USER_STATE_GP_EMPLOYEE} ? join($USER_STATE_DATE_SEPARATOR, @{$userState->{$user}->{$USER_STATE_GP_EMPLOYEE}}) : ""), 
-	                                                             ($userState->{$user}->{$USER_STATE_GP_STUDENT} ? join($USER_STATE_DATE_SEPARATOR, @{$userState->{$user}->{$USER_STATE_GP_STUDENT}}) : ""), 
-	                                                             $userState->{$user}->{$USER_STATE_GP_NOTIFICATION_SENT} || $USER_STATE_GP_NOTIFICATION_SENT_NONE,
-	                                                            )
-	                                     );
-	print USER_STATE_TMP_FILEHANDLE "\n";
-	delete $userState->{$user};
-	return $userState;
-}
-
-sub saveStoredUserStates {
-	close USER_STATE_TMP_FILEHANDLE or die "Cannot close $USER_STATE_TMP_FILE: $!";
-	move $USER_STATE_TMP_FILE, $USER_STATE_FILE or die "Cannot move tmp state $USER_STATE_TMP_FILE to current state $USER_STATE_FILE: $!";
-}
-
-sub computeGracePeriod($$$) {
-	my ($user, $oldRoles, $rolesFromPerun) = @_;
-
-	my $gracePeriodRoles = $R_NONE;
-
-	#if user get the role again, remove conresponding grace period
-	if($rolesFromPerun & $R_EMPLOYEE) { removeGracePeriod($user, $GP_EMPLOYEE); }
-	if($rolesFromPerun & $R_STUDENT) { removeGracePeriod($user, $GP_STUDENT); }
-
-	$gracePeriodRoles |= getGracePeriods($user);
-
-	#start new grace periods
-	if(($oldRoles & $R_EMPLOYEE) && !($rolesFromPerun & $R_EMPLOYEE)) { 
-		startGracePeriod($user, $GP_EMPLOYEE);
-		$gracePeriodRoles |= $GP_EMPLOYEE;
-	}
-	if(($oldRoles & $R_STUDENT) && !($rolesFromPerun & $R_STUDENT)) { 
-		startGracePeriod($user, $GP_STUDENT);
-		$gracePeriodRoles |= $GP_STUDENT;
-	}
-	
-	return $gracePeriodRoles;
-}
-
-#input roles
-sub getO365Licence($) {
-	$_ = shift;
-	if($_ & ($R_EMPLOYEE | $GP_EMPLOYEE)) {
-		return $R_EMPLOYEE;
-	} elsif($_ & ($R_STUDENT | $GP_STUDENT)) {
-		return $R_STUDENT;
-	} elsif($_ & $F_ALUMNI) {
-		return $F_ALUMNI;
-	}
-	return $R_NONE;
-}
-
-
-sub startGracePeriod($$) {
-	my ($user, $roles) = @_;
-	#print "Starting grace for $user and role: " . roleToString($roles) . "\n";
-
-	my $gpType;
-	if($roles == $GP_EMPLOYEE) {
-		$gpType = $USER_STATE_GP_EMPLOYEE;
-	} elsif($roles == $GP_STUDENT) {
-		$gpType = $USER_STATE_GP_STUDENT;
-	} else {
-		die "Unsupported role: " . $roles;
-	}
-	$userState->{$user}->{$gpType} = \@today;
-	1;
-}
-
-sub removeGracePeriod($) {
-	my ($user, $roles) = @_;
-	#print "Removing grace for $user and role: " . roleToString($roles) . "\n";
-
-	my $gpType;
-	if($roles == $GP_EMPLOYEE) {
-		$gpType = $USER_STATE_GP_EMPLOYEE;
-	} elsif($roles == $GP_STUDENT) {
-		$gpType = $USER_STATE_GP_STUDENT;
-	} else {
-		die "Unsupported role: " . $roles;
-	}
-	$userState->{$user}->{$gpType} = undef;
-}
-
-sub getGracePeriods($) {
-	my $user = shift;
-	#print "Getting grace for $user \n";
-
-	my $gracePeriodRoles = $R_NONE;
-
-	if($userState->{$user}->{$USER_STATE_GP_EMPLOYEE}) {
-		if(Delta_Days(@{$userState->{$user}->{$USER_STATE_GP_EMPLOYEE}}, @today) < $GRACE_PERIOD_EXPIRATION) {
-			$gracePeriodRoles |= $GP_EMPLOYEE;
-		}
-	}
-
-	if($userState->{$user}->{$USER_STATE_GP_STUDENT}) {
-		if(Delta_Days(@{$userState->{$user}->{$USER_STATE_GP_STUDENT}}, @today) < $GRACE_PERIOD_EXPIRATION) {
-			$gracePeriodRoles |= $GP_STUDENT;
-		}
-	}
-
-	return $gracePeriodRoles;
-
-}
-
-sub getEmailTemplateAndSetNotificationSentState($$$) {
-	my ($oldRoles, $newRoles, $user) = @_;
-
-	if(haveNoRole($oldRoles) && haveFullRole($newRoles)) {
-		$userState->{$user}->{$USER_STATE_GP_NOTIFICATION_SENT} = $USER_STATE_GP_NOTIFICATION_SENT_NONE;
-		return $MAIL_newUser;
-	} elsif(haveOnlyGracePeriodRole($oldRoles) && haveFullRole($newRoles)) {
-		$userState->{$user}->{$USER_STATE_GP_NOTIFICATION_SENT} = $USER_STATE_GP_NOTIFICATION_SENT_NONE;
-		return $MAIL_extendedGracePeriod;
-	} elsif(haveOnlyAlumniRole($oldRoles) && haveFullRole($newRoles)) {
-		$userState->{$user}->{$USER_STATE_GP_NOTIFICATION_SENT} = $USER_STATE_GP_NOTIFICATION_SENT_NONE;
-		return $MAIL_fromAlumniToActiveRole;
-	} elsif(haveFullRole($oldRoles) && haveOnlyGracePeriodRole($newRoles)) {
-		$userState->{$user}->{$USER_STATE_GP_NOTIFICATION_SENT} = $USER_STATE_GP_NOTIFICATION_SENT_INICIAL;
-		if($newRoles & $F_ALUMNI) {
-			if($newRoles & $GP_EMPLOYEE) {
-				return $MAIL_GPStartAlumni_allowExtension;
-			} else {
-				return $MAIL_GPStartAlumni;
-			}
-		} else {
-			return $MAIL_GPStartNonAlumni;
-		}
-	}
-	
-	return undef;
-}
-
-sub roleToString($) {
-	my $role = shift;
-	my $output = "";
-
-	$output .= "E" if($role & $R_EMPLOYEE);
-	$output .= "gE" if($role & $GP_EMPLOYEE);
-	$output .= "S" if($role & $R_STUDENT);
-	$output .= "gS" if($role & $GP_STUDENT);
-	$output .= "M" if($role & $F_MANUAL);
-	$output .= "A" if($role & $F_ALUMNI);
-
-	return $output;
-
-}
-
-#Notify about expiring grace periods $GRACE_PERIOD_EXPIRATION_NOTIFICATION_DELTA_DAYS days before.
-#
-# returns expired grace period roles
-sub expireAndNotifyGracePeriods($$) {
-	my $user = shift;
-	my $roles = shift;
-	my $expiredRoles = $R_NONE;
-
-	my $employeeGPExpirationInDays = $userState->{$user}->{$USER_STATE_GP_EMPLOYEE} ? Delta_Days(@today, Add_Delta_Days(@{$userState->{$user}->{$USER_STATE_GP_EMPLOYEE}}, $GRACE_PERIOD_EXPIRATION)) : undef;
-	my $studentGPExpirationInDays = $userState->{$user}->{$USER_STATE_GP_STUDENT} ? Delta_Days(@today, Add_Delta_Days(@{$userState->{$user}->{$USER_STATE_GP_STUDENT}}, $GRACE_PERIOD_EXPIRATION)) : undef;
-
-	unless($employeeGPExpirationInDays || $studentGPExpirationInDays) {
-		#no expiration set
-		return $R_NONE;
-	}
-
-	#print "New --- roles: " . roleToString($roles) . "\n";
-
-	my $laterGPExpirationInDays;
-	if(($employeeGPExpirationInDays || -1000)  >= ($studentGPExpirationInDays || -1000)) {
-		$laterGPExpirationInDays = $employeeGPExpirationInDays;
-	} else {
-		$laterGPExpirationInDays = $studentGPExpirationInDays;
-	}
-	
-
-	#Do we want to send the expiration reminder
-	if(haveOnlyGracePeriodRole($roles) && $laterGPExpirationInDays <= $GRACE_PERIOD_EXPIRATION_NOTIFICATION_DELTA_DAYS && $userState->{$user}->{$USER_STATE_GP_NOTIFICATION_SENT} == $USER_STATE_GP_NOTIFICATION_SENT_INICIAL) { 
-		my $mail;
-		if($roles & $F_ALUMNI) {
-			if($employeeGPExpirationInDays > $studentGPExpirationInDays) {
-				$mail = $MAIL_GPReminderAlumni_AllowExtension;
-			} else {
-				$mail = $MAIL_GPReminderAlumni;
-			}
-		} else {
-			$mail = $MAIL_GPReminderNonAlumni;
-		}
-
-		$mail = substituteVariablesInEmailTemplate($mail, $user, $roles);
-
-		sendMail($mail, $mailAdresses{$user});
-		$userState->{$user}->{$USER_STATE_GP_NOTIFICATION_SENT} = $USER_STATE_GP_NOTIFICATION_SENT_REMINDER;
-	}
-
-=c
-	if($employeeGPExpirationInDays < 0) {
-		$userState->{$user}->{$USER_STATE_GP_EMPLOYEE} = undef;
-		$expiredRoles |= $GP_EMPLOYEE;
-	}
-
-	if($studentGPExpirationInDays < 0) {
-		$userState->{$user}->{$USER_STATE_GP_STUDENT} = undef;
-		$expiredRoles |= $GP_STUDENT;
-	}
-=cut 
-
-	return $expiredRoles;
-}
-
-#substitu variable in email templete with values
-sub substituteVariablesInEmailTemplate {
-	my $template = shift;
-	my $user = shift;
-	my $roles = shift;
-
-	my $employeeExpiration = $userState->{$user}->{$USER_STATE_GP_EMPLOYEE} ? Date_to_Days @{$userState->{$user}->{$USER_STATE_GP_EMPLOYEE}} : 0;
-	my $studentExpiration = $userState->{$user}->{$USER_STATE_GP_STUDENT} ? Date_to_Days @{$userState->{$user}->{$USER_STATE_GP_STUDENT}} : 0;
-
-	my $substituteRole;
-	if($roles & $R_EMPLOYEE) {
-		$substituteRole = $roles & $F_MANUAL ? $MAIL_SUBSTITUTE_O365ROLE_MANUAL : $MAIL_SUBSTITUTE_O365ROLE_EMPLOYEE;
-	} elsif($roles & $R_STUDENT) {
-		$substituteRole = $MAIL_SUBSTITUTE_O365ROLE_STUDENT;
-	} elsif($roles & ($GP_EMPLOYEE | $GP_STUDENT)) {
-		#select one which expires later
-		$substituteRole = $employeeExpiration >= $studentExpiration ? $MAIL_SUBSTITUTE_O365ROLE_EMPLOYEE : $MAIL_SUBSTITUTE_O365ROLE_STUDENT;
-	} elsif($roles & $GP_EMPLOYEE) {
-		$substituteRole = $roles & $F_MANUAL ? $MAIL_SUBSTITUTE_O365ROLE_MANUAL : $MAIL_SUBSTITUTE_O365ROLE_EMPLOYEE;
-	} elsif($roles & $GP_STUDENT) {
-		$substituteRole = $MAIL_SUBSTITUTE_O365ROLE_STUDENT;
-	}
-
-	my $substituteRoleName;
-	my $substituteRoleEN;
-	my $substituteRoleNameEN;
-	if($substituteRole eq $MAIL_SUBSTITUTE_O365ROLE_EMPLOYEE) {
-		$substituteRoleName = $MAIL_SUBSTITUTE_O365ROLE_NAME_EMPLOYEE;
-		$substituteRoleEN = $MAIL_SUBSTITUTE_O365ROLE_EMPLOYEE_EN;
-		$substituteRoleNameEN = $MAIL_SUBSTITUTE_O365ROLE_NAME_EMPLOYEE_EN;
-	} elsif($substituteRole eq $MAIL_SUBSTITUTE_O365ROLE_STUDENT) {
-		$substituteRoleName = $MAIL_SUBSTITUTE_O365ROLE_NAME_STUDENT;
-		$substituteRoleEN = $MAIL_SUBSTITUTE_O365ROLE_STUDENT_EN;
-		$substituteRoleNameEN = $MAIL_SUBSTITUTE_O365ROLE_NAME_STUDENT_EN;
-	} else {
-		$substituteRoleName = $MAIL_SUBSTITUTE_O365ROLE_NAME_MANUAL;
-		$substituteRoleEN = $MAIL_SUBSTITUTE_O365ROLE_MANUAL_EN;
-		$substituteRoleNameEN = $MAIL_SUBSTITUTE_O365ROLE_NAME_MANUAL_EN;
-	}
-
-	$template =~ s/$MAIL_SUBSTITUTE_PLACEHOLDER_O365ROLE/$substituteRole/;
-	$template =~ s/$MAIL_SUBSTITUTE_PLACEHOLDER_O365ROLE_NAME/$substituteRoleName/;
-
-	$template =~ s/$MAIL_SUBSTITUTE_PLACEHOLDER_O365ROLE_EN/$substituteRoleEN/;
-	$template =~ s/$MAIL_SUBSTITUTE_PLACEHOLDER_O365ROLE_NAME_EN/$substituteRoleNameEN/;
-
-
-	# expiration date replacement
-	my $expirationDateString;
-	if($template =~ /$MAIL_SUBSTITUTE_PLACEHOLDER_O365EXPIRATION/) {
-		my @expirationDate = Add_Delta_Days(@{$userState->{$user}->{$employeeExpiration >= $studentExpiration ? $USER_STATE_GP_EMPLOYEE : $USER_STATE_GP_STUDENT}}, $GRACE_PERIOD_EXPIRATION);
-		$expirationDateString = join(".", reverse @expirationDate);
-	}
-
-	$template =~ s/$MAIL_SUBSTITUTE_PLACEHOLDER_O365EXPIRATION/$expirationDateString/g;
-
-
-	return $template;
-}
-
-sub haveNoRole {
-	my $role = shift;
-	return !($role & ($R_STUDENT | $R_EMPLOYEE | $GP_STUDENT | $GP_EMPLOYEE | $F_ALUMNI));
-	
-}
-
-sub haveFullRole {
-	my $role = shift;
-	return $role & ($R_STUDENT | $R_EMPLOYEE);
-	
-}
-
-sub haveOnlyGracePeriodRole {
-	my $role = shift;
-	return ($role & ($GP_STUDENT | $GP_EMPLOYEE)) && !($role & ($R_EMPLOYEE | $R_STUDENT));
-}
-
-sub haveOnlyAlumniRole {
-	my $role = shift;
-	return $role == $F_ALUMNI;
-}
