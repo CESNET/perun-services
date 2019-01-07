@@ -69,7 +69,7 @@ while(my $line = <FILE>) {
 	chomp(@parts);
 	my $uco = $parts[0]; # UČO
 	$dataByKey->{$uco}->{'OS_CISLO'} = $uco;
-	$dataByKey->{$uco}->{'TYP_VZTAHU'} = $parts[1]; # STU/ZAM/Externista - pedagog
+	$dataByKey->{$uco}->{'TYP_VZTAHU'} = $parts[1]; # STU/ZAM/EXT (pedagog)
 	$dataByKey->{$uco}->{'TITUL'} = (($parts[2] ne '') ? $parts[2] : undef);
 	$dataByKey->{$uco}->{'JMENO'} = (($parts[3] ne '') ? $parts[3] : undef);
 	$dataByKey->{$uco}->{'PRIJMENI'} = (($parts[4] ne '') ? $parts[4] : undef);
@@ -138,11 +138,6 @@ foreach my $uco (sort keys %$dataByKey) {
 	my $RODCISLO = $dataByKey->{$uco}->{'ROD_CISLO'};
 	my $POHLAVI = $dataByKey->{$uco}->{'POHLAVI'};
 	my $FUNKCE = $dataByKey->{$uco}->{'FUNKCE'};
-
-	# for the purpose of ELA_OSB table, "Externista - pedagog" = "EXT"
-	if ($TYP_VZTAHU eq "Externista - pedagog") {
-		$TYP_VZTAHU = "EXT";
-	}
 
 	# Use max. 20 bytes for TITUL
 	if ($TITUL) {
@@ -383,14 +378,14 @@ my $deleteVztah = $dbh->prepare(qq{DELETE FROM $tableNameVzt where OSB_ID=?});
 foreach my $uco (sort keys %$dataByKey) {
 
 	my $TYP_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
-	unless ($TYP_VZTAHU eq "Externista - pedagog") {
+	unless ($TYP_VZTAHU eq "EXT") {
 		# process only external teachers
 		next;
 	}
 
+	# FIXME - we have constant for external teachers here !!
 	# fix sent params (EXT vs. Externista - pedagog)
-	my $DRUH_VZTAHU = $dataByKey->{$uco}->{'TYP_VZTAHU'};
-	$TYP_VZTAHU = "EXT";
+	my $DRUH_VZTAHU = "Externista - pedagog";
 	my $USER_ID = $dataByKey->{$uco}->{'USER_ID'};
 	my $EXT_ID = $dataByKey->{$uco}->{'USER_ID'};
 

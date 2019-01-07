@@ -29,7 +29,7 @@ our $A_GENDER;  *A_GENDER = \'urn:perun:user:attribute-def:def:gender';
 our $A_JOB;  *A_JOB = \'urn:perun:user:attribute-def:def:job';
 our $A_BIRTH_NUMBER;  *A_BIRTH_NUMBER = \'urn:perun:user:attribute-def:def:birthNumber';
 
-# to define STUD | ZAM | Externista - pedagog
+# to define STUD | ZAM | EXT (only pedagog)
 our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
 
 # address
@@ -51,7 +51,7 @@ our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:virt:preferredPhone';
 our $A_BANK_ACCOUNT_DC2; *A_BANK_ACCOUNT_DC2 = \'urn:perun:user:attribute-def:def:bankAccount';
 our $A_BANK_ACCOUNT_KOS; *A_BANK_ACCOUNT_KOS = \'urn:perun:user:attribute-def:def:bankAccountKos';
 
-# relation ID for "Externista - pedagog"
+# relation ID for "EXT  (pedagog)"
 our $A_USER_ID;  *A_USER_ID = \'urn:perun:user:attribute-def:core:id';
 
 # users mail
@@ -101,7 +101,7 @@ foreach my $rData ($data->getChildElements) {
 			unless ($users->{$key}->{'TYP_VTAHU'}) {
 				$users->{$key}->{'TYP_VTAHU'} = $relationType;
 			}
-		} elsif ($relationType eq "Externista - pedagog") {
+		} elsif ($relationType eq "EXT") {
 			unless ($users->{$key}->{'TYP_VTAHU'}) {
 				$users->{$key}->{'TYP_VTAHU'} = $relationType;
 			}
