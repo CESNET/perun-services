@@ -33,6 +33,10 @@ our $DISPLAY_NAME_HEADER = 'displayName';
 our $ORGANIZATION_HEADER = 'organization';
 our $GROUPS_IN_RT_HEADER = 'groupsInRT';
 
+#Other constants
+our $EINFRA_DOMAIN = '@einfra.cesnet.cz';
+our $META_DOMAIN   = '@meta.cesnet.cz';
+
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 
 my $usersStructureByUserId = {};
@@ -53,12 +57,23 @@ foreach my $rData (@resourcesData) {
 			my $userPrefMail = $memberAttributes->{$A_USER_RT_PREF_MAIL} || $memberAttributes->{$A_USER_PREFERRED_MAIL};
 			my $userOrganization = $memberAttributes->{$A_USER_ORGANIZATION};
 			my $userName = $memberAttributes->{$A_USER_DISPLAY_NAME};
-			my $userEPPNs = $memberAttributes->{$A_USER_EPPN};
+			#if user has meta eppn, he should have also einfra eppn
+			my %userEPPNs = map { $_ => 1 } @{$memberAttributes->{$A_USER_EPPN}};
+			foreach my $eppn (keys %userEPPNs) {
+				if($eppn =~ m/$META_DOMAIN/) {
+					my $neweppn = $eppn;
+					$neweppn =~ s/$META_DOMAIN/$EINFRA_DOMAIN/ge;
+					$userEPPNs{$neweppn} = 1;
+					last;
+				}
+			}
+			#list of eppns must be unique
+			
 
 			$usersStructureByUserId->{$userId}->{$PREF_MAIL_HEADER} = $userPrefMail;
 			$usersStructureByUserId->{$userId}->{$DISPLAY_NAME_HEADER} = $userName;
 			$usersStructureByUserId->{$userId}->{$ORGANIZATION_HEADER} = $userOrganization;
-			$usersStructureByUserId->{$userId}->{$EPPNS_HEADER} = $userEPPNs;
+			$usersStructureByUserId->{$userId}->{$EPPNS_HEADER} = \%userEPPNs;
 		}
 
 		$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER}->{$rtGroupName} = 1;
@@ -69,12 +84,15 @@ foreach my $rData (@resourcesData) {
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 binmode SERVICE_FILE, ":utf8";
 
+#print header to the file
+print SERVICE_FILE "user_id" . "\t" . $PREF_MAIL_HEADER . "\t" . $DISPLAY_NAME_HEADER . "\t" . $ORGANIZATION_HEADER . "\t" . $EPPNS_HEADER . "\t" . $GROUPS_IN_RT_HEADER . "\n";
+
 foreach my $userId (sort { $a <=> $b } keys %$usersStructureByUserId) {
 	print SERVICE_FILE $userId . "\t";
 	print SERVICE_FILE $usersStructureByUserId->{$userId}->{$PREF_MAIL_HEADER} . "\t";
 	print SERVICE_FILE $usersStructureByUserId->{$userId}->{$DISPLAY_NAME_HEADER} . "\t";
 	print SERVICE_FILE $usersStructureByUserId->{$userId}->{$ORGANIZATION_HEADER} ? $usersStructureByUserId->{$userId}->{$ORGANIZATION_HEADER} . "\t" : "\t";
-	print SERVICE_FILE join(',', @{$usersStructureByUserId->{$userId}->{$EPPNS_HEADER}}) . "\t";
+	print SERVICE_FILE join(',', keys %{$usersStructureByUserId->{$userId}->{$EPPNS_HEADER}}) . "\t";
 	print SERVICE_FILE join(',', keys %{$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER}}) . "\n";
 }
 
