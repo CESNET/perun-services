@@ -102,7 +102,8 @@ OLD_FILE="$DESTINATION_DIR/safeq-content.ldif"
 SINFILE=`mktemp --tmpdir=/tmp sorted-safeq-XXXXXX.ldif`
 S_OLD_FILE=`mktemp --tmpdir=/tmp sorted-safeq-old-XXXXXXX.ldif`
 
-FINAL=`mktemp safeq-final-XXXXXX.ldif`
+LDIF=`mktemp --tmpdir=/tmp safeq-ldif-XXXXXXX.ldif`
+FINAL=`mktemp --tmpdir=/tmp safeq-final-XXXXXX.ldif`
 
 if test -s "$OLD_FILE"; then
 # LDAP is not empty under base DN
@@ -112,7 +113,8 @@ if test -s "$OLD_FILE"; then
 	catch_error E_LDIFSORT_FILE $LDIFSORT -k dn $INFILE >$SINFILE
 
 	# DIFF LDIFs
-	catch_error E_LDIFDIFF_FILE $LDIFDIFF -k dn $SINFILE $S_OLD_FILE | sed '1,1{/^$/d; }; /^[^ ].*/N; s/\n //g' | $SAFEQ_LDIF_SORT > "$FINAL"
+	catch_error E_LDIFDIFF_FILE $LDIFDIFF -k dn $SINFILE $S_OLD_FILE > $LDIF
+	sed '1,1{/^$/d; }; /^[^ ].*/N; s/\n //g' $LDIF | $SAFEQ_LDIF_SORT > "$FINAL"
 
 else
 # LDAP is empty under base DN
@@ -126,7 +128,7 @@ else
 
 fi
 
-catch_error E_REMOVE_FILE rm "$SINFILE" "$S_OLD_FILE"
+catch_error E_REMOVE_FILE rm "$SINFILE" "$S_OLD_FILE" "$LDIF"
 TIMESTAMP=`date "+%F_%H.%M.%S"`
 
 if [ `stat -c %s "$FINAL"` -gt 1  ]; then #first line of file is always empty
