@@ -3,57 +3,70 @@
 EXAMPLE of python script for processing SCIM files from Perun
 '''
 
-USERS_FILE = '/var/spool/perun/scim-service-users.scim'
-GROUPS_FILE = '/var/spool/perun/scim-service-grops.scim'
-
 import os
 import sys
 import json
 
+''' Get paths to the input files: users_file groups_file '''
+if len(sys.argv) != 3:
+	print("Missing argument, usage: ./script path_to_users_file path_to_groups_file")
+	exit(1)
+
+users_file = sys.argv[1]
+groups_file = sys.argv[2]
+
 ''' GETTING DATA FROM JSON '''
-json_users = open(USERS_FILE)
+if not os.path.isfile(users_file):
+	print("users_file {} doesn't exist").format(users_file)
+	exit(1)
+json_users = open(users_file)
 users_data = json.load(json_users)
 json_users.close()
 
-json_groups = open(GROUPS_FILE)
+if not os.path.isfile(groups_file):
+	print("groups_file {} doesn't exist").format(groups_file)
+	exit(1)
+json_groups = open(groups_file)
 groups_data = json.load(json_groups)
 json_groups.close()
 
 ''' PARSING DATA FROM users.scim '''
 for item in users_data:
-	userJSON_ids.append(int(item['id']))	
-	tmpUser = User()
-	tmpUser.displayName = (item['displayName'])
-	tmpUser.mail = (item['mail'])
-	tmpUser.status = (item['status'])
-	tmpUser.external_id = int(item['id'])
-	users_list.append(tmpUser)
+	user_json_ids.append(int(item['id']))
+	tmp_user = User()
+	tmp_user.displayName = (item['displayName'])
+	tmp_user.mail = (item['mail'])
+	tmp_user.status = (item['status'])
+	tmp_user.external_id = int(item['id'])
+	users_list.append(tmp_user)
 
 	for i in item['identities']:
 		identities_json.append(i)
-		tmpIdentity = Identity()
-		tmpIdentity.login = i
-		tmpIdentity.external_id = int(item['id'])
-		identities_list.append(tmpIdentity)
+		tmp_identity = Identity()
+		tmp_identity.login = i
+		tmp_identity.external_id = int(item['id'])
+		# Users will be available in list variable identities_list
+		identities_list.append(tmp_identity)
 
 ''' PARSING DATA FROM groups.scim '''		
 for item in groups_data:
-	groupJSON_ids.append(int(item['id']))
-	tmpGroup = Group()
-	tmpGroup.name = (item['name'])
-	tmpGroup.external_id = int(item['id'])
+	group_json_ids.append(int(item['id']))
+	tmp_group = Group()
+	tmp_group.name = (item['name'])
+	tmp_group.external_id = int(item['id'])
 	
 	if item['parentGroupId'] is None:
-		tmpGroup.parent_group_id = None
+		tmp_group.parent_group_id = None
 	else:
-		tmpGroup.parent_group_id = int(item['parentGroupId'])
+		tmp_group.parent_group_id = int(item['parentGroupId'])
 		#This removes prefix of parent group exported from perun, that is not suitable
-		tmpGroup.name = tmpGroup.name.split(':')[-1]
+		tmp_group.name = tmp_group.name.split(':')[-1]
 
-	groups_list.append(tmpGroup)
+	groups_list.append(tmp_group)
 	
 	for i in item['members']:
-		tmpUserInGroup = UserInGroup()
-		tmpUserInGroup.user_external_id = int(i['userId'])
-		tmpUserInGroup.group_external_id = int(item['id'])
-		usersInGroups_list.append(tmpUserInGroup)
+		tmp_user_in_group = UserInGroup()
+		tmp_user_in_group.user_external_id = int(i['userId'])
+		tmp_user_in_group.group_external_id = int(item['id'])
+		# Groups will be available in list variable users_in_groups_list
+		users_in_groups_list_list.append(tmp_user_in_group)

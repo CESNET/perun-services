@@ -24,17 +24,16 @@ function process {
 	E_DIR_NOT_EXISTS=(100 "${DST_DIR} does not exists")
 	E_DIR_NOT_WRITABLE=(101 "${DST_DIR} is not writable for user ${CURRENT_USER}")
 	E_PROCESS_SCRIPT_NOT_EXECUTABLE=(102 "'${PROCESS_SCRIPT}' is not executable")
+	E_PROCESS_SCRIPT_FAILED=(103 "'${PROCESS_SCRIPT}' failed")
 	
 	FROM_PERUN_USERS="${WORK_DIR}/users.scim"
 	FROM_PERUN_GROUPS="${WORK_DIR}/groups.scim"
 
 	if [ ! -d "${DST_DIR}" ]; then
 		log_msg	E_DIR_NOT_EXISTS
-		exit 1
 	fi
 	if [ ! -w "${DST_DIR}" ]; then
 		log_msg	E_DIR_NOT_WRITABLE
-		exit 1
 	fi
 
 	create_lock
@@ -48,8 +47,10 @@ function process {
 		log_msg I_CHANGED
 		# if script for processing SCIM data exists and is runnable, then run it
 		if [ -x ${PROCESS_SCRIPT} ]; then
-			eval ${PROCESS_SCRIPT}
-			exit $?               
+			eval ${PROCESS_SCRIPT} ${DST_FILE_USERS} ${DST_FILE_GROUPS}
+			if [ $? -ne 0 ]; then
+				log_msg E_PROCESS_SCRIPT_FAILED
+			fi
 		else
 		    log_msg  E_PROCESS_SCRIPT_NOT_EXECUTABLE
 		fi

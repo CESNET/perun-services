@@ -1,5 +1,5 @@
 perun-slave-process-scim (3.0.0) stable; urgency=low
 
-  * Added service perun-slave-scim
+  * Added service perun-slave-scim, it process data sent by the Perun in SCIM format.
 
  -- Michal Prochazka <michalp@ics.muni.cz>  Tue, 1 Aug 2017 14:35:00 +0200
