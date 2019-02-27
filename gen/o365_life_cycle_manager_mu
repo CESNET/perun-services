@@ -172,7 +172,7 @@ sub processUsers {
 		$userStruc->{$userId}->{$o365EmailAddressesHeader} = $o365EmailAddresses;
 		$userStruc->{$userId}->{$o365AllumniAccountEnabledHeader} = $o365AllumniAccountEnabled ? JSON::true : JSON::false;
 		$userStruc->{$userId}->{$eligibleForO365AlumniLicenceHeader} = $eligibleForO365AlumniLicence ? JSON::true : JSON::false;
-		$userStruc->{$userId}->{$o365PrivilegedLicenceHeader} = $o365PrivilegedLicence ? JSON::true : JSON::false;
+		$userStruc->{$userId}->{$o365PrivilegedLicenceHeader} = $o365PrivilegedLicence;
 		$userStruc->{$userId}->{$o365GracePeriodExpirationHeader} = $o365GracePeriodExpiration;
 
 		#we need to set correct group expiration if affiliation is for guests
