@@ -39,15 +39,15 @@ function process {
 	create_lock
 
 	diff_mv "${FROM_PERUN_USERS}" "${DST_FILE_USERS}"
-	user_diff=$?
+	USER_DIFF=$?
 	diff_mv "${FROM_PERUN_GROUPS}" "${DST_FILE_GROUPS}"
-	group_diff=$?
+	GROUP_DIFF=$?
 	
-	if [ $user_diff -eq 0 ] || [ $group_diff -eq 0 ]; then
+	if [ $USER_DIFF -eq 0 ] || [ $GROUP_DIFF -eq 0 ]; then
 		log_msg I_CHANGED
 		# if script for processing SCIM data exists and is runnable, then run it
-		if [ -x ${PROCESS_SCRIPT} ]; then
-			eval ${PROCESS_SCRIPT} ${DST_FILE_USERS} ${DST_FILE_GROUPS}
+		if [ -x "${PROCESS_SCRIPT}" ]; then
+			eval "${PROCESS_SCRIPT}" "${DST_FILE_USERS}" "${DST_FILE_GROUPS}"
 			if [ $? -ne 0 ]; then
 				log_msg E_PROCESS_SCRIPT_FAILED
 			fi
