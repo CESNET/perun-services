@@ -1,0 +1,35 @@
+#!/bin/bash
+
+EXISTING_MAILING_LISTS="/etc/perun/services/mailman_mu/existing_mailinglists"
+NOTIF_MAIL="notify@example.com" # Where to send the notification about request to create the new mailing list
+FROM_PERUN_DIR="${WORK_DIR}/mailinglists/"
+PERUN_MAIL="perun@example.com" # Mail address which is used in notification as a signature
+
+### Status codes
+I_MAIL_SENT=(0 'Request for creating new mailing list ${MAILING_LIST_NAME} has been sent to ${NOTIF_MAIL}.')
+
+### Error codes
+E_EXISTING_MAILING_LISTS_NOT_EXISTS=(1 'File ${EXISTING_MAILING_LISTS} with lists of Perun managed mailing lists does not exists.')
+
+# Check if the file with Perun managed mailing lists exists
+catch_error E_EXISTING_MAILING_LISTS_NOT_EXISTS stat ${EXISTING_MAILING_LISTS} >/dev/null
+
+for MAILING_LIST_NAME in `ls $FROM_PERUN_DIR/` ; do
+        if [ `grep -c "^${MAILING_LIST_NAME} " ${EXISTING_MAILING_LISTS}` -eq 0 ]; then
+                # Mailing lists doesn't exists, so generate mail to the mailman administrators
+
+                # Get mailing list admin's mail
+                MAILING_LIST_ADMIN=`grep MANAGERS_MAIL $FROM_PERUN_DIR/$MAILING_LIST_NAME | sed 's/^#MANAGERS_MAIL=\(.*\)$/\1/'`
+
+                # Generate admin's password
+                PASSWORD=`head -c 5 /dev/urandom | base64`
+
+                # Prepare message
+                MSG="Request to create a new mailng list:\n\nMAILING LIST NAME: ${MAILING_LIST_NAME}\nMAILING LIST MANAGER: ${MAILING_LIST_ADMIN}\nPASSWORD: ${PASSWORD}\n\nYour Perun System\n--\n${PERUN_MAIL}"
+
+                # Send mail
+                echo -e ${MSG} | mail -s "[Perun] Request to create a new mailing list '${MAILING_LIST_NAME}'" ${NOTIF_MAIL}
+
+                log_msg I_MAIL_SENT
+        fi
+done
