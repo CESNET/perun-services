@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_web";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.5";
+my $SCRIPT_VERSION = "3.0.6";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -15,6 +15,7 @@ my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
 my $fileNameCAO = "$DIRECTORY/$::SERVICE_NAME"."_cao.csv";
 my $fileNameEXT = "$DIRECTORY/$::SERVICE_NAME"."_ext.csv";
 my $fileNamePass = "$DIRECTORY/$::SERVICE_NAME"."_pass.csv";
+my $fileNameNS = "$DIRECTORY/$::SERVICE_NAME"."_ns.csv";
 my $data = perunServicesInit::getDataWithGroups;
 
 #Constants
@@ -55,12 +56,18 @@ our $A_G_CAO_FUNKCE_ID;  *A_G_CAO_FUNKCE_ID = \'urn:perun:group:attribute-def:de
 
 our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
 
+# group attrs for NS
+our $A_G_NS_NAME;  *A_G_NS_NAME = \'urn:perun:group:attribute-def:def:nsName';
+our $A_G_NS_ID;  *A_G_NS_ID = \'urn:perun:group:attribute-def:def:nsId';
+
 # GATHER USERS
 my $users;  # $users->{$uco}->{ATTR} = $attrValue;
 # Gather CAO membership
 my $cao;    # $cao->{$organ}->{$funkce:$funkceId}->{$uco} = 1;
 # Gather EXT membership
 my $ext;   #  $ext->{$uco}->{ATTR} = $attrValue;
+# Gather NS groups
+my $groups;  # $groups->{ID}->{NAME/USERS} = name/{uco} = 1;
 
 #
 # AGGREGATE DATA
@@ -76,6 +83,10 @@ foreach my $rData ($data->getChildElements) {
 	foreach my $group (@groupsData) {
 
 		my %gAttributes = attributesToHash $group->getAttributes;
+
+		if (defined $gAttributes{$A_G_NS_ID} and defined $gAttributes{$A_G_NS_NAME}) {
+			$groups->{$gAttributes{$A_G_NS_ID}}->{"NAME"} = $gAttributes{$A_G_NS_NAME};
+		}
 
 		my @membersData = ($group->getChildElements)[1]->getChildElements;
 		foreach my $member (@membersData) {
@@ -138,6 +149,14 @@ foreach my $rData ($data->getChildElements) {
 				$ext->{$uco}->{$A_JOB_ID} = $uAttributes{$A_JOB_ID} || '';
 				$ext->{$uco}->{$A_NS} = $uAttributes{$A_NS} || '';
 				$ext->{$uco}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
+			}
+
+			# is from NS group
+			if (defined $gAttributes{$A_G_NS_ID} and defined $gAttributes{$A_G_NS_NAME}) {
+
+				# fill person to NS
+				$groups->{$gAttributes{$A_G_NS_ID}}->{"USERS"}->{$uco} = 1;
+
 			}
 
 		}
@@ -220,6 +239,21 @@ for my $uco (@ext_keys) {
 	print FILE $uco . "\t" . $ext->{$uco}->{$A_USER_ID} . "\t" . $ext->{$uco}->{"TYPE"} . "\t" .
 		$ext->{$uco}->{$A_JOB} . "\t" . $ext->{$uco}->{$A_JOB_ID} . "\t" . $ext->{$uco}->{$A_NS}  . "\n";
 
+}
+
+close(FILE);
+
+open FILE,">$fileNameNS" or die "Cannot open $fileNameNS: $! \n";
+binmode FILE, ":utf8";
+
+# FOR EACH NS GROUP
+my @ns_keys = sort keys %{$groups};
+for my $key (@ns_keys) {
+	my $name = $groups->{$key}->{"NAME"};
+	my @ucos = sort keys %{$groups->{$key}->{"USERS"}};
+	for my $uco (@ucos) {
+		print FILE $key . "\t" . $name . "\t" . $uco . "\n";
+	}
 }
 
 close(FILE);

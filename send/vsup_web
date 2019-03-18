@@ -14,6 +14,7 @@ my $tableName = 'IDM2WEB_OSOBY';
 my $tableName_cao = 'IDM2WEB_CAO';
 my $tableName_ext = 'IDM2WEB_EXT';
 my $tableName_pass = 'IDM2WEB_PRIHLASKY';
+my $tableName_ns = 'IDM2WEB_NS';
 
 # define service
 my $service_name = "vsup_web";
@@ -27,6 +28,7 @@ my $service_file = "$service_files_dir/$service_name.csv";
 my $service_file_cao = "$service_files_dir/$service_name" . "_cao.csv";
 my $service_file_ext = "$service_files_dir/$service_name" . "_ext.csv";
 my $service_file_pass = "$service_files_dir/$service_name" . "_pass.csv";
+my $service_file_ns = "$service_files_dir/$service_name" . "_ns.csv";
 
 # propagation destination
 my $destination = $ARGV[1];
@@ -486,19 +488,60 @@ if (length $elementsPass) {
 	$deletedPass += $dbh->do("DELETE FROM $tableName_pass");
 }
 
+##########################
+#
+# NS handling
+#
+##########################
+
+#Main Structure
+my $dataByNs = {};
+
+open FILE, $service_file_ns or die "Could not open $service_file_ns: $!";
+while(my $line = <FILE>) {
+	my @parts = split /\t/, $line;
+	chomp(@parts);
+	$dataByNs->{$parts[0]}->{'NAME'} = $parts[1];
+	$dataByNs->{$parts[0]}->{'USERS'}->{$parts[2]} = 1
+}
+close FILE;
+
+#statistic and information variables
+my $inserted_NS = 0;
+my $deleted_NS = 0;
+
+$deleted_NS += $dbh->do("DELETE FROM $tableName_ns");
+
+#update and insert new
+foreach my $NS_KOD (sort keys %$dataByNs) {
+
+	my $NS_NAZEV = $dataByNs->{$NS_KOD}->{'NAME'};
+
+	foreach my $UCO (sort keys %{$dataByNs->{$NS_KOD}->{'USERS'}}) {
+
+		if($DEBUG == 1) { print "INSERT NEW RECORD: ".$NS_KOD." ".$NS_NAZEV." ".$UCO."\n"; }
+		$inserted_NS++;
+		# we will do insert
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName_ns (NS_KOD, NS_NAZEV, UCO) VALUES (?,?,?)});
+		$insertPerson->execute($NS_KOD, $NS_NAZEV, $UCO);
+
+	}
+
+}
+
 commit $dbh;
 $dbh->disconnect();
 
 # print info about operations
 print "=======================================\n";
 print "Newly inserted:   \t$inserted\n";
-print "Found and skiped: \t$foundAndSkipped\n";
+print "Found and skipped: \t$foundAndSkipped\n";
 print "Found and updated:\t$foundAndUpdated\n";
 print "---------------------------------------\n";
 print "Newly inserted CAO:    \t$insertedCao\n";
 print "Found and skipped CAO: \t$foundAndSkippedCao\n";
 print "Deleted CAO completely:\t$deletedCao (rows)\n";
-print "Deleted CAO partialy:  \t$deletedCao2 processed people ($deletedCao3 deleted rows)\n";
+print "Deleted CAO partially:  \t$deletedCao2 processed people ($deletedCao3 deleted rows)\n";
 print "---------------------------------------\n";
 print "Newly inserted EXT:    \t$insertedExt\n";
 print "Found and updated EXT: \t$foundAndUpdatedExt\n";
@@ -509,6 +552,9 @@ print "Newly inserted PASS:    \t$insertedPass\n";
 print "Found and updated PASS: \t$foundAndUpdatedPass\n";
 print "Found and skipped PASS: \t$foundAndSkippedPass\n";
 print "Deleted PASS completely:\t$deletedPass (rows)\n";
+print "---------------------------------------\n";
+print "Inserted NS:\t$inserted_NS (new rows)\n";
+print "Deleted NS:\t$deleted_NS (old rows)\n";
 print "=======================================\n";
 
 $lock->unlock();
