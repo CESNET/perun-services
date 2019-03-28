@@ -23,8 +23,11 @@ our $A_USER_RT_PREF_MAIL;       *A_USER_RT_PREF_MAIL =         \'urn:perun:user:
 our $A_USER_EPPN;               *A_USER_EPPN =                 \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 our $A_USER_DISPLAY_NAME;       *A_USER_DISPLAY_NAME =         \'urn:perun:user:attribute-def:core:displayName';
 our $A_USER_ORGANIZATION;       *A_USER_ORGANIZATION =         \'urn:perun:user:attribute-def:def:organization';
+our $A_MEMBER_STATUS;           *A_MEMBER_STATUS =             \'urn:perun:member:attribute-def:core:status';
 our $A_RES_NAME;                *A_RES_NAME =                  \'urn:perun:resource:attribute-def:core:name';
 our $A_RES_RT_GROUP_NAME;       *A_RES_RT_GROUP_NAME =         \'urn:perun:resource:attribute-def:def:rtGroupName';
+
+our $STATUS_VALID;              *STATUS_VALID =                \'VALID';
 
 #Headers
 our $PREF_MAIL_HEADER = 'preferredMail';
@@ -43,7 +46,7 @@ my $usersStructureByUserId = {};
 
 #####################################
 
-my @resourcesData = $data->getChildElements;                                                                                            
+my @resourcesData = $data->getChildElements; 
 foreach my $rData (@resourcesData) {
 	my %resourceAttributes  = attributesToHash $rData->getAttributes;
 	
@@ -51,8 +54,10 @@ foreach my $rData (@resourcesData) {
 
 	my @membersData = $rData->getChildElements;
 	foreach my $memberAttributes (dataToAttributesHashes @membersData) {
-		my $userId = $memberAttributes->{$A_USER_ID};
+		#skip non-valid members
+		next if $memberAttributes->{$A_MEMBER_STATUS} ne $STATUS_VALID;
 
+		my $userId = $memberAttributes->{$A_USER_ID};
 		unless(defined $usersStructureByUserId->{$userId}) {
 			my $userPrefMail = $memberAttributes->{$A_USER_RT_PREF_MAIL} || $memberAttributes->{$A_USER_PREFERRED_MAIL};
 			my $userOrganization = $memberAttributes->{$A_USER_ORGANIZATION};
@@ -64,7 +69,6 @@ foreach my $rData (@resourcesData) {
 					my $neweppn = $eppn;
 					$neweppn =~ s/$META_DOMAIN/$EINFRA_DOMAIN/ge;
 					$userEPPNs{$neweppn} = 1;
-					last;
 				}
 			}
 			#list of eppns must be unique
@@ -92,8 +96,8 @@ foreach my $userId (sort { $a <=> $b } keys %$usersStructureByUserId) {
 	print SERVICE_FILE $usersStructureByUserId->{$userId}->{$PREF_MAIL_HEADER} . "\t";
 	print SERVICE_FILE $usersStructureByUserId->{$userId}->{$DISPLAY_NAME_HEADER} . "\t";
 	print SERVICE_FILE $usersStructureByUserId->{$userId}->{$ORGANIZATION_HEADER} ? $usersStructureByUserId->{$userId}->{$ORGANIZATION_HEADER} . "\t" : "\t";
-	print SERVICE_FILE join(',', keys %{$usersStructureByUserId->{$userId}->{$EPPNS_HEADER}}) . "\t";
-	print SERVICE_FILE join(',', keys %{$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER}}) . "\n";
+	print SERVICE_FILE join(',', sort keys %{$usersStructureByUserId->{$userId}->{$EPPNS_HEADER}}) . "\t";
+	print SERVICE_FILE join(',', sort keys %{$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER}}) . "\n";
 }
 
 close(SERVICE_FILE);
