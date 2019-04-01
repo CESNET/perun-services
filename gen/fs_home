@@ -59,12 +59,8 @@ our $A_MR_DATAQUOTA;               *A_MR_DATAQUOTA =                 \'urn:perun
 our $A_MR_FILESLIMIT;              *A_MR_FILESLIMIT =                \'urn:perun:member_resource:attribute-def:def:filesLimit';
 our $A_MR_FILESQUOTA;              *A_MR_FILESQUOTA =                \'urn:perun:member_resource:attribute-def:def:filesQuota';
 our $A_F_QUOTAENABLED;             *A_F_QUOTAENABLED =               \'urn:perun:facility:attribute-def:def:quotaEnabled';
-
-#our $A_RESOURCE_UNIX_GROUP_NAME;  *A_RESOURCE_UNIX_GROUP_NAME =     \'urn:perun:resource:attribute-def:virt:unixGroupName';
-#our $A_RESOURCE_UNIX_GID;         *A_RESOURCE_UNIX_GID =            \'urn:perun:resource:attribute-def:virt:unixGID';
 our $A_GROUP_UNIX_GROUP_NAME;      *A_GROUP_UNIX_GROUP_NAME =        \'urn:perun:group_resource:attribute-def:virt:unixGroupName';
 our $A_GROUP_GROUP_NAME;           *A_GROUP_GROUP_NAME =             \'urn:perun:group:attribute-def:core:name';
-#our $A_GROUP_UNIX_GID;            *A_GROUP_UNIX_GID =               \'urn:perun:group_resource:attribute-def:virt:unixGID';
 our $A_R_VO_NAME;                  *A_R_VO_NAME =                    \'urn:perun:resource:attribute-def:virt:voShortName';
 
 our $STRUC_GROUPS;   *STRUC_GROUPS =  \"groups";
@@ -92,22 +88,20 @@ foreach my $rData (@resourcesData) {
 
 	foreach my $mData (@membersData) {
 		my %memberAttributes = attributesToHash $mData->getAttributes;
+		my $login = $memberAttributes{$A_USER_LOGIN};
 
-		unless(defined $memberAttributesByLoginAndMount->{$memberAttributes{$A_USER_LOGIN}}->{$volume}) { $memberAttributesByLoginAndMount->{$memberAttributes{$A_USER_LOGIN}}->{$volume} = {}; }
-		my $alreadyStoredMemberAttrByMount = $memberAttributesByLoginAndMount->{$memberAttributes{$A_USER_LOGIN}}->{$volume};
+		unless(defined $memberAttributesByLoginAndMount->{$login}->{$volume}) { $memberAttributesByLoginAndMount->{$login}->{$volume} = {}; }
+		my $alreadyStoredMemberAttrByMount = $memberAttributesByLoginAndMount->{$login}->{$volume};
 
 		$alreadyStoredMemberAttrByMount->{$A_R_VOLUME} = $volume;
-		$alreadyStoredMemberAttrByMount->{$A_USER_LOGIN} = $memberAttributes{$A_USER_LOGIN};
+		$alreadyStoredMemberAttrByMount->{$A_USER_LOGIN} = $login;
 		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_GID} = $resourceAttributes{$A_GID};
 		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_UID} = $memberAttributes{$A_UID};
 		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_USER_STATUS} = mergeStatuses $memberAttributes{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_USER_STATUS}, $memberAttributes{$A_USER_STATUS};
-		$alreadyStoredMemberAttrByMount->{$A_MR_DATAQUOTA}  = mergeQuotas $memberAttributesByLoginAndMount->{$memberAttributes{$A_USER_LOGIN}}->{$volume}->{$A_MR_DATAQUOTA},  quotaToKb $resourceAttributes{$A_R_SOFT_QUOTA_DATA}, (defined $memberAttributes{$A_MR_DATAQUOTA} ? quotaToKb $memberAttributes{$A_MR_DATAQUOTA} : undef);
-		$alreadyStoredMemberAttrByMount->{$A_MR_DATALIMIT}  = mergeQuotas $memberAttributesByLoginAndMount->{$memberAttributes{$A_USER_LOGIN}}->{$volume}->{$A_MR_DATALIMIT},  quotaToKb $resourceAttributes{$A_R_HARD_QUOTA_DATA}, (defined $memberAttributes{$A_MR_DATALIMIT} ? quotaToKb $memberAttributes{$A_MR_DATALIMIT} : undef);
-		$alreadyStoredMemberAttrByMount->{$A_MR_FILESQUOTA} = mergeQuotas $memberAttributesByLoginAndMount->{$memberAttributes{$A_USER_LOGIN}}->{$volume}->{$A_MR_FILESQUOTA}, $resourceAttributes{$A_R_SOFT_QUOTA_FILE}, $memberAttributes{$A_MR_FILESQUOTA};
-		$alreadyStoredMemberAttrByMount->{$A_MR_FILESLIMIT} = mergeQuotas $memberAttributesByLoginAndMount->{$memberAttributes{$A_USER_LOGIN}}->{$volume}->{$A_MR_FILESLIMIT}, $resourceAttributes{$A_R_HARD_QUOTA_FILE}, $memberAttributes{$A_MR_FILESLIMIT};
-
-		#store to global structure
-		#$memberAttributesByLoginAndMount->{$memberAttributes{$A_USER_LOGIN}}->{$volume} = \%memberAttributes;
+		$alreadyStoredMemberAttrByMount->{$A_MR_DATAQUOTA}  = mergeQuotas $memberAttributesByLoginAndMount->{$login}->{$volume}->{$A_MR_DATAQUOTA},  quotaToKb $resourceAttributes{$A_R_SOFT_QUOTA_DATA}, (defined $memberAttributes{$A_MR_DATAQUOTA} ? quotaToKb $memberAttributes{$A_MR_DATAQUOTA} : undef);
+		$alreadyStoredMemberAttrByMount->{$A_MR_DATALIMIT}  = mergeQuotas $memberAttributesByLoginAndMount->{$login}->{$volume}->{$A_MR_DATALIMIT},  quotaToKb $resourceAttributes{$A_R_HARD_QUOTA_DATA}, (defined $memberAttributes{$A_MR_DATALIMIT} ? quotaToKb $memberAttributes{$A_MR_DATALIMIT} : undef);
+		$alreadyStoredMemberAttrByMount->{$A_MR_FILESQUOTA} = mergeQuotas $memberAttributesByLoginAndMount->{$login}->{$volume}->{$A_MR_FILESQUOTA}, $resourceAttributes{$A_R_SOFT_QUOTA_FILE}, $memberAttributes{$A_MR_FILESQUOTA};
+		$alreadyStoredMemberAttrByMount->{$A_MR_FILESLIMIT} = mergeQuotas $memberAttributesByLoginAndMount->{$login}->{$volume}->{$A_MR_FILESLIMIT}, $resourceAttributes{$A_R_HARD_QUOTA_FILE}, $memberAttributes{$A_MR_FILESLIMIT};
 	}
 
 	foreach my $groupData (($rData->getChildElements)[0]->getChildElements) {
@@ -122,17 +116,20 @@ foreach my $rData (@resourcesData) {
 
 		foreach my $mData ($membersElement->getChildElements) {
 			my %memberAttributes = attributesToHash $mData->getAttributes;
-			$memberAttributesByLoginAndMount->{$memberAttributes{$A_USER_LOGIN}}->{$volume}->{$STRUC_GROUPS}->{$groupNameWithVo} = $unixGroupName;
+			my $login = $memberAttributes{$A_USER_LOGIN};
+			$memberAttributesByLoginAndMount->{$login}->{$volume}->{$STRUC_GROUPS}->{$groupNameWithVo} = $unixGroupName;
 		}
 	}
 }
 
-foreach my $sortedKey (sort keys %$memberAttributesByLoginAndMount) {
-    my $userAttributesByMount = $memberAttributesByLoginAndMount->{$sortedKey};
+foreach my $login (sort keys %$memberAttributesByLoginAndMount) {
+	my $userAttributesByMount = $memberAttributesByLoginAndMount->{$login};
+	
 	for my $userAttributes (values %$userAttributesByMount) {
+		
 		for my $mountPoint (keys %{$userAttributes->{$A_HOME_MOUNTPOINT}}) {
 			print SERVICE_FILE $mountPoint . "\t";
-			print SERVICE_FILE $userAttributes->{$A_USER_LOGIN} . "\t";
+			print SERVICE_FILE $login . "\t";
 			print SERVICE_FILE $userAttributes->{$A_HOME_MOUNTPOINT}->{$mountPoint}->{$A_UID} . "\t";
 			print SERVICE_FILE $userAttributes->{$A_HOME_MOUNTPOINT}->{$mountPoint}->{$A_GID} . "\t";
 			print SERVICE_FILE $userAttributes->{$A_MR_DATAQUOTA} . "\t";
