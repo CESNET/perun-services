@@ -7,8 +7,8 @@ use File::Basename;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 our $SERVICE_NAME = basename($0);
-our $PROTOCOL_VERSION = "3.6.0";
-my $SCRIPT_VERSION = "3.0.9";
+our $PROTOCOL_VERSION = "3.7.0";
+my $SCRIPT_VERSION = "3.0.10";
 
 sub mergeQuotas {
 	my ($sumQuota, $resourceQuota, $memberQuota) = @_;
@@ -44,6 +44,8 @@ my $data = perunServicesInit::getDataWithGroups;
 
 #Constants
 our $A_USER_LOGIN;                 *A_USER_LOGIN =                   \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UF_DATA_QUOTAS;             *A_UF_DATA_QUOTAS =               \'urn:perun:user_facility:attribute-def:virt:dataQuotas';
+our $A_UF_FILE_QUOTAS;             *A_UF_FILE_QUOTAS =               \'urn:perun:user_facility:attribute-def:virt:fileQuotas';
 our $A_USER_STATUS;                *A_USER_STATUS =                  \'urn:perun:member:attribute-def:core:status';
 our $A_HOME_MOUNTPOINT;            *A_HOME_MOUNTPOINT =              \'urn:perun:resource:attribute-def:def:fsHomeMountPoint';
 our $A_R_VOLUME;                   *A_R_VOLUME =                     \'urn:perun:resource:attribute-def:def:fsVolume';
@@ -62,22 +64,34 @@ our $A_F_QUOTAENABLED;             *A_F_QUOTAENABLED =               \'urn:perun
 our $A_GROUP_UNIX_GROUP_NAME;      *A_GROUP_UNIX_GROUP_NAME =        \'urn:perun:group_resource:attribute-def:virt:unixGroupName';
 our $A_GROUP_GROUP_NAME;           *A_GROUP_GROUP_NAME =             \'urn:perun:group:attribute-def:core:name';
 our $A_R_VO_NAME;                  *A_R_VO_NAME =                    \'urn:perun:resource:attribute-def:virt:voShortName';
+our $A_F_NEW_QUOTAS_READY;         *A_F_NEW_QUOTAS_READY =           \'urn:perun:facility:attribute-def:def:readyForNewQuotas';
 
 our $STRUC_GROUPS;   *STRUC_GROUPS =  \"groups";
 
+#headers
+my $DATA_QUOTA_HEADER = "dataQuota";
+my $DATA_LIMIT_HEADER = "dataLimit";                                                                                                      
+my $FILE_QUOTA_HEADER = "fileQuota";
+my $FILE_LIMIT_HEADER = "fileLimit";
+
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
+my $quotas_file_name = "$DIRECTORY/quotas";
 my $umask_file_name = "$DIRECTORY/umask";
 my $quota_enabled_file_name = "$DIRECTORY/quota_enabled";
 
-my $memberAttributesByLoginAndMount = {};
-
 my %facilityAttributes = attributesToHash $data->getAttributes;
-#####################################
+my @resourcesData = $data->getChildElements;
 
-####### output file ######################
+#----------------------------------------------------------
+# HOME DATA
+#----------------------------------------------------------
+
+#structured data about user's home directories
+my $dataForUserHomeByLogin = {};
+
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 
-my @resourcesData = $data->getChildElements;
+#prepare home data
 foreach my $rData (@resourcesData) {
 	my %resourceAttributes = attributesToHash $rData->getAttributes;
 
@@ -90,18 +104,14 @@ foreach my $rData (@resourcesData) {
 		my %memberAttributes = attributesToHash $mData->getAttributes;
 		my $login = $memberAttributes{$A_USER_LOGIN};
 
-		unless(defined $memberAttributesByLoginAndMount->{$login}->{$volume}) { $memberAttributesByLoginAndMount->{$login}->{$volume} = {}; }
-		my $alreadyStoredMemberAttrByMount = $memberAttributesByLoginAndMount->{$login}->{$volume};
+		unless(defined $dataForUserHomeByLogin->{$login}->{$volume}) { $dataForUserHomeByLogin->{$login}->{$volume} = {}; }
+		my $alreadyStoredMemberAttrByMount = $dataForUserHomeByLogin->{$login}->{$volume};
 
 		$alreadyStoredMemberAttrByMount->{$A_R_VOLUME} = $volume;
 		$alreadyStoredMemberAttrByMount->{$A_USER_LOGIN} = $login;
 		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_GID} = $resourceAttributes{$A_GID};
 		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_UID} = $memberAttributes{$A_UID};
 		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_USER_STATUS} = mergeStatuses $memberAttributes{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_USER_STATUS}, $memberAttributes{$A_USER_STATUS};
-		$alreadyStoredMemberAttrByMount->{$A_MR_DATAQUOTA}  = mergeQuotas $memberAttributesByLoginAndMount->{$login}->{$volume}->{$A_MR_DATAQUOTA},  quotaToKb $resourceAttributes{$A_R_SOFT_QUOTA_DATA}, (defined $memberAttributes{$A_MR_DATAQUOTA} ? quotaToKb $memberAttributes{$A_MR_DATAQUOTA} : undef);
-		$alreadyStoredMemberAttrByMount->{$A_MR_DATALIMIT}  = mergeQuotas $memberAttributesByLoginAndMount->{$login}->{$volume}->{$A_MR_DATALIMIT},  quotaToKb $resourceAttributes{$A_R_HARD_QUOTA_DATA}, (defined $memberAttributes{$A_MR_DATALIMIT} ? quotaToKb $memberAttributes{$A_MR_DATALIMIT} : undef);
-		$alreadyStoredMemberAttrByMount->{$A_MR_FILESQUOTA} = mergeQuotas $memberAttributesByLoginAndMount->{$login}->{$volume}->{$A_MR_FILESQUOTA}, $resourceAttributes{$A_R_SOFT_QUOTA_FILE}, $memberAttributes{$A_MR_FILESQUOTA};
-		$alreadyStoredMemberAttrByMount->{$A_MR_FILESLIMIT} = mergeQuotas $memberAttributesByLoginAndMount->{$login}->{$volume}->{$A_MR_FILESLIMIT}, $resourceAttributes{$A_R_HARD_QUOTA_FILE}, $memberAttributes{$A_MR_FILESLIMIT};
 	}
 
 	foreach my $groupData (($rData->getChildElements)[0]->getChildElements) {
@@ -117,25 +127,21 @@ foreach my $rData (@resourcesData) {
 		foreach my $mData ($membersElement->getChildElements) {
 			my %memberAttributes = attributesToHash $mData->getAttributes;
 			my $login = $memberAttributes{$A_USER_LOGIN};
-			$memberAttributesByLoginAndMount->{$login}->{$volume}->{$STRUC_GROUPS}->{$groupNameWithVo} = $unixGroupName;
+			$dataForUserHomeByLogin->{$login}->{$volume}->{$STRUC_GROUPS}->{$groupNameWithVo} = $unixGroupName;
 		}
 	}
 }
 
-foreach my $login (sort keys %$memberAttributesByLoginAndMount) {
-	my $userAttributesByMount = $memberAttributesByLoginAndMount->{$login};
+foreach my $login (sort keys %$dataForUserHomeByLogin) {
+	my $userAttributesByMount = $dataForUserHomeByLogin->{$login};
 	
 	for my $userAttributes (values %$userAttributesByMount) {
 		
-		for my $mountPoint (keys %{$userAttributes->{$A_HOME_MOUNTPOINT}}) {
+		for my $mountPoint (sort keys %{$userAttributes->{$A_HOME_MOUNTPOINT}}) {
 			print SERVICE_FILE $mountPoint . "\t";
 			print SERVICE_FILE $login . "\t";
 			print SERVICE_FILE $userAttributes->{$A_HOME_MOUNTPOINT}->{$mountPoint}->{$A_UID} . "\t";
 			print SERVICE_FILE $userAttributes->{$A_HOME_MOUNTPOINT}->{$mountPoint}->{$A_GID} . "\t";
-			print SERVICE_FILE $userAttributes->{$A_MR_DATAQUOTA} . "\t";
-			print SERVICE_FILE $userAttributes->{$A_MR_DATALIMIT} . "\t";
-			print SERVICE_FILE $userAttributes->{$A_MR_FILESQUOTA} . "\t";
-			print SERVICE_FILE $userAttributes->{$A_MR_FILESLIMIT} . "\t";
 			print SERVICE_FILE $userAttributes->{$A_HOME_MOUNTPOINT}->{$mountPoint}->{$A_USER_STATUS} . "\t";
 
 			print SERVICE_FILE join ',', map { $_ . ">" . ($userAttributes->{$STRUC_GROUPS}->{$_} || "") } sort keys %{$userAttributes->{$STRUC_GROUPS}};
@@ -147,16 +153,108 @@ foreach my $login (sort keys %$memberAttributesByLoginAndMount) {
 
 close(SERVICE_FILE);
 
+#----------------------------------------------------------
+# QUOTAS DATA
+#----------------------------------------------------------
+
+#structured data about quotas
+my $dataForUserQuotasByUID = {};
+
+open QUOTAS_FILE,">$quotas_file_name" or die "Cannot open $quotas_file_name: $! \n";
+
+#Temporary define if facility is ready for new quotas (dataQuotas and fileQuotas)
+my $readyForNewQuotas = $facilityAttributes{$A_F_NEW_QUOTAS_READY};
+
+#prepare quotas data
+foreach my $rData (@resourcesData) {
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my @membersData = ($rData->getChildElements)[1]->getChildElements;
+
+	if($readyForNewQuotas) {
+		foreach my $mData (@membersData) {
+			my %memberAttributes = attributesToHash $mData->getAttributes;
+			my $uid = $memberAttributes{$A_UID};
+
+			unless($dataForUserQuotasByUID->{$uid}) {
+				#First process data quotas
+				foreach my $volume (keys %{$memberAttributes{$A_UF_DATA_QUOTAS}}) {
+					my $dataQuota = $memberAttributes{$A_UF_DATA_QUOTAS}{$volume};
+
+					my $softDataQuota = $dataQuota;
+					$softDataQuota =~ s/:.*$//;
+					my $hardDataQuota = $dataQuota;
+					$hardDataQuota =~ s/^.*://;
+					$dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_QUOTA_HEADER} = quotaToKb $softDataQuota;
+					$dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_LIMIT_HEADER} = quotaToKb $hardDataQuota;
+					$dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_QUOTA_HEADER} = 0;
+					$dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_LIMIT_HEADER} = 0;
+				}
+
+				#Then process file quotas
+				foreach my $volume (keys %{$memberAttributes{$A_UF_FILE_QUOTAS}}) {
+					my $fileQuota = $memberAttributes{$A_UF_FILE_QUOTAS}{$volume};
+					
+					my $softFileQuota = $fileQuota;
+					$softFileQuota =~ s/:.*$//;
+					my $hardFileQuota = $fileQuota;
+					$hardFileQuota =~ s/^.*://;
+					$dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_QUOTA_HEADER} = $softFileQuota;
+					$dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_LIMIT_HEADER} = $hardFileQuota;
+					unless ($dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_QUOTA_HEADER}) {
+						$dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_QUOTA_HEADER} = 0;
+					}
+					unless ($dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_LIMIT_HEADER}) {
+						$dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_LIMIT_HEADER} = 0;
+					}
+				}
+			}
+		}		
+	} else {
+		my $volume = $resourceAttributes{$A_R_VOLUME} || $resourceAttributes{$A_HOME_MOUNTPOINT};
+
+		foreach my $mData (@membersData) {
+			my %memberAttributes = attributesToHash $mData->getAttributes;
+			my $uid = $memberAttributes{$A_UID};
+
+			$dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_QUOTA_HEADER} = mergeQuotas $dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_QUOTA_HEADER}, quotaToKb $resourceAttributes{$A_R_SOFT_QUOTA_DATA}, (defined $memberAttributes{$A_MR_DATAQUOTA} ? quotaToKb $memberAttributes{$A_MR_DATAQUOTA} : undef);
+			$dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_LIMIT_HEADER} = mergeQuotas $dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_LIMIT_HEADER}, quotaToKb $resourceAttributes{$A_R_HARD_QUOTA_DATA}, (defined $memberAttributes{$A_MR_DATALIMIT} ? quotaToKb $memberAttributes{$A_MR_DATALIMIT} : undef);
+			$dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_QUOTA_HEADER} = mergeQuotas $dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_QUOTA_HEADER}, $resourceAttributes{$A_R_SOFT_QUOTA_FILE}, $memberAttributes{$A_MR_FILESQUOTA};
+			$dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_LIMIT_HEADER} = mergeQuotas $dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_LIMIT_HEADER}, $resourceAttributes{$A_R_HARD_QUOTA_FILE}, $memberAttributes{$A_MR_FILESLIMIT};
+		}		
+	}
+}
+
+foreach my $uid (sort keys %$dataForUserQuotasByUID) {
+	foreach my $volume (sort keys %{$dataForUserQuotasByUID->{$uid}}) {
+		print QUOTAS_FILE $uid . "\t";
+		print QUOTAS_FILE $volume . "\t";
+		print QUOTAS_FILE $dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_QUOTA_HEADER} . "\t";
+		print QUOTAS_FILE $dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_LIMIT_HEADER} . "\t";
+		print QUOTAS_FILE $dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_QUOTA_HEADER} . "\t";
+		print QUOTAS_FILE $dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_LIMIT_HEADER} . "\n";
+	}
+}
+
+close(QUOTAS_FILE);
+#----------------------------------------------------------
+# UMASK DATA
+#----------------------------------------------------------
+
 if(defined $facilityAttributes{$A_F_UMASK}) {
 	open UMASK_FH, ">$umask_file_name" or die "Cannot open $umask_file_name: $!\n";
 	print UMASK_FH $facilityAttributes{$A_F_UMASK}, "\n";
 	close UMASK_FH;
 }
 
+#----------------------------------------------------------
+# QUOTA ENABLED DATA
+#----------------------------------------------------------
+
 if(defined $facilityAttributes{$A_F_QUOTAENABLED}) {
 	open QUOTA_FH, ">$quota_enabled_file_name" or die "Cannot open $quota_enabled_file_name: $!\n";
 	print QUOTA_FH $facilityAttributes{$A_F_QUOTAENABLED}, "\n";
 	close QUOTA_FH;
 }
+
 #####################################################
 perunServicesInit::finalize;
