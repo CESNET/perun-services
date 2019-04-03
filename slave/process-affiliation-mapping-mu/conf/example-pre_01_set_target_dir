@@ -1,0 +1,3 @@
+#!/bin/sh
+#SET destination file
+#DST_FILE=/tmp/affiliation_mapping_mu
