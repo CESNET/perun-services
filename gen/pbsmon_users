@@ -25,6 +25,7 @@ our $A_USER_LOGIN;          *A_USER_LOGIN =          \'urn:perun:user_facility:a
 our $A_USER_PUBLICATIONS;   *A_USER_PUBLICATIONS =   \'urn:perun:user:attribute-def:def:publications';
 our $A_USER_STATUS;         *A_USER_STATUS =         \'urn:perun:member:attribute-def:core:status';
 our $A_USER_EXPIRES;        *A_USER_EXPIRES =        \'urn:perun:member:attribute-def:def:membershipExpiration';
+our $A_MEMBER_ORG;          *A_MEMBER_ORG =          \'urn:perun:member:attribute-def:def:organization';
 our $A_GROUP_NAME;          *A_GROUP_NAME =          \'urn:perun:group:attribute-def:core:name';
 our $A_GROUP_STATISTIC;     *A_GROUP_STATISTIC =     \'urn:perun:group:attribute-def:def:statisticGroup';
 our $A_VO_NAME;             *A_VO_NAME =             \'urn:perun:vo:attribute-def:core:name';
@@ -82,6 +83,7 @@ sub processGroupData {
 		unless($attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}) {
 			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"expires"} = $memberAttributes{$A_USER_EXPIRES};
 			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"status"} = $memberAttributes{$A_USER_STATUS};
+			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"org"} =  $memberAttributes{$A_MEMBER_ORG};
 		}
 
 		#membership in groups
