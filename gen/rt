@@ -21,7 +21,8 @@ our $A_USER_ID;                 *A_USER_ID =                   \'urn:perun:user:
 our $A_USER_PREFERRED_MAIL;     *A_USER_PREFERRED_MAIL =       \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_RT_PREF_MAIL;       *A_USER_RT_PREF_MAIL =         \'urn:perun:user:attribute-def:def:rtPreferredMail';
 our $A_USER_EPPN;               *A_USER_EPPN =                 \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
-our $A_USER_DISPLAY_NAME;       *A_USER_DISPLAY_NAME =         \'urn:perun:user:attribute-def:core:displayName';
+our $A_USER_FIRST_NAME;         *A_USER_FIRST_NAME =           \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LAST_NAME;          *A_USER_LAST_NAME =            \'urn:perun:user:attribute-def:core:lastName';
 our $A_USER_ORGANIZATION;       *A_USER_ORGANIZATION =         \'urn:perun:user:attribute-def:def:organization';
 our $A_MEMBER_STATUS;           *A_MEMBER_STATUS =             \'urn:perun:member:attribute-def:core:status';
 our $A_RES_NAME;                *A_RES_NAME =                  \'urn:perun:resource:attribute-def:core:name';
@@ -61,7 +62,19 @@ foreach my $rData (@resourcesData) {
 		unless(defined $usersStructureByUserId->{$userId}) {
 			my $userPrefMail = $memberAttributes->{$A_USER_RT_PREF_MAIL} || $memberAttributes->{$A_USER_PREFERRED_MAIL};
 			my $userOrganization = $memberAttributes->{$A_USER_ORGANIZATION};
-			my $userName = $memberAttributes->{$A_USER_DISPLAY_NAME};
+			my $firstName = $memberAttributes->{$A_USER_FIRST_NAME};
+			my $lastName = $memberAttributes->{$A_USER_LAST_NAME};
+			my $userName;
+			if($firstName && $lastName) {
+				$userName = $firstName . ' ' . $lastName;
+			} elsif ($firstName) {
+				$userName = $firstName;
+			} elsif ($lastName) {
+				$userName = $lastName;
+			} else {
+				$userName = "";
+			}
+
 			#if user has meta eppn, he should have also einfra eppn
 			my %userEPPNs = map { $_ => 1 } @{$memberAttributes->{$A_USER_EPPN}};
 			foreach my $eppn (keys %userEPPNs) {
