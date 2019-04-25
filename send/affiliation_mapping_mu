@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="affiliation_mapping_mu"
+
+. generic_send
