@@ -262,7 +262,7 @@ foreach my $vo (@{$vos->{'vo'}}) { # Iterating through individual VOs in the XML
 	my @groups_toBe = ( "/$name" );	# Desired list of groups
 	my @roles_toBe = ( "VO-Admin" );# Desired list of roles, plus the default VO-Admin role
 	my @DNs_Seen;			# DNs already included
-	foreach $user (@{$vo->{'users'}->{'user'}}) {
+	foreach $user (sort { $a->{'CA'} cmp $b->{'CA'} } @{$vo->{'users'}->{'user'}}) {
 		next unless knownCA(\@cas, $user->{'CA'});
 		my %theUser= ( 'CA' => "$user->{'CA'}",'DN' => normalizeUID(normalizeEmail($user->{'DN'})), 'CN' => getCN($user->{'DN'}), 'email' => "$user->{'email'}" );
 		next unless ($checkCA || uniqueDN(\%theUser, \@DNs_Seen));
