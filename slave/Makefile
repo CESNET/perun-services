@@ -35,7 +35,7 @@ $(processes):
 	cd $@ && DEBEMAIL=$(maintainer_email) DEBFULLNAME=$(maintainer_name) dh_make -i -y -n -p "$(package_prefix_name)$@_`head -n 1 changelog | sed -e 's/.*\([0-9]\+[.][0-9]\+[.][0-9]\+\).*/\1/'`" -t "$(realpath templates/dh_make)" --createorig
 	@cd $@/debian && rm *.ex *.EX README.*
 	@cd $@ && if [ -s changelog ]; then cp changelog ./debian/; fi
-	@cd $@ && echo -en "\noverride_dh_gencontrol:\n\tdh_gencontrol -- -Vmisc:Depends=\"`cat dependencies`\"" >> ./debian/rules;
+	@cd $@ && echo -en "\noverride_dh_builddeb:\n\tdh_builddeb -- -Zgzip\noverride_dh_gencontrol:\n\tdh_gencontrol -- -Vmisc:Depends=\"`cat dependencies`\"" >> ./debian/rules;
 	@cd $@ && echo "Conflicts: perun-slave" >> debian/control;
 	@cd $@ && if [ -s short_desc ]; then echo "Description: `cat short_desc`" >> debian/control; fi
 	@cd $@ && if [ -s short_desc -a -s long_desc ]; then sed 's/^/ /g' long_desc >> debian/control; fi
