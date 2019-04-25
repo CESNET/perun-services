@@ -1,3 +1,9 @@
+perun-slave-full (3.1.6) stable; urgency=medium
+
+  * added new services affiliation-mapping, affiliation-mapping-mu
+
+ -- Martin Kuba <makub@ics.muni.cz>  Thu, 25 Apr 2019 17:46:46 +0200
+
 perun-slave-full (3.1.5) stable; urgency=medium
 
   * Changed architecture to all
