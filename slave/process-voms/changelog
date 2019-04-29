@@ -1,3 +1,10 @@
+perun-slave-process-voms (3.1.13) stable; urgency=medium
+
+  * Sort user records by CA, so that matching DNs issued by different
+    CAs will always come in the same order, probably oldest first.
+
+ -- Zdenek Sustr <sustr4@cesnet.cz>  Thu 25 Apr 2019 16:41:28 +0200
+
 perun-slave-process-voms (3.1.12) stable; urgency=medium
 
   * Changed architecture to all
