@@ -98,7 +98,7 @@ sub getAllAccounts() {
 	my $currentLogin;     # current step in output parsing
 
 	# read versbose output of all accounts in zimbra
-	my @output = `sudo /opt/zimbra/bin/zmprov -l gaa -v vsup.cz`;
+	my @output = `sudo -u zimbra /opt/zimbra/bin/zmprov -l gaa -v vsup.cz`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
@@ -444,7 +444,7 @@ sub createAccount() {
 
 	my $account = shift;
 
-	my $output = `sudo /opt/zimbra/bin/zmprov ca '$account->{"MAILBOX"}' '' zimbraCOSid '$account->{"zimbraCOSId"}' givenName '$account->{"givenName"}' sn '$account->{"sn"}' displayName '$account->{"displayName"}'`;
+	my $output = `sudo -u zimbra /opt/zimbra/bin/zmprov ca '$account->{"MAILBOX"}' '' zimbraCOSid '$account->{"zimbraCOSId"}' givenName '$account->{"givenName"}' sn '$account->{"sn"}' displayName '$account->{"displayName"}'`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
@@ -473,7 +473,7 @@ sub updateAccount() {
 	my $attrName = shift;
 	my $value = shift || '';
 
-	my $output = `sudo /opt/zimbra/bin/zmprov ma '$account' $attrName '$value'`;
+	my $output = `sudo -u zimbra /opt/zimbra/bin/zmprov ma '$account' $attrName '$value'`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
@@ -499,7 +499,7 @@ sub addAlias() {
 	my $account = shift;
 	my $alias = shift;
 
-	my $output = `sudo /opt/zimbra/bin/zmprov aaa '$account' '$alias'`;
+	my $output = `sudo -u zimbra /opt/zimbra/bin/zmprov aaa '$account' '$alias'`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
@@ -529,7 +529,7 @@ sub removeAlias() {
 	my $account = shift;
 	my $alias = shift;
 
-	my $output = `sudo /opt/zimbra/bin/zmprov raa '$account' '$alias'`;
+	my $output = `sudo -u zimbra /opt/zimbra/bin/zmprov raa '$account' '$alias'`;
 	my $ret = $?; # get ret.code of backticks command
 	$ret = ($ret >> 8); # shift 8 bits to get original return code
 
