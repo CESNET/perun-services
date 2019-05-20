@@ -58,6 +58,14 @@ function process {
 		fi
 	fi
 
+	# set quotas
+	while IFS=`echo -e "\t"` read U_UID QUOTA_FS SOFT_QUOTA_DATA HARD_QUOTA_DATA SOFT_QUOTA_FILES HARD_QUOTA_FILES REST_OF_LINE; do
+		if [ "$QUOTA_ENABLED" -gt 0 ]; then
+			SET_QUOTA_PARAMS=`eval echo $SET_QUOTA_TEMPLATE`
+			catch_error E_CANNOT_SET_QUOTA $SET_QUOTA $SET_QUOTA_PARAMS
+		fi
+	done < "${QUOTAS_FILE}"
+
 	SKEL_DIR=
 	#find first path from $PERUN_SKEL_PATH which exists and is a directory
 	if [ -n "$PERUN_SKEL_PATH" ]; then
@@ -105,11 +113,4 @@ function process {
 		fi
 	done < "${FROM_PERUN}"
 
-	# set quotas
-	while IFS=`echo -e "\t"` read U_UID QUOTA_FS SOFT_QUOTA_DATA HARD_QUOTA_DATA SOFT_QUOTA_FILES HARD_QUOTA_FILES REST_OF_LINE; do
-		if [ "$QUOTA_ENABLED" -gt 0 ]; then
-			SET_QUOTA_PARAMS=`eval echo $SET_QUOTA_TEMPLATE`
-			catch_error E_CANNOT_SET_QUOTA $SET_QUOTA $SET_QUOTA_PARAMS
-		fi
-	done < "${QUOTAS_FILE}"
 }
