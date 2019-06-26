@@ -16,6 +16,7 @@ my $data = perunServicesInit::getDataWithGroups;
 
 #Constants
 our $A_R_VO_SHORT_NAME; *A_R_VO_SHORT_NAME =   \'urn:perun:resource:attribute-def:virt:voShortName';
+our $A_R_VOMS_VO_NAME;  *A_R_VOMS_VO_NAME =    \'urn:perun:resource:attribute-def:def:vomsVoName';
 our $A_USER_MAIL;       *A_USER_MAIL =         \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_CERT_DNS;   *A_USER_CERT_DNS =     \'urn:perun:user:attribute-def:virt:userCertDNs';
 our $A_USER_STATUS;     *A_USER_STATUS =       \'urn:perun:member:attribute-def:core:status';
@@ -32,9 +33,12 @@ my $uniquenessMapping = {};
 foreach my $resourceData ($data->getChildElements) {
 	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
 	#information about VO itself (shortname and roles for every user in vo from this resource)
-	my $voShortName = $resourceAttrs{$A_R_VO_SHORT_NAME};
+	#if attribute for voms name exists, use it, if not, use VO short name instead
+	my $vomsVoName = $resourceAttrs{$A_R_VOMS_VO_NAME};
+	unless($vomsVoName) { $vomsVoName = $resourceAttrs{$A_R_VO_SHORT_NAME}; }
+
 	#create info about existing vo (even if it is empty)
-	if(!defined($struc->{$voShortName})) { $struc->{$voShortName}->{'name'} = $voShortName; }
+	if(!defined($struc->{$vomsVoName})) { $struc->{$vomsVoName}->{'name'} = $vomsVoName; }
 	
 	my @rolesInVoForResource = ();
 	if(defined($resourceAttrs{$A_R_VOMS_ROLES})) { @rolesInVoForResource = @{$resourceAttrs{$A_R_VOMS_ROLES}} };
@@ -81,40 +85,40 @@ foreach my $resourceData ($data->getChildElements) {
 				}
 
 				#create new member if not exists in VO yet
-				if(!defined($struc->{$voShortName}->{'users'}->{$uniqueVomsUser})) {
-					$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'email'} = $email;
-					$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'roles'} = {};	
-					$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'groups'} = {};
-					if($voShortName eq 'auger' && defined($memberAttributes{$A_USER_NICKNAME})) {
-						$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'nickname'} = $memberAttributes{$A_USER_NICKNAME};
+				if(!defined($struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser})) {
+					$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'email'} = $email;
+					$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'roles'} = {};	
+					$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'groups'} = {};
+					if($vomsVoName eq 'auger' && defined($memberAttributes{$A_USER_NICKNAME})) {
+						$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'nickname'} = $memberAttributes{$A_USER_NICKNAME};
 					}
 				}
-				$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'CA'} = $CADN;
-				$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'DN'} = $subjectDNWithoutPrefix;
+				$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'CA'} = $CADN;
+				$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'DN'} = $subjectDNWithoutPrefix;
 				
 				#fill vo roles
 				foreach my $role (@rolesInVoForResource) {
-					$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'roles'}->{$role} = 1;
+					$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'roles'}->{$role} = 1;
 				}
 
 				#set it just for filled vomsGroupName (it can be null)
 				if(defined($vomsGroupName)) {
 					#fill groups
-					if(!defined($struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'groups'}->{$vomsGroupName})) {
-						$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'groups'}->{$vomsGroupName}->{'name'} = $vomsGroupName;
-						$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'groups'}->{$vomsGroupName}->{'roles'} = {};
+					if(!defined($struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'groups'}->{$vomsGroupName})) {
+						$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'groups'}->{$vomsGroupName}->{'name'} = $vomsGroupName;
+						$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'groups'}->{$vomsGroupName}->{'roles'} = {};
 					}
 
 
 					#fill group roles
 					foreach my $role (@rolesInVoForGroup) {
-						$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'groups'}->{$vomsGroupName}->{'roles'}->{$role} = 1;
+						$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'groups'}->{$vomsGroupName}->{'roles'}->{$role} = 1;
 					}
 				# if name is not filled set all these roles for vo instead of group
 				} else {
 					#fill vo roles defined by group without name
 					foreach my $role (@rolesInVoForGroup) {
-						$struc->{$voShortName}->{'users'}->{$uniqueVomsUser}->{'roles'}->{$role} = 1;
+						$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'roles'}->{$role} = 1;
 					}
 				}
 			}
