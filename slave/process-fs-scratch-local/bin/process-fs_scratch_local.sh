@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # List of logins who have to have directory in the /scratch
-PROTOCOL_VERSION='3.3.0'
+PROTOCOL_VERSION='3.4.0'
 
 
 function process {
@@ -29,7 +29,7 @@ function process {
 	fi
 
 	# lines contains login\tUID\tGID\t...
-	while IFS=`echo -e "\t"` read LOGIN U_UID U_GID SOFT_QUOTA_DATA HARD_QUOTA_DATA SOFT_QUOTA_FILES HARD_QUOTA_FILES; do
+	while IFS=`echo -e "\t"` read LOGIN U_UID U_GID; do
 		SCRATCH_DIR="${SCRATCH_MOUNTPOINT}/${LOGIN}"
 
 		if [ ! -d "${SCRATCH_DIR}" ]; then
