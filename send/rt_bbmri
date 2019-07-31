@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="rt_bbmri"
+
+. generic_send
