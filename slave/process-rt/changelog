@@ -1,5 +1,14 @@
+perun-slave-process-rt (3.1.2) stable; urgency=low
+
+  * Support changing of the output-file name. We are still using the same
+    directory '/tmp/' but the name of the file can be now changed by facility
+    attribute in Perun.
+  * protocol version was increased
+
+ -- Michal Stava <stavamichal@gmail.com>  Fri, 09 Aug 2019 08:49:00 +0200
+
 perun-slave-process-rt (3.1.1) stable; urgency=low
 
   * New package version for perun-slave-process-rt
 
- -- Michal Stava <stavamichal@gmail.com>  Wed, 31 Jul 2019 14:22:00 +0100
+ -- Michal Stava <stavamichal@gmail.com>  Wed, 31 Jul 2019 14:22:00 +0200
