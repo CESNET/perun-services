@@ -9,7 +9,7 @@ use utf8;
 binmode STDOUT, ":utf8";
 
 our $SERVICE_NAME = basename($0);
-our $PROTOCOL_VERSION = "3.0.0";
+our $PROTOCOL_VERSION = "3.1.0";
 my $SCRIPT_VERSION = "3.0.0";
 
 perunServicesInit::init;
@@ -27,6 +27,7 @@ our $A_USER_ORGANIZATION;       *A_USER_ORGANIZATION =         \'urn:perun:user:
 our $A_MEMBER_STATUS;           *A_MEMBER_STATUS =             \'urn:perun:member:attribute-def:core:status';
 our $A_RES_NAME;                *A_RES_NAME =                  \'urn:perun:resource:attribute-def:core:name';
 our $A_RES_RT_GROUP_NAME;       *A_RES_RT_GROUP_NAME =         \'urn:perun:resource:attribute-def:def:rtGroupName';
+our $A_FAC_OUTPUT_FILE_NAME;    *A_FAC_OUTPUT_FILE_NAME =      \'urn:perun:facility:attribute-def:def:rtOutputFileName';
 
 our $STATUS_VALID;              *STATUS_VALID =                \'VALID';
 
@@ -42,10 +43,14 @@ our $EINFRA_DOMAIN = '@einfra.cesnet.cz';
 our $META_DOMAIN   = '@meta.cesnet.cz';
 
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
+my $file_with_output_file_name = "$DIRECTORY/output_file_name";
 
 my $usersStructureByUserId = {};
 
 #####################################
+
+my %facilityAttributes = attributesToHash $data->getAttributes;
+my $output_file_name = $facilityAttributes{$A_FAC_OUTPUT_FILE_NAME} || 'rt-data';
 
 my @resourcesData = $data->getChildElements; 
 foreach my $rData (@resourcesData) {
@@ -97,7 +102,13 @@ foreach my $rData (@resourcesData) {
 	}
 }
 
-####### output file ######################
+####### FILE WITH NAME OF THE OUTPUT FILE ######
+open NAME_FILE,">$file_with_output_file_name" or die "Cannot open $file_with_output_file_name: $! \n";
+binmode NAME_FILE, ":utf8";
+print NAME_FILE $output_file_name;
+close(NAME_FILE);
+
+####### FILE WITH DATA FOR OUTPUT FILE ######
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 binmode SERVICE_FILE, ":utf8";
 
