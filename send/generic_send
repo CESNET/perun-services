@@ -22,6 +22,19 @@ DESTINATION_TYPE_EMAIL="email"
 DESTINATION_TYPE_HOST="host"
 DESTINATION_TYPE_USER_HOST="user@host"
 DESTINATION_TYPE_USER_HOST_PORT="user@host:port"
+DESTINATION_TYPE_USER_HOST_WINDOWS="user@host-windows"
+DESTINATION_TYPE_HOST_WINDOWS_PROXY="host-windows-proxy"
+
+#This function converts stdin based on DESTINATION_TYPE variable
+function destination_type_transformation {
+	if [ "$DESTINATION_TYPE" = "$DESTINATION_TYPE_HOST_WINDOWS_PROXY" ]; then
+		base64 | sed -e "\$s/\$/ $DESTINATION/g" #converts stdin to base64 and append single space and "$DESTINATION" at the end of it
+	elif [ "$DESTINATION_TYPE" = "$DESTINATION_TYPE_USER_HOST_WINDOWS" ]; then
+		base64 #converts stdin to base64
+	else
+		cat #just prints stdin to stdout for other destination types
+	fi
+}
 
 #if there is no destination type, use default 'host'
 if [ -z "$DESTINATION_TYPE" ]; then
@@ -42,6 +55,11 @@ fi
 #overriding of existing variables as TRANSPORT_COMMAND etc.
 if [ -f "/etc/perun/services/${SERVICE_NAME}/${SERVICE_NAME}.conf" ]; then
 	. "/etc/perun/services/${SERVICE_NAME}/${SERVICE_NAME}.conf"
+fi
+
+#load variables from generic_send configuration like WINDOWS_PROXY etc.
+if [ -f "/etc/perun/services/generic_send/generic_send.conf" ]; then
+	. "/etc/perun/services/generic_send/generic_send.conf"
 fi
 
 #use standard time and language settings (ASCII)
@@ -83,6 +101,14 @@ case $DESTINATION_TYPE in
 	${DESTINATION_TYPE_URL})
 		HOSTNAME="$DESTINATION"
 		HOST="$DESTINATION"
+		;;
+	${DESTINATION_TYPE_USER_HOST_WINDOWS})
+		HOST=`echo $DESTINATION | sed -e 's/:.*//'`
+		HOSTNAME=`echo $HOST | sed -e 's/^.*@//'`
+		;;
+	${DESTINATION_TYPE_HOST_WINDOWS_PROXY})
+		if [ -z "${WINDOWS_PROXY}" ]; then echo 'Variable WINDOWS_PROXY is not defined. It is usually defined in /etc/perun/services/generic_send/generic_send.conf.' >&2 ; exit 1; fi
+		HOST=`echo $WINDOWS_PROXY | sed -e 's/^.*@//'`
 		;;
 	${DESTINATION_TYPE_EMAIL})
 		echo "Destination type '$DESTINATION_TYPE' is not supported yet." >&2
@@ -131,9 +157,9 @@ fi
 
 if [ -d "$SERVICE_FILES_FOR_DESTINATION" ]
 then
-	tar $TAR_MODE -C "$SERVICE_FILES_FOR_DESTINATION" . -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
+	tar $TAR_MODE -C "$SERVICE_FILES_FOR_DESTINATION" . -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | destination_type_transformation | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
 else
-	tar $TAR_MODE -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
+	tar $TAR_MODE -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | destination_type_transformation | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
 fi
 
 ERR_CODE=$?
