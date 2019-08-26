@@ -137,28 +137,36 @@ sub getFacility {
 
 sub getHierarchicalData {
 	if(defined $local_data) { return $local_data; }
-	my $data = $servicesAgent->getHierarchicalData(service => $service->getId, facility => $facility->getId);
+	my $filterExpiredMembers = shift;
+	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
+	my $data = $servicesAgent->getHierarchicalData(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
 	logData $data, 'hierarchicalData';
 	return $data;
 }
 
 sub getFlatData {
 	if(defined $local_data) { return $local_data; }
-	my $data = $servicesAgent->getFlatData(service => $service->getId, facility => $facility->getId);
+	my $filterExpiredMembers = shift;
+	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
+	my $data = $servicesAgent->getFlatData(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
 	logData $data, 'flatData';
 	return $data;
 }
 
 sub getDataWithGroups {
 	if(defined $local_data) { return $local_data; }
-	my $data = $servicesAgent->getDataWithGroups(service => $service->getId, facility => $facility->getId);
+	my $filterExpiredMembers = shift;
+	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
+	my $data = $servicesAgent->getDataWithGroups(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
 	logData $data, 'dataWithGroups';
 	return $data;
 }
 
 sub getDataWithVos {
 	if(defined $local_data) { return $local_data; }
-	my $data = $servicesAgent->getDataWithVos(service => $service->getId, facility => $facility->getId);
+	my $filterExpiredMembers = shift;
+	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
+	my $data = $servicesAgent->getDataWithVos(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
 	logData $data, 'dataWithVos';
 	return $data;
 }
