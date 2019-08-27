@@ -5,6 +5,8 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 use Time::Piece;
+use MIME::Base64;
+use Encode;
 
 sub processMembers;
 sub processExtendedLicenses;
@@ -49,6 +51,7 @@ our $A_G_R_AD_EMAIL_ADDRESSES;  *A_G_R_AD_EMAIL_ADDRESSES = \'urn:perun:group_re
 # User/member attributes
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_U_CERTIFICATES;  *A_U_CERTIFICATES = \'urn:perun:user:attribute-def:virt:userCertificatesLimited';
 our $A_M_MAILS;  *A_M_MAILS = \'urn:perun:member:attribute-def:def:o365EmailAddresses:mu';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_M_G_O365_SEND_ON_BEHALF; *A_M_G_O365_SEND_ON_BEHALF = \'urn:perun:member_group:attribute-def:def:o365SendOnBehalf';
@@ -206,6 +209,8 @@ sub processMembers() {
 			$users->{$login}->{$A_LAST_NAME} = $memberAttributes{$A_LAST_NAME};
 			$users->{$login}->{$A_M_MAILS} = $memberAttributes{$A_M_MAILS};
 			$users->{$login}->{$A_U_F_O365_PREFERRED_LANGUAGE} = $memberAttributes{$A_U_F_O365_PREFERRED_LANGUAGE};
+			my @certificates = values %{$memberAttributes{$A_U_CERTIFICATES}};
+			$users->{$login}->{$A_U_CERTIFICATES} = \@certificates;
 
 		}
 	}
@@ -528,6 +533,16 @@ for my $login (@logins) {
 	print FILE "msDS-cloudExtensionAttribute3: TRUE\n";
 
 	print FILE "userAccountControl: $facilityAttributes{$A_F_UAC}\n";
+
+	# Encode each user certificate into base64 and print it to the file as userCertificate attribute
+	foreach my $certificate_pem (@{$users->{$login}->{$A_U_CERTIFICATES}}) {
+		print FILE "userCertificate:: ", encode_base64(Encode::encode_utf8($certificate_pem), ''), "\n";
+	}
+
+	# Encode each user certificate into base64 and print it to the file as userSMIMECertificate attribute
+	foreach my $certificate_pem (@{$users->{$login}->{$A_U_CERTIFICATES}}) {
+		print FILE "userSMIMECertificate:: ", encode_base64(Encode::encode_utf8($certificate_pem), ''), "\n";
+	}
 
 	# print classes
 	print FILE "objectclass: top\n";
