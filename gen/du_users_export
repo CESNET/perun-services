@@ -98,7 +98,10 @@ foreach my $rData (@resourcesData) {
 			#prepare shibboleth logins in required format
 			my @shibbolethLogins = ();
 			for my $idpIdentifier (keys %{$memberAttributes{$A_U_SHIBBOLETH_EXT_SOURCES}}) {
-				push @shibbolethLogins, { "src" => $idpIdentifier, 
+				#strip prefix from the identifier
+				my $idpIdentifierWithoutPrefix = $idpIdentifier;
+				$idpIdentifierWithoutPrefix =~ s/^\d+[:]//;
+				push @shibbolethLogins, { "src" => $idpIdentifierWithoutPrefix, 
 																	"id"  => $memberAttributes{$A_U_SHIBBOLETH_EXT_SOURCES}->{$idpIdentifier},
 																};
 			}			
@@ -128,7 +131,10 @@ foreach my $rData (@resourcesData) {
 
 					my @assocUserShibbolethLogins = ();
 					for my $idpIdentifier (keys %{$assocUserAttrs->{$A_U_SHIBBOLETH_EXT_SOURCES}}) {
-						push @assocUserShibbolethLogins, { "src" => $idpIdentifier, 
+						#strip prefix from the identifier
+						my $idpIdentifierWithoutPrefix = $idpIdentifier;
+						$idpIdentifierWithoutPrefix =~ s/^\d+[:]//;
+						push @assocUserShibbolethLogins, { "src" => $idpIdentifierWithoutPrefix, 
 						                                   "id"  => $assocUserAttrs->{$A_U_SHIBBOLETH_EXT_SOURCES}->{$idpIdentifier},
 						                                 };
 					}
@@ -276,7 +282,10 @@ for my $vo (keys %attributesByVo) {
 
 	my @shibbolethLogins = ();
 	for my $idpIdentifier (keys %{$adminAttributes->{$A_U_SHIBBOLETH_EXT_SOURCES}}) {
-		push @shibbolethLogins, { "src" => $idpIdentifier, 
+		#strip prefix from the identifier
+		my $idpIdentifierWithoutPrefix = $idpIdentifier;
+		$idpIdentifierWithoutPrefix =~ s/^\d+[:]//;
+		push @shibbolethLogins, { "src" => $idpIdentifierWithoutPrefix, 
 	                            "id"  => $adminAttributes->{$A_U_SHIBBOLETH_EXT_SOURCES}->{$idpIdentifier},
 	                          };
 	}
