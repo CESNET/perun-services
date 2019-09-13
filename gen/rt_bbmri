@@ -1,12 +1,81 @@
 #!/usr/bin/perl
-
 use strict;
 use warnings;
+use perunServicesInit;
+use perunServicesUtils;
 use File::Basename;
-use perunDataGenerator;
+use JSON::XS;
 
-local $::SERVICE_NAME = basename($0);
-local $::PROTOCOL_VERSION = "3.0.0";
+our $SERVICE_NAME = basename($0);
+our $PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.0.0";
 
-perunDataGenerator::generateUsersDataInJSON;
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHierarchicalData;
 
+#Constants
+our $A_USER_ID;                 *A_USER_ID =                   \'urn:perun:user:attribute-def:core:id';
+our $A_USER_LOGIN_BBMRI;        *A_USER_LOGIN_BBMRI =          \'urn:perun:user:attribute-def:def:login-namespace:bbmri';
+our $A_USER_PREFERRED_MAIL;     *A_USER_PREFERRED_MAIL =       \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_RT_PREF_MAIL;       *A_USER_RT_PREF_MAIL =         \'urn:perun:user:attribute-def:def:rtPreferredMail';
+our $A_USER_LAST_NAME;          *A_USER_LAST_NAME =            \'urn:perun:user:attribute-def:core:lastName';
+our $A_RES_NAME;                *A_RES_NAME =                  \'urn:perun:resource:attribute-def:core:name';
+our $A_RES_RT_GROUP_NAME;       *A_RES_RT_GROUP_NAME =         \'urn:perun:resource:attribute-def:def:rtGroupName';
+our $A_FAC_OUTPUT_FILE_NAME;    *A_FAC_OUTPUT_FILE_NAME =      \'urn:perun:facility:attribute-def:def:rtOutputFileName';
+
+#Headers
+our $LOGIN_HEADER = 'login';
+our $PREF_MAIL_HEADER = 'preferredMail';
+our $LAST_NAME_HEADER = 'lastName';
+our $GROUPS_IN_RT_HEADER = 'groupsInRT';
+
+my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
+my $file_with_output_file_name = "$DIRECTORY/output_file_name";
+
+my $usersStructureByUserId = {};
+
+#####################################
+
+my %facilityAttributes = attributesToHash $data->getAttributes;
+my $output_file_name = $facilityAttributes{$A_FAC_OUTPUT_FILE_NAME} || 'rt-bbmri-data';
+
+my @resourcesData = $data->getChildElements; 
+foreach my $rData (@resourcesData) {
+	my %resourceAttributes  = attributesToHash $rData->getAttributes;
+	
+	my $rtGroupName = $resourceAttributes{$A_RES_RT_GROUP_NAME} || $resourceAttributes{$A_RES_NAME} ;
+
+	my @membersData = $rData->getChildElements;
+	foreach my $memberAttributes (dataToAttributesHashes @membersData) {
+
+		my $userId = $memberAttributes->{$A_USER_ID};
+		unless(defined $usersStructureByUserId->{$userId}) {
+			my $login = $memberAttributes->{$A_USER_LOGIN_BBMRI};
+			my $userPrefMail = $memberAttributes->{$A_USER_RT_PREF_MAIL} || $memberAttributes->{$A_USER_PREFERRED_MAIL};
+			my $lastName = $memberAttributes->{$A_USER_LAST_NAME};
+
+			$usersStructureByUserId->{$userId}->{$PREF_MAIL_HEADER} = $userPrefMail;
+			$usersStructureByUserId->{$userId}->{$LAST_NAME_HEADER} = $lastName;
+			$usersStructureByUserId->{$userId}->{$LOGIN_HEADER} = $login;
+			$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER} = ();
+		}
+		
+		my @listOfRTGroups = uniqList((@{$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER}},  $rtGroupName));
+		$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER} = \@listOfRTGroups;
+	}
+}
+
+####### FILE WITH NAME OF THE OUTPUT FILE ######
+open NAME_FILE,">$file_with_output_file_name" or die "Cannot open $file_with_output_file_name: $! \n";
+binmode NAME_FILE, ":utf8";
+print NAME_FILE $output_file_name;
+close(NAME_FILE);
+
+my @users = values %$usersStructureByUserId;
+####### FILE WITH JSON DATA FOR OUTPUT FILE ######
+open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
+print SERVICE_FILE JSON::XS->new->utf8->pretty->encode(\@users);
+close(SERVICE_FILE) or die "Cannot close $service_file_name: $! \n";
+
+perunServicesInit::finalize;
