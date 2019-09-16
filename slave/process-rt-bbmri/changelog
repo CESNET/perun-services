@@ -1,3 +1,16 @@
+perun-slave-process-rt-bbmri (3.1.2) stable; urgency=high
+
+  * Change of data format. It is still JSON but entities has name without the
+    base part "urn:perun..." and there can be other entities than just user or
+    user-facility
+  * new attribute in json: groupsInRT (list of all resources, where user is
+    assigned in by any of his groups)
+  * the output file name can be now changed by the facility attribute
+    "rtOutputFileName" in Perun
+  * Protocol version was increased
+
+ -- Michal Stava <stavamichal@gmail.com>  Fri, 13 Sep 2019 12:45:00 +0200
+
 perun-slave-process-rt-bbmri (3.1.1) stable; urgency=low
 
   * New package version for perun-slave-process-rt-bbmri
