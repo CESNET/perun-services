@@ -20,6 +20,7 @@ our $A_USER_LOGIN_BBMRI;        *A_USER_LOGIN_BBMRI =          \'urn:perun:user:
 our $A_USER_PREFERRED_MAIL;     *A_USER_PREFERRED_MAIL =       \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_RT_PREF_MAIL;       *A_USER_RT_PREF_MAIL =         \'urn:perun:user:attribute-def:def:rtPreferredMail';
 our $A_USER_LAST_NAME;          *A_USER_LAST_NAME =            \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_ORGANIZATION;       *A_USER_ORGANIZATION =         \'urn:perun:user:attribute-def:def:organization';
 our $A_RES_NAME;                *A_RES_NAME =                  \'urn:perun:resource:attribute-def:core:name';
 our $A_RES_RT_GROUP_NAME;       *A_RES_RT_GROUP_NAME =         \'urn:perun:resource:attribute-def:def:rtGroupName';
 our $A_FAC_OUTPUT_FILE_NAME;    *A_FAC_OUTPUT_FILE_NAME =      \'urn:perun:facility:attribute-def:def:rtOutputFileName';
@@ -28,6 +29,7 @@ our $A_FAC_OUTPUT_FILE_NAME;    *A_FAC_OUTPUT_FILE_NAME =      \'urn:perun:facil
 our $LOGIN_HEADER = 'login';
 our $PREF_MAIL_HEADER = 'preferredMail';
 our $LAST_NAME_HEADER = 'lastName';
+our $ORGANIZATION_HEADER = 'organization';
 our $GROUPS_IN_RT_HEADER = 'groupsInRT';
 
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
@@ -54,10 +56,12 @@ foreach my $rData (@resourcesData) {
 			my $login = $memberAttributes->{$A_USER_LOGIN_BBMRI};
 			my $userPrefMail = $memberAttributes->{$A_USER_RT_PREF_MAIL} || $memberAttributes->{$A_USER_PREFERRED_MAIL};
 			my $lastName = $memberAttributes->{$A_USER_LAST_NAME};
+			my $organization = $memberAttributes->{$A_USER_ORGANIZATION};
 
 			$usersStructureByUserId->{$userId}->{$PREF_MAIL_HEADER} = $userPrefMail;
 			$usersStructureByUserId->{$userId}->{$LAST_NAME_HEADER} = $lastName;
 			$usersStructureByUserId->{$userId}->{$LOGIN_HEADER} = $login;
+			$usersStructureByUserId->{$userId}->{$ORGANIZATION_HEADER} = $organization;
 			$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER} = ();
 		}
 		
