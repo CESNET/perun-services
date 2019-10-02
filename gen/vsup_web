@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_web";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.6";
+my $SCRIPT_VERSION = "3.0.7";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -31,6 +31,7 @@ our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMa
 our $A_EMAIL_PRIV_KOS;  *A_EMAIL_PRIV_KOS = \'urn:perun:user:attribute-def:opt:privateMailKos';
 our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
 our $A_FOTO;  *A_FOTO = \'urn:perun:user:attribute-def:def:cardPhoto';
+our $A_EXCLUDED; *A_EXCLUDED = \'urn:perun:user:attribute-def:def:webExclude';
 
 our $A_STUDY_ID;  *A_STUDY_ID = \'urn:perun:user:attribute-def:def:studyId';
 our $A_STUDY_SINCE;  *A_STUDY_SINCE = \'urn:perun:user:attribute-def:def:studySince';
@@ -92,6 +93,11 @@ foreach my $rData ($data->getChildElements) {
 		foreach my $member (@membersData) {
 
 			my %uAttributes = attributesToHash $member->getAttributes;
+
+			if ($uAttributes{$A_EXCLUDED}) {
+				# skip users, which shouldn't be displayed on the web
+				next;
+			}
 
 			my $uco = $uAttributes{$A_UCO};
 			$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
