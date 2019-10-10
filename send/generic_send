@@ -49,7 +49,13 @@ else
 	if [ -r "${PERUN_CERT}" -a -r "${PERUN_KEY}" ]; then
 		PERUN_CERT_SETTING="--cert ${PERUN_CERT} --key ${PERUN_KEY}"
 	fi
-	TRANSPORT_COMMAND="curl ${PERUN_CERT_SETTING} -i -H Content-Type:application/x-tar -f -X PUT --data-binary @- "
+	TMPFILE=`mktemp /tmp/perun-generic-send-script.XXXXXX`
+	if [ $? -ne 0 ]; then
+		echo "Can't create TMPFILE /tmp/perun-generic-send-script.XXXXXX" >&2
+		exit 255
+	fi
+	trap 'rm -r -f "$TMPFILE"' EXIT
+	TRANSPORT_COMMAND="curl ${PERUN_CERT_SETTING} -i -H Content-Type:application/x-tar -w %{http_code} --silent -o $TMPFILE -X PUT --data-binary @- "
 fi
 
 #overriding of existing variables as TRANSPORT_COMMAND etc.
@@ -130,7 +136,7 @@ if [ $? -ne 0 ]; then
 	exit 255
 fi
 
-trap 'rm -r -f "$TMP_HOSTNAME_DIR"' EXIT
+trap 'rm -r -f "$TMP_HOSTNAME_DIR" "$TMPFILE"' EXIT
 
 echo $HOSTNAME > "$TMP_HOSTNAME_DIR/HOSTNAME"
 if [ $? -ne 0 ]; then
@@ -157,9 +163,9 @@ fi
 
 if [ -d "$SERVICE_FILES_FOR_DESTINATION" ]
 then
-	tar $TAR_MODE -C "$SERVICE_FILES_FOR_DESTINATION" . -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | destination_type_transformation | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
+	STDOUT=`tar $TAR_MODE -C "$SERVICE_FILES_FOR_DESTINATION" . -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | destination_type_transformation | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND`
 else
-	tar $TAR_MODE -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | destination_type_transformation | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
+	STDOUT=`tar $TAR_MODE -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | destination_type_transformation | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND`
 fi
 
 ERR_CODE=$?
@@ -168,6 +174,19 @@ ERR_CODE=$?
 if [ $ERR_CODE -eq 124 ]; then
 	echo "Communication with slave script was timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
 else
+	if [ "$DESTINATION_TYPE" = "$DESTINATION_TYPE_URL" ]; then
+		#the return code from curl is saved in STDOUT
+		if [ 200 -ne "$STDOUT" ]; then
+			ERR_CODE=$STDOUT
+			cat "$TMPFILE" >&2
+		else
+			ERR_CODE=0
+			cat "$TMPFILE"
+		fi
+	else
+		#if this is not url destination, than we need to print stdout from slave script
+		echo "$STDOUT"
+	fi
 	echo "Communication with slave script ends with return code: $ERR_CODE" >&2
 fi
 
