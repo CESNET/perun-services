@@ -16,6 +16,8 @@ KEYTAB=/etc/krb5.keytab
 NAME=perun-propagate
 DESC="Perun propagation"
 PERUN_SERVER='perun.ics.muni.cz'
+#Default options for perun propagate scipt are empty, they can be set in script defaults
+OPTIONS=""
 #Timeout in seconds
 TIMEOUT=120
 LOG=/var/log/$NAME
@@ -98,7 +100,7 @@ perun_propagate_start() {
 		fi
 		TMP_ERROR=`mktemp --tmpdir=/tmp/ perun-propagate.XXXXXXXXX`
 		add_on_exit "rm -f ${TMP_ERROR}"
-		remctl "${PERUN_SERVER}" perun propagate 2>&1 | tee ${TMP_ERROR} | sed "s;^;$LINE:;" | ts >> ${LOG} &
+		remctl "${PERUN_SERVER}" perun propagate "${OPTIONS}" 2>&1 | tee ${TMP_ERROR} | sed "s;^;$LINE:;" | ts >> ${LOG} &
 		PID=$!
 		PID_ARRAY[$ITERATOR]=$PID
 		TMP_ERROR_ARRAY[$ITERATOR]=$TMP_ERROR
