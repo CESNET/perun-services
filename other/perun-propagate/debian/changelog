@@ -1,3 +1,15 @@
+perun-propagate (3.0.6) stable; urgency=low
+
+  * add two new options for perun_propagate script, both are optional
+  * first option is "-n" or "--notPropagate" which will skip all
+    propagations if needed for any reason
+  * second option is "-u" or "--unblockDestinations" which will unblock all
+    services for server destination
+  * options can be set by using variable OPTIONS="" in
+    /etc/default/perun_propagate file for every affected server
+
+ -- Michal Stava <stavamichal@gmail.com>  Wed, 16 Oct 2019 14:40:00 +0200
+
 perun-propagate (3.0.5) stable; urgency=low
 
   * add perun_propagate while instalation to initialization after system
