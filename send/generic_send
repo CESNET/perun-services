@@ -55,7 +55,7 @@ else
 		exit 255
 	fi
 	trap 'rm -r -f "$TMPFILE"' EXIT
-	TRANSPORT_COMMAND="curl ${PERUN_CERT_SETTING} -i -H Content-Type:application/x-tar -w %{http_code} --silent -o $TMPFILE -X PUT --data-binary @- "
+	TRANSPORT_COMMAND="curl ${PERUN_CERT_SETTING} -i -H Content-Type:application/x-tar -w %{http_code} --show-error --silent -o $TMPFILE -X PUT --data-binary @- "
 fi
 
 #overriding of existing variables as TRANSPORT_COMMAND etc.
@@ -170,23 +170,33 @@ fi
 
 ERR_CODE=$?
 
-#Error code 124 means - timeouted
 if [ $ERR_CODE -eq 124 ]; then
+	#Special situation when error code 124 has been thrown. That means - timeouted and terminated from our side
+	echo "$STDOUT"
 	echo "Communication with slave script was timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
 else
+	#In all other cases we need to resolve if 'ssh' or 'curl' was used
 	if [ "$DESTINATION_TYPE" = "$DESTINATION_TYPE_URL" ]; then
-		#the return code from curl is saved in STDOUT
-		if [ 200 -ne "$STDOUT" ]; then
-			ERR_CODE=$STDOUT
-			cat "$TMPFILE" >&2
-		else
-			ERR_CODE=0
-			cat "$TMPFILE"
+		#In this situation 'curl' was used
+		if [ $ERR_CODE -eq "0" ]; then 
+			#Check if curl ended without an error (ERR_CODE = 0) (if not, we can continue as usual, because there is an error on STDERR)
+			if [ 200 -ne "$STDOUT" ]; then
+				#Check if HTTP_CODE is different from OK (200)
+				#If yes, then we will use HTTP_CODE as ERROR_CODE which is always non-zero
+				ERR_CODE=$STDOUT
+				cat "$TMPFILE" >&2
+			else
+				#If HTTP_CODE is 200, then call was successful and result call can be printed with info
+				#Result call is saved in $TMPFILE
+				ERR_CODE=0
+				cat "$TMPFILE"
+			fi
 		fi
 	else
-		#if this is not url destination, than we need to print stdout from slave script
+		#In this situation 'ssh' was used, STDOUT has to be printed
 		echo "$STDOUT"
 	fi
+	#For all situations different from timouted by our side we can return value from ERR_CODE as the result
 	echo "Communication with slave script ends with return code: $ERR_CODE" >&2
 fi
 
