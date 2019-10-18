@@ -1,3 +1,9 @@
+perun-slave-full (3.1.7) stable; urgency=medium
+
+  * new services
+
+ -- Martin Kuba <makub@ics.muni.cz>  Mon, 16 Sep 2019 14:26:25 +0200
+
 perun-slave-full (3.1.6) stable; urgency=medium
 
   * added new services affiliation-mapping, affiliation-mapping-mu

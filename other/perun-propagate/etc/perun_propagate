@@ -15,7 +15,7 @@
 KEYTAB=/etc/krb5.keytab
 NAME=perun-propagate
 DESC="Perun propagation"
-PERUN_SERVER='perun.ics.muni.cz'
+PERUN_SERVER='perun.cesnet.cz'
 #Default options for perun propagate scipt are empty, they can be set in script defaults
 OPTIONS=""
 #Timeout in seconds
