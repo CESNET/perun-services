@@ -43,7 +43,7 @@ fi
 
 #choose transport command, only url type has different transport command at this moment
 if [ "$DESTINATION_TYPE" != "$DESTINATION_TYPE_URL" ]; then
-	TRANSPORT_COMMAND="ssh -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5  -i $KEY_PATH"
+	TRANSPORT_COMMAND="ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5  -i $KEY_PATH"
 else
 	#add certificate to the curl if cert file and key file exists and they are readable
 	if [ -r "${PERUN_CERT}" -a -r "${PERUN_KEY}" ]; then
