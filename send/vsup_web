@@ -529,6 +529,39 @@ foreach my $NS_KOD (sort keys %$dataByNs) {
 
 }
 
+#
+# CLEAR all data for People removed from the WEB
+#
+my $deletedUsers = 0;
+my $ary_ref_users = $dbh->selectcol_arrayref(qq{select distinct UCO from $tableName where UCO is not null});
+my @web_ucos = @$ary_ref_users;
+my $deleteUser = $dbh->prepare(qq{DELETE from $tableName where UCO=?});
+my $deleteCao = $dbh->prepare(qq{DELETE from $tableName_cao WHERE UCO=?});
+my $deletePass = $dbh->prepare(qq{DELETE from $tableName_pass WHERE UCO=?});
+my $deleteExt = $dbh->prepare(qq{DELETE from $tableName_ext WHERE UCO=?});
+my $deleteNs = $dbh->prepare(qq{DELETE from $tableName_ns WHERE UCO=?});
+my $deleteDC2 = $dbh->prepare(qq{DELETE from DC22WEB_VZTAHY WHERE UCO=?});
+my $deleteKOS = $dbh->prepare(qq{DELETE from KOS2WEB_VZTAHY WHERE UCO=?});
+
+foreach my $uco (@web_ucos) {
+	unless (exists $dataByUco->{$uco}) {
+		if($DEBUG == 1) {
+			print "DELETE UCO: $uco (including all relations etc.)\n";
+		}
+		# delete all relations
+		$deleteCao->execute($uco);
+		$deleteExt->execute($uco);
+		$deletePass->execute($uco);
+		$deleteNs->execute($uco);
+		$deleteDC2->execute($uco);
+		$deleteKOS->execute($uco);
+		$deleteUser->execute($uco);
+
+		$deletedUsers++;
+
+	}
+}
+
 commit $dbh;
 $dbh->disconnect();
 
@@ -555,6 +588,8 @@ print "Deleted PASS completely:\t$deletedPass (rows)\n";
 print "---------------------------------------\n";
 print "Inserted NS:\t$inserted_NS (new rows)\n";
 print "Deleted NS:\t$deleted_NS (old rows)\n";
+print "---------------------------------------\n";
+print "Deleted users:\t$deletedUsers\n";
 print "=======================================\n";
 
 $lock->unlock();
