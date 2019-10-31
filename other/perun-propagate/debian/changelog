@@ -7,6 +7,7 @@ perun-propagate (3.0.6) stable; urgency=low
     services for server destination
   * options can be set by using variable OPTIONS="" in
     /etc/default/perun_propagate file for every affected server
+  * address of server was changed from perun.ics.muni.cz to perun.cesnet.cz
 
  -- Michal Stava <stavamichal@gmail.com>  Wed, 16 Oct 2019 14:40:00 +0200
 
