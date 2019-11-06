@@ -40,7 +40,7 @@ if($pbsServer ne perunServicesInit::getFacility->getName) {
 	my $pbsServerFacility;
 	$pbsServerFacility = $facilitiesAgent->getFacilityByName(name => $pbsServer);
 
-	$agent->getGeneralServicesAgent->planServicePropagation(service => $service->getId, facility => $pbsServerFacility->getId);
+	$servicesAgent->planServicePropagation(service => $service->getId, facility => $pbsServerFacility->getId);
 	exit 0;
 }
 

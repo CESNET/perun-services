@@ -20,6 +20,6 @@ my $servicesAgent = $agent->getServicesAgent;
 # We expect it's on the same facility.
 
 my $service = $servicesAgent->getServiceByName(name => 'vsup_zimbra');
-$agent->getGeneralServicesAgent->planServicePropagation(service => $service->getId, facility => perunServicesInit->getFacility->getId);
+$servicesAgent->planServicePropagation(service => $service->getId, facility => perunServicesInit->getFacility->getId);
 
 perunServicesInit::finalize;
