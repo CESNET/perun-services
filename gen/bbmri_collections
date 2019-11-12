@@ -31,6 +31,7 @@ our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:
 our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_EPPNS;                *A_USER_EPPNS =            \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 our $A_USER_D_NAME;               *A_USER_D_NAME =           \'urn:perun:user:attribute-def:core:displayName';
+our $A_USER_ORGANIZATION;         *A_USER_ORGANIZATION =     \'urn:perun:user:attribute-def:def:organization';
 our $A_GROUP_ID;                  *A_GROUP_ID =              \'urn:perun:group:attribute-def:core:id';
 our $A_GROUP_NAME;                *A_GROUP_NAME =            \'urn:perun:group:attribute-def:core:name';
 our $A_COLLECTION_ID;             *A_COLLECTION_ID =         \'urn:perun:group:attribute-def:def:collectionID';
@@ -45,6 +46,7 @@ our $u_status = {};
 our $u_email = {};
 our $u_name = {};
 our $u_eppn = {};
+our $u_organization = {};
 
 our $groupStruc = {};
 our $g_name = {};
@@ -72,7 +74,8 @@ foreach my $uid (sort keys %$userStruc) {
 	$user->{"displayName"} = $userStruc->{$uid}->{$u_name};
 	$user->{"status"} = $userStruc->{$uid}->{$u_status};
 	$user->{"mail"} = $userStruc->{$uid}->{$u_email};
-	$user->{"identities"} = $userStruc->{$uid}->{$u_eppn}; 
+	$user->{"identities"} = $userStruc->{$uid}->{$u_eppn};
+	$user->{"organization"} = $userStruc->{$uid}->{$u_organization};
 
 	push @users, $user;
 }
@@ -125,6 +128,7 @@ sub processUsers {
 	my $status = $memberAttributes{$A_USER_STATUS};
 	my $email = $memberAttributes{$A_USER_EMAIL};
 	my $d_name = $memberAttributes{$A_USER_D_NAME};
+	my $organization = $memberAttributes{$A_USER_ORGANIZATION};
 
 	# Select right eppn from the list of eppns, TEMPORARLY get google one, then we will use elixir
 	my @eppns = @{$memberAttributes{$A_USER_EPPNS}};
@@ -148,6 +152,7 @@ sub processUsers {
 		$userStruc->{$uid}->{$u_email} = $email;
 		$userStruc->{$uid}->{$u_name} = $d_name;
 		$userStruc->{$uid}->{$u_eppn} = \@eppns;
+		$userStruc->{$uid}->{$u_organization} = $organization;
 	}
 
 	processMemberships $gid, $uid;
