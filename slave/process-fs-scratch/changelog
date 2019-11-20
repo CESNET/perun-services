@@ -1,3 +1,11 @@
+perun-slave-process-fs-scratch (3.1.7) stable; urgency=low
+
+  * Remove quotas from slave script. This part of service fs-scratch 
+    is not used correctly and will be reworked in the future.
+  * Protocol version was increased because input data were changed.
+
+ -- Michal Stava <Michal.Stava@cesnet.cz>  Tue, 02 Jul 2019 15:35:00 +0200
+
 perun-slave-process-fs-scratch (3.1.6) stable; urgency=medium
 
   * Changed architecture to all
