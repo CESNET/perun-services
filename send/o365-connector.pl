@@ -146,7 +146,7 @@ SetGroup mandatory options:
  --contacts    | -t list of contacts to be able to send email as group
 SetResourceMail mandatory options:
  --alias                | -A text alias
- --emails               | -B list of emails space separated
+ --resEmails            | -B list of resource emails space separated
  --displayName          | -C text display name
  --type                 | -D text type
 SetResourceMail optional options:
@@ -202,7 +202,7 @@ GetOptions("help|h"	=> sub {
 	"emails|e=s"                 => \$argEmailAddresses,
 	'contacts|t=s@{1,}'          => \@argContacts,
 	"alias|A=s"                  => \$argResAlias,
-	'emails|B=s@{1,}'            => \@argResEmails,
+	'resEmails|B=s@{1,}'         => \@argResEmails,
 	"displayName|C=s"            => \$argResDisplayName,
 	"type|D=s"                   => \$argResType,
 	"capacity|E=i"               => \$argResCapacity,
