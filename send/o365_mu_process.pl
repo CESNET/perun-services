@@ -175,13 +175,6 @@ if(@$err) {
 my $lastStateOfUsersFilename = $cacheDir . "o365_mu-users";
 my $lastStateOfGroupsFilename = $cacheDir . "o365_mu-groups";
 
-#file with active users need to exists
-my $pathToActiveUsersFile = $basicCacheDir . "activeO365Users";
-if(! -f $pathToActiveUsersFile) {
-	print "ERORR - Missing file with list of active o365 users.\n";
-	exit 17;
-}
-
 #read data from files and convert them to the hash structure in perl
 #read new data about users from PERUN
 my $newUsersStruc = readDataAboutUsers $usersDataFilename;
@@ -191,9 +184,6 @@ my $newGroupsStruc = readDataAboutGroups $groupsDataFilename;
 
 #read new data about resource mails from PERUN
 my $newResourceMailsStruc = readDataAboutResourceMails $resourceMailsDataFilename;
-
-#Read active users from file
-my $activeUsers = readDataAboutActiveUsers $pathToActiveUsersFile;
 
 #Read data (cache) about last state of users
 my $lastUsersStruc = {};
@@ -226,8 +216,6 @@ startThreads;
 foreach my $key (keys %$newUsersStruc) {
 	my $newUser = $newUsersStruc->{$key};
 	my $oldUser = $lastUsersStruc->{$key};
-	#if user is not active in AD, skip him
-	unless($activeUsers->{$key}) { next; }
 
 	my $job;
 	unless($oldUser) {
@@ -253,10 +241,6 @@ foreach my $key (keys %$newGroupsStruc) {
 	my $newGroup = $newGroupsStruc->{$key};
 	my $oldGroup = $lastGroupsStruc->{$key};
 	
-	#remove not active users from sendAs of the new group
-	$newGroup->{$SEND_AS_TEXT} = [ grep { $activeUsers->{$_}  }  @{$newGroup->{$SEND_AS_TEXT}} ];
-	$newGroup->{$PLAIN_TEXT_OBJECT_TEXT} = $key . "\t" . join " ", @{$newGroup->{$SEND_AS_TEXT}};
-
 	my $job;
 	unless($oldGroup) {
 		#group is new, add it
@@ -568,28 +552,6 @@ sub readDataAboutUsers {
 	close FILE or die "Could not close file $pathToFile: $!\n";
 
 	return $usersStruc;
-}
-
-#Sub to read data about active users from file and convert it to perl hash
-sub readDataAboutActiveUsers {
-	my $pathToFile = shift;
-
-	my $activeUsersStruc = {};
-	open FILE, $pathToFile or die "Could not open file with active users $pathToFile: $!\n";
-	while(my $line = <FILE>) {
-		chomp( $line );
-		#If ID is from any reason empty, set global return code to 1 and skip this user
-		unless($line) { 
-			print "ERROR - Can't find ID of active user in $pathToFile for line '$line'\n";
-			$returnCode = 1;
-			next;
-		}
-		my $id = $line . "@" . $domain;
-		$activeUsersStruc->{$id} = 1;
-	}
-	close FILE or die "Could not close file $pathToFile: $!\n";
-
-	return $activeUsersStruc;
 }
 
 #Sub to read data about groups from file and convert it to perl hash

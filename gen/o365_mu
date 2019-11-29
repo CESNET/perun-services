@@ -31,7 +31,7 @@ my $data      = perunServicesInit::getDataWithGroups;
 our $A_GR_AD_NAME;                           *A_GR_AD_NAME =                           \'urn:perun:group_resource:attribute-def:def:adName';
 our $A_F_DOMAIN_NAME;                        *A_F_DOMAIN_NAME =                        \'urn:perun:facility:attribute-def:def:o365DomainName';
 our $A_MR_O365_SEND_AS;                      *A_MR_O365_SEND_AS =                      \'urn:perun:member_group:attribute-def:def:o365SendAs';
-our $A_M_O365_MAIL_ADDRS;                    *A_M_O365_MAIL_ADDRS =                    \'urn:perun:member:attribute-def:def:o365EmailAddresses:mu';
+our $A_U_O365_MAIL_ADDRS;                    *A_U_O365_MAIL_ADDRS =                    \'urn:perun:user:attribute-def:def:o365EmailAddresses:mu';
 our $A_UF_DISABLE_MAIL_FORWARD;              *A_UF_DISABLE_MAIL_FORWARD =              \'urn:perun:user_facility:attribute-def:def:disableO365MailForward';
 our $A_UF_LOGIN;                             *A_UF_LOGIN =                             \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_UF_O365_MAIL_FORWARD;                 *A_UF_O365_MAIL_FORWARD =                 \'urn:perun:user_facility:attribute-def:def:o365MailForward';
@@ -176,7 +176,7 @@ sub processResource {
 	foreach my $member (($resourceData->getChildElements)[1]->getChildElements) {
 		processResourceMember $member;
 	}
-	
+
 	#if resource mail name exists, process it as resource mail (resource-mails data)
 	if($resName) {
 		#prevent duplicity in resource name
@@ -198,7 +198,7 @@ sub processResource {
 # process data about resource mailing list
 sub processResourceMail {
 	my $resourceData = shift;
-	
+
 	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
 	my $resName = $resourceAttributes{$A_R_O365_RES_NAME};
 
@@ -231,17 +231,17 @@ sub processResourceMail {
 	my @resBookInPolicy = ();
 	my @resReqInPolicy = ();
 	my @resReqOutOfPolicy = ();
-	
+
 	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
 		my %groupAttributes = attributesToHash $groupData->getAttributes;
-			
+
 		my $onResourceBookInPolicy = $groupAttributes{$A_GR_O365_RES_BOOK_IN_POLICY};
 		my $onResourceRequestInPolicy = $groupAttributes{$A_GR_O365_RES_REQUEST_IN_POLICY};
 		my $onResourceRequestOutOfPolicy = $groupAttributes{$A_GR_O365_RES_REQUEST_OUT_OF_POLICY};
-		my $onResourceDelegates = $groupAttributes{$A_GR_O365_RES_DELEGATES};	
+		my $onResourceDelegates = $groupAttributes{$A_GR_O365_RES_DELEGATES};
 
 		foreach my $memberData(($groupData->getChildElements)[1]->getChildElements) {
-			my %memberAttributes = attributesToHash $memberData->getAttributes;                                                                                                                 
+			my %memberAttributes = attributesToHash $memberData->getAttributes;
 			my $UCO = $memberAttributes{$A_UF_LOGIN};
 			my $UPN = $users->{$UCO}->{$UPN_TEXT};
 
@@ -268,7 +268,7 @@ sub processResourceMember {
 		my $UCO = $memberAttributes{$A_UF_LOGIN};
 		my $disableForward = $memberAttributes{$A_UF_DISABLE_MAIL_FORWARD};
 		my $licence = $memberAttributes{$A_UF_O365_LICENCE};
-		
+
 		#if member has no licence, skip him
 		unless($licence) {
 			$skippedUsers->{$UCO} = 1;
@@ -281,8 +281,10 @@ sub processResourceMember {
 		my $archive = $memberAttributes{$A_UF_O365_ARCHIVE};
 		my $storeAndForward = $memberAttributes{$A_UF_O365_STORE_AND_FORWARD};
 		my @emailsArray = ();
-		if(defined($memberAttributes{$A_M_O365_MAIL_ADDRS})) {
-			@emailsArray = @{$memberAttributes{$A_M_O365_MAIL_ADDRS}};
+		if(defined($memberAttributes{$A_U_O365_MAIL_ADDRS})) {
+			@emailsArray = @{$memberAttributes{$A_U_O365_MAIL_ADDRS}};
+		} else {
+			warn "Can't find emails for user with UCO: $UCO \n";
 		}
 		my $emailsString = join(',', sort @emailsArray);
 
@@ -291,7 +293,7 @@ sub processResourceMember {
 			$users->{$UCO}->{$MAIL_FORWARD_TEXT} = $mailForward ? $mailForward : "";
 			$users->{$UCO}->{$ARCHIVE_TEXT} = $archive ? "1" : "0";
 			$users->{$UCO}->{$STORE_AND_FORWARD_TEXT} = $storeAndForward ? "1" : "0";
-			$users->{$UCO}->{$EMAIL_ADDRESSES} = $emailsString ? $emailsString : "";
+			$users->{$UCO}->{$EMAIL_ADDRESSES} = $emailsString;
 		}
 }
 
@@ -302,7 +304,7 @@ sub processGroup {
 
 	my %groupAttributes = attributesToHash $groupData->getAttributes;
 	my $groupADName = $groupAttributes{$A_GR_AD_NAME};
-	
+
 	if($groupADName) {
 		#all groups for mu should have specific part of name
 		my $groupADName = $groupAttributes{$A_GR_AD_NAME} . '_group.muni.cz';
@@ -360,7 +362,7 @@ sub saveGroupsToFile {
 
 	open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
 	binmode FILE, ":utf8";
-	
+
 	foreach my $adName (sort keys %$groupsData) {
 		my $contacts = join " ", sort keys %{$groupsData->{$adName}};
 		unless($contacts) { $contacts = ""; }
@@ -390,7 +392,7 @@ sub saveResourceMailsToFile {
 
 	open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
 	binmode FILE, ":utf8";
-	
+
 	foreach my $resourceMailName (sort keys %$resourceMailsData) {
 		print FILE $resourceMailsData->{$resourceMailName}->{$RES_NAME_TEXT} . "\t";
 		print FILE $resourceMailsData->{$resourceMailName}->{$RES_ALIAS_TEXT} . "\t";
