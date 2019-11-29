@@ -325,7 +325,6 @@ sub processGroupMember {
 	my $UCO = $memberAttributes{$A_UF_LOGIN};
 	#skipped user which has no licence
 	if($skippedUsers->{$UCO}) {
-		print "SKIP-FOR_GROUP: $UCO\n";
 		return;
 	}
 	my $UPN = $users->{$UCO}->{$UPN_TEXT};
