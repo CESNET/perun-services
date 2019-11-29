@@ -272,7 +272,6 @@ sub processResourceMember {
 		#if member has no licence, skip him
 		unless($licence) {
 			$skippedUsers->{$UCO} = 1;
-			print "SKIP-FOR_RESOURCE: $UCO\n";
 			return;
 		}
 
