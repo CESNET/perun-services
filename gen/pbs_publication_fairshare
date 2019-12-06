@@ -17,7 +17,6 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $data = perunServicesInit::getHierarchicalData;
 
 # Constants
-our $YEAR;                         *YEAR                       =   \(60 * 60 * 24 * 365);
 our $HOW_OLD_PUBLICATIONS;         *HOW_OLD_PUBLICATIONS       =   \3;   #in years
 our $A_USER_LOGIN;                 *A_USER_LOGIN               =   \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_ID;                    *A_USER_ID                  =   \'urn:perun:user:attribute-def:core:id';
@@ -63,25 +62,30 @@ foreach my $rData (@resourcesData) {
 			$users->{$mAttrs{$A_USER_ID}}->{"weight"} = 1.0;
 			$users->{$mAttrs{$A_USER_ID}}->{"group"} = "G:" . $rAttrs{$A_RESOURCE_FAIRSHARE_GNAME};
 
-			#add all user publications
+			# skip users without publications
 			my $userID = $mAttrs{$A_USER_ID};
 			next unless defined $authorsByID->{$userID};
-			my $author = $authorsByID->{$userID};
-			for my $authorship ($author->getAuthorships) {
-				$publicationsIDs->{$authorship->getPublicationId} = 1;
+
+			# add all user publications
+			my @publications = $cabinetAgent->findPublicationsByFilter(
+				userId => $userID,
+				yearSince => ($nowYear - $HOW_OLD_PUBLICATIONS),
+				yearTill => $nowYear);
+
+			for my $pub (@publications) {
+				$publicationsIDs->{$pub->getId} = $pub;
 			}
+
 		}
 
-		foreach my $publicationID (keys %$publicationsIDs) {
-			my $publication = $cabinetAgent->getPublicationById(id => $publicationID);
-			# filter out too old publications
-			if($publication->getYear < $nowYear - $HOW_OLD_PUBLICATIONS) { next; }
-
-				#### Start of fairshare algorithm ####
-				my $pubWeight = $categoriesRanks{$publication->getCategoryId} * (1 - (($nowYear - $publication->getYear - 1) / $HOW_OLD_PUBLICATIONS ));
-				$resources->{$rAttrs{$A_RESOURCE_ID}}->{"weight"} += $pubWeight;
-				#### End of fairshare algorithm ####
+		# process each publication of multiple authors only once !!
+		foreach my $publication (values %$publicationsIDs) {
+			#### Start of fairshare algorithm ####
+			my $pubWeight = $categoriesRanks{$publication->getCategoryId} * (1 - (($nowYear - $publication->getYear - 1) / $HOW_OLD_PUBLICATIONS ));
+			$resources->{$rAttrs{$A_RESOURCE_ID}}->{"weight"} += $pubWeight;
+			#### End of fairshare algorithm ####
 		}
+
 	} else {
 		# this resource is not fairshare group
 		for my $mData ($rData->getChildElements) {
@@ -91,8 +95,8 @@ foreach my $rData (@resourcesData) {
 			$users->{$mAttrs{$A_USER_ID}}->{"login"} = $mAttrs{$A_USER_LOGIN};
 			$users->{$mAttrs{$A_USER_ID}}->{"weight"} = 1.0;
 			$users->{$mAttrs{$A_USER_ID}}->{"group"} = 'root';
-		}	
-	}	
+		}
+	}
 }
 
 #Count all root users fairshares
@@ -100,19 +104,22 @@ for my $author (@authors) {
 	next unless defined $users->{$author->getId}; #filter out users which are not assigned on the facility for which this script is executed right now
 	next unless ($users->{$author->getId}->{'group'} eq 'root');
 
-	for my $authorship ($author->getAuthorships) {
-		# get the publication
-		my $publication = $cabinetAgent->getPublicationById(id => $authorship->getPublicationId);
+	## get all publications of author
+	my @publications = $cabinetAgent->findPublicationsByFilter(
+		userId => $author->getId,
+		yearSince => ($nowYear - $HOW_OLD_PUBLICATIONS),
+		yearTill => $nowYear);
 
-		# filter out too old publications
-		if($publication->getYear < $nowYear - $HOW_OLD_PUBLICATIONS) { next; }
+	for my $publication (@publications) {
 
 		#### Start of fairshare algorithm ####
 		my $pubWeight = $categoriesRanks{$publication->getCategoryId} * (1 - (($nowYear - $publication->getYear - 1) / $HOW_OLD_PUBLICATIONS ));
 		$users->{$author->getId}->{"weight"} += $pubWeight;
 		push @{$users->{$author->getId}->{"pubs"}}, $pubWeight;
-		#### End of fairshare algorithm ####	
+		#### End of fairshare algorithm ####
+
 	}
+
 }
 
 # start uid must be bigger than 1 so for example 10
