@@ -47,6 +47,7 @@ our $A_USER_LOGIN_MU;                 *A_USER_LOGIN_MU =                 \'urn:p
 our $A_USER_PREFERRED_MAIL;           *A_USER_PREFERRED_MAIL =           \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_RESOURCE_AFFILIATIONS;         *A_RESOURCE_AFFILIATIONS =         \'urn:perun:resource:attribute-def:def:affiliation';
 our $A_GROUP_MEMBERSHIP_EXPIRATION;   *A_GROUP_MEMBERSHIP_EXPIRATION =   \'urn:perun:member_group:attribute-def:def:groupMembershipExpiration';
+our $A_MEMBER_STATUS_IN_GROUP;        *A_MEMBER_STATUS_IN_GROUP =        \'urn:perun:member_group:attribute-def:virt:groupStatus';
 our $A_USER_O365_USER_EMAILS_MU;      *A_USER_O365_USER_EMAILS_MU =      \'urn:perun:user:attribute-def:def:o365UserEmailAddresses:mu';
 our $A_USER_O365_PRIMARY_EMAIL_MU;    *A_USER_O365_PRIMARY_EMAIL_MU =    \'urn:perun:user:attribute-def:def:o365PrimaryEmailAddress:mu';
 our $A_USER_FAC_O365_MAIL_FORWARD;    *A_USER_FAC_O365_MAIL_FORWARD =    \'urn:perun:user_facility:attribute-def:def:o365MailForward';
@@ -80,6 +81,9 @@ foreach my $resourceData ($data->getChildElements) {
 		for my $memberData ($membersElement->getChildElements) {
 			my %memberAttributes = attributesToHash $memberData->getAttributes;
 			my $userId = $memberAttributes{$A_USER_ID};
+			#skip expired membership in group
+			my $statusInGroup = $memberAttributes{$A_MEMBER_STATUS_IN_GROUP};
+			next if $statusInGroup eq 'EXPIRED';
 			my $expirationInGroup = $memberAttributes{$A_GROUP_MEMBERSHIP_EXPIRATION};
 
 			#process every member|group|resource combination one by one
