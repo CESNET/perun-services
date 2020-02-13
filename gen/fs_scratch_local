@@ -45,7 +45,7 @@ foreach my $rData (@resourcesData) {
 		# Print attributes
 		print SERVICE_FILE $memberAttributes{$A_USER_LOGIN} . "\t";
 		print SERVICE_FILE $memberAttributes{$A_UID} . "\t";
-		print SERVICE_FILE $memberAttributes{$A_GID} . "\t";
+		print SERVICE_FILE $memberAttributes{$A_GID} . "\n";
 	}
 }
 
