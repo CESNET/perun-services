@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="o365_mail_forward_export"
+
+. generic_send
