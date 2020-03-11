@@ -22,6 +22,7 @@ our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseD
 our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
 our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName';
 our $A_R_GRACE_PERIOD;  *A_R_GRACE_PERIOD = \'urn:perun:resource:attribute-def:def:adGracePeriod';
+our $A_MR_V_IS_BANNED;  *A_MR_V_IS_BANNED = \'urn:perun:member_resource:attribute-def:virt:isBanned';
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -72,6 +73,10 @@ foreach my $rData (@resourcesData) {
 
 		my %mAttributes = attributesToHash $mData->getAttributes;
 		my $login = $mAttributes{$A_LOGIN};
+		my $isBanned = $mAttributes{$A_MR_V_IS_BANNED};
+
+		#skip banned members
+		next if $isBanned;
 
 		# allow only UČO, 9UČO and s-[smth] logins
 
