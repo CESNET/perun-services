@@ -19,6 +19,7 @@ our $A_MEMBER_O365_EMAIL_ADDRESSES_MU;     *A_MEMBER_O365_EMAIL_ADDRESSES_MU =  
 our $A_USER_FACILITY_LOGIN;                *A_USER_FACILITY_LOGIN =                \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_FACILITY_MAIL_FORWARD;         *A_USER_FACILITY_MAIL_FORWARD =         \'urn:perun:user_facility:attribute-def:def:o365MailForward';
 our $A_USER_FACILITY_DISABLE_MAIL_FORWARD; *A_USER_FACILITY_DISABLE_MAIL_FORWARD = \'urn:perun:user_facility:attribute-def:def:disableO365MailForward';
+our $A_USER_FACILITY_STORE_AND_FORWARD;    *A_USER_FACILITY_STORE_AND_FORWARD =    \'urn:perun:user_facility:attribute-def:def:o365MailStoreAndForward';
 our $A_FACILITY_FORWARD_EXPORT_DOMAINS;    *A_FACILITY_FORWARD_EXPORT_DOMAINS =    \'urn:perun:facility:attribute-def:def:o365MailForwardExportDomains';
 
 our $DEFAULT_FORWARDING_DOMAIN = '@mo.muni.cz';
@@ -37,6 +38,8 @@ foreach my $resourceData (@resourcesData) {
 
 		#skip this user if disabled forward is set to true
 		next if $memberAttributes{$A_USER_FACILITY_DISABLE_MAIL_FORWARD};
+		#skip this user if store and forward is set to true
+		next if $memberAttributes{$A_USER_FACILITY_STORE_AND_FORWARD};
 
 		#login in MU is UCO
 		my $login = $memberAttributes{$A_USER_FACILITY_LOGIN};
