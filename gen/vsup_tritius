@@ -6,13 +6,13 @@ use perunServicesInit;
 use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_tritius";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+local $::PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
-my $data = perunServicesInit::getFlatData;
+my $data = perunServicesInit::getHierarchicalData;
 
 #Constants
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
@@ -39,6 +39,8 @@ our $A_ADDRESS_TOWN_KOS; *A_ADDRESS_TOWN_KOS = \'urn:perun:user:attribute-def:de
 our $A_ADDRESS_TOWN_DC2; *A_ADDRESS_TOWN_DC2 = \'urn:perun:user:attribute-def:def:addressTownDc2';
 our $A_ADDRESS_POSTAL_CODE_KOS; *A_ADDRESS_POSTAL_CODE_KOS = \'urn:perun:user:attribute-def:def:addressPostalCodeKos';
 our $A_ADDRESS_POSTAL_CODE_DC2; *A_ADDRESS_POSTAL_CODE_DC2 = \'urn:perun:user:attribute-def:def:addressPostalCodeDc2';
+# relation
+our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
 
 # GATHER USERS
 my $users;  # $users->{$uco}->{ATTR} = $attrValue;
@@ -47,53 +49,80 @@ my $users;  # $users->{$uco}->{ATTR} = $attrValue;
 # AGGREGATE DATA
 #
 # FOR EACH USER
-foreach my $user (($data->getChildElements)[1]->getChildElements) {
+foreach my $rData ($data->getChildElements) {
 
-	my %uAttributes = attributesToHash $user->getAttributes;
+	my %resourceAttributes = attributesToHash $rData->getAttributes;
+	my $relationType = $resourceAttributes{$A_R_RELATION_TYPE};
 
-	my $uco = $uAttributes{$A_UCO};
-	$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
-	$users->{$uco}->{$A_VSUP_MAIL} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
-	$users->{$uco}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE} || '';
-	$users->{$uco}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
-	$users->{$uco}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
-	$users->{$uco}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER} || '';
-	$users->{$uco}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
-	$users->{$uco}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
-	$users->{$uco}->{$A_BIRTH_NUMBER} = $uAttributes{$A_BIRTH_NUMBER} || '';
-
-	# if multiple, send only first one
-	if (defined $uAttributes{$A_CARD_BARCODES}) {
-		$users->{$uco}->{$A_CARD_BARCODES} = $uAttributes{$A_CARD_BARCODES}->[0];
-	} else {
-		$users->{$uco}->{$A_CARD_BARCODES} = '';
-	}
-	if (defined $uAttributes{$A_CARD_CHIP_NUMBERS}) {
-		$users->{$uco}->{$A_CARD_CHIP_NUMBERS} = $uAttributes{$A_CARD_CHIP_NUMBERS}->[0];
-	} else {
-		$users->{$uco}->{$A_CARD_CHIP_NUMBERS} = '';
+	# Users from Resource must be in a relation
+	unless ($relationType) {
+		next;
 	}
 
-	if (defined $uAttributes{$A_ADDRESS_STREET_DC2}) {
-		# has address from DC2
-		$users->{$uco}->{'STREET'} = $uAttributes{$A_ADDRESS_STREET_DC2};
-		$users->{$uco}->{'HOUSE_NUMBER'} = $uAttributes{$A_ADDRESS_HOUSE_NUMBER_DC2} ? $uAttributes{$A_ADDRESS_HOUSE_NUMBER_DC2} : '';
-		$users->{$uco}->{'TOWN'} = $uAttributes{$A_ADDRESS_TOWN_DC2} || '';
-		$users->{$uco}->{'POSTAL_CODE'} = $uAttributes{$A_ADDRESS_POSTAL_CODE_DC2} || '';
-	} elsif (defined $uAttributes{$A_ADDRESS_STREET_KOS}) {
-		# has address from KOS
-		$users->{$uco}->{'STREET'} = $uAttributes{$A_ADDRESS_STREET_KOS};
-		$users->{$uco}->{'HOUSE_NUMBER'} = $uAttributes{$A_ADDRESS_HOUSE_NUMBER_KOS} || '';
-		$users->{$uco}->{'TOWN'} = $uAttributes{$A_ADDRESS_TOWN_KOS} || '';
-		$users->{$uco}->{'POSTAL_CODE'} = $uAttributes{$A_ADDRESS_POSTAL_CODE_KOS} || '';
-	} else {
-		# don't have address
-		$users->{$uco}->{'STREET'} = '';
-		$users->{$uco}->{'HOUSE_NUMBER'} = '';
-		$users->{$uco}->{'TOWN'} = '';
-		$users->{$uco}->{'POSTAL_CODE'} = '';
-	}
+	my @membersData = $rData->getChildElements;
 
+	foreach my $member (@membersData) {
+
+		my %uAttributes = attributesToHash $member->getAttributes;
+
+		my $uco = $uAttributes{$A_UCO};
+		$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
+		$users->{$uco}->{$A_VSUP_MAIL} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
+		$users->{$uco}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE} || '';
+		$users->{$uco}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
+		$users->{$uco}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+		$users->{$uco}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER} || '';
+		$users->{$uco}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
+		$users->{$uco}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
+		$users->{$uco}->{$A_BIRTH_NUMBER} = $uAttributes{$A_BIRTH_NUMBER} || '';
+
+		if ($relationType eq "ZAM") {
+			# prefer ZAM over anything
+			$users->{$uco}->{'TYPE'} = $relationType;
+		} elsif ($relationType eq "STU") {
+			# set STU if not ZAM
+			if (!defined $users->{$uco}->{'TYPE'} || $users->{$uco}->{'TYPE'} ne 'ZAM') {
+				$users->{$uco}->{'TYPE'} = $relationType;
+			}
+		}
+
+		# if multiple, send only first one
+		if (defined $uAttributes{$A_CARD_BARCODES}) {
+			$users->{$uco}->{$A_CARD_BARCODES} = $uAttributes{$A_CARD_BARCODES}->[0];
+		}
+		else {
+			$users->{$uco}->{$A_CARD_BARCODES} = '';
+		}
+		if (defined $uAttributes{$A_CARD_CHIP_NUMBERS}) {
+			$users->{$uco}->{$A_CARD_CHIP_NUMBERS} = $uAttributes{$A_CARD_CHIP_NUMBERS}->[0];
+		}
+		else {
+			$users->{$uco}->{$A_CARD_CHIP_NUMBERS} = '';
+		}
+
+		if (defined $uAttributes{$A_ADDRESS_STREET_DC2}) {
+			# has address from DC2
+			$users->{$uco}->{'STREET'} = $uAttributes{$A_ADDRESS_STREET_DC2};
+			$users->{$uco}->{'HOUSE_NUMBER'} = $uAttributes{$A_ADDRESS_HOUSE_NUMBER_DC2} ? $uAttributes{$A_ADDRESS_HOUSE_NUMBER_DC2} : '';
+			$users->{$uco}->{'TOWN'} = $uAttributes{$A_ADDRESS_TOWN_DC2} || '';
+			$users->{$uco}->{'POSTAL_CODE'} = $uAttributes{$A_ADDRESS_POSTAL_CODE_DC2} || '';
+		}
+		elsif (defined $uAttributes{$A_ADDRESS_STREET_KOS}) {
+			# has address from KOS
+			$users->{$uco}->{'STREET'} = $uAttributes{$A_ADDRESS_STREET_KOS};
+			$users->{$uco}->{'HOUSE_NUMBER'} = $uAttributes{$A_ADDRESS_HOUSE_NUMBER_KOS} || '';
+			$users->{$uco}->{'TOWN'} = $uAttributes{$A_ADDRESS_TOWN_KOS} || '';
+			$users->{$uco}->{'POSTAL_CODE'} = $uAttributes{$A_ADDRESS_POSTAL_CODE_KOS} || '';
+		}
+		else {
+			# don't have address
+			$users->{$uco}->{'STREET'} = '';
+			$users->{$uco}->{'HOUSE_NUMBER'} = '';
+			$users->{$uco}->{'TOWN'} = '';
+			$users->{$uco}->{'POSTAL_CODE'} = '';
+		}
+
+	}
 }
 
 #
@@ -107,11 +136,12 @@ my @keys = sort keys %{$users};
 for my $uco (@keys) {
 
 	# print attributes, which are never empty
-	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{$A_VSUP_MAIL} . "\t" . $users->{$uco}->{$A_FIRST_NAME}
-			. "\t" . $users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_TITLE_AFTER}
-			. "\t" . $users->{$uco}->{$A_BIRTH_NUMBER} . "\t" . $users->{$uco}->{$A_GENDER} . "\t" . $users->{$uco}->{$A_PHONE}
-			. "\t" . $users->{$uco}->{$A_CARD_BARCODES} . "\t" . $users->{$uco}->{$A_CARD_CHIP_NUMBERS} . "\t" . $users->{$uco}->{'STREET'}
-			. "\t" . $users->{$uco}->{HOUSE_NUMBER} . "\t" . $users->{$uco}->{'TOWN'} . "\t" . $users->{$uco}->{'POSTAL_CODE'} . "\n";
+	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{'TYPE'} . "\t" . $users->{$uco}->{$A_VSUP_MAIL}
+		. "\t" . $users->{$uco}->{$A_FIRST_NAME} . "\t" . $users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_BEFORE}
+		. "\t" . $users->{$uco}->{$A_TITLE_AFTER} . "\t" . $users->{$uco}->{$A_BIRTH_NUMBER} . "\t" . $users->{$uco}->{$A_GENDER}
+		. "\t" . $users->{$uco}->{$A_PHONE} . "\t" . $users->{$uco}->{$A_CARD_BARCODES} . "\t" . $users->{$uco}->{$A_CARD_CHIP_NUMBERS}
+		. "\t" . $users->{$uco}->{'STREET'} . "\t" . $users->{$uco}->{HOUSE_NUMBER} . "\t" . $users->{$uco}->{'TOWN'}
+		. "\t" . $users->{$uco}->{'POSTAL_CODE'} . "\n";
 
 }
 

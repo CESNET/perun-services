@@ -55,20 +55,21 @@ open FILE, $service_file or die "Could not open $service_file: $!";
 while(my $line = <FILE>) {
 	my @parts = split /\t/, $line;
 	$dataByUco->{$parts[0]}->{'LOGIN'} = $parts[1];
-	$dataByUco->{$parts[0]}->{'EMAIL'} = $parts[2];
-	$dataByUco->{$parts[0]}->{'FIRST_NAME'} = (($parts[3] ne '') ? $parts[3] : undef);
-	$dataByUco->{$parts[0]}->{'LAST_NAME'} = (($parts[4] ne '') ? $parts[4] : undef);
-	$dataByUco->{$parts[0]}->{'TITLE_BEFORE'} = (($parts[5] ne '') ? $parts[5] : undef);
-	$dataByUco->{$parts[0]}->{'TITLE_AFTER'} = (($parts[6] ne '') ? $parts[6] : undef);
-	$dataByUco->{$parts[0]}->{'BIRTH_NUMBER'} = (($parts[7] ne '') ? $parts[7] : undef);
-	$dataByUco->{$parts[0]}->{'GENDER'} = (($parts[8] ne '') ? $parts[8] : undef);
-	$dataByUco->{$parts[0]}->{'PHONE'} = (($parts[9] ne '') ? $parts[9] : undef);
-	$dataByUco->{$parts[0]}->{'CARD_BARCODE'} = (($parts[10] ne '') ? $parts[10] : undef);
-	$dataByUco->{$parts[0]}->{'CARD_CHIP_NUMBER'} = (($parts[11] ne '') ? $parts[11] : undef);
-	$dataByUco->{$parts[0]}->{'STREET'} = (($parts[12] ne '') ? $parts[12] : undef);
-	$dataByUco->{$parts[0]}->{'HOUSE_NUMBER'} = (($parts[13] ne '') ? $parts[13] : undef);
-	$dataByUco->{$parts[0]}->{'TOWN'} = (($parts[14] ne '') ? $parts[14] : undef);
-	$dataByUco->{$parts[0]}->{'POSTAL_CODE'} = (($parts[15] ne '') ? $parts[15] : undef);
+	$dataByUco->{$parts[0]}->{'TYPE'} = (($parts[2] ne '') ? $parts[2] : 'STU');  # fallback to students
+	$dataByUco->{$parts[0]}->{'EMAIL'} = $parts[3];
+	$dataByUco->{$parts[0]}->{'FIRST_NAME'} = (($parts[4] ne '') ? $parts[4] : undef);
+	$dataByUco->{$parts[0]}->{'LAST_NAME'} = (($parts[5] ne '') ? $parts[5] : undef);
+	$dataByUco->{$parts[0]}->{'TITLE_BEFORE'} = (($parts[6] ne '') ? $parts[6] : undef);
+	$dataByUco->{$parts[0]}->{'TITLE_AFTER'} = (($parts[7] ne '') ? $parts[7] : undef);
+	$dataByUco->{$parts[0]}->{'BIRTH_NUMBER'} = (($parts[8] ne '') ? $parts[8] : undef);
+	$dataByUco->{$parts[0]}->{'GENDER'} = (($parts[9] ne '') ? $parts[9] : undef);
+	$dataByUco->{$parts[0]}->{'PHONE'} = (($parts[10] ne '') ? $parts[10] : undef);
+	$dataByUco->{$parts[0]}->{'CARD_BARCODE'} = (($parts[11] ne '') ? $parts[11] : undef);
+	$dataByUco->{$parts[0]}->{'CARD_CHIP_NUMBER'} = (($parts[12] ne '') ? $parts[12] : undef);
+	$dataByUco->{$parts[0]}->{'STREET'} = (($parts[13] ne '') ? $parts[13] : undef);
+	$dataByUco->{$parts[0]}->{'HOUSE_NUMBER'} = (($parts[14] ne '') ? $parts[14] : undef);
+	$dataByUco->{$parts[0]}->{'TOWN'} = (($parts[15] ne '') ? $parts[15] : undef);
+	$dataByUco->{$parts[0]}->{'POSTAL_CODE'} = (($parts[16] ne '') ? $parts[16] : undef);
 }
 close FILE;
 
@@ -85,6 +86,7 @@ $deleted += $dbh->do("DELETE FROM $tableName");
 foreach my $uco (sort keys %$dataByUco) {
 
 	my $LOGIN = $dataByUco->{$uco}->{'LOGIN'};
+	my $TYPE = $dataByUco->{$uco}->{'TYPE'};
 	my $EMAIL = $dataByUco->{$uco}->{'EMAIL'};
 	my $TITLE_BEFORE = $dataByUco->{$uco}->{'TITLE_BEFORE'};
 	my $FIRST_NAME = $dataByUco->{$uco}->{'FIRST_NAME'};
@@ -103,8 +105,8 @@ foreach my $uco (sort keys %$dataByUco) {
 	if($DEBUG == 1) { print "INSERT NEW RECORD: $uco\n"; }
 	$inserted++;
 	# we will do insert
-	my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, EMAIL, TITUL_PRED, JMENO, PRIJMENI, TITUL_ZA, TELEFON, ROD_CISLO, POHLAVI, KARTA_KOD_CIPU, KARTA_KOD_CAROVY, ADR_ULICE, ADR_CP_CO, ADR_MESTO, ADR_PSC, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())});
-	$insertPerson->execute($uco, $LOGIN, $EMAIL, $TITLE_BEFORE, $FIRST_NAME, $LAST_NAME, $TITLE_AFTER, $PHONE, $BIRTH_NUMBER, $GENDER, $CARD_CHIP_NUMBER, $CARD_BARCODE, $STREET, $HOUSE_NUMBER, $TOWN, $POSTAL_CODE);
+	my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, TYP_VZTAHU, EMAIL, TITUL_PRED, JMENO, PRIJMENI, TITUL_ZA, TELEFON, ROD_CISLO, POHLAVI, KARTA_KOD_CIPU, KARTA_KOD_CAROVY, ADR_ULICE, ADR_CP_CO, ADR_MESTO, ADR_PSC, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())});
+	$insertPerson->execute($uco, $LOGIN, $TYPE, $EMAIL, $TITLE_BEFORE, $FIRST_NAME, $LAST_NAME, $TITLE_AFTER, $PHONE, $BIRTH_NUMBER, $GENDER, $CARD_CHIP_NUMBER, $CARD_BARCODE, $STREET, $HOUSE_NUMBER, $TOWN, $POSTAL_CODE);
 
 }
 
