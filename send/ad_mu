@@ -377,8 +377,8 @@ $lockManager->lock($errorLockFile) || die "There were an error in previous run. 
 
 # init configuration
 my @conf = init_config($namespace);
-my $ldap_location = resolve_pdc($conf[0]);
-my $ldap = ldap_connect($ldap_location);
+my @ldap_locations = resolve_domain_controlers($conf[0]);
+my $ldap = ldap_connect_multiple_options(\@ldap_locations);
 
 # bind
 ldap_bind($ldap, $conf[1], $conf[2]);

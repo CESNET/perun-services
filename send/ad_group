@@ -46,8 +46,8 @@ my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespa
 
 # init configuration
 my @conf = init_config($namespace);
-my $ldap_location = resolve_pdc($conf[0]);
-my $ldap = ldap_connect($ldap_location);
+my @ldap_locations = resolve_domain_controlers($conf[0]);
+my $ldap = ldap_connect_multiple_options(\@ldap_locations);
 my $filter = '(objectClass=group)';
 
 # connect
