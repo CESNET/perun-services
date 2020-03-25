@@ -1,7 +1,7 @@
 package ADConnector;
 use Exporter 'import';
 @ISA = ('Exporter');
-@EXPORT = qw(init_config resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members compare_entry enable_uac disable_uac is_uac_enabled);
+@EXPORT = qw(init_config resolve_domain_controlers ldap_connect_multiple_options resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members compare_entry enable_uac disable_uac is_uac_enabled);
 
 use strict;
 use warnings;
@@ -36,6 +36,14 @@ This library provides shared functions for Perun send scripts to manage users an
 =head2 init_config()
 
 Return URL and credentials for specified namespace. Data are read from C</etc/perun/namespace.ad> file.
+
+=head2 resolve_domain_controlers()
+
+Return a list of available domain controlers from a domain URL. Expected format of parameter is C<protocol://host:port>. Result is a list of URLs in the same format.
+
+=head2 ldap_connect_multiple_options()
+
+Connect to the AD through the first possible controler from a list of controlers. Connection (Net::LDAP) object is returned.
 
 =head2 resolve_pdc()
 
@@ -79,6 +87,7 @@ Pavel Zlámal - <zlamal@cesnet.cz>
 
 =cut
 
+use Net::DNS::Resolver;
 use Net::LDAPS;
 use Net::LDAP::Entry;
 use Net::LDAP::Message;
@@ -116,6 +125,54 @@ sub init_config($) {
 	push(@credentials, $lines[2]);
 	return @credentials;
 
+}
+
+#
+# Resolve available domain controlers from a URL
+#
+sub resolve_domain_controlers($) {
+	my $ldap_location = shift;
+	my ($protocol, $host, $port);
+	if ($ldap_location =~ /^([^\/]+:\/\/)?([^:]+):([0-9]+)$/) {
+		($protocol, $host, $port) = ($1, $2, $3);
+	} else {
+		ldap_log('ad_connection', "[AD] Ldap location in wrong format. Expected: protocol://host:port");
+		die "[AD] Ldap location in wrong format. Expected: protocol://host:port";
+	}
+	my $resolver = Net::DNS::Resolver->new;
+	my $query = $resolver->search($host);
+	my @controlers = ();
+
+	if ($query) {
+		foreach ($query->answer) {
+			next unless $_->type eq "A";
+			push(@controlers, $protocol . $_->address . ":" . $port);
+		}
+	} else {
+		my $error = $resolver->errorstring();
+		ldap_log('ad_connection', "[AD] No answer was found for $host. DNS query returned error message: $error");
+		die "[AD] No answer was found for $host. DNS query returned error message: $error";
+	}
+	if (!@controlers) {
+		ldap_log('ad_connection', "[AD] DNS query for $host did not return any controler.");
+		die "[AD] DNS query for $host did not return any controler.";
+	}
+	return @controlers;
+}
+
+#
+# Connect to a controler from a list of controlers
+#
+sub ldap_connect_multiple_options($) {
+	my $controlers = shift;
+	my $ldap;
+
+	foreach (@$controlers) {
+		$ldap = Net::LDAPS->new( "$_" , onerror => 'warn' , timeout => 15);
+		last if $ldap;
+	}
+
+	return $ldap;
 }
 
 #
