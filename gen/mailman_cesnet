@@ -9,7 +9,7 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 use Text::Unidecode;
-use POSIX qw/strftime/; 
+use POSIX qw/strftime/;
 use Data::Dumper;
 
 local $::SERVICE_NAME = "mailman_cesnet";
@@ -26,14 +26,14 @@ our $A_USER_MAIL;                            *A_USER_MAIL =                     
 our $A_USER_LANG;                            *A_USER_LANG =                             \'urn:perun:user:attribute-def:def:preferredLanguage';
 our $A_USER_STATUS;                          *A_USER_STATUS =                           \'urn:perun:member:attribute-def:core:status';
 our $A_USER_EXPIRES;                         *A_USER_EXPIRES =                          \'urn:perun:member:attribute-def:def:membershipExpiration';
-our $A_USER_LOA;                             *A_USER_LOA =                              \'urn:perun:member:attribute-def:virt:loa';
+our $A_USER_LOA;                             *A_USER_LOA =                              \'urn:perun:user:attribute-def:virt:loa';
 our $A_USER_OPT_OUT;                         *A_USER_OPT_OUT =                          \'urn:perun:member_resource:attribute-def:def:optOutMailingList';
 
 our $A_RESOURCE_MAILING_LIST_NAME;           *A_RESOURCE_MAILING_LIST_NAME =            \'urn:perun:resource:attribute-def:def:mailingListName';
 our $A_RESOURCE_MAILING_LIST_VARIANTS;			 *A_RESOURCE_MAILING_LIST_VARIANTS =        \'urn:perun:resource:attribute-def:def:mailingListUsesLangVariants'; # true for -cs and -en variants
 our $A_RESOURCE_MAILING_LIST_NONVALID_USERS; *A_RESOURCE_MAILING_LIST_NONVALID_USERS =  \'urn:perun:resource:attribute-def:def:mailingListAllowInvalidUsers'; # true to allow users with status other than VALID
 
-my $mailinglistStruc = {};  # $mailinglistStruc->{"mailing list name including lang"}->{"user's e-mail"}->{A_USER_*} 
+my $mailinglistStruc = {};  # $mailinglistStruc->{"mailing list name including lang"}->{"user's e-mail"}->{A_USER_*}
 
 my $mailinglistsDirectory = "$DIRECTORY/mailinglists";
 mkdir $mailinglistsDirectory or die "Can't mkdir $mailinglistsDirectory: $!";
