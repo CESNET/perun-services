@@ -27,7 +27,7 @@ our $A_USER_STATUS;                          *A_USER_STATUS =                   
 our $A_USER_OPT_OUT;                         *A_USER_OPT_OUT =                          \'urn:perun:member_resource:attribute-def:def:optOutMailingList';
 
 our $A_RESOURCE_MAILING_LIST_NAME;           *A_RESOURCE_MAILING_LIST_NAME =            \'urn:perun:resource:attribute-def:def:mailingListName';
-our $A_RESOURCE_MAILING_LIST_VARIANTS;			 *A_RESOURCE_MAILING_LIST_VARIANTS =        \'urn:perun:resource:attribute-def:def:mailingListUsesLangVariants'; # true for -cs and -en variants
+our $A_RESOURCE_MAILING_LIST_VARIANTS;       *A_RESOURCE_MAILING_LIST_VARIANTS =        \'urn:perun:resource:attribute-def:def:mailingListUsesLangVariants'; # true for -cs and -en variants
 our $A_RESOURCE_MAILING_LIST_NONVALID_USERS; *A_RESOURCE_MAILING_LIST_NONVALID_USERS =  \'urn:perun:resource:attribute-def:def:mailingListAllowInvalidUsers'; # true to allow users with status other than VALID
 
 my $mailinglistStruc = {};  # $mailinglistStruc->{"mailing list name including lang"}->{"user's e-mail"}->{A_USER_*}
@@ -53,7 +53,6 @@ foreach my $rData (@resourcesData) {
 		$mailinglistStruc->{$listNameCS} = {} unless $mailinglistStruc->{$listNameCS};
 		$mailinglistStruc->{$listNameEN} = {} unless $mailinglistStruc->{$listNameEN};
 	} else {
-		print "No list\n";
 		$mailinglistStruc->{$listName} = {} unless $mailinglistStruc->{$listName};
 	}
 
