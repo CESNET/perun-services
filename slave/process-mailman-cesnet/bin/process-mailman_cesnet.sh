@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PROTOCOL_VERSION='3.0.0'
+PROTOCOL_VERSION='3.0.1'
 
 function process {
 	DST_DIR="/var/spool/mailinglists"
