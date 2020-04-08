@@ -9,12 +9,12 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 use Text::Unidecode;
-use POSIX qw/strftime/; 
+use POSIX qw/strftime/;
 use Data::Dumper;
 
 local $::SERVICE_NAME = "mailman_cesnet";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+local $::PROTOCOL_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -25,20 +25,17 @@ our $A_USER_NAME;                            *A_USER_NAME =                     
 our $A_USER_MAIL;                            *A_USER_MAIL =                             \'urn:perun:member:attribute-def:def:mail';
 our $A_USER_LANG;                            *A_USER_LANG =                             \'urn:perun:user:attribute-def:def:preferredLanguage';
 our $A_USER_STATUS;                          *A_USER_STATUS =                           \'urn:perun:member:attribute-def:core:status';
-our $A_USER_EXPIRES;                         *A_USER_EXPIRES =                          \'urn:perun:member:attribute-def:def:membershipExpiration';
-our $A_USER_LOA;                             *A_USER_LOA =                              \'urn:perun:member:attribute-def:virt:loa';
 our $A_USER_OPT_OUT;                         *A_USER_OPT_OUT =                          \'urn:perun:member_resource:attribute-def:def:optOutMailingList';
 
 our $A_RESOURCE_MAILING_LIST_NAME;           *A_RESOURCE_MAILING_LIST_NAME =            \'urn:perun:resource:attribute-def:def:mailingListName';
-our $A_RESOURCE_MAILING_LIST_VARIANTS;			 *A_RESOURCE_MAILING_LIST_VARIANTS =        \'urn:perun:resource:attribute-def:def:mailingListUsesLangVariants'; # true for -cs and -en variants
+our $A_RESOURCE_MAILING_LIST_VARIANTS;       *A_RESOURCE_MAILING_LIST_VARIANTS =        \'urn:perun:resource:attribute-def:def:mailingListUsesLangVariants'; # true for -cs and -en variants
 our $A_RESOURCE_MAILING_LIST_NONVALID_USERS; *A_RESOURCE_MAILING_LIST_NONVALID_USERS =  \'urn:perun:resource:attribute-def:def:mailingListAllowInvalidUsers'; # true to allow users with status other than VALID
 
-my $mailinglistStruc = {};  # $mailinglistStruc->{"mailing list name including lang"}->{"user's e-mail"}->{A_USER_*} 
+my $mailinglistStruc = {};  # $mailinglistStruc->{"mailing list name including lang"}->{"user's e-mail"}->{A_USER_*}
 
 my $mailinglistsDirectory = "$DIRECTORY/mailinglists";
 mkdir $mailinglistsDirectory or die "Can't mkdir $mailinglistsDirectory: $!";
 
-my @membersAttributes;
 my @resourcesData = $data->getChildElements;
 foreach my $rData (@resourcesData) {
 	my %resourceAttributes  = attributesToHash $rData->getAttributes;
@@ -75,19 +72,6 @@ foreach my $rData (@resourcesData) {
 			}
 		}
 
-		#list-specific filters
-		if ($listName eq "metavo-membership") {
-			#list only members that have loa=2 and expires in less than 60 days or expired before less than 30 days
-			my $userLoa = $memberAttributes->{$A_USER_LOA};
-			next if not $userLoa eq "2" ;
-			my $userExpires = $memberAttributes->{$A_USER_EXPIRES};
-			my $in60days = strftime("%Y-%m-%d",localtime (time+(60*60*24*60)));
-			my $before30days = strftime("%Y-%m-%d",localtime (time-(60*60*24*30)));
-			next if ($userExpires gt $in60days);
-			next if ($userExpires lt $before30days);
-			$mailinglistStruc->{$listNameWithLang}->{$memberAttributes->{$A_USER_MAIL}}->{$A_USER_EXPIRES} = $memberAttributes->{$A_USER_EXPIRES};
-		}
-
 		$mailinglistStruc->{$listNameWithLang}->{$memberAttributes->{$A_USER_MAIL}}->{$A_USER_NAME} = $memberAttributes->{$A_USER_NAME};
 	}
 }
@@ -99,7 +83,6 @@ for my $listName (keys %$mailinglistStruc) {
 
 	for my $mail (keys %{$mailinglistStruc->{$listName}}) {
 		print FILE "\"", unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME});
-		if(defined $mailinglistStruc->{$listName}->{$mail}->{$A_USER_EXPIRES}) { print FILE " expiring ", $mailinglistStruc->{$listName}->{$mail}->{$A_USER_EXPIRES}; }
 		print FILE "\" <", $mail, ">\n";
 	}
 

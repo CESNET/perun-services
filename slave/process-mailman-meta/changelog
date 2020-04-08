@@ -1,3 +1,10 @@
+perun-slave-process-mailman-meta (3.1.5) stable; urgency=low
+
+  * Removed handling of expiration and loa for hardcoded
+    metavo-membership list. Updated script and protocol version.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Wed, 08 Apr 2020 10:00:00 +0200
+
 perun-slave-process-mailman-meta (3.1.4) stable; urgency=medium
 
   * Changed architecture to all
