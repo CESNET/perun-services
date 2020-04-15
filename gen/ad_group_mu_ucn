@@ -14,14 +14,14 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
-my $data = perunServicesInit::getHierarchicalData;
+#Get hierarchical data without expired members
+my $data = perunServicesInit::getHierarchicalData(1);
 
 #Constants
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
 our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
 our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName';
-our $A_R_GRACE_PERIOD;  *A_R_GRACE_PERIOD = \'urn:perun:resource:attribute-def:def:adGracePeriod';
 our $A_MR_V_IS_BANNED;  *A_MR_V_IS_BANNED = \'urn:perun:member_resource:attribute-def:virt:isBanned';
 
 # CHECK ON FACILITY ATTRIBUTES
@@ -46,7 +46,6 @@ close(FILE);
 
 my @resourcesData = $data->getChildElements;
 my $groups = {};
-my $gracePeriods = {};
 my $usersByResource = {};
 
 # FOR EACH RESOURCE
@@ -54,16 +53,7 @@ foreach my $rData (@resourcesData) {
 
 	my %rAttributes = attributesToHash $rData->getAttributes;
 	my $group = $rAttributes{$A_R_GROUP_NAME};
-	my $gracePeriod;
-
-	if (!defined($rAttributes{$A_R_GRACE_PERIOD})) {
-		$gracePeriod = "0";
-	} else {
-		$gracePeriod = $rAttributes{$A_R_GRACE_PERIOD};
-	}
-
 	$groups->{$group} = 1;
-	$gracePeriods->{$group} = $gracePeriod;
 
 	# process members
 	my @membersData = $rData->getChildElements;
@@ -109,7 +99,6 @@ for my $group (sort keys %$groups) {
 	print FILE "samAccountName: " . $group . "\n";
 	print FILE "objectClass: group\n";
 	print FILE "objectClass: top\n";
-	print FILE "gracePeriod: " . $gracePeriods->{$group} . "\n";
 
 	my @groupMembers = sort keys %{$usersByResource->{$group}};
 	for my $member (@groupMembers) {
