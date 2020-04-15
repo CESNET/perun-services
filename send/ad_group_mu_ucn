@@ -1,7 +1,4 @@
 #!/usr/bin/perl
-
-my @today = Today();
-
 use strict;
 use warnings;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
@@ -9,8 +6,6 @@ use Net::LDAPS;
 use Net::LDAP::Entry;
 use Net::LDAP::Message;
 use Net::LDAP::LDIF;
-use Date::Calc qw/ Today Delta_Days Add_Delta_Days Date_to_Days /;
-use File::Copy;
 
 # Import shared AD library
 use ADConnector;
@@ -20,19 +15,11 @@ sub process_add;
 sub process_remove;
 sub process_update;
 
-sub compute_grace_period;
-sub load_members_state;
-sub save_members_state;
-
 # log counters
 my $counter_add = 0;
 my $counter_remove = 0;
 my $counter_update = 0;
 my $counter_fail = 0;
-
-my $MEMBER_STATE_SEPARATOR ="\t";
-my $MEMBER_STATE_DATE_SEPARATOR ="-";
-my $MEMBER_STATE_GP = "Grace period";
 
 # define service
 my $service_name = "ad_group_mu_ucn";
@@ -42,13 +29,6 @@ my $facility_name = $ARGV[0];
 chomp($facility_name);
 my $service_files_base_dir="../gen/spool";
 my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
-
-# files used for computing a grace period
-my $MEMBER_STATE_FILE ="spool/$facility_name/ad_group_mu_ucn/memberState";
-my $MEMBER_STATE_TMP_FILE ="spool/$facility_name/ad_group_mu_ucn/memberState.tmp";
-
-my $members_state; #state of all members
-open MEMBER_STATE_TMP_FILEHANDLE, ">", $MEMBER_STATE_TMP_FILE or die "Cannot open $MEMBER_STATE_TMP_FILE: $!";
 
 # BASE DN
 open my $file, '<', "$service_files_dir/baseDN";
@@ -79,7 +59,6 @@ my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn']);
 
 my %ad_entries_map = ();
 my %perun_entries_map = ();
-my %grace_periods_map = ();
 
 foreach my $ad_entry (@ad_entries) {
 	my $cn = $ad_entry->get_value('cn');
@@ -88,20 +67,12 @@ foreach my $ad_entry (@ad_entries) {
 foreach my $perun_entry (@perun_entries) {
 	my $cn = $perun_entry->get_value('cn');
 	$perun_entries_map{ $cn } = $perun_entry;
-	# We need to save grace period separately because this attribute does not exist in AD
-	$grace_periods_map{ $cn } = $perun_entry->get_value('gracePeriod');
-	$perun_entry->delete('gracePeriod');
 }
-
-$members_state = load_members_state;
 
 # process data
 process_add();
 process_remove();
 process_update();
-
-# save states for the next run
-save_members_state($members_state);
 
 # disconnect
 ldap_unbind($ldap);
@@ -166,11 +137,9 @@ sub process_remove() {
 	foreach my $ad_entry (@ad_entries) {
 		my $cn = $ad_entry->get_value('cn');
 		unless (exists $perun_entries_map{$cn}) {
+
 			my $response = $ldap->delete($ad_entry);
 			unless ($response->is_error()) {
-				if (exists $members_state->{$cn}) {
-					delete $members_state->{$cn};
-				}
 				ldap_log($service_name, "Deleted entry: " . $ad_entry->dn());
 				$counter_remove++;
 			} else {
@@ -208,53 +177,15 @@ sub process_update() {
 		# compare using smart-match (perl 5.10.1+)
 		unless(@sorted_ad_val ~~ @sorted_per_val) {
 
-
-			my %ad_val_map = map { $_ => 1 } @sorted_ad_val;
-			my %per_val_map = map { $_ => 1 } @sorted_per_val;
-
-			my @to_be_added;
-			my @to_be_removed;
-
-			# add members
-			foreach my $per_val_member (@sorted_per_val) {
-				unless (exists $ad_val_map{$per_val_member}) {
-					push (@to_be_added, $per_val_member);
-				}
-			}
-
-			# remove members
-			foreach my $ad_val_member (@sorted_ad_val) {
-				unless (exists $per_val_map{$ad_val_member}) {
-					push (@to_be_removed, $ad_val_member);
-				}
-			}
-
+			# members of group are not equals
 			# we must get reference to real group from AD in order to call "replace"
 			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'base' );
 			unless ($response_ad->is_error()) {
 				# SUCCESS
 				my $ad_entry = $response_ad->entry(0);
-
-				if (@to_be_added) {
-					$ad_entry->add(
-						'member' => \@to_be_added
-					);
-				}
-
-				# remove only those members who has grace period expired
-				my @to_be_truly_removed = compute_grace_period(\@to_be_removed, $perun_entry->get_value('cn'));
-
-				if (@to_be_truly_removed) {
-					$ad_entry->delete(
-						'member' => \@to_be_truly_removed
-					);
-				}
-
-				#FIXME - temporary fix - if we decided to not do any changes at the end, just skip empty update action (it causes error otherwise)
-				unless(@to_be_added || @to_be_truly_removed) {
-					next;
-				}
-
+				$ad_entry->replace(
+					'member' => \@per_val
+				);
 				# Update entry in AD
 				my $response = $ad_entry->update($ldap);
 
@@ -262,8 +193,7 @@ sub process_update() {
 					unless ($response->is_error()) {
 						# SUCCESS (group updated)
 						$counter_update++;
-						ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @to_be_added));
-						ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n",@to_be_truly_removed));
+						ldap_log($service_name, "Group members updated: " . $ad_entry->dn() . " | \n" . join(",\n",@sorted_ad_val) .  "\n=>\n" . join(",\n",@sorted_per_val));
 					} else {
 						# FAIL (to update group)
 						$counter_fail++;
@@ -283,79 +213,4 @@ sub process_update() {
 
 	}
 
-}
-
-#
-# Compute grace periods for all members of a group who are not in Perun anymore.
-# Remove outdated grace periods from the file.
-#
-sub compute_grace_period($$$) {
-	my ($membersToRemove, $group) = @_;
-	my $gracePeriod = $grace_periods_map{$group};
-	my @membersTrulyRemove;
-	my %members_remove_map = map { $_ => 1 } @$membersToRemove;
-
-	# fi the grace period is set to 0 for the group, remove grace periods from the file for the group and return all members who are not in Perun.
-	if ($gracePeriod eq "0") {
-		@membersTrulyRemove = @$membersToRemove;
-		if (exists $members_state->{$group}) {
-			delete $members_state->{$group};
-		}
-	} else {
-		foreach my  $member (keys %{$members_state->{$group}}) {
-			# Member who was in grace period is in Perun again
-			unless (exists $members_remove_map{$member}) {
-				delete $members_state->{$group}->{$member};
-			} else {
-				# Check if grace period has ended for the member
-				if (Delta_Days(@{$members_state->{$group}->{$member}->{$MEMBER_STATE_GP}}, @today) > int($gracePeriod)) {
-					delete $members_state->{$group}->{$member};
-					push (@membersTrulyRemove, $member);
-				}
-				# Grace period was removed or kept untouched.
-				# We need to remove it from members_remove_map, because it will be used to start grace period.
-				delete $members_remove_map{$member};
-			}
-		}
-
-		# start grace period for members who were deleted in the perun and who do not have started grace period yet.
-		foreach my $member (keys %members_remove_map) {
-			$members_state->{$group}->{$member}->{$MEMBER_STATE_GP} = \@today;
-		}
-
-	}
-
-	return @membersTrulyRemove;
-}
-
-sub load_members_state() {
-	open FILE, $MEMBER_STATE_FILE or die "Cannot open $MEMBER_STATE_FILE: $!";
-	my $memberState;
-
-	while(my $line = <FILE>) {
-		chomp($line);
-		my($group, $member, $gracePeriod) = split $MEMBER_STATE_SEPARATOR, $line;
-		$memberState->{$group}->{$member}->{$MEMBER_STATE_GP} = [ split($MEMBER_STATE_DATE_SEPARATOR, $gracePeriod) ];
-	}
-
-	close FILE or die "Cannot close $MEMBER_STATE_FILE: $!";
-	return $memberState;
-}
-
-sub save_members_state() {
-	my $memberState = shift;
-
-	foreach my $group (sort keys %{$memberState}) {
-		foreach my $member (sort keys %{$memberState->{$group}}) {
-			print MEMBER_STATE_TMP_FILEHANDLE join($MEMBER_STATE_SEPARATOR, ($group,
-                                                                                         $member,
-                                                                                         join $MEMBER_STATE_DATE_SEPARATOR, @{$memberState->{$group}->{$member}->{$MEMBER_STATE_GP}},
-                                                                                        )
-                                                              );
-			print MEMBER_STATE_TMP_FILEHANDLE "\n";
-		}
-	}
-
-	close MEMBER_STATE_TMP_FILEHANDLE or die "Cannot close $MEMBER_STATE_TMP_FILE: $!";
-	move $MEMBER_STATE_TMP_FILE, $MEMBER_STATE_FILE or die "Cannot move tmp state $MEMBER_STATE_TMP_FILE to current state $MEMBER_STATE_FILE: $!";
 }
