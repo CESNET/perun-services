@@ -1,3 +1,9 @@
+perun-propagate (3.0.7) stable; urgency=medium
+
+  * changed architecture from any to all
+
+ -- Martin Kuba <makub@ics.muni.cz>  Fri, 17 Apr 2020 14:22:28 +0200
+
 perun-propagate (3.0.6) stable; urgency=low
 
   * add two new options for perun_propagate script, both are optional

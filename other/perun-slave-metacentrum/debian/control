@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 8.0.0)
 Standards-Version: 3.9.5
 
 Package: perun-slave-metacentrum
-Architecture: any
+Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts: perun-slave-meta, perun-slave
 Description: Package with required dependencies for slave scripts in Metacentrum.

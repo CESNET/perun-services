@@ -1,3 +1,9 @@
+perun-slave-metacentrum (3.0.6) stable; urgency=medium
+
+  * changed architecture from any to all
+
+ -- Martin Kuba <makub@ics.muni.cz>  Fri, 17 Apr 2020 14:07:11 +0200
+
 perun-slave-metacentrum (3.0.5) stable; urgency=low
 
   * add missing conflicts for perun-slave-metacentrum package on
