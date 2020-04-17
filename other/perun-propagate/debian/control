@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 7)
 Standards-Version: 3.9.5
 
 Package: perun-propagate
-Architecture: any
+Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Conflicts: perun-slave-meta
 Description: Perun propagate init.d script.
