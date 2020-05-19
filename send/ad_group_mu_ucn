@@ -177,15 +177,52 @@ sub process_update() {
 		# compare using smart-match (perl 5.10.1+)
 		unless(@sorted_ad_val ~~ @sorted_per_val) {
 
+			my %ad_val_map = map { $_ => 1 } @sorted_ad_val;
+			my %per_val_map = map { $_ => 1 } @sorted_per_val;
+
+			my @to_be_added;
+			my @to_be_removed;
+
+			# add members
+			foreach my $per_val_member (@sorted_per_val) {
+				unless (exists $ad_val_map{$per_val_member}) {
+					push (@to_be_added, $per_val_member);
+				}
+			}
+
+			# remove members
+			foreach my $ad_val_member (@sorted_ad_val) {
+				unless (exists $per_val_map{$ad_val_member}) {
+					push (@to_be_removed, $ad_val_member);
+				}
+			}
+
 			# members of group are not equals
 			# we must get reference to real group from AD in order to call "replace"
 			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'base' );
 			unless ($response_ad->is_error()) {
 				# SUCCESS
+
 				my $ad_entry = $response_ad->entry(0);
-				$ad_entry->replace(
-					'member' => \@per_val
-				);
+
+				if (@to_be_added) {
+					$ad_entry->add(
+						'member' => \@to_be_added
+					);
+				}
+
+
+				if (@to_be_removed) {
+					$ad_entry->delete(
+						'member' => \@to_be_removed
+					);
+				}
+
+				#FIXME - temporary fix - if we decided to not do any changes at the end, just skip empty update action (it causes error otherwise)
+				unless(@to_be_added || @to_be_removed) {
+					next;
+				}
+
 				# Update entry in AD
 				my $response = $ad_entry->update($ldap);
 
@@ -193,12 +230,14 @@ sub process_update() {
 					unless ($response->is_error()) {
 						# SUCCESS (group updated)
 						$counter_update++;
-						ldap_log($service_name, "Group members updated: " . $ad_entry->dn() . " | \n" . join(",\n",@sorted_ad_val) .  "\n=>\n" . join(",\n",@sorted_per_val));
+						ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @to_be_added));
+						ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n",@to_be_removed));
 					} else {
 						# FAIL (to update group)
 						$counter_fail++;
 						ldap_log($service_name, "Group members NOT updated: " . $ad_entry->dn() . " | " . $response->error());
-						ldap_log($service_name, $ad_entry->ldif());
+						ldap_log($service_name, "Group members who should be added: " . $ad_entry->dn() . " | \n" . join(",\n", @to_be_added));
+						ldap_log($service_name, "Group members who should be removed: " . $ad_entry->dn() . " | \n" . join(",\n",@to_be_removed));
 					}
 				}
 
