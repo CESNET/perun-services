@@ -24,11 +24,11 @@ fi
 
 # Specify command to tranfer the data
 TRANSPORT_COMMAND="curl --cacert /etc/ssl/chain_TERENA_SSL_CA_3.pem -i -H Content-Type:application/json -f -X POST"
-USER_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @$USER_FILE -u `echo $DESTINATION | tr '@' ' '`$USER_ENDPOINT"
-GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @$GROUP_FILE -u `echo $DESTINATION | tr '@' ' '`$GROUP_ENDPOINT"
+USER_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- -u `echo $DESTINATION | tr '@' ' '`$USER_ENDPOINT"
+GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- -u `echo $DESTINATION | tr '@' ' '`$GROUP_ENDPOINT"
 
 # HTTP Request with timeout for USERS
-timeout -k $TIMEOUT_KILL $TIMEOUT $USER_TRANSPORT_COMMAND
+cat "$USER_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $USER_TRANSPORT_COMMAND
 # Catch errors
 ERR_CODE=$?
 #Error code 124 means - timeouted
@@ -39,7 +39,7 @@ else
 fi
 
 # HTTP Request with timeout for GROUPS
-timeout -k $TIMEOUT_KILL $TIMEOUT $GROUP_TRANSPORT_COMMAND
+cat "$GROUP_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $GROUP_TRANSPORT_COMMAND
 # Catch errors
 ERR_CODE=$?
 #Error code 124 means - timeouted
