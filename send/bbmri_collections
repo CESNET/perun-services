@@ -22,10 +22,13 @@ if [ "$DESTINATION_TYPE" != "url" ]; then
 	exit 1;
 fi
 
+# Read user name and password from configuration if it is present.
+[ -r /etc/perun/services/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME
+
 # Specify command to tranfer the data
 TRANSPORT_COMMAND="curl --cacert /etc/ssl/chain_TERENA_SSL_CA_3.pem -i -H Content-Type:application/json -f -X POST"
-USER_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- -u `echo $DESTINATION | tr '@' ' '`$USER_ENDPOINT"
-GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- -u `echo $DESTINATION | tr '@' ' '`$GROUP_ENDPOINT"
+USER_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- -u $USERNAME_AND_PASSWORD $DESTINATION$USER_ENDPOINT"
+GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- -u $USERNAME_AND_PASSWORD $DESTINATION$GROUP_ENDPOINT"
 
 # HTTP Request with timeout for USERS
 cat "$USER_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $USER_TRANSPORT_COMMAND
