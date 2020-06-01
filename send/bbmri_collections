@@ -22,20 +22,20 @@ if [ "$DESTINATION_TYPE" != "url" ]; then
 	exit 1;
 fi
 
-# Read user name and password from configuration if it is present.
+# Read user name and password from configuration if it is present ( expect string "-u user:pass" )
 [ -r /etc/perun/services/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME
 
-# Specify command to tranfer the data
-TRANSPORT_COMMAND="curl --cacert /etc/ssl/chain_TERENA_SSL_CA_3.pem -i -H Content-Type:application/json -f -X POST"
-USER_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- -u $USERNAME_AND_PASSWORD $DESTINATION$USER_ENDPOINT"
-GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- -u $USERNAME_AND_PASSWORD $DESTINATION$GROUP_ENDPOINT"
+# Specify command to transfer the data
+TRANSPORT_COMMAND="curl -i -H Content-Type:application/json -f -X POST"
+USER_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- $USERNAME_AND_PASSWORD $DESTINATION$USER_ENDPOINT"
+GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- $USERNAME_AND_PASSWORD $DESTINATION$GROUP_ENDPOINT"
 
 # HTTP Request with timeout for USERS
 cat "$USER_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $USER_TRANSPORT_COMMAND
 # Catch errors
 ERR_CODE=$?
-#Error code 124 means - timeouted
-if [ $ERR_CODE -e 124 ]; then
+#Error code 124 means - timed out
+if [ $ERR_CODE -eq 124 ]; then
 	echo "Communication with the peer has timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
 else
 	echo "Communication with the peer ends with return code: $ERR_CODE" >&2
@@ -45,9 +45,9 @@ fi
 cat "$GROUP_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $GROUP_TRANSPORT_COMMAND
 # Catch errors
 ERR_CODE=$?
-#Error code 124 means - timeouted
-if [ $ERR_CODE -e 124 ]; then
-  echo "Communication with the peer has timed out with return code: $ERR_CODE" >&2
+#Error code 124 means - timed out
+if [ $ERR_CODE -eq 124 ]; then
+	echo "Communication with the peer has timed out with return code: $ERR_CODE" >&2
 else
 	echo "Communication with the peer ends with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
 fi
