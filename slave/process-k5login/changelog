@@ -1,3 +1,10 @@
+perun-slave-process-k5login (3.1.6) stable; urgency=low
+
+  * Skip information about not changed k5login files. This information is
+    not important for administrators of a service.
+
+ -- Michal Stava <stavamichal@gmail.com> Wed, 03 Jun 2020 14:57:00 +0200
+
 perun-slave-process-k5login (3.1.5) stable; urgency=medium
 
   * Changed architecture to all

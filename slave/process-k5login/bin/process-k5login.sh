@@ -58,7 +58,8 @@ function process {
 
 		#nothing to add, can skip to another user
 		if [ -z "${ADDED_PRINCIPALS}" ]; then
-			log_msg I_K5LOGIN_NOT_UPDATED
+			#skip this log, not important information for administrators
+			#log_msg I_K5LOGIN_NOT_UPDATED
 			continue
 		fi
 
