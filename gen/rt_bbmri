@@ -7,7 +7,7 @@ use File::Basename;
 use JSON::XS;
 
 our $SERVICE_NAME = basename($0);
-our $PROTOCOL_VERSION = "3.1.0";
+our $PROTOCOL_VERSION = "3.1.1";
 my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
