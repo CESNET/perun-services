@@ -8,7 +8,7 @@ use JSON::XS;
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -20,6 +20,9 @@ our $A_USER_LOGIN_BBMRI;        *A_USER_LOGIN_BBMRI =          \'urn:perun:user:
 our $A_USER_PREFERRED_MAIL;     *A_USER_PREFERRED_MAIL =       \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_RT_PREF_MAIL;       *A_USER_RT_PREF_MAIL =         \'urn:perun:user:attribute-def:def:rtPreferredMail';
 our $A_USER_LAST_NAME;          *A_USER_LAST_NAME =            \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_MIDDLE_NAME;        *A_USER_MIDDLE_NAME =          \'urn:perun:user:attribute-def:core:middleName';
+our $A_USER_FIRST_NAME;         *A_USER_FIRST_NAME =           \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_DISPLAY_NAME;       *A_USER_DISPLAY_NAME =         \'urn:perun:user:attribute-def:core:displayName';
 our $A_USER_ORGANIZATION;       *A_USER_ORGANIZATION =         \'urn:perun:user:attribute-def:def:organization';
 our $A_RES_NAME;                *A_RES_NAME =                  \'urn:perun:resource:attribute-def:core:name';
 our $A_RES_RT_GROUP_NAME;       *A_RES_RT_GROUP_NAME =         \'urn:perun:resource:attribute-def:def:rtGroupName';
@@ -29,6 +32,9 @@ our $A_FAC_OUTPUT_FILE_NAME;    *A_FAC_OUTPUT_FILE_NAME =      \'urn:perun:facil
 our $LOGIN_HEADER = 'login';
 our $PREF_MAIL_HEADER = 'preferredMail';
 our $LAST_NAME_HEADER = 'lastName';
+our $MIDDLE_NAME_HEADER = 'middleName';
+our $FIRST_NAME_HEADER = 'firstName';
+our $DISPLAY_NAME_HEADER = 'displayName';
 our $ORGANIZATION_HEADER = 'organization';
 our $GROUPS_IN_RT_HEADER = 'groupsInRT';
 
@@ -42,10 +48,10 @@ my $usersStructureByUserId = {};
 my %facilityAttributes = attributesToHash $data->getAttributes;
 my $output_file_name = $facilityAttributes{$A_FAC_OUTPUT_FILE_NAME} || 'rt-bbmri-data';
 
-my @resourcesData = $data->getChildElements; 
+my @resourcesData = $data->getChildElements;
 foreach my $rData (@resourcesData) {
 	my %resourceAttributes  = attributesToHash $rData->getAttributes;
-	
+
 	my $rtGroupName = $resourceAttributes{$A_RES_RT_GROUP_NAME} || $resourceAttributes{$A_RES_NAME} ;
 
 	my @membersData = $rData->getChildElements;
@@ -56,15 +62,21 @@ foreach my $rData (@resourcesData) {
 			my $login = $memberAttributes->{$A_USER_LOGIN_BBMRI};
 			my $userPrefMail = $memberAttributes->{$A_USER_RT_PREF_MAIL} || $memberAttributes->{$A_USER_PREFERRED_MAIL};
 			my $lastName = $memberAttributes->{$A_USER_LAST_NAME};
+			my $middleName = $memberAttributes->{$A_USER_MIDDLE_NAME};
+			my $firstName = $memberAttributes->{$A_USER_FIRST_NAME};
+			my $displayName = $memberAttributes->{$A_USER_DISPLAY_NAME};
 			my $organization = $memberAttributes->{$A_USER_ORGANIZATION};
 
 			$usersStructureByUserId->{$userId}->{$PREF_MAIL_HEADER} = $userPrefMail;
 			$usersStructureByUserId->{$userId}->{$LAST_NAME_HEADER} = $lastName;
+			$usersStructureByUserId->{$userId}->{$MIDDLE_NAME_HEADER} = $middleName;
+			$usersStructureByUserId->{$userId}->{$FIRST_NAME_HEADER} = $firstName;
+			$usersStructureByUserId->{$userId}->{$DISPLAY_NAME_HEADER} = $displayName;
 			$usersStructureByUserId->{$userId}->{$LOGIN_HEADER} = $login;
 			$usersStructureByUserId->{$userId}->{$ORGANIZATION_HEADER} = $organization;
 			$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER} = ();
 		}
-		
+
 		my @listOfRTGroups = uniqList((@{$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER}},  $rtGroupName));
 		$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER} = \@listOfRTGroups;
 	}
