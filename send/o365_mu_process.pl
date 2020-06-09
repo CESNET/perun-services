@@ -461,7 +461,7 @@ sub processResourceMail {
 		
 		if($DEBUG) { print "CHANGE RESOURCE-MAIL: " . $resourceMailObject->{$RES_NAME_TEXT} . " - STARTED\n"; }
 		`$command`;
-		if($@) { 
+		if($?) { 
 			print "CHANGE RESOURCE-MAIL: " . $resourceMailObject->{$RES_NAME_TEXT} . " - ERROR - $@\n";
 			return 0; 
 		}
