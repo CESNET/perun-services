@@ -12,9 +12,14 @@ use URI;
 use JSON;
 use Data::Dumper;
 use POSIX qw(strftime);
+use Encode qw(decode_utf8);
 
 #We want to have data in UTF8 on output
 binmode STDOUT, ':utf8';
+binmode STDERR, ':utf8';
+
+#parse arguments in utf8
+@ARGV = map { decode_utf8($_, 1) } @ARGV;
 
 sub shellEscape($);
 
