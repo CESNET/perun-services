@@ -19,7 +19,10 @@ TOPDESK_FILE=$SERVICE_FILES_DIR/${SERVICE_NAME}.csv
 # Define SERVICE_SPECIFIC destination type in Perun system and provide just this:
 # --basic --user username:your_local_operator_password  https://trait.topdesk.net/webdav/import/elixirimport.csv
 
-TRANSPORT_COMMAND="/usr/bin/curl -T $TOPDESK_FILE $DESTINATION"
+# Read user name and password from configuration if it is present ( expect string "-u user:pass" )
+[ -r /etc/perun/services/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME
+
+TRANSPORT_COMMAND="/usr/bin/curl -T $TOPDESK_FILE $USERNAME_AND_PASSWORD $DESTINATION"
 
 #Just safety check. This should not happen.
 if [ ! -d "$SERVICE_FILES_DIR" ]; then echo '$SERVICE_FILES_DIR: '$SERVICE_FILES_DIR' is not a directory' >&2 ; exit 1; fi
@@ -28,9 +31,9 @@ timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
 
 ERR_CODE=$?
 
-#Error code 124 means - timeouted
-if [ $ERR_CODE -e 124 ]; then
-	echo "Communication with slave script was timeouted with return code: $ERR_CODE (Warning: this error can mask original error 124 from slave script!)" >&2
+#Error code 124 means - timed out
+if [ $ERR_CODE -eq 124 ]; then
+	echo "Communication with slave script has timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from slave script!)" >&2
 else
 	echo "Communication with slave script ends with return code: $ERR_CODE" >&2
 fi
