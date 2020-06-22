@@ -27,6 +27,7 @@ our $A_USER_LANG;                            *A_USER_LANG =                     
 our $A_USER_STATUS;                          *A_USER_STATUS =                           \'urn:perun:member:attribute-def:core:status';
 our $A_USER_OPT_OUT;                         *A_USER_OPT_OUT =                          \'urn:perun:member_resource:attribute-def:def:optOutMailingList';
 
+our $A_RESOURCE_DISABLE_OPT_OUT;             *A_RESOURCE_DISABLE_OPT_OUT =               \'urn:perun:resource:attribute-def:def:disableMailingListOptOut';
 our $A_RESOURCE_MAILING_LIST_NAME;           *A_RESOURCE_MAILING_LIST_NAME =            \'urn:perun:resource:attribute-def:def:mailingListName';
 our $A_RESOURCE_MAILING_LIST_VARIANTS;       *A_RESOURCE_MAILING_LIST_VARIANTS =        \'urn:perun:resource:attribute-def:def:mailingListUsesLangVariants'; # true for -cs and -en variants
 our $A_RESOURCE_MAILING_LIST_NONVALID_USERS; *A_RESOURCE_MAILING_LIST_NONVALID_USERS =  \'urn:perun:resource:attribute-def:def:mailingListAllowInvalidUsers'; # true to allow users with status other than VALID
@@ -44,6 +45,7 @@ foreach my $rData (@resourcesData) {
 	my @membersData = $rData->getChildElements;
 	my $useLangVariants = (defined($resourceAttributes{$A_RESOURCE_MAILING_LIST_VARIANTS}) && ($resourceAttributes{$A_RESOURCE_MAILING_LIST_VARIANTS} eq "true") );
 	my $allowNonvalidUsers = (defined($resourceAttributes{$A_RESOURCE_MAILING_LIST_NONVALID_USERS}) && ($resourceAttributes{$A_RESOURCE_MAILING_LIST_NONVALID_USERS} eq "true") );
+	my $disableOptOut = (defined($resourceAttributes{$A_RESOURCE_DISABLE_OPT_OUT}) && ($resourceAttributes{$A_RESOURCE_DISABLE_OPT_OUT} eq "true") );
 
 	my $listName = "$resourceAttributes{$A_RESOURCE_MAILING_LIST_NAME}";
 	my $listNameEN = $listName . "-en";
@@ -58,10 +60,15 @@ foreach my $rData (@resourcesData) {
 	}
 
 	foreach my $memberAttributes (dataToAttributesHashes @membersData) {
+
 		#list only VALID members except if allowNonvalidUsers is true
 		next unless(($memberAttributes->{$A_USER_STATUS} eq "VALID") || ($allowNonvalidUsers));
-		#list only members that did not opt out
-		next if defined $memberAttributes->{$A_USER_OPT_OUT};
+
+		# check if mailing list respect opt-out
+		unless ($disableOptOut) {
+			# list only members that did not opt out
+			next if defined $memberAttributes->{$A_USER_OPT_OUT};
+		}
 
 		my $listNameWithLang = $listName;
 		if($useLangVariants) {
