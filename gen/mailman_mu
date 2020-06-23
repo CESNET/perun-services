@@ -45,6 +45,10 @@ foreach my $rData (@resourcesData) {
 	# Store the admin's mail
 	$mailinglistAdminMailStruc->{$listName} = $adminMail;
 
+	# store empty mailing list
+	$mailinglistStruc->{$listName} = ();
+
+	# fill mailing list
 	foreach my $memberAttributes (dataToAttributesHashes @membersData) {
 		#list only VALID members except if allowNonvalidUsers is true
 		next unless($memberAttributes->{$A_USER_STATUS} eq "VALID");
