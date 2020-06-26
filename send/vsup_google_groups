@@ -7,12 +7,12 @@ SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
 SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
 
 #Just safety check. This should not happen.
-if [ ! -d "$SERVICE_FILES_DIR" ]; then echo '$SERVICE_FILES_DIR: '$SERVICE_FILES_DIR' is not a directory' >&2 ; exit 1; fi
+if [ ! -d "$SERVICE_FILES_DIR" ]; then echo 'SERVICE_FILES_DIR: '"$SERVICE_FILES_DIR"' is not a directory' >&2 ; exit 1; fi
 
-JAR='/home/perun/perun-google-group-connector/GoogleGroupConnector-2.0.0.jar'
+JAR='/home/perun/perun-google-group-connector/google-group-connector-2.0.0.jar'
 LOGBACK='-Dlogback.configurationFile=/etc/perun/logback-google-groups.xml'
 
 # manage users
-java $LOGBACK -jar $JAR `cat "$SERVICE_FILES_DIR"/vsup_google_groups_domain` "users" "$SERVICE_FILES_DIR/vsup_google_groups_users.csv" || exit 1;
+java $LOGBACK -jar $JAR "$(cat "${SERVICE_FILES_DIR}/vsup_google_groups_domain")" "users" "$SERVICE_FILES_DIR/vsup_google_groups_users.csv" || exit 1;
 # manage groups
-java $LOGBACK -jar $JAR `cat "$SERVICE_FILES_DIR"/vsup_google_groups_domain` "groups" "$SERVICE_FILES_DIR/vsup_google_groups_groups.csv" || exit 1;
+java $LOGBACK -jar $JAR "$(cat "${SERVICE_FILES_DIR}/vsup_google_groups_domain")" "groups" "$SERVICE_FILES_DIR/vsup_google_groups_groups.csv" || exit 1;
