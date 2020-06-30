@@ -134,6 +134,9 @@ sub calculateExpiration() {
 		return undef;
 	}
 
+	# add one day, since we want users to be valid during the last day
+	$latest_expiration = $latest_expiration + 86400;
+
 	return localtime($latest_expiration)->ymd;
 
 }
