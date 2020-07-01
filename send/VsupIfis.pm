@@ -112,7 +112,7 @@ sub load_dc2() {
         ELSE null
         END as KARTA_IDENT
         FROM PAM2IDM_VZTAHY
-        WHERE (DO >= SYSDATE OR DO is NULL) and UCO is not null});
+        WHERE (DO >= TRUNC(SYSDATE) OR DO is NULL) and UCO is not null});
 	$sth->execute();
 
 	#Structure to store data from input database (DC2)
