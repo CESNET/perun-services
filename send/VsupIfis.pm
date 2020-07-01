@@ -59,7 +59,7 @@ sub load_kos() {
 	$dbh->do("alter session set nls_date_format='YYYY-MM-DD HH24:MI:SS'");
 
 	# Select query for input database (KOS) - all students with UCO not null and DO_ >= now or null
-	my $sth = $dbh->prepare(qq{select case when OSB_ID=UCO then null else UCO end as UCO, NS, 'STU' as TYP_VZTAHU, STUD_FORMA as DRUH_VZTAHU, ID_STUDIA as VZTAH_CISLO, STUD_FORMA as STU_FORMA, STUD_STAV as STUD_STAV, STUD_TYP as STU_PROGR, OD, DO_, KARTA_LIC as KARTA_IDENT from SIS2IDM_STUDIA where (case when OSB_ID=UCO then null else UCO end) is not null and (DO_ >= SYSDATE OR DO_ is NULL)});
+	my $sth = $dbh->prepare(qq{select case when OSB_ID=UCO then null else UCO end as UCO, NS, 'STU' as TYP_VZTAHU, STUD_FORMA as DRUH_VZTAHU, ID_STUDIA as VZTAH_CISLO, STUD_FORMA as STU_FORMA, STUD_STAV as STUD_STAV, STUD_TYP as STU_PROGR, OD, DO_, KARTA_LIC as KARTA_IDENT from SIS2IDM_STUDIA where (case when OSB_ID=UCO then null else UCO end) is not null and (DO_ >= TRUNC(SYSDATE) OR DO_ is NULL)});
 	$sth->execute();
 
 	# Structure to store data from input database (KOS)
@@ -109,7 +109,7 @@ sub load_vema() {
 	END as KARTA_IDENT,
 	VZ_S_C
 	FROM PAMIDMVZ
-	WHERE (DO_ >= SYSDATE OR DO_ is NULL) and UCO is not null});
+	WHERE (DO_ >= TRUNC(SYSDATE) OR DO_ is NULL) and UCO is not null});
 	$sth->execute();
 
 	# Structure to store data from input database (DC2)
