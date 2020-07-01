@@ -1,7 +1,7 @@
 package VsupIfis;
 use Exporter 'import';
 @ISA = ('Exporter');
-@EXPORT = qw(load_kos load_vema);
+@EXPORT = qw(load_kos load_vema load_dc2);
 
 use strict;
 use warnings FATAL => 'all';
