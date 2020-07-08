@@ -76,80 +76,117 @@ if [ -z "$DESTINATION_TYPE" ]; then
 	DESTINATION_TYPE="service-specific"
 fi
 
-case $DESTINATION_TYPE in
-	service-specific)
-		DESTINATION_DIR="$DESTINATION"
-		;;
-	*)
-		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
-		exit 1;
-		;;
-esac
-
-
+#chose by destination
+if [ "$DESTINATION_TYPE" = "service-specific" ]; then
+	DESTINATION_DIR="$DESTINATION"
+	
 	# sort & diff scripts from CPAN
-LDIFDIFF="./ldifdiff.pl"
-LDIFSORT="./ldifsort.pl"
+	LDIFDIFF="./ldifdiff.pl"
+	LDIFSORT="./ldifsort.pl"
 
-SAFEQ_LDIF_SORT="./safeq-ldif-sort.pl";
+	SAFEQ_LDIF_SORT="./safeq-ldif-sort.pl";
 
 
-# work files location
-INFILE="$SERVICE_FILES_DIR/safeq"
-OLD_FILE="$DESTINATION_DIR/safeq-content.ldif"
+	# work files location
+	INFILE="$SERVICE_FILES_DIR/safeq"
+	OLD_FILE="$DESTINATION_DIR/safeq-content.ldif"
 
-# sorted work files
-SINFILE=`mktemp --tmpdir=/tmp sorted-safeq-XXXXXX.ldif`
-S_OLD_FILE=`mktemp --tmpdir=/tmp sorted-safeq-old-XXXXXXX.ldif`
+	# sorted work files
+	SINFILE=`mktemp --tmpdir=/tmp sorted-safeq-XXXXXX.ldif`
+	S_OLD_FILE=`mktemp --tmpdir=/tmp sorted-safeq-old-XXXXXXX.ldif`
 
-LDIF=`mktemp --tmpdir=/tmp safeq-ldif-XXXXXXX.ldif`
-FINAL=`mktemp --tmpdir=/tmp safeq-final-XXXXXX.ldif`
+	LDIF=`mktemp --tmpdir=/tmp safeq-ldif-XXXXXXX.ldif`
+	FINAL=`mktemp --tmpdir=/tmp safeq-final-XXXXXX.ldif`
 
-if test -s "$OLD_FILE"; then
-# LDAP is not empty under base DN
+	if test -s "$OLD_FILE"; then
+		# LDAP is not empty under base DN
 
-	# SORT LDIFs
-	catch_error E_LDIFSORT_FILE $LDIFSORT -k dn $OLD_FILE >$S_OLD_FILE
-	catch_error E_LDIFSORT_FILE $LDIFSORT -k dn $INFILE >$SINFILE
+		# SORT LDIFs
+		catch_error E_LDIFSORT_FILE $LDIFSORT -k dn $OLD_FILE >$S_OLD_FILE
+		catch_error E_LDIFSORT_FILE $LDIFSORT -k dn $INFILE >$SINFILE
 
-	# DIFF LDIFs
-	catch_error E_LDIFDIFF_FILE $LDIFDIFF -k dn $SINFILE $S_OLD_FILE > $LDIF
-	sed '1,1{/^$/d; }; /^[^ ].*/N; s/\n //g' $LDIF | $SAFEQ_LDIF_SORT > "$FINAL"
+		# DIFF LDIFs
+		catch_error E_LDIFDIFF_FILE $LDIFDIFF -k dn $SINFILE $S_OLD_FILE > $LDIF
+		sed '1,1{/^$/d; }; /^[^ ].*/N; s/\n //g' $LDIF | $SAFEQ_LDIF_SORT > "$FINAL"
 
-else
-# LDAP is empty under base DN
+	else
+		# LDAP is empty under base DN
 
-	echo "File with old stat is missing: $OLD_FILE"  >&2
-	exit 5;
+		echo "File with old stat is missing: $OLD_FILE"  >&2
+		exit 5;
 
-	#$LDIFSORT -k dn $INFILE >$SINFILE
+		#$LDIFSORT -k dn $INFILE >$SINFILE
 
-	#$LDIFDIFF -k dn $SINFILE /dev/null | sed '1,1{/^$/d; }; /^[^ ].*/N; s/\n //g' | $SAFEQ_LDIF_SORT  > "$FINAL"
+		#$LDIFDIFF -k dn $SINFILE /dev/null | sed '1,1{/^$/d; }; /^[^ ].*/N; s/\n //g' | $SAFEQ_LDIF_SORT  > "$FINAL"
 
-fi
-
-catch_error E_REMOVE_FILE rm "$SINFILE" "$S_OLD_FILE" "$LDIF"
-TIMESTAMP=`date "+%F_%H.%M.%S"`
-
-if [ `stat -c %s "$FINAL"` -gt 1  ]; then #first line of file is always empty
-	mv "$FINAL" "$DESTINATION_DIR/data/safeq-$TIMESTAMP.ldif"
-	if [ $? -ne 0 ]; then
-		echo "Could not move file ${FINAL} to ${DESTINATION_DIR}/data/safeq-${TIMESTAMP}.ldif" >> "$SERVICE_ERROR_LOG"
 	fi
-else
-	rm "$FINAL"
-	if [ $? -ne 0 ]; then
-		echo "Could not remove ${FINAL}" >> "$SERVICE_ERROR_LOG"
+
+	catch_error E_REMOVE_FILE rm "$SINFILE" "$S_OLD_FILE" "$LDIF"
+	TIMESTAMP=`date "+%F_%H.%M.%S"`
+
+	if [ `stat -c %s "$FINAL"` -gt 1  ]; then #first line of file is always empty
+		mv "$FINAL" "$DESTINATION_DIR/data/safeq-$TIMESTAMP.ldif"
+		if [ $? -ne 0 ]; then
+			echo "Could not move file ${FINAL} to ${DESTINATION_DIR}/data/safeq-${TIMESTAMP}.ldif" >> "$SERVICE_ERROR_LOG"
+		fi
+	else
+		rm "$FINAL"
+		if [ $? -ne 0 ]; then
+			echo "Could not remove ${FINAL}" >> "$SERVICE_ERROR_LOG"
+		fi
+		echo No changes
 	fi
-	echo No changes
+	cp "$INFILE" "$DESTINATION_DIR/backup-data-from-perun/safeq-content-$TIMESTAMP.ldif"
+	if [ $? -ne 0 ]; then
+		echo "Could not copy ${INFILE} to ${DESTINATION_DIR}/backup-data-from-perun/safeq-content-${TIMESTAMP}.ldif" >> "$SERVICE_ERROR_LOG"
+	fi
+	cp "$INFILE" "$OLD_FILE"
+	if [ $? -ne 0 ]; then
+		echo "Could not copy ${INFILE} to ${OLD_FILE}" >> "$SERVICE_ERROR_LOG"
+	fi
+	if [ -e "$SERVICE_ERROR_LOG" ]; then cat $SERVICE_ERROR_LOG >&2 ; exit 1; fi
+
+elif [ "$DESTINATION_TYPE" = "user@host-windows" ]; then
+	HOST=`echo $DESTINATION | sed -e 's/:.*//'`
+	HOSTNAME=`echo $HOST | sed -e 's/^.*@//'`
+
+	TMP_HOSTNAME_DIR="`mktemp -d /tmp/perun-send.XXXXXXXXXX`"
+	if [ $? -ne 0 ]; then
+		echo "Can't create temporary dir" >&2
+		exit 255
+	fi
+
+	trap 'rm -r -f "$TMP_HOSTNAME_DIR" "$TMPFILE"' EXIT
+
+	echo $HOSTNAME > "$TMP_HOSTNAME_DIR/HOSTNAME"
+	if [ $? -ne 0 ]; then
+		echo "Can't write hostname to $TMP_HOSTNAME_DIR/HOSTNAME" >&2
+		exit 255
+	fi
+
+	#Default tar mode - create an archive
+	TAR_MODE="-c"
+
+	#Add host to the transport command for all types of destination
+	TRANSPORT_COMMAND="$TRANSPORT_COMMAND $HOST $SLAVE_COMMAND"
+
+	#prepare stdout for command
+	STDOUT=`tar $TAR_MODE -C "$SERVICE_FILES_DIR"  --exclude="_destination" .  -C "$TMP_HOSTNAME_DIR" . | destination_type_transformation | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND`
+
+	ERR_CODE=$?
+
+	if [ $ERR_CODE -eq 124 ]; then
+  	#Special situation when error code 124 has been thrown. That means - timeouted and terminated from our side
+  	echo "$STDOUT"
+  	echo "Communication with slave script was timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
+	else
+		echo "$STDOUT"
+  fi
+  #For all situations different from timouted by our side we can return value from ERR_CODE as the result
+  echo "Communication with slave script ends with return code: $ERR_CODE" >&2
+	
+else
+	echo "Unknown destination type '$DESTINATION_TYPE'." >&2
+  exit 1;
 fi
-cp "$INFILE" "$DESTINATION_DIR/backup-data-from-perun/safeq-content-$TIMESTAMP.ldif"
-if [ $? -ne 0 ]; then
-	echo "Could not copy ${INFILE} to ${DESTINATION_DIR}/backup-data-from-perun/safeq-content-${TIMESTAMP}.ldif" >> "$SERVICE_ERROR_LOG"
-fi
-cp "$INFILE" "$OLD_FILE"
-if [ $? -ne 0 ]; then
-	echo "Could not copy ${INFILE} to ${OLD_FILE}" >> "$SERVICE_ERROR_LOG"
-fi
-if [ -e "$SERVICE_ERROR_LOG" ]; then cat $SERVICE_ERROR_LOG >&2 ; exit 1; fi
 
