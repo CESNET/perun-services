@@ -54,6 +54,26 @@ function log_msg {
 	fi
 }
 
+#if there is no destination type, end with error
+if [ -z "$DESTINATION_TYPE" ]; then
+	echo "Missing destination type." >&2
+	exit 1;
+fi
+
+case $DESTINATION_TYPE in
+	service-specific)
+		DESTINATION_DIR="$DESTINATION"
+		;;
+	user@host-windows)
+		. generic_send
+		exit 0;
+		;;
+	*)
+		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
+		exit 1;
+		;;
+esac
+
 if [ ! -d "$SERVICE_ERROR_DIR" ]; then
 	catch_error E_CREATE_DIR mkdir "$SERVICE_ERROR_DIR"
 fi
@@ -70,24 +90,7 @@ if [ ! -d "$SERVICE_FILES_DIR" ]; then echo '$SERVICE_FILES_DIR: '$SERVICE_FILES
 #unless specific configuration for destination exists use common configuration for all destination
 [ -d "$SERVICE_FILES_FOR_DESTINATION" ] || SERVICE_FILES_FOR_DESTINATION="$SERVICE_FILES_DIR/_destination/all"
 
-
-#if there is no destination type, use default 'host'
-if [ -z "$DESTINATION_TYPE" ]; then
-	DESTINATION_TYPE="service-specific"
-fi
-
-case $DESTINATION_TYPE in
-	service-specific)
-		DESTINATION_DIR="$DESTINATION"
-		;;
-	*)
-		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
-		exit 1;
-		;;
-esac
-
-
-	# sort & diff scripts from CPAN
+# sort & diff scripts from CPAN
 LDIFDIFF="./ldifdiff.pl"
 LDIFSORT="./ldifsort.pl"
 
