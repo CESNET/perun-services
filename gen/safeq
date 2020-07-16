@@ -35,6 +35,7 @@ our $A_RESOURCE_BILLING_CODE;  *A_RESOURCE_BILLING_CODE = \'urn:perun:resource:a
 our $A_R_PREPAID;              *A_R_PREPAID =             \'urn:perun:resource:attribute-def:def:safeq-prepaid';
 our $A_R_PRINT_FOR_FREE;       *A_R_PRINT_FOR_FREE =      \'urn:perun:resource:attribute-def:def:safeq-printForFree';
 
+my %facilityAttributes = attributesToHash $data->getAttributes;
 my $baseDNUsers = $facilityAttributes{$A_F_BASE_DN};
 
 my $file = $DIRECTORY . "safeq";
