@@ -21,7 +21,7 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $data = perunServicesInit::getHierarchicalData;
 
 #Constants
-our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adUsersBaseDN';
+our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
 
 our $A_USER_LOGIN;             *A_USER_LOGIN =            \'urn:perun:user:attribute-def:def:login-namespace:mu';
 our $A_USER_FIRST_NAME;        *A_USER_FIRST_NAME =       \'urn:perun:user:attribute-def:core:firstName';
