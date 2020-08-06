@@ -41,10 +41,10 @@ our $A_F_ID;  *A_F_ID = \'urn:perun:facility:attribute-def:core:id';
 our $A_R_OU_NAME;  *A_R_OU_NAME = \'urn:perun:resource:attribute-def:def:adOuName';
 our $A_R_RELATION_TYPE;  *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType'; # STU/ZAM/ABS
 
-our $A_G_R_AD_NAME;  *A_G_R_AD_NAME = \'urn:perun:group_resource:attribute-def:def:adName';
-our $A_G_R_AD_DISPLAY_NAME;  *A_G_R_AD_DISPLAY_NAME = \'urn:perun:group_resource:attribute-def:def:adDisplayName';
+our $A_G_AD_NAME;    *A_G_AD_NAME = \'urn:perun:group:attribute-def:def:adName:o365mu';
+our $A_G_AD_DISPLAY_NAME;  *A_G_AD_DISPLAY_NAME = \'urn:perun:group:attribute-def:def:adDisplayName:o365mu';
 our $A_G_R_msExchRequireAuthToSendTo;  *A_G_R_msExchRequireAuthToSendTo = \'urn:perun:group_resource:attribute-def:def:adRequireSenderAuthenticationEnabled';
-our $A_G_R_AD_EMAIL_ADDRESSES;  *A_G_R_AD_EMAIL_ADDRESSES = \'urn:perun:group_resource:attribute-def:def:o365EmailAddresses:mu';
+our $A_G_AD_EMAIL_ADDRESSES;  *A_G_AD_EMAIL_ADDRESSES = \'urn:perun:group:attribute-def:def:o365EmailAddresses:o365mu';
 
 # User/member attributes
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
@@ -226,14 +226,14 @@ sub processGroups {
 	# process normal groups
 	unless ($ouName eq 'licenses') {
 
-		if(defined $groupAttributes{$A_G_R_AD_NAME}) {
+		if(defined $groupAttributes{$A_G_AD_NAME}) {
 			# create group entry
-			my $key = "CN=".$groupAttributes{$A_G_R_AD_NAME}."_group.muni.cz,OU=".$ouName.",".$baseDNGroups;
+			my $key = "CN=".$groupAttributes{$A_G_AD_NAME}."_group.muni.cz,OU=".$ouName.",".$baseDNGroups;
 
-			$groups->{$ouName}->{$key}->{$A_G_R_AD_NAME} = $groupAttributes{$A_G_R_AD_NAME};
-			$groups->{$ouName}->{$key}->{$A_G_R_AD_DISPLAY_NAME} = $groupAttributes{$A_G_R_AD_DISPLAY_NAME};
+			$groups->{$ouName}->{$key}->{$A_G_AD_NAME} = $groupAttributes{$A_G_AD_NAME};
+			$groups->{$ouName}->{$key}->{$A_G_AD_DISPLAY_NAME} = $groupAttributes{$A_G_AD_DISPLAY_NAME};
 			$groups->{$ouName}->{$key}->{$A_G_R_msExchRequireAuthToSendTo} = $groupAttributes{$A_G_R_msExchRequireAuthToSendTo};
-			$groups->{$ouName}->{$key}->{$A_G_R_AD_EMAIL_ADDRESSES} = $groupAttributes{$A_G_R_AD_EMAIL_ADDRESSES};
+			$groups->{$ouName}->{$key}->{$A_G_AD_EMAIL_ADDRESSES} = $groupAttributes{$A_G_AD_EMAIL_ADDRESSES};
 
 			# resolve groups members
 			for my $memberData ($membersElement->getChildElements) {
@@ -261,10 +261,10 @@ sub processGroups {
 		for my $rel (@rels) {
 
 			# create group entry
-			my $key = "CN=O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME} . "_group.muni.cz,OU=" . $ouName . "," . $baseDNGroups;
+			my $key = "CN=O365Lic_" . $rel . "_" . $groupAttributes{$A_G_AD_NAME} . "_group.muni.cz,OU=" . $ouName . "," . $baseDNGroups;
 
-			$groups->{$ouName}->{$key}->{$A_G_R_AD_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME};
-			$groups->{$ouName}->{$key}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_R_AD_NAME};
+			$groups->{$ouName}->{$key}->{$A_G_AD_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_AD_NAME};
+			$groups->{$ouName}->{$key}->{$A_G_AD_DISPLAY_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_AD_NAME};
 
 			# store between possible partial license groups
 			$licGroupNames->{$key} = 1;
@@ -291,7 +291,7 @@ sub processGroups {
 					}
 
 					# store basic licenses of users (might contain users, which are no longer employee/student - it's resolved by send script)
-					$licenses->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers}->{$groupAttributes{$A_G_R_AD_NAME}} = 1;
+					$licenses->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers}->{$groupAttributes{$A_G_AD_NAME}} = 1;
 
 				}
 			}
@@ -313,12 +313,12 @@ sub processGroups {
 #
 ####################
 my $key1 = "CN=O365Lic_Employee_group.muni.cz,OU=licenses," . $baseDNGroups;
-$groups->{"licenses"}->{$key1}->{$A_G_R_AD_NAME} = "O365Lic_Employee";
-$groups->{"licenses"}->{$key1}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Employee";
+$groups->{"licenses"}->{$key1}->{$A_G_AD_NAME} = "O365Lic_Employee";
+$groups->{"licenses"}->{$key1}->{$A_G_AD_DISPLAY_NAME} = "O365Lic_Employee";
 
 my $key2 = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $baseDNGroups;
-$groups->{"licenses"}->{$key2}->{$A_G_R_AD_NAME} = "O365Lic_Student";
-$groups->{"licenses"}->{$key2}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Student";
+$groups->{"licenses"}->{$key2}->{$A_G_AD_NAME} = "O365Lic_Student";
+$groups->{"licenses"}->{$key2}->{$A_G_AD_DISPLAY_NAME} = "O365Lic_Student";
 
 foreach my $mem (sort keys %{$usersRelation}) {
 
@@ -332,12 +332,12 @@ foreach my $mem (sort keys %{$usersRelation}) {
 
 # this group members are resolved by the send script !!
 my $key3 = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $baseDNGroups;
-$groups->{"licenses"}->{$key3}->{$A_G_R_AD_NAME} = "O365Lic_Alumni";
-$groups->{"licenses"}->{$key3}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Alumni";
+$groups->{"licenses"}->{$key3}->{$A_G_AD_NAME} = "O365Lic_Alumni";
+$groups->{"licenses"}->{$key3}->{$A_G_AD_DISPLAY_NAME} = "O365Lic_Alumni";
 
 my $key4 = "CN=O365Lic_Student2_group.muni.cz,OU=licenses," . $baseDNGroups;
-$groups->{"licenses"}->{$key4}->{$A_G_R_AD_NAME} = "O365Lic_Student2";
-$groups->{"licenses"}->{$key4}->{$A_G_R_AD_DISPLAY_NAME} = "O365Lic_Student2";
+$groups->{"licenses"}->{$key4}->{$A_G_AD_NAME} = "O365Lic_Student2";
+$groups->{"licenses"}->{$key4}->{$A_G_AD_DISPLAY_NAME} = "O365Lic_Student2";
 
 ############################
 #
@@ -380,16 +380,16 @@ for my $ouKey (@groupOus) {
 		for my $key (@groupKeys) {
 
 			print FILE "dn: " . $key . "\n";
-			print FILE "cn: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "_group.muni.cz\n";
-			print FILE "samAccountName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "_" . $ouKey . "\n";
-			print FILE "displayName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_DISPLAY_NAME} . "\n";
-			print FILE "MailNickName: " . $groups->{$ouKey}->{$key}->{$A_G_R_AD_NAME} . "\n";
+			print FILE "cn: " . $groups->{$ouKey}->{$key}->{$A_G_AD_NAME} . "_group.muni.cz\n";
+			print FILE "samAccountName: " . $groups->{$ouKey}->{$key}->{$A_G_AD_NAME} . "_" . $ouKey . "\n";
+			print FILE "displayName: " . $groups->{$ouKey}->{$key}->{$A_G_AD_DISPLAY_NAME} . "\n";
+			print FILE "MailNickName: " . $groups->{$ouKey}->{$key}->{$A_G_AD_NAME} . "\n";
 			print FILE "extensionAttribute1: TRUE\n";  # group exists (set to false by send script instead of deletion, hence we must set it, if group is recreated with same name).
 			my $msExchVal = $groups->{$ouKey}->{$key}->{$A_G_R_msExchRequireAuthToSendTo};
 			print FILE "msExchRequireAuthToSendTo: " . ((defined $msExchVal and $msExchVal == 1) ? 'TRUE' : 'FALSE') . "\n";
 
 			# get proxy addresses
-			my $proxyAddresses = ($groups->{$ouKey}->{$key}->{$A_G_R_AD_EMAIL_ADDRESSES}) ? $groups->{$ouKey}->{$key}->{$A_G_R_AD_EMAIL_ADDRESSES} : ();
+			my $proxyAddresses = ($groups->{$ouKey}->{$key}->{$A_G_AD_EMAIL_ADDRESSES}) ? $groups->{$ouKey}->{$key}->{$A_G_AD_EMAIL_ADDRESSES} : ();
 
 			my $first = 0;
 			my $mail;
