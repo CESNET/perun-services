@@ -32,25 +32,38 @@ USER_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- $USERNAME_AND_PASSWORD $DESTINA
 GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- $USERNAME_AND_PASSWORD $DESTINATION$GROUP_ENDPOINT"
 
 # HTTP Request with timeout for USERS
-cat "$USER_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $USER_TRANSPORT_COMMAND
+jq -c '.' "$USER_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $USER_TRANSPORT_COMMAND
 # Catch errors
-ERR_CODE=$?
-#Error code 124 means - timed out
-if [ $ERR_CODE -eq 124 ]; then
-	echo "Communication with the peer has timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
+RES_CODE=$?
+#Result code 124 means - timed out
+if [ $RES_CODE -ne 0 ]; then
+	ERR_CODE=$RES_CODE
+	if [ $ERR_CODE -eq 124 ]; then
+	        echo "Communication with the peer ends with return code: $ERR_CODE (timeout). Warning: this error can mask original error 124 from the transportation process!" >&2
+	else
+        	echo "Communication with the peer ends with return code: $ERR_CODE" >&2
+	fi
+	exit $ERR_CODE
 else
-	echo "Communication with the peer ends with return code: $ERR_CODE" >&2
+	echo "Communication with the peer ends with return code: $RES_CODE"
 fi
+
 
 # HTTP Request with timeout for GROUPS
-cat "$GROUP_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $GROUP_TRANSPORT_COMMAND
+jq -c '.' "$GROUP_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $GROUP_TRANSPORT_COMMAND
 # Catch errors
-ERR_CODE=$?
-#Error code 124 means - timed out
-if [ $ERR_CODE -eq 124 ]; then
-	echo "Communication with the peer has timed out with return code: $ERR_CODE" >&2
+RES_CODE=$?
+#Result code 124 means - timed out
+if [ $RES_CODE -ne 0 ]; then
+	ERR_CODE=$RES_CODE
+	if [ $ERR_CODE -eq 124 ]; then
+	        echo "Communication with the peer ends with return code: $ERR_CODE (timeout). Warning: this error can mask original error 124 from the transportation process!" >&2
+	else
+        	echo "Communication with the peer ends with return code: $ERR_CODE" >&2
+	fi
+	exit $ERR_CODE
 else
-	echo "Communication with the peer ends with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
+	echo "Communication with the peer ends with return code: $RES_CODE"
 fi
 
-exit $ERR_CODE
+exit $RES_CODE
