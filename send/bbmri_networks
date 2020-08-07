@@ -1,0 +1,56 @@
+#!/bin/bash
+SERVICE_NAME="bbmri_networks"
+
+TIMEOUT="5400" #90s * 60 sec = 1.5h
+TIMEOUT_KILL="60" # 60 sec to kill after timeout
+
+FACILITY_NAME=$1
+DESTINATION=$2
+DESTINATION_TYPE=$3
+
+SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
+USER_FILE_NAME="users.scim"
+GROUP_FILE_NAME="groups.scim"
+USER_FILE="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME/$USER_FILE_NAME"
+GROUP_FILE="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME/$GROUP_FILE_NAME"
+USER_ENDPOINT="users"
+GROUP_ENDPOINT="mapping"
+
+# Destination type has to be 'url'
+if [ "$DESTINATION_TYPE" != "url" ]; then
+	echo "Unknown destination type '$DESTINATION_TYPE' (url type required)." >&2
+	exit 1;
+fi
+
+# Read user name and password from configuration if it is present ( expect string "-u user:pass" )
+[ -r /etc/perun/services/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME
+
+# Specify command to tranfer the data
+#TRANSPORT_COMMAND="curl --cacert /etc/ssl/chain_TERENA_SSL_CA_3.pem -i -H Content-Type:application/json -f -X POST"
+TRANSPORT_COMMAND="curl -i -H Content-Type:application/json -f -X POST"
+USER_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- $USERNAME_AND_PASSWORD $DESTINATION$USER_ENDPOINT"
+GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- $USERNAME_AND_PASSWORD $DESTINATION$GROUP_ENDPOINT"
+
+# HTTP Request with timeout for USERS
+cat "$USER_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $USER_TRANSPORT_COMMAND
+# Catch errors
+ERR_CODE=$?
+#Error code 124 means - timed out
+if [ $ERR_CODE -eq 124 ]; then
+	echo "Communication with the peer has timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
+else
+	echo "Communication with the peer ends with return code: $ERR_CODE" >&2
+fi
+
+# HTTP Request with timeout for GROUPS
+cat "$GROUP_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $GROUP_TRANSPORT_COMMAND
+# Catch errors
+ERR_CODE=$?
+#Error code 124 means - timed out
+if [ $ERR_CODE -eq 124 ]; then
+	echo "Communication with the peer has timed out with return code: $ERR_CODE" >&2
+else
+	echo "Communication with the peer ends with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
+fi
+
+exit $ERR_CODE
