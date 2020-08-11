@@ -252,7 +252,10 @@ foreach my $key (sort keys %$groups) {
 	my $CODE = $groups->{$key}->{'CODE'};
 	my $NAME = $groups->{$key}->{'NAME'};
 	my $PRIORITY = $groups->{$key}->{'PRIORITY'};
-	my @MEMBERS = @{$groups->{$key}->{'MEMBERS'}}; # dereference array
+	my @MEMBERS = ();
+	if (defined $groups->{$key}->{'MEMBERS'}) {
+		@MEMBERS = @{$groups->{$key}->{'MEMBERS'}}; # dereference array
+	}
 
 	# There is
 	my $groupExists = $dbh->prepare(qq{select 1 from $tableNameSkup where ID=?});
