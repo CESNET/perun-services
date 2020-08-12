@@ -28,7 +28,7 @@ my $data      = perunServicesInit::getDataWithGroups;
 # CONSTANTS AND DEFINITIONS
 #-------------------------------------------------------------------------
 
-our $A_GR_AD_NAME;                           *A_GR_AD_NAME =                           \'urn:perun:group_resource:attribute-def:def:adName';
+our $A_G_AD_NAME;                            *A_G_AD_NAME =                            \'urn:perun:group:attribute-def:def:adName:o365mu';
 our $A_F_DOMAIN_NAME;                        *A_F_DOMAIN_NAME =                        \'urn:perun:facility:attribute-def:def:o365DomainName';
 our $A_MR_O365_SEND_AS;                      *A_MR_O365_SEND_AS =                      \'urn:perun:member_group:attribute-def:def:o365SendAs';
 our $A_U_O365_MAIL_ADDRS;                    *A_U_O365_MAIL_ADDRS =                    \'urn:perun:user:attribute-def:def:o365EmailAddresses:mu';
@@ -303,11 +303,11 @@ sub processGroup {
 	my $groupData = shift;
 
 	my %groupAttributes = attributesToHash $groupData->getAttributes;
-	my $groupADName = $groupAttributes{$A_GR_AD_NAME};
+	my $groupADName = $groupAttributes{$A_G_AD_NAME};
 
 	if($groupADName) {
 		#all groups for mu should have specific part of name
-		my $groupADName = $groupAttributes{$A_GR_AD_NAME} . '_group.muni.cz';
+		my $groupADName = $groupAttributes{$A_G_AD_NAME} . '_group.muni.cz';
 		$groups->{$groupADName} = undef;
 
 		foreach my $member(($groupData->getChildElements)[1]->getChildElements) {
