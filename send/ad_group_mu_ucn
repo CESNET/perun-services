@@ -19,10 +19,14 @@ sub process_update;
 my $counter_add = 0;
 my $counter_remove = 0;
 my $counter_update = 0;
+my $counter_updated_with_errors = 0;
 my $counter_fail = 0;
 
 # define service
 my $service_name = "ad_group_mu_ucn";
+
+my $FAIL = 0;
+my $SUCCESS = 1;
 
 # GEN folder location
 my $facility_name = $ARGV[0];
@@ -80,18 +84,21 @@ ldap_unbind($ldap);
 # log results
 ldap_log($service_name, "Added: " . $counter_add . " entries.");
 ldap_log($service_name, "Removed: " . $counter_remove . " entries.");
-ldap_log($service_name, "Updated: " . $counter_update. " entries.");
+ldap_log($service_name, "Updated without errors: " . $counter_update . " entries.");
+ldap_log($service_name, "Updated with errors: " . $counter_updated_with_errors . " entries.");
 ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
 
 # print results for TaskResults in GUI
 print "Added: " . $counter_add . " entries.\n";
 print "Removed: " . $counter_remove . " entries.\n";
-print "Updated: " . $counter_update. " entries.\n";
+print "Updated without errors: " . $counter_update . " entries.\n";
+print "Updated with errors: " . $counter_updated_with_errors . " entries.\n";
 print "Failed: " . $counter_fail. " entries.\n";
 
 $lock->unlock();
 
-if ($counter_fail > 0) { die "Failed to process: " . $counter_fail . " entries.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
+if ($counter_fail > 0) { die "Some entries failed to process.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
+if ($counter_updated_with_errors > 0) { die "Some members were not updated.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
 
 # END of main script
 
@@ -177,31 +184,16 @@ sub process_update() {
 		# compare using smart-match (perl 5.10.1+)
 		unless(@sorted_ad_val ~~ @sorted_per_val) {
 
+			my %ad_val_map = map { $_ => 1 } @sorted_ad_val;
+			my %per_val_map = map { $_ => 1 } @sorted_per_val;
+
 			# members of group are not equals
 			# we must get reference to real group from AD in order to call "replace"
 			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'base' );
 			unless ($response_ad->is_error()) {
 				# SUCCESS
 				my $ad_entry = $response_ad->entry(0);
-				$ad_entry->replace(
-					'member' => \@per_val
-				);
-				# Update entry in AD
-				my $response = $ad_entry->update($ldap);
-
-				if ($response) {
-					unless ($response->is_error()) {
-						# SUCCESS (group updated)
-						$counter_update++;
-						ldap_log($service_name, "Group members updated: " . $ad_entry->dn() . " | \n" . join(",\n",@sorted_ad_val) .  "\n=>\n" . join(",\n",@sorted_per_val));
-					} else {
-						# FAIL (to update group)
-						$counter_fail++;
-						ldap_log($service_name, "Group members NOT updated: " . $ad_entry->dn() . " | " . $response->error());
-						ldap_log($service_name, $ad_entry->ldif());
-					}
-				}
-
+				update_group_membership($ad_entry, \%ad_val_map, \%per_val_map);
 			} else {
 				# FAIL (to get group from AD)
 				$counter_fail++;
@@ -213,4 +205,98 @@ sub process_update() {
 
 	}
 
+}
+
+sub add_members_to_entry {
+
+	my $ad_entry = shift;
+	my $to_be_added = shift;
+	my $return_code = $SUCCESS;
+
+	# chunks of size less than 5000 have to be used, because LDAP cannot process more than 5000 operations at once.
+	my @chunks_to_add = ();
+
+	push @chunks_to_add, [ splice @$to_be_added, 0, 4999 ] while @$to_be_added;
+
+	foreach (@chunks_to_add) {
+		$ad_entry->add(
+			'member' => $_
+		);
+		my $response = $ad_entry->update($ldap);
+		if ($response) {
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
+			} else {
+				ldap_log($service_name, "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
+				$return_code = $FAIL;
+			}
+		}
+	}
+
+	return $return_code;
+}
+
+sub remove_members_from_entry {
+
+	my $ad_entry = shift;
+	my $to_be_removed = shift;
+	my $return_code = $SUCCESS;
+
+	# chunks of size less than 5000 have to be used, because LDAP cannot process more than 5000 operations at once.
+	my @chunks_to_remove = ();
+
+	push @chunks_to_remove, [ splice @$to_be_removed, 0, 4999 ] while @$to_be_removed;
+
+	foreach (@chunks_to_remove) {
+		$ad_entry->delete(
+			'member' => $_
+		);
+		my $response = $ad_entry->update($ldap);
+		if ($response) {
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
+			} else {
+				ldap_log($service_name, "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
+				$return_code = $FAIL;
+			}
+		}
+	}
+
+	return $return_code;
+}
+
+sub update_group_membership {
+
+	my $ad_entry = shift;
+	my $ad_members_state = shift;
+	my $perun_members_state = shift;
+
+	my @to_be_added = ();
+	my @to_be_removed = ();
+
+	foreach (keys %{$perun_members_state}) {
+		unless (defined $ad_members_state->{$_}) {
+			push (@to_be_added, $_);
+		}
+	}
+
+	foreach (keys %{$ad_members_state}) {
+		unless (defined $perun_members_state->{$_}) {
+			push (@to_be_removed, $_);
+		}
+	}
+
+	if (@to_be_added or @to_be_removed) {
+		@to_be_added = sort @to_be_added;
+		@to_be_removed = sort @to_be_removed;
+
+		my $response_add = add_members_to_entry($ad_entry, \@to_be_added);
+		my $response_remove = remove_members_from_entry($ad_entry, \@to_be_removed);
+
+		if ($response_add == $SUCCESS and $response_remove == $SUCCESS) {
+			$counter_update++;
+		} else {
+			$counter_updated_with_errors++;
+		}
+	}
 }
