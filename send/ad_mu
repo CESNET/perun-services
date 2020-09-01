@@ -324,6 +324,9 @@ my $USER_STATE_GP_NOTIFICATION_SENT_REMINDER = "2";
 my $GRACE_PERIOD_EXPIRATION = 301; #days
 my $GRACE_PERIOD_EXPIRATION_NOTIFICATION_DELTA_DAYS = 14; #days
 
+my $SUCCESS = 1;
+my $FAIL = 0;
+
 
 my $facility_name = $ARGV[0];
 chomp($facility_name);
@@ -393,6 +396,11 @@ my $studentDN = "CN=O365Lic_Student_group.muni.cz,OU=licenses," . $base_dn_group
 my $student2DN = "CN=O365Lic_Student2_group.muni.cz,OU=licenses," . $base_dn_groups;
 my $alumniDN = "CN=O365Lic_Alumni_group.muni.cz,OU=licenses," . $base_dn_groups;
 
+# operations results
+my $RESULT_ERRORS = "errors";
+my $RESULT_CHANGED = "changed";
+my $RESULT_UNCHANGED = "unchanged";
+
 # log counters
 my $counter_add = 0;
 my $counter_updated = 0;
@@ -403,6 +411,7 @@ my $counter_fail_ous = 0;
 my $counter_group_add = 0;
 my $counter_group_remove = 0;
 my $counter_group_updated = 0;
+my $counter_group_updated_with_errors = 0;
 my $counter_group_failed = 0;
 
 # load all data
@@ -465,7 +474,8 @@ ldap_log($service_name, "Disabled: " . $counter_disabled . " entries.");
 ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
 ldap_log($service_name, "Group added: " . $counter_group_add . " entries.");
 ldap_log($service_name, "Group removed: " . $counter_group_remove . " entries.");
-ldap_log($service_name, "Group updated: " . $counter_group_updated . " entries.");
+ldap_log($service_name, "Group updated without errors: " . $counter_group_updated . " entries.");
+ldap_log($service_name, "Group updated with errors: " . $counter_group_updated_with_errors . " entries.");
 ldap_log($service_name, "Group failed: " . $counter_group_failed . " entries.");
 
 # print results
@@ -477,13 +487,14 @@ print "OU added: " . $counter_add_ous . " entries.\n";
 print "OU failed: " . $counter_fail_ous . " entries.\n";
 print "Group added: " . $counter_group_add . " entries.\n";
 print "Group removed: " . $counter_group_remove . " entries.\n";
-print "Group updated: " . $counter_group_updated . " entries.\n";
+print "Group updated without errors: " . $counter_group_updated . " entries.\n";
+print "Group updated with errors: " . $counter_group_updated_with_errors . " entries.\n";
 print "Group failed: " . $counter_group_failed . " entries.\n";
 
 $lock->unlock();
 $lockManager->unlock($errorLockFile);
 
-if ($counter_fail or $counter_fail_ous or $counter_group_failed) {
+if ($counter_fail or $counter_fail_ous or $counter_group_failed or $counter_group_updated_with_errors) {
 	# some update of AD failed, tell it to the engine to re-schedule the service.
 	exit 1;
 }
@@ -810,57 +821,13 @@ sub process_groups_members() {
 		my %ad_val_map = map { $_ => 1 } @sorted_ad_val;
 		my %per_val_map = map { $_ => 1 } @sorted_per_val;
 
-		my @to_be_added;
-		my @to_be_removed;
-
-		# add members
-		foreach my $per_val_member (@sorted_per_val) {
-			unless (exists $ad_val_map{$per_val_member}) {
-				push (@to_be_added, $per_val_member);
-			}
-		}
-
-		# remove members
-		foreach my $ad_val_member (@sorted_ad_val) {
-			unless (exists $per_val_map{$ad_val_member}) {
-				push (@to_be_removed, $ad_val_member);
-			}
-		}
-
 		# we must get reference to real group from AD in order to call "replace"
 		my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter_groups, scope => 'base' );
 		unless ($response_ad->is_error()) {
 			# SUCCESS
 			my $ad_entry = $response_ad->entry(0);
+			update_group_membership($ad_entry, \%ad_val_map, \%per_val_map);
 
-			if (@to_be_added) {
-				$ad_entry->add(
-					'member' => \@to_be_added
-				);
-			}
-
-			if (@to_be_removed) {
-				$ad_entry->delete(
-					'member' => \@to_be_removed
-				);
-			}
-
-			# Update entry in AD
-			my $response = $ad_entry->update($ldap);
-
-			if ($response) {
-				unless ($response->is_error()) {
-					# SUCCESS (group updated)
-					$counter_group_updated++;
-					ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @to_be_added));
-					ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n",@to_be_removed));
-				} else {
-					# FAIL (to update group)
-					$counter_group_failed++;
-					ldap_log($service_name, "Group members NOT updated: " . $ad_entry->dn() . " | " . $response->error());
-					ldap_log($service_name, $ad_entry->ldif());
-				}
-			}
 		} else {
 			# FAIL (to get group from AD)
 			$counter_group_failed++;
@@ -1025,22 +992,38 @@ saveStoredUserStates;
 		@studentsSecondPart{@studentsIndexes[$upperBound+1..$#studentsIndexes]} = @{$students}{@studentsIndexes[$upperBound+1..$#studentsIndexes]};
 	}
 
-	add_to_license_group($ad_entries_group_map{$employeeDN}, $ad_state->{$employeeDN}, $employees);
-	add_to_license_group($ad_entries_group_map{$alumniDN}, $ad_state->{$alumniDN}, $alumni);
-	add_to_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, \%studentsFirstPart);
-	add_to_license_group($ad_entries_group_map{$student2DN}, $ad_state->{$student2DN}, \%studentsSecondPart);
+	my %add_result;
+	my %remove_result;
 
+	$add_result{$employeeDN} = add_to_license_group($ad_entries_group_map{$employeeDN}, $ad_state->{$employeeDN}, $employees);
+	$add_result{$alumniDN} = add_to_license_group($ad_entries_group_map{$alumniDN}, $ad_state->{$alumniDN}, $alumni);
+	$add_result{$studentDN} = add_to_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, \%studentsFirstPart);
+	$add_result{$student2DN} = add_to_license_group($ad_entries_group_map{$student2DN}, $ad_state->{$student2DN}, \%studentsSecondPart);
 
-	remove_from_license_group($ad_entries_group_map{$employeeDN}, $ad_state->{$employeeDN}, $employees);
-	remove_from_license_group($ad_entries_group_map{$alumniDN}, $ad_state->{$alumniDN}, $alumni);
-	remove_from_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, \%studentsFirstPart);
-	remove_from_license_group($ad_entries_group_map{$student2DN}, $ad_state->{$student2DN}, \%studentsSecondPart);
+	foreach ($employeeDN, $alumniDN, $studentDN, $student2DN) {
+		if ($add_result{$_} eq $RESULT_ERRORS) {
+			$counter_group_updated_with_errors++;
+			die "Failed to add members to one or more main license groups. Check logs for more information.";
+		}
+	}
+
+	$remove_result{$employeeDN} = remove_from_license_group($ad_entries_group_map{$employeeDN}, $ad_state->{$employeeDN}, $employees);
+	$remove_result{$alumniDN} = remove_from_license_group($ad_entries_group_map{$alumniDN}, $ad_state->{$alumniDN}, $alumni);
+	$remove_result{$studentDN} = remove_from_license_group($ad_entries_group_map{$studentDN}, $ad_state->{$studentDN}, \%studentsFirstPart);
+	$remove_result{$student2DN} = remove_from_license_group($ad_entries_group_map{$student2DN}, $ad_state->{$student2DN}, \%studentsSecondPart);
+
+	foreach ($employeeDN, $alumniDN, $studentDN, $student2DN) {
+		if ($remove_result{$_} eq $RESULT_ERRORS) {
+			$counter_group_updated_with_errors++;
+		} elsif ($add_result{$_} eq $RESULT_CHANGED or $remove_result{$_} eq $RESULT_CHANGED) {
+			$counter_group_updated++;
+		}
+	}
 
 	# process specific license groups
 	foreach my $group_dn (sort keys %{$perun_state}) {
 		unless (($group_dn eq $employeeDN) or ($group_dn eq $studentDN) or ($group_dn eq $alumniDN) or ($group_dn eq $student2DN)) {
-			add_to_license_group($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, $perun_state->{$group_dn});
-			remove_from_license_group($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, $perun_state->{$group_dn});
+			update_group_membership($ad_entries_group_map{$group_dn}, $ad_state->{$group_dn}, $perun_state->{$group_dn});
 		}
 	}
 
@@ -1076,36 +1059,14 @@ sub add_to_license_group() {
 	@to_be_added = sort @to_be_added;
 
 	if (@to_be_added) {
-
-		#AD need to process changes in chunks of max 5000
-		my @chunks = ();
-		push @chunks, [ splice @to_be_added, 0, 1000 ] while @to_be_added;
-
-		for my $chunk (@chunks) {
-
-			$ad_entry->add(
-				'member' => $chunk
-			);
-
-			# Update entry in AD
-			my $response = $ad_entry->update($ldap);
-
-			if ($response) {
-				unless ($response->is_error()) {
-					# SUCCESS (group updated)
-					$counter_group_updated++;
-					ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @$chunk));
-				} else {
-					# FAIL (to update group)
-					$counter_group_failed++;
-					ldap_log($service_name, "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error());
-					ldap_log($service_name, $ad_entry->ldif());
-					die "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error();
-				}
-			}
+		if (add_members_to_entry($ad_entry, \@to_be_added) == $SUCCESS) {
+			return $RESULT_CHANGED;
+		} else {
+			return $RESULT_ERRORS;
 		}
 	}
 
+	return $RESULT_UNCHANGED;
 }
 
 #
@@ -1132,28 +1093,14 @@ sub remove_from_license_group() {
 	@to_be_removed = sort @to_be_removed;
 
 	if (@to_be_removed) {
-		$ad_entry->delete(
-			'member' => \@to_be_removed
-		);
-
-		# Update entry in AD
-		my $response = $ad_entry->update($ldap);
-
-		if ($response) {
-			unless ($response->is_error()) {
-				# SUCCESS (group updated)
-				$counter_group_updated++;
-				ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n", @to_be_removed));
-
-			} else {
-				# FAIL (to update group)
-				$counter_group_failed++;
-				ldap_log($service_name, "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error());
-				ldap_log($service_name, $ad_entry->ldif());
-				die "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error();
-			}
+		if (remove_members_from_entry($ad_entry, \@to_be_removed)  == $SUCCESS) {
+			return $RESULT_CHANGED;
+		} else {
+			return $RESULT_ERRORS;
 		}
 	}
+
+	return $RESULT_UNCHANGED;
 
 }
 
@@ -2012,4 +1959,98 @@ sub haveOnlyGracePeriodRole {
 sub haveOnlyAlumniRole {
 	my $role = shift;
 	return $role == $F_ALUMNI;
+}
+
+sub add_members_to_entry {
+
+	my $ad_entry = shift;
+	my $to_be_added = shift;
+	my $return_code = $SUCCESS;
+
+	# chunks of size less than 5000 have to be used, because LDAP cannot process more than 5000 operations at once.
+	my @chunks_to_add = ();
+
+	push @chunks_to_add, [ splice @$to_be_added, 0, 4999 ] while @$to_be_added;
+
+	foreach (@chunks_to_add) {
+		$ad_entry->add(
+			'member' => $_
+		);
+		my $response = $ad_entry->update($ldap);
+		if ($response) {
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
+			} else {
+				ldap_log($service_name, "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
+				$return_code = $FAIL;
+			}
+		}
+	}
+
+	return $return_code;
+}
+
+sub remove_members_from_entry {
+
+	my $ad_entry = shift;
+	my $to_be_removed = shift;
+	my $return_code = $SUCCESS;
+
+	# chunks of size less than 5000 have to be used, because LDAP cannot process more than 5000 operations at once.
+	my @chunks_to_remove = ();
+
+	push @chunks_to_remove, [ splice @$to_be_removed, 0, 4999 ] while @$to_be_removed;
+
+	foreach (@chunks_to_remove) {
+		$ad_entry->delete(
+			'member' => $_
+		);
+		my $response = $ad_entry->update($ldap);
+		if ($response) {
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
+			} else {
+				ldap_log($service_name, "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
+				$return_code = $FAIL;
+			}
+		}
+	}
+
+	return $return_code;
+}
+
+sub update_group_membership {
+
+	my $ad_entry = shift;
+	my $ad_members_state = shift;
+	my $perun_members_state = shift;
+
+	my @to_be_added = ();
+	my @to_be_removed = ();
+
+	foreach (keys %{$perun_members_state}) {
+		unless (defined $ad_members_state->{$_}) {
+			push (@to_be_added, $_);
+		}
+	}
+
+	foreach (keys %{$ad_members_state}) {
+		unless (defined $perun_members_state->{$_}) {
+			push (@to_be_removed, $_);
+		}
+	}
+
+	if (@to_be_added or @to_be_removed) {
+		@to_be_added = sort @to_be_added;
+		@to_be_removed = sort @to_be_removed;
+
+		my $response_add = add_members_to_entry($ad_entry, \@to_be_added);
+		my $response_remove = remove_members_from_entry($ad_entry, \@to_be_removed);
+
+		if ($response_add == $SUCCESS and $response_remove == $SUCCESS) {
+			$counter_group_updated++;
+		} else {
+			$counter_group_updated_with_errors++;
+		}
+	}
 }
