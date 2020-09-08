@@ -16,11 +16,14 @@ sub process_remove;
 sub process_update;
 
 # log counters
-my $counter_add = 0;
-my $counter_remove = 0;
-my $counter_update = 0;
-my $counter_updated_with_errors = 0;
-my $counter_fail = 0;
+my $counter_group_added = 0;
+my $counter_group_not_added = 0;
+my $counter_group_not_emptied = 0;
+my $counter_group_removed = 0;
+my $counter_group_not_removed = 0;
+my $counter_group_members_updated = 0;
+my $counter_group_members_updated_with_errors = 0;
+my $counter_group_members_not_updated = 0;
 
 # define service
 my $service_name = "ad_group_mu_ucn";
@@ -82,23 +85,35 @@ process_update();
 ldap_unbind($ldap);
 
 # log results
-ldap_log($service_name, "Added: " . $counter_add . " entries.");
-ldap_log($service_name, "Removed: " . $counter_remove . " entries.");
-ldap_log($service_name, "Updated without errors: " . $counter_update . " entries.");
-ldap_log($service_name, "Updated with errors: " . $counter_updated_with_errors . " entries.");
-ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
+ldap_log($service_name, "Group added (without members): " . $counter_group_added . " entries.");
+ldap_log($service_name, "Group failed to add: " . $counter_group_not_added. " entries.");
+ldap_log($service_name, "-------------------------------------------------------------------------------------------------------");
+ldap_log($service_name, "Group updated (members): " . $counter_group_members_updated . " entries.");
+ldap_log($service_name, "Group updated with errors (members): " . $counter_group_members_updated_with_errors . " entries.");
+ldap_log($service_name, "Group failed to update (members): " . $counter_group_members_not_updated. " entries.");
+ldap_log($service_name, "-------------------------------------------------------------------------------------------------------");
+ldap_log($service_name, "Group removed: " . $counter_group_removed . " entries.");
+ldap_log($service_name, "Group failed to empty during removal: " . $counter_group_not_emptied . " entries.");
+ldap_log($service_name, "Group failed to remove: " . $counter_group_not_removed. " entries.");
 
 # print results for TaskResults in GUI
-print "Added: " . $counter_add . " entries.\n";
-print "Removed: " . $counter_remove . " entries.\n";
-print "Updated without errors: " . $counter_update . " entries.\n";
-print "Updated with errors: " . $counter_updated_with_errors . " entries.\n";
-print "Failed: " . $counter_fail. " entries.\n";
+print "Group added (without members): " . $counter_group_added . " entries.\n";
+print "Group failed to add: " . $counter_group_not_added. " entries.\n";
+print "-------------------------------------------------------------------------------------------------------\n";
+print "Group updated (members): " . $counter_group_members_updated . " entries.\n";
+print "Group updated with errors (members): " . $counter_group_members_updated_with_errors . " entries.\n";
+print "Group failed to update (members): " . $counter_group_members_not_updated. " entries.\n";
+print "-------------------------------------------------------------------------------------------------------\n";
+print "Group removed: " . $counter_group_removed . " entries.\n";
+print "Group failed to empty during removal: " . $counter_group_not_emptied . " entries.\n";
+print "Group failed to remove: " . $counter_group_not_removed. " entries.\n";
 
 $lock->unlock();
 
-if ($counter_fail > 0) { die "Some entries failed to process.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
-if ($counter_updated_with_errors > 0) { die "Some members were not updated.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
+if ($counter_group_not_added or $counter_group_members_not_updated or $counter_group_not_removed or $counter_group_not_emptied) {
+	die "Some entries failed to process.\nSee log at: ~/perun-engine/send/logs/$service_name.log";
+}
+if ($counter_group_members_updated_with_errors > 0) { die "Some members were not updated.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
 
 # END of main script
 
@@ -118,17 +133,19 @@ sub process_add() {
 		my $cn = $perun_entry->get_value('cn');
 		unless (exists $ad_entries_map{$cn}) {
 
+			my @attrs_to_add = ('cn', 'samAccountName', 'objectClass');
+			my $new_ad_entry = clone_entry_with_specific_attributes($perun_entry, \@attrs_to_add);
 			# Add new entry to AD
-			my $response = $perun_entry->update($ldap);
+			my $response = $new_ad_entry->update($ldap);
 			unless ($response->is_error()) {
 				# SUCCESS
-				ldap_log($service_name, "Added: " . $perun_entry->dn());
-				$counter_add++;
+				ldap_log($service_name, "Group added (without members): " . $perun_entry->dn());
+				$counter_group_added++;
 			} else {
 				# FAIL
-				ldap_log($service_name, "NOT added: " . $perun_entry->dn() . " | " . $response->error());
-				ldap_log($service_name, $perun_entry->ldif());
-				$counter_fail++;
+				ldap_log($service_name, "Group NOT added: " . $perun_entry->dn() . " | " . $response->error());
+				ldap_log($service_name, $new_ad_entry->ldif());
+				$counter_group_not_added++;
 			}
 
 		}
@@ -145,14 +162,24 @@ sub process_remove() {
 		my $cn = $ad_entry->get_value('cn');
 		unless (exists $perun_entries_map{$cn}) {
 
-			my $response = $ldap->delete($ad_entry);
-			unless ($response->is_error()) {
-				ldap_log($service_name, "Deleted entry: " . $ad_entry->dn());
-				$counter_remove++;
+			# clear members
+			# load members of a group from AD
+			my @to_be_removed = load_group_members($ldap, $ad_entry->dn(), $filter);
+			my $response_remove = remove_members_from_entry($ad_entry, \@to_be_removed);
+			unless ($response_remove == $SUCCESS) {
+				ldap_log($service_name, "Failed to remove all members from group during the group removal process: ".$ad_entry->dn());
+				$counter_group_not_emptied++;
 			} else {
-				ldap_log($service_name, "NOT deleted: " . $ad_entry->dn() . " | " . $response->error());
-				ldap_log($service_name, $ad_entry->ldif());
-				$counter_fail++;
+				my $response = $ldap->delete($ad_entry->dn());
+				unless ($response->is_error()) {
+					ldap_log($service_name, "Group removed: " . $ad_entry->dn());
+					$counter_group_removed++;
+				}
+				else {
+					ldap_log($service_name, "Group NOT removed: " . $ad_entry->dn() . " | " . $response->error());
+					ldap_log($service_name, $ad_entry->ldif());
+					$counter_group_not_removed++;
+				}
 			}
 
 		}
@@ -196,7 +223,7 @@ sub process_update() {
 				update_group_membership($ad_entry, \%ad_val_map, \%per_val_map);
 			} else {
 				# FAIL (to get group from AD)
-				$counter_fail++;
+				$counter_group_members_not_updated++;
 				ldap_log($service_name, "Group members NOT updated: " . $perun_entry->dn() . " | " . $response_ad->error());
 			}
 		}
@@ -294,9 +321,9 @@ sub update_group_membership {
 		my $response_remove = remove_members_from_entry($ad_entry, \@to_be_removed);
 
 		if ($response_add == $SUCCESS and $response_remove == $SUCCESS) {
-			$counter_update++;
+			$counter_group_members_updated++;
 		} else {
-			$counter_updated_with_errors++;
+			$counter_group_members_updated_with_errors++;
 		}
 	}
 }

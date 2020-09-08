@@ -1,7 +1,7 @@
 package ADConnector;
 use Exporter 'import';
 @ISA = ('Exporter');
-@EXPORT = qw(init_config resolve_domain_controlers ldap_connect_multiple_options resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members compare_entry enable_uac disable_uac is_uac_enabled);
+@EXPORT = qw(init_config resolve_domain_controlers ldap_connect_multiple_options resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members compare_entry enable_uac disable_uac is_uac_enabled clone_entry_with_specific_attributes);
 
 use strict;
 use warnings;
@@ -80,6 +80,10 @@ Takes two entries and compares specified attribute. Return 1 if attr value diffe
 =head2 ldap_log()
 
 Log message to file. Takes service name and message string params.
+
+=head2 clone_entry_with_specific_attributes()
+
+Create clone of an existing ldap entry with specified attributes.
 
 =head1 AUTHOR
 
@@ -500,6 +504,32 @@ sub is_uac_enabled($) {
 		return 1;
 	}
 
+}
+
+#
+# Create clone of an existing ldap entry with specified attributes
+#
+# Takes:
+# LDAP entry which will be cloned
+# Attributes which will be cloned among the entries
+#
+# Return:
+# Copy of the given LDAP entry with the specified attributes
+#
+sub clone_entry_with_specific_attributes($$) {
+	my $entry = shift;
+	my $attrs = shift;
+
+	my $clone = Net::LDAP::Entry->new($entry->dn());
+
+	foreach my $attr (@{$attrs}) {
+		my @value = $entry->get_value($attr);
+		$clone->add(
+			$attr => \@value
+		);
+	}
+
+	return $clone;
 }
 
 1;
