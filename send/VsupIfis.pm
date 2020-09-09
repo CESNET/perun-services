@@ -101,10 +101,6 @@ sub load_dc2() {
 	my $dbh = DBI->connect("dbi:Oracle://$hostname:$port/$db_name", $db_user, $db_password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
 	$dbh->do("alter session set nls_date_format='YYYY-MM-DD HH24:MI:SS'");
 
-	# FIXME - which is correct combination of VZ_S_C and VZ_F_C for determining ITIC ??
-	# NEW FROM VEMA: VZ_S_C in (101) AND VZ_F_C in (1,2,3,4,5,52)
-	# OLD FROM DC2:  VZTAH_STATUS_CISLO in (1,2,4,5,7,8,9,10,16,17,21) AND VZTAH_FUNKCE_CISLO in (1,2,3,4,5,52)
-
 	# Select query for input database (DC2) - internal/external teachers with valid relation
 	my $sth = $dbh->prepare(qq{SELECT UCO, VZTAH_CISLO, NS, VZTAH_STATUS_NAZEV, VZTAH_STATUS_CISLO, OD, DO,
         CASE WHEN (VZTAH_STATUS_CISLO in (1,2,4,5,7,8,9,10,16,17,21) AND VZTAH_FUNKCE_CISLO in (1,2,3,4,5,52))
