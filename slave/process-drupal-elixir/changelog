@@ -1,3 +1,11 @@
+perun-slave-process-drupal-elixir (3.1.5) stable; urgency=medium
+
+  * process file with duplicities and send them on error output if any exists
+  * protocol version was increased to 3.1.0 and is not compatible with old
+    version of gen script
+
+ -- Michal Stava <stavamichal@gmail.com>  Fri, 11 Sep 2020 12:30:00 +0200
+
 perun-slave-process-drupal-elixir (3.1.4) stable; urgency=medium
 
   * Changed architecture to all
