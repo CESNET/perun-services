@@ -18,7 +18,7 @@ all: processes meta
 processes: $(processes)
 
 meta:
-	@cd meta && PACKAGE_NAME=$(package_prefix_name)$(meta_package_name) DEPENDENCIES="$(subst $(space),$(comma)$(space)$,$(addprefix $(package_prefix_name),$(processes)))" VERSION=`head -n 1 changelog | sed -e 's/.*\([0-9]\+[.][0-9]\+[.][0-9]\+\).*/\1/'` envsubst < ../templates/equivs/control > control
+	@cd meta && PACKAGE_NAME=$(package_prefix_name)$(meta_package_name) DEPENDENCIES="$(subst $(space),$(comma)$(space),$(addprefix $(package_prefix_name),$(processes)))" VERSION=`head -n 1 changelog | sed -e 's/.*\([0-9]\+[.][0-9]\+[.][0-9]\+\).*/\1/'` envsubst < ../templates/equivs/control > control
 	@cd meta && if [ -s short_desc ]; then echo "Description: `cat short_desc`" >> control; fi
 	@cd meta && echo "Conflicts: perun-slave" >> control;
 	@cd meta && if [ -s short_desc -a -s long_desc ]; then sed 's/^/ /g' long_desc >> control; fi
