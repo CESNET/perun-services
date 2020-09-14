@@ -762,14 +762,14 @@ for my $UCO (sort keys %$dataByKey) {
 
 		# Resolve HLAVNI by priority
 
-		#1. ZAM (VZTAH_STATUS = 1,2,5,8,9,10,16,17)
-		#2. ZAM (VZTAH_STATUS = 4,7,21)
+		#1. ZAM (VZTAH_STATUS = 1,2,5,6,8,9,10,16,17) aka ZAM INTERNI
+		#2. ZAM (VZTAH_STATUS = 4,7,21) aka ZAM EXTERNI
 		#3. STU
 		#4. EXT
 
 		# duplicity on same level: for ZAM take one with later DO_ or bigger ID, for rest take one with bigger ID.
 
-		my %priority1 = map { $_ => 1 } (1,2,5,8,9,10,16,17);
+		my %priority1 = map { $_ => 1 } (1,2,5,6,8,9,10,16,17);
 		my %priority2 = map { $_ => 1 } (4,7,21);
 
 		my $priorityMap = {};
@@ -934,32 +934,32 @@ $lock->unlock();
 # Print info about operations
 print "=======================================\n";
 print "User inserted:    \t$inserted\n";
-print "User skiped:      \t$foundAndSkipped\n";
+print "User skipped:     \t$foundAndSkipped\n";
 print "User updated:	 \t$foundAndUpdated\n";
 print "User deleted:     \t$deleted\n";
 print "---------------------------------------\n";
 print "Address inserted: \t$insertedAdr\n";
-print "Address skiped:   \t$foundAndSkippedAdr\n";
+print "Address skipped:  \t$foundAndSkippedAdr\n";
 print "Address updated:  \t$foundAndUpdatedAdr\n";
 print "Address deleted:  \t$deletedAdr\n";
 print "---------------------------------------\n";
 print "Contact inserted: \t$insertedSpj\n";
-print "Contact skiped:   \t$foundAndSkippedSpj\n";
+print "Contact skipped:  \t$foundAndSkippedSpj\n";
 print "Contact updated:  \t$foundAndUpdatedSpj\n";
 print "Contact deleted:  \t$deletedSpj\n";
 print "---------------------------------------\n";
 print "Vztah (ext) inserted: \t$insertedVzt\n";
-print "Vztah (ext) skiped:   \t$foundAndSkippedVzt\n";
+print "Vztah (ext) skipped:  \t$foundAndSkippedVzt\n";
 print "Vztah (ext) updated:  \t$foundAndUpdatedVzt\n";
 print "Vztah (any) deleted:  \t$deletedVzt\n";
 print "---------------------------------------\n";
 print "Vztah (zam) inserted: \t$dc2_inserted\n";
-print "Vztah (zam) skiped:   \t$dc2_foundAndSkipped\n";
+print "Vztah (zam) skipped:  \t$dc2_foundAndSkipped\n";
 print "Vztah (zam) updated:  \t$dc2_foundAndUpdated\n";
 print "Vztah (zam) deleted:  \t$dc2_deleted\n";
 print "---------------------------------------\n";
 print "Vztah (stu) inserted: \t$kos_inserted\n";
-print "Vztah (stu) skiped:   \t$kos_foundAndSkipped\n";
+print "Vztah (stu) skipped:  \t$kos_foundAndSkipped\n";
 print "Vztah (stu) updated:  \t$kos_foundAndUpdated\n";
 print "Vztah (stu) deleted:  \t$kos_deleted\n";
 print "=======================================\n";
