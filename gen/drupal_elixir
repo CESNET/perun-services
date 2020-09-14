@@ -9,8 +9,8 @@ use Perun::GroupsAgent;
 use open qw/:std :utf8/;
 
 local $::SERVICE_NAME = "drupal_elixir";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+local $::PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.1.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -46,6 +46,9 @@ our $u_email = {};
 our $u_name = {};
 our $u_eppn = {};
 
+our $duplicityUserStruc = {};
+our $lowerCaseEmailStruc = {};
+
 our $groupStruc = {};
 our $g_name = {};
 our $g_type = {};
@@ -53,9 +56,9 @@ our $g_parent_id = {};
 
 our $membershipStruc = {};
 our $usedEmailsStruc = {};
-our $errorInDuplicity;
 
 my $fileUsers = $DIRECTORY . "users.csv";
+my $fileUsersDuplicities = $DIRECTORY . "users-duplicities.csv";
 my $fileGroups = $DIRECTORY . "groups.csv";
 my $fileMemberships = $DIRECTORY . "memberships.csv";
 
@@ -69,15 +72,19 @@ foreach my $resourceData ($data->getChildElements) {
 	}
 }
 
-#duplicities in emails are not allowed
-if($errorInDuplicity) { die "ERROR: There are some duplicities in emails:\n" . $errorInDuplicity; }
-
 # USERS: user_id login status e-mail display_name
 open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
 foreach my $uid (sort keys %$userStruc) {
 	print FILE_USERS "\"$uid\", \"$userStruc->{$uid}->{$u_login}\", \"$userStruc->{$uid}->{$u_status}\", \"$userStruc->{$uid}->{$u_email}\", \"$userStruc->{$uid}->{$u_name}\", \"$userStruc->{$uid}->{$u_eppn}\"","\n";
 }
 close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
+
+# USERS-duplicities: $uid login e-mail
+open FILE_USERS_DUPLICITIES,">$fileUsersDuplicities" or die "Cannot open $fileUsersDuplicities: $! \n";
+foreach my $uid (sort keys %$duplicityUserStruc) {
+	print FILE_USERS_DUPLICITIES "UID:\"$uid\", LOGIN:\"$duplicityUserStruc->{$uid}->{$u_login}\", EMAIL:\"$duplicityUserStruc->{$uid}->{$u_email}\"", "\n";
+}
+close (FILE_USERS_DUPLICITIES) or die "Cannot close $fileUsersDuplicities: $! \n";
 
 # GROUPS: group_id group_name type parent_id
 open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
@@ -134,7 +141,7 @@ sub processUsers {
 	#select first eppn which ends with '@elixir-europe.org', if there is no one matching select first eppn, if there is no eppn at all use empty string
 	my $eppn = (grep /\@elixir-europe.org$/, @eppns)[0] || $eppns[0] || "";
 	
-	if(exists $userStruc->{$uid}->{$u_login}) {
+	if(exists $userStruc->{$uid}) {
 		my $memberStatus = $userStruc->{$uid}->{$u_status};
 
 		if ($memberStatus eq $STATUS_EXPIRED && $status eq $STATUS_VALID){
@@ -147,19 +154,20 @@ sub processUsers {
 			# change from SUSPENDED to EXPIRED
 			$userStruc->{$uid}->{$u_status} = $status;
 		}
-	} else {
-		$userStruc->{$uid}->{$u_login} = $login;
-		$userStruc->{$uid}->{$u_status} = $status;
-		$userStruc->{$uid}->{$u_email} = $email;
-		#duplicity of two different users in email is not allowed
+	} else{
 		my $lowerCaseEmail = lc($email);
-		if($usedEmailsStruc->{$lowerCaseEmail}) {
-			$errorInDuplicity .= "Users with logins '$login' and '" . $usedEmailsStruc->{$lowerCaseEmail} . "' have same email '$email'\n";
+		#duplicity found, create record of duplicity accounts
+		if(exists $lowerCaseEmailStruc->{$lowerCaseEmail}) {
+			$duplicityUserStruc->{$uid}->{$u_login} = $login;
+			$duplicityUserStruc->{$uid}->{$u_email} = $email;
 		} else {
-			$usedEmailsStruc->{$lowerCaseEmail}= $login;
+			$userStruc->{$uid}->{$u_login} = $login;
+			$userStruc->{$uid}->{$u_status} = $status;
+			$userStruc->{$uid}->{$u_email} = $email;
+			$userStruc->{$uid}->{$u_name} = $d_name;
+			$userStruc->{$uid}->{$u_eppn} = $eppn;
+			$lowerCaseEmailStruc->{$lowerCaseEmail} = 1;
 		}
-		$userStruc->{$uid}->{$u_name} = $d_name;
-		$userStruc->{$uid}->{$u_eppn} = $eppn;
 	}
 
 	if(@admins) {

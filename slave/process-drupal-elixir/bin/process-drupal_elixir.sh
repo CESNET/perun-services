@@ -1,10 +1,11 @@
 #!/bin/bash
 
-PROTOCOL_VERSION='3.0.0'
+PROTOCOL_VERSION='3.1.0'
 
 
 function process {
 	FILE_USERS="users.csv"
+	FILE_USERS_DUPLICITIES="users-duplicities.csv"
 	FILE_GROUPS="groups.csv"
 	FILE_MEMBERSHIPS="memberships.csv"
 
@@ -12,6 +13,7 @@ function process {
 	I_CHANGED=(0 '${FILE} updated')
 	I_NOT_CHANGED=(0 '${FILE} has not changed')
 	E_CHMOD=(51 'Cannot chmod on $WORK_DIR/$FILE')
+	E_DUPLICITIES=(52 '')
 
 
 	create_lock
@@ -36,4 +38,10 @@ function process {
 			log_msg I_NOT_CHANGED
 		fi
 	done
+
+	#there are some duplicities, need to end with error
+	if [ -s "$FILE_USERS_DUPLICITIES" ]; then
+		cat "${FILE_USERS_DUPLICITIES}" >&2;
+		log_msg E_DUPLICITIES
+	fi
 }
