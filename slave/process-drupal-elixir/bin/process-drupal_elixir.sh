@@ -5,7 +5,6 @@ PROTOCOL_VERSION='3.1.0'
 
 function process {
 	FILE_USERS="users.csv"
-	FILE_USERS_DUPLICITIES="users-duplicities.csv"
 	FILE_GROUPS="groups.csv"
 	FILE_MEMBERSHIPS="memberships.csv"
 
@@ -13,8 +12,7 @@ function process {
 	I_CHANGED=(0 '${FILE} updated')
 	I_NOT_CHANGED=(0 '${FILE} has not changed')
 	E_CHMOD=(51 'Cannot chmod on $WORK_DIR/$FILE')
-	E_DUPLICITIES=(52 '')
-
+	E_DUPLICATES=(52 'Email duplicates: ${DUPLICATES}')
 
 	create_lock
 
@@ -39,9 +37,10 @@ function process {
 		fi
 	done
 
-	#there are some duplicities, need to end with error
-	if [ -s "$FILE_USERS_DUPLICITIES" ]; then
-		cat "${FILE_USERS_DUPLICITIES}" >&2;
-		log_msg E_DUPLICITIES
+	FILE_USER_DUPLICATES="$WORK_DIR/users-duplicities.csv"
+	#there are some duplicates between emails, need to end with error
+	if [ -s "${FILE_USER_DUPLICATES}" ]; then
+		DUPLICATES=`cat $FILE_USER_DUPLICATES`
+		log_msg E_DUPLICATES
 	fi
 }
