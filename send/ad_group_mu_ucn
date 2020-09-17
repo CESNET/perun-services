@@ -65,8 +65,9 @@ my $filter = '(objectClass=group)';
 ldap_bind($ldap, $conf[1], $conf[2]);
 
 # load all data
+my @attrs = ('cn', 'info');
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
-my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn']);
+my @ad_entries = load_ad($ldap, "OU=MU,DC=fabrikam,DC=muni,DC=cz", $filter, \@attrs);
 
 my %ad_entries_map = ();
 my %perun_entries_map = ();
@@ -151,10 +152,27 @@ sub process_add() {
 				ldap_log($service_name, $new_ad_entry->ldif());
 				$counter_group_not_added++;
 			}
-
+		} else {
+			# Group Exists; set info that the group is managed by Perun.
+			my $ad_entry = $ad_entries_map{$cn};
+			foreach (@attrs) {
+				next if($_ eq 'cn');
+				unless ($ad_entry->get_value($_) ~~ $perun_entry->get_value($_)){
+					$ad_entry->add(
+						"$_" => $perun_entry->get_value($_)
+					);
+					my $response = $ad_entry->update($ldap);
+					if ($response) {
+						unless ($response->is_error()) {
+							ldap_log($service_name, "Group Attributes Updated: " . $ad_entry->dn() . " | \n");
+						} else {
+							ldap_log($service_name, "Group NOT updated: " . $ad_entry->dn() . " | " . $response->error() . " | \n");
+						}
+					}
+				}
+			}
 		}
 	}
-
 }
 
 #
@@ -164,7 +182,13 @@ sub process_remove() {
 
 	foreach my $ad_entry (@ad_entries) {
 		my $cn = $ad_entry->get_value('cn');
-		unless (exists $perun_entries_map{$cn}) {
+		# In the attribute we store who manages the group /AccMgr = null, perun = perun@muni.cz/
+		my $info = $ad_entry->get_value('info') || "null";
+		# Do not remove groups that are not managed by Perun.
+		if ($info ne "perun\@muni.cz") {
+			update_not_managed_group($ad_entry);
+			next;
+		};
 
 			# clear members
 			# load members of a group from AD
@@ -185,10 +209,29 @@ sub process_remove() {
 					$counter_group_not_removed++;
 				}
 			}
-
 		}
 	}
 
+}
+sub update_not_managed_group {
+	my $ad_entry = shift;
+
+	my @ad_val = load_group_members($ldap, $ad_entry->dn(), $filter);
+	my %ad_val_map = map { $_ => 1 } @ad_val;
+	my %per_val_map = ();
+
+	my $response_ad = $ldap->search( base => $ad_entry->dn(), filter => $filter, scope => 'sub' );
+	unless ($response_ad->is_error()) {
+		# SUCCESS
+		my $ad_entry = $response_ad->entry(0);
+		update_group_membership($ad_entry, \%ad_val_map, \%per_val_map);
+	} else {
+		# FAIL (to get group from AD)
+		$counter_fail++;
+		ldap_log($service_name, "Unmanaged Group members NOT updated: " . $ad_entry->dn() . " | " . $response_ad->error());
+		return;
+	}
+	$counter_emptied_unmanaged++;
 }
 
 #
@@ -220,7 +263,7 @@ sub process_update() {
 
 			# members of group are not equals
 			# we must get reference to real group from AD in order to call "replace"
-			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'base' );
+			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'sub' );
 			unless ($response_ad->is_error()) {
 				# SUCCESS
 				my $ad_entry = $response_ad->entry(0);
