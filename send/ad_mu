@@ -402,6 +402,18 @@ my $RESULT_ERRORS = "errors";
 my $RESULT_CHANGED = "changed";
 my $RESULT_UNCHANGED = "unchanged";
 
+# extension attributes for groups (filled by Perun)
+
+# This attribute can be 'TRUE' or 'FALSE'. The first one means that a group exists in AD.
+# The second one serves as a sign that a group was removed. We do not remove groups physically,
+# because if we would want to recreate it, AD would have not recognized that it is a group which existed before.
+my $extension_attr_one = 'extensionAttribute1';
+
+# This attribute contains a date, after which will be group removed (extensionAttribute1 = 'FALSE'), or is not defined.
+# It is not filled by the gen script. The grace period can be set only in the send script, when a group should be removed.
+# When such group is recreated in Perun, this attribute is set to undef in the update process.
+my $extension_attr_two = 'extensionAttribute2';
+
 # log counters
 my $counter_add = 0;
 my $counter_updated = 0;
@@ -409,11 +421,18 @@ my $counter_disabled = 0;
 my $counter_fail = 0;
 my $counter_add_ous = 0;
 my $counter_fail_ous = 0;
-my $counter_group_add = 0;
-my $counter_group_remove = 0;
-my $counter_group_updated = 0;
-my $counter_group_updated_with_errors = 0;
-my $counter_group_failed = 0;
+my $counter_group_added = 0;
+my $counter_group_not_added = 0;
+my $counter_group_attributes_updated = 0;
+my $counter_group_attributes_not_updated = 0;
+my $counter_group_members_updated = 0;
+my $counter_group_members_updated_with_errors = 0;
+my $counter_group_members_not_updated = 0;
+my $counter_group_not_emptied = 0;
+my $counter_group_grace_period_set = 0;
+my $counter_group_grace_period_not_set = 0;
+my $counter_group_removed = 0;
+my $counter_group_not_removed = 0;
 
 # load all data
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
@@ -469,33 +488,62 @@ process_licenses_groups();
 ldap_unbind($ldap);
 
 # log results
-ldap_log($service_name, "Added: " . $counter_add . " entries.");
-ldap_log($service_name, "Updated: " . $counter_updated . " entries.");
-ldap_log($service_name, "Disabled: " . $counter_disabled . " entries.");
-ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
-ldap_log($service_name, "Group added: " . $counter_group_add . " entries.");
-ldap_log($service_name, "Group removed: " . $counter_group_remove . " entries.");
-ldap_log($service_name, "Group updated without errors: " . $counter_group_updated . " entries.");
-ldap_log($service_name, "Group updated with errors: " . $counter_group_updated_with_errors . " entries.");
-ldap_log($service_name, "Group failed: " . $counter_group_failed . " entries.");
+ldap_log($service_name, "User added: " . $counter_add . " entries.");
+ldap_log($service_name, "User updated: " . $counter_updated . " entries.");
+ldap_log($service_name, "User disabled: " . $counter_disabled . " entries.");
+ldap_log($service_name, "User failed: " . $counter_fail. " entries.");
+ldap_log($service_name, "-------------------------------------------------------------------------------------------------------");
+ldap_log($service_name, "OU added: " . $counter_add_ous . " entries.");
+ldap_log($service_name, "OU failed: " . $counter_fail_ous . " entries.");
+ldap_log($service_name, "-------------------------------------------------------------------------------------------------------");
+ldap_log($service_name, "Group added (without members): " . $counter_group_added . " entries.");
+ldap_log($service_name, "Group failed to add: " . $counter_group_not_added . " entries.");
+ldap_log($service_name, "-------------------------------------------------------------------------------------------------------");
+ldap_log($service_name, "Group set as removed: " . $counter_group_removed . " entries.");
+ldap_log($service_name, "Group grace period set: " . $counter_group_grace_period_set . " entries.");
+ldap_log($service_name, "Group failed to empty during removal: " . $counter_group_not_emptied . " entries.");
+ldap_log($service_name, "Group grace period failed to set: " . $counter_group_grace_period_not_set . " entries.");
+ldap_log($service_name, "Group failed to set as removed: " . $counter_group_not_removed . " entries.");
+ldap_log($service_name, "-------------------------------------------------------------------------------------------------------");
+ldap_log($service_name, "Group updated (attributes): " . $counter_group_attributes_updated . " entries.");
+ldap_log($service_name, "Group failed to update (attributes): " . $counter_group_attributes_not_updated . " entries.");
+ldap_log($service_name, "-------------------------------------------------------------------------------------------------------");
+ldap_log($service_name, "Group updated (members): " . $counter_group_members_updated . " entries.");
+ldap_log($service_name, "Group updated with errors (members)" . $counter_group_members_updated_with_errors . " entries.");
+ldap_log($service_name, "Group failed to update (members): " . $counter_group_members_not_updated . " entries.");
 
 # print results
-print "Added: " . $counter_add . " entries.\n";
-print "Updated: " . $counter_updated . " entries.\n";
-print "Disabled: " . $counter_disabled . " entries.\n";
-print "Failed: " . $counter_fail. " entries.\n";
+print "User added: " . $counter_add . " entries.\n";
+print "User updated: " . $counter_updated . " entries.\n";
+print "User disabled: " . $counter_disabled . " entries.\n";
+print "User failed: " . $counter_fail. " entries.\n";
+print "-------------------------------------------------------------------------------------------------------\n";
 print "OU added: " . $counter_add_ous . " entries.\n";
 print "OU failed: " . $counter_fail_ous . " entries.\n";
-print "Group added: " . $counter_group_add . " entries.\n";
-print "Group removed: " . $counter_group_remove . " entries.\n";
-print "Group updated without errors: " . $counter_group_updated . " entries.\n";
-print "Group updated with errors: " . $counter_group_updated_with_errors . " entries.\n";
-print "Group failed: " . $counter_group_failed . " entries.\n";
+print "-------------------------------------------------------------------------------------------------------\n";
+print "Group added (without members): " . $counter_group_added . " entries.\n";
+print "Group failed to add: " . $counter_group_not_added . " entries.\n";
+print "-------------------------------------------------------------------------------------------------------\n";
+print "Group set as removed: " . $counter_group_removed . " entries.\n";
+print "Group grace period set: " . $counter_group_grace_period_set . " entries.\n";
+print "Group failed to empty during removal: " . $counter_group_not_emptied . " entries.\n";
+print "Group grace period failed to set: " . $counter_group_grace_period_not_set . " entries.\n";
+print "Group failed to set as removed: " . $counter_group_not_removed . " entries.\n";
+print "-------------------------------------------------------------------------------------------------------\n";
+print "Group updated (attributes): " . $counter_group_attributes_updated . " entries.\n";
+print "Group failed to update (attributes): " . $counter_group_attributes_not_updated . " entries.\n";
+print "-------------------------------------------------------------------------------------------------------\n";
+print "Group updated (members): " . $counter_group_members_updated . " entries.\n";
+print "Group updated with errors (members): " . $counter_group_members_updated_with_errors . " entries.\n";
+print "Group failed to update (members): " . $counter_group_members_not_updated . " entries.\n";
 
 $lock->unlock();
 $lockManager->unlock($errorLockFile);
 
-if ($counter_fail or $counter_fail_ous or $counter_group_failed or $counter_group_updated_with_errors) {
+if ($counter_fail or $counter_fail_ous or
+	$counter_group_not_added or $counter_group_members_not_updated or
+	$counter_group_members_updated_with_errors or $counter_group_attributes_not_updated or
+	$counter_group_not_removed or $counter_group_grace_period_not_set or $counter_group_not_emptied) {
 	# some update of AD failed, tell it to the engine to re-schedule the service.
 	exit 1;
 }
@@ -661,7 +709,7 @@ sub process_groups() {
 
 	my @perun_entries_groups = load_perun($service_files_dir."/".$service_name."_groups_".$ouName.".ldif");
 	my @ad_entries_groups = load_ad($ldap, "OU=".$ouName.",".$base_dn_groups, $filter_groups,
-		[ 'cn', 'samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates' , 'ProxyAddresses', 'mail', 'extensionAttribute1', 'extensionAttribute2']);
+		[ 'cn', 'samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates' , 'ProxyAddresses', 'mail', $extension_attr_one, $extension_attr_two]);
 
 	my %ad_entries_group_map = ();
 	my %perun_entries_group_map = ();
@@ -681,17 +729,20 @@ sub process_groups() {
 		my $cn = $perun_entry->get_value('cn');
 		unless (exists $ad_entries_group_map{$cn}) {
 
-			# Add new entry to AD (including members!)
-			my $response = $perun_entry->update($ldap);
+			my @attrs_to_add = ('cn', 'samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', $extension_attr_one, 'objectClass');
+			my $new_ad_entry = clone_entry_with_specific_attributes($perun_entry, \@attrs_to_add);
+			# Add new entry to AD
+			my $response = $new_ad_entry->update($ldap);
 			unless ($response->is_error()) {
 				# SUCCESS
-				ldap_log($service_name, "Group added: ".$perun_entry->dn());
-				$counter_group_add++;
+				ldap_log($service_name, "Group added (without members): ".$perun_entry->dn());
+				push(@ad_entries_groups, $new_ad_entry);
+				$counter_group_added++;
 			} else {
 				# FAIL
 				ldap_log($service_name, "Group NOT added: ".$perun_entry->dn()." | ".$response->error());
-				ldap_log($service_name, $perun_entry->ldif());
-				$counter_group_failed++;
+				ldap_log($service_name, $new_ad_entry->ldif());
+				$counter_group_not_added++;
 			}
 
 		}
@@ -711,7 +762,7 @@ sub process_groups() {
 			my $perun_entry = $perun_entries_group_map{$cn};
 
 			# attrs without cn!
-			my @attrs = ('samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates', 'ProxyAddresses', 'mail', 'extensionAttribute1', 'extensionAttribute2');
+			my @attrs = ('samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates', 'ProxyAddresses', 'mail', $extension_attr_one, $extension_attr_two);
 			# stored log messages to check if entry should be updated
 			my @entry_changed = ();
 
@@ -737,14 +788,14 @@ sub process_groups() {
 				unless ($response->is_error()) {
 					# SUCCESS
 					foreach my $log_message (@entry_changed) {
-						ldap_log($service_name, "Group updated: ".$ad_entry->dn()." | ".$log_message);
+						ldap_log($service_name, "Group attributes updated: ".$ad_entry->dn()." | ".$log_message);
 					}
-					$counter_group_updated++;
+					$counter_group_attributes_updated++;
 				} else {
 					# FAIL
-					ldap_log($service_name, "Group NOT updated: ".$ad_entry->dn()." | ".$response->error());
+					ldap_log($service_name, "Group attributes NOT updated: ".$ad_entry->dn()." | ".$response->error());
 					ldap_log($service_name, $ad_entry->ldif());
-					$counter_group_failed++;
+					$counter_group_attributes_not_updated++;
 				}
 			}
 
@@ -762,40 +813,50 @@ sub process_groups() {
 
 	foreach my $ad_entry (@ad_entries_groups) {
 		my $cn = $ad_entry->get_value('cn');
-		unless (exists $perun_entries_group_map{$cn}) {
+		unless (exists $perun_entries_group_map{$cn} || $ad_entry->get_value($extension_attr_one) eq 'FALSE') {
 
 			# Prevent clearing main license group Employee,Student,Alumni !!
 			unless (($ad_entry->dn() eq $employeeDN) or ($ad_entry->dn() eq $studentDN) or ($ad_entry->dn() eq $alumniDN) or ($ad_entry->dn() eq $student2DN)){
 
 				# clear members
-				my @empty_members = ();
-				$ad_entry->replace(
-					'member' => \@empty_members
-				);
-
-				my $grace_period = $ad_entry->get_value('extensionAttribute2');
-				unless (defined $grace_period) {
-					$ad_entry->replace(
-						'extensionAttribute2' => $groups_grace_period_date
-					);
+				# load members of a group from AD
+				my @to_be_removed = load_group_members($ldap, $ad_entry->dn(), $filter_groups);
+				my $response_remove = remove_members_from_entry($ad_entry, \@to_be_removed);
+				unless ($response_remove == $SUCCESS) {
+					ldap_log($service_name, "Failed to remove all members from group during the group removal process: ".$ad_entry->dn());
+					$counter_group_not_emptied++;
 				} else {
-					my @grace_period_array = Decode_Date_EU($grace_period);
-					if(Delta_Days(@today, @grace_period_array) < 0) {
-						# set this attribute to FALSE
+					my $grace_period = $ad_entry->get_value($extension_attr_two);
+					unless (defined $grace_period) {
 						$ad_entry->replace(
-							'extensionAttribute1' => 'FALSE'
+							$extension_attr_two => $groups_grace_period_date
 						);
+						my $response = $ad_entry->update($ldap);
+						unless ($response->is_error()) {
+							ldap_log($service_name, "Set grace period for group: ".$ad_entry->dn(). "to ". $groups_grace_period_date);
+							$counter_group_grace_period_set++;
+						} else {
+							ldap_log($service_name, "Failed to set grace period for group: ".$ad_entry->dn()." | ".$response->error());
+							$counter_group_grace_period_not_set++;
+						}
+					} else {
+						my @grace_period_array = Decode_Date_EU($grace_period);
+						# if group's grace period passed, set the group as removed.
+						if(Delta_Days(@today, @grace_period_array) < 0) {
+							# set this attribute to FALSE
+							$ad_entry->replace(
+								$extension_attr_one => 'FALSE'
+							);
+							my $response = $ad_entry->update($ldap);
+							unless ($response->is_error()) {
+								ldap_log($service_name, "Group set as removed: ".$ad_entry->dn());
+								$counter_group_removed++;
+							} else {
+								ldap_log($service_name, "Failed to set group as removed: ".$ad_entry->dn()." | ".$response->error());
+								$counter_group_not_removed++;
+							}
+						}
 					}
-				}
-
-				my $response = $ad_entry->update($ldap);
-				unless ($response->is_error()) {
-					ldap_log($service_name, "Group emptied: ".$ad_entry->dn());
-					$counter_group_remove++;
-				} else {
-					ldap_log($service_name, "Group NOT emptied: ".$ad_entry->dn()." | ".$response->error());
-					ldap_log($service_name, $ad_entry->ldif());
-					$counter_group_failed++;
 				}
 			}
 
@@ -819,7 +880,7 @@ sub process_groups_members() {
 
 	if ($? != 0) {
 		ldap_log($service_name, "Unable to load Perun group members from AD: " . $perun_entry->dn());
-		$counter_group_failed++;
+		$counter_group_members_not_updated++;
 		return;
 	}
 
@@ -842,7 +903,7 @@ sub process_groups_members() {
 
 		} else {
 			# FAIL (to get group from AD)
-			$counter_group_failed++;
+			$counter_group_members_not_updated++;
 			ldap_log($service_name, "Group members NOT updated: " . $perun_entry->dn() . " | " . $response_ad->error());
 		}
 	}
@@ -1014,7 +1075,7 @@ saveStoredUserStates;
 
 	foreach ($employeeDN, $alumniDN, $studentDN, $student2DN) {
 		if ($add_result{$_} eq $RESULT_ERRORS) {
-			$counter_group_updated_with_errors++;
+			$counter_group_members_updated_with_errors++;
 			die "Failed to add members to one or more main license groups. Check logs for more information.";
 		}
 	}
@@ -1026,9 +1087,9 @@ saveStoredUserStates;
 
 	foreach ($employeeDN, $alumniDN, $studentDN, $student2DN) {
 		if ($remove_result{$_} eq $RESULT_ERRORS) {
-			$counter_group_updated_with_errors++;
+			$counter_group_members_updated_with_errors++;
 		} elsif ($add_result{$_} eq $RESULT_CHANGED or $remove_result{$_} eq $RESULT_CHANGED) {
-			$counter_group_updated++;
+			$counter_group_members_updated++;
 		}
 	}
 
@@ -2060,9 +2121,9 @@ sub update_group_membership {
 		my $response_remove = remove_members_from_entry($ad_entry, \@to_be_removed);
 
 		if ($response_add == $SUCCESS and $response_remove == $SUCCESS) {
-			$counter_group_updated++;
+			$counter_group_members_updated++;
 		} else {
-			$counter_group_updated_with_errors++;
+			$counter_group_members_updated_with_errors++;
 		}
 	}
 }
