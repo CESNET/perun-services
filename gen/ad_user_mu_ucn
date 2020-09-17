@@ -4,6 +4,8 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
+use MIME::Base64;
+use JSON::XS;
 
 local $::SERVICE_NAME = "ad_user_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
@@ -14,7 +16,7 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
-my $data = perunServicesInit::getFlatData;
+my $data = perunServicesInit::getDataWithGroups;
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
@@ -25,6 +27,7 @@ our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_CHIPNUMBERS; *A_CHIPNUMBERS = \"urn:perun:user:attribute-def:def:chipNumbers";
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -52,23 +55,25 @@ open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileN
 print FILE $baseDN;
 close(FILE);
 
-#
-# AGGREGATE DATA
-#
-# FOR EACH USER
-foreach my $user (($data->getChildElements)[1]->getChildElements) {
+# Process Resources
+foreach my $resource ( $data->getChildElements ) {
+	my %resourceAttributes = attributesToHash $resource->getAttributes;
+	my $groupName = $resourceAttributes{$A_R_ADGROUPNAME};
+	next if (!$groupName);
 
-	my %uAttributes = attributesToHash $user->getAttributes;
+	#process all members from resource (users data)
+	foreach my $member (($resource->getChildElements)[1]->getChildElements) {
+		my %uAttributes = attributesToHash $member->getAttributes;
+		my $login = $uAttributes{$A_LOGIN};
 
-	my $login = $uAttributes{$A_LOGIN};
-
-	$users->{$login}->{"DN"} = "CN=" . $uAttributes{$A_LOGIN} . "," . $baseDN;
-	# store standard attrs
-	$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
-	$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
-	$users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
-	$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
-
+		$users->{$login}->{"DN"} = "CN=" . $uAttributes{$A_LOGIN} . "," . $baseDN;
+		# store standard attrs
+		$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
+		$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
+		$users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
+		$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
+		$users->{$login}->{$A_CHIPNUMBERS} = $uAttributes{$A_CHIPNUMBERS};
+	}
 }
 
 #
@@ -81,25 +86,27 @@ binmode FILE, ":utf8";
 my @logins = sort keys %{$users};
 for my $login (@logins) {
 
-	unless ($login =~ /^9[0-9]{6}$/) {
-		# Allow only 9UČO users !!
-		next;
-	}
+	#unless ($login =~ /^9[0-9]{6}$/) {
+	#	# Allow only 9UČO users !!
+	#	next;
+	#}
 
 	# print attributes, which are never empty
 	print FILE "dn: " . $users->{$login}->{"DN"} . "\n";
-
 	print FILE "cn: " . $login . "\n";
 	print FILE "samAccountName: " . $login . "\n";
-	print FILE "userPrincipalName: " . $login . "\@" . $domain . "\n";
+	print FILE "userPrincipalName: " . $login . "\n";
+	print FILE "employeeID: " . $login . "\n";
 	# enable accounts (if not) using service propagation
 	print FILE "userAccountControl: " . $uac . "\n";
+
 
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
 	my $sn = $users->{$login}->{$A_LAST_NAME};
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
 	my $displayName = $users->{$login}->{$A_DISPLAY_NAME};
 	my $mail = $users->{$login}->{$A_MAIL};
+	my $chips = $users->{$login}->{$A_CHIPNUMBERS};
 
 	if (defined $displayName and length $displayName) {
 		print FILE "displayName: " . $displayName . "\n";
@@ -114,6 +121,15 @@ for my $login (@logins) {
 		print FILE "mail: " . $mail . "\n";
 	}
 
+	#my %allChipNumbers;  #used for consistency check - each chip number should belong to only one user
+	#foreach my $chipNumber (@{$chips}) {
+	#	if($allChipNumbers{$chipNumber}) {
+	#		warn "Same chip number shared by more users. Logins of users: " . $login . ", " . $allChipNumbers{$chipNumber} . "\n";
+	#	}
+	#	$allChipNumbers{$chipNumber} = $login;
+	#	print FILE "houseIdentifier:", checkBase64($chipNumber), "\n";
+	#}
+
 	# print classes
 	print FILE "objectclass: top\n";
 	print FILE "objectclass: person\n";
@@ -124,6 +140,18 @@ for my $login (@logins) {
 	print FILE "\n";
 
 }
+
+# method checks if value starts with SAFE-INIT-CHAR and then continue with SAFE-CHAR
+# if not then it encode to Base64 with ":: " prefix
+sub checkBase64 {
+	my $value = shift;
+
+	if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
+		return " ", $value;
+	}
+	return ": ", encode_base64(Encode::encode_utf8($value), '');
+}
+
 
 close(FILE);
 

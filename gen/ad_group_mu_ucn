@@ -23,6 +23,7 @@ our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseD
 our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
 our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName';
 our $A_MR_V_IS_BANNED;  *A_MR_V_IS_BANNED = \'urn:perun:member_resource:attribute-def:virt:isBanned';
+our $A_R_ADOUNAME; *A_R_ADOUNAME = \'urn:perun:resource:attribute-def:def:adOuName';
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -53,7 +54,7 @@ foreach my $rData (@resourcesData) {
 
 	my %rAttributes = attributesToHash $rData->getAttributes;
 	my $group = $rAttributes{$A_R_GROUP_NAME};
-	$groups->{$group} = 1;
+	$groups->{$group}->{$A_R_ADOUNAME} = $rAttributes{$A_R_ADOUNAME} || $baseGroupDN;
 
 	# process members
 	my @membersData = $rData->getChildElements;
@@ -81,10 +82,7 @@ foreach my $rData (@resourcesData) {
 			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDNforSpecial} = 1
 
 		}
-
-
 	}
-
 }
 
 #
@@ -94,8 +92,9 @@ open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
 
 for my $group (sort keys %$groups) {
 
-	print FILE "dn: CN=" . $group . "," . $baseGroupDN . "\n";
+	print FILE "dn: CN=" . $group . "," . $groups->{$group}->{$A_R_ADOUNAME} . "\n";
 	print FILE "cn: " . $group . "\n";
+	print FILE "mail: perun\@muni.cz\n";
 	print FILE "samAccountName: " . $group . "\n";
 	print FILE "objectClass: group\n";
 	print FILE "objectClass: top\n";
