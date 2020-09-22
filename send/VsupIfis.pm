@@ -1,7 +1,7 @@
 package VsupIfis;
 use Exporter 'import';
 @ISA = ('Exporter');
-@EXPORT = qw(load_kos load_vema);
+@EXPORT = qw(load_kos load_vema load_dc2);
 
 use strict;
 use warnings FATAL => 'all';
@@ -88,6 +88,53 @@ sub load_kos() {
 #
 # Load map of users relations from DC2
 #
+sub load_dc2() {
+
+	my $config = init_config("dc2.conf");
+
+	my $hostname = $config->{"hostname"};
+	my $port = $config->{"port"};
+	my $db_name = $config->{"db_name"};
+	my $db_user = $config->{"username"};
+	my $db_password = $config->{"password"};
+
+	my $dbh = DBI->connect("dbi:Oracle://$hostname:$port/$db_name", $db_user, $db_password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+	$dbh->do("alter session set nls_date_format='YYYY-MM-DD HH24:MI:SS'");
+
+	# Select query for input database (DC2) - internal/external teachers with valid relation
+	my $sth = $dbh->prepare(qq{SELECT UCO, VZTAH_CISLO, NS, VZTAH_STATUS_NAZEV, VZTAH_STATUS_CISLO, OD, DO,
+        CASE WHEN (VZTAH_STATUS_CISLO in (1,2,4,5,6,7,8,9,10,16,17,21) AND VZTAH_FUNKCE_CISLO in (1,2,3,4,5,52))
+                THEN 'ITIC'
+        ELSE null
+        END as KARTA_IDENT
+        FROM PAM2IDM_VZTAHY
+        WHERE (DO >= TRUNC(SYSDATE) OR DO is NULL) and UCO is not null});
+	$sth->execute();
+
+	#Structure to store data from input database (DC2)
+	my $inputData = {};
+	while(my $row = $sth->fetchrow_hashref()) {
+		my $key = $row->{VZTAH_CISLO};
+		$inputData->{$key}->{'OSB_ID'} = $row->{UCO};
+		# Limit to 35 ??? ($row->{VZTAH_STATUS_NAZEV}) ? substr($row->{VZTAH_STATUS_NAZEV}, 0, 35) : undef;
+		$inputData->{$key}->{'VZTAH_STATUS_NAZEV'} = $row->{VZTAH_STATUS_NAZEV};
+		$inputData->{$key}->{'NS'} = $row->{NS};
+		$inputData->{$key}->{'VZTAH_OD'} = $row->{OD};
+		$inputData->{$key}->{'VZTAH_DO'} = $row->{DO};
+		$inputData->{$key}->{'KARTA_IDENT'} = $row->{KARTA_IDENT};
+		$inputData->{$key}->{'VZTAH_STATUS_CISLO'} = $row->{VZTAH_STATUS_CISLO};
+	}
+
+	# Disconnect from input database (DC2)
+	$dbh->disconnect();
+
+	return $inputData;
+
+}
+
+#
+# Load map of users relations from VEMA
+#
 sub load_vema() {
 
 	my $config = init_config("vema.conf");
@@ -101,7 +148,7 @@ sub load_vema() {
 	my $dbh = DBI->connect("dbi:Oracle://$hostname:$port/$db_name", $db_user, $db_password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
 	$dbh->do("alter session set nls_date_format='YYYY-MM-DD HH24:MI:SS'");
 
-	# Select query for input database (DC2) - internal/external teachers with valid relation
+	# Select query for input database (VEMA) - internal/external teachers with valid relation
 	my $sth = $dbh->prepare(qq{SELECT UCO, VZ_CISLO, NS, VZ_S_N, OD, DO_,
 	CASE WHEN (VZ_S_C in (101) AND VZ_F_C in (1,2,3,4,5,52))
 		THEN 'ITIC'
@@ -112,7 +159,7 @@ sub load_vema() {
 	WHERE (DO_ >= TRUNC(SYSDATE) OR DO_ is NULL) and UCO is not null});
 	$sth->execute();
 
-	# Structure to store data from input database (DC2)
+	# Structure to store data from input database (VEMA)
 	my $inputData = {};
 	while(my $row = $sth->fetchrow_hashref()) {
 		my $key = $row->{UCO} . "_" . $row->{VZ_CISLO};
@@ -126,7 +173,7 @@ sub load_vema() {
 		$inputData->{$key}->{'VZTAH_STATUS_CISLO'} = $row->{VZ_S_C};
 	}
 
-	# Disconnect from input database (KOS)
+	# Disconnect from input database (VEMA)
 	$dbh->disconnect();
 
 	return $inputData;

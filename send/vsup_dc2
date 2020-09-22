@@ -9,7 +9,6 @@ use ScriptLock;
 my $username;
 my $password;
 my $tableName = 'IDM2PAM_OSOBY';
-#my $encoding = 'cp1250'; # for Oracle EE8MSWIN1250
 
 # define service
 my $service_name = "vsup_dc2";
@@ -54,6 +53,7 @@ my $dataByOsbId = {};
 open FILE, $service_file or die "Could not open $service_file: $!";
 while(my $line = <FILE>) {
 	my @parts = split /\t/, $line;
+	chomp(@parts);
 	$dataByOsbId->{$parts[0]}->{'UCO'} = $parts[1];
 	$dataByOsbId->{$parts[0]}->{'LOGIN'} = $parts[2];
 	$dataByOsbId->{$parts[0]}->{'EMAIL'} = $parts[3];
@@ -117,7 +117,7 @@ $dbh->disconnect();
 #Info about operations
 print "=======================================\n";
 print "Newly inserted:   \t$inserted\n";
-print "Found and skiped: \t$foundAndSkipped\n";
+print "Found and skipped: \t$foundAndSkipped\n";
 print "Found and updated:\t$foundAndUpdated\n";
 print "=======================================\n";
 
