@@ -9,21 +9,27 @@ local $::SERVICE_NAME = "ad_group_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
 my $SCRIPT_VERSION = "3.0.0";
 
+sub add_member_to_group;
+
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
 #Get hierarchical data without expired members
-my $data = perunServicesInit::getHierarchicalData(1);
+my $data = perunServicesInit::getDataWithGroups(1);
 
 #Constants
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
 our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
 our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName';
 our $A_MR_V_IS_BANNED;  *A_MR_V_IS_BANNED = \'urn:perun:member_resource:attribute-def:virt:isBanned';
 our $A_R_ADOUNAME; *A_R_ADOUNAME = \'urn:perun:resource:attribute-def:def:adOuName';
+our $A_G_INETVAZPR; *A_G_INETVAZPR = \'urn:perun:group:attribute-def:def:inetVazpr';
+our $A_G_DESCRIPTION; *A_G_DESCRIPTION = \'urn:perun:group:attribute-def:core:description';
+our $A_R_DESCRIPTION; *A_R_DESCRIPTION = \'urn:perun:resource:attribute-def:core:description';
 
 # CHECK ON FACILITY ATTRIBUTES
 my %facilityAttributes = attributesToHash $data->getAttributes;
@@ -45,44 +51,34 @@ open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileN
 print FILE $baseGroupDN;
 close(FILE);
 
-my @resourcesData = $data->getChildElements;
 my $groups = {};
 my $usersByResource = {};
 
 # FOR EACH RESOURCE
-foreach my $rData (@resourcesData) {
+foreach my $rData ($data->getChildElements) {
 
 	my %rAttributes = attributesToHash $rData->getAttributes;
 	my $group = $rAttributes{$A_R_GROUP_NAME};
-	$groups->{$group}->{$A_R_ADOUNAME} = $rAttributes{$A_R_ADOUNAME} || $baseGroupDN;
 
-	# process members
-	my @membersData = $rData->getChildElements;
+	unless ($group eq "workplaces"){
+		$groups->{$group}->{$A_R_ADOUNAME} = $rAttributes{$A_R_ADOUNAME} || $baseGroupDN;
+		$groups->{$group}->{"description"} = $rAttributes{$A_R_DESCRIPTION};
 
-	# FOR EACH MEMBER ON RESOURCE
-	foreach my $mData (@membersData) {
-
-		my %mAttributes = attributesToHash $mData->getAttributes;
-		my $login = $mAttributes{$A_LOGIN};
-		my $isBanned = $mAttributes{$A_MR_V_IS_BANNED};
-
-		#skip banned members
-		next if $isBanned;
-
-		# allow only UČO, 9UČO and s-[smth] logins
-
-		if ($login =~ /^9[0-9]{6}$/ or $login =~ /^[0-9]{1,6}$/) {
-
-			# store UČO and 9UČO users
-			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDN} = 1
-
-		} elsif ($login =~ /^s-/) {
-
-			# store "s-[something]" users - hack to be compatible with existing accounts
-			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDNforSpecial} = 1
-
+		my $memberData = ($rData->getChildElements)[1];
+		add_member_to_group($memberData, $group);
+	} else {
+		my $groupData = ($rData->getChildElements)[0];
+		# Process groups on resource
+		foreach my $gData ($groupData->getChildElements) {
+			my %gAttributes = attributesToHash $gData->getAttributes;
+			my $inetVazpr = $gAttributes{$A_G_INETVAZPR};
+			my $groupName = "wplace-$inetVazpr";
+			$groups->{$groupName}->{$A_R_ADOUNAME} = $baseGroupDN;
+			$groups->{$groupName}->{"description"} = $gAttributes{$A_G_DESCRIPTION};
+			add_member_to_group(($gData->getChildElements)[1], $groupName);
 		}
 	}
+
 }
 
 #
@@ -94,6 +90,7 @@ for my $group (sort keys %$groups) {
 
 	print FILE "dn: CN=" . $group . "," . $groups->{$group}->{$A_R_ADOUNAME} . "\n";
 	print FILE "cn: " . $group . "\n";
+	print FILE "description: " . $groups->{$group}->{"description"} . "\n";
 	print FILE "mail: perun\@muni.cz\n";
 	print FILE "samAccountName: " . $group . "\n";
 	print FILE "objectClass: group\n";
@@ -112,3 +109,30 @@ for my $group (sort keys %$groups) {
 close FILE;
 
 perunServicesInit::finalize;
+
+sub add_member_to_group {
+	my $memberData = shift;
+	my $groupName = shift;
+
+	# FOR EACH MEMBER ON RESOURCE
+	foreach my $mData ($memberData->getChildElements) {
+		my %mAttributes = attributesToHash $mData->getAttributes;
+		my $login = $mAttributes{$A_LOGIN};
+		my $isBanned = $mAttributes{$A_MR_V_IS_BANNED};
+		#skip banned members
+		next if $isBanned;
+
+		# allow only UČO, 9UČO and s-[smth] logins
+		if ($login =~ /^9[0-9]{6}$/ or $login =~ /^[0-9]{1,6}$/) {
+
+			# store UČO and 9UČO users
+			$usersByResource->{$groupName}->{"CN=" . $login . "," . $baseDN} = 1
+
+		} elsif ($login =~ /^s-/) {
+
+			# store "s-[something]" users - hack to be compatible with existing accounts
+			$usersByResource->{$groupName}->{"CN=" . $login . "," . $baseDNforSpecial} = 1
+
+		}
+	}
+}
