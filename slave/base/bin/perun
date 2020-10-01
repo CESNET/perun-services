@@ -383,7 +383,7 @@ WORK_DIR=`mktemp -d ${TMPDIR:-/tmp}/${NAME}.XXXXXXXXXX`
 add_on_exit "rm -rf ${WORK_DIR}"
 
 ### Receive and process data
-catch_error E_TAR_FILES tar --no-same-owner --no-same-permissions -x -C "${WORK_DIR}" <&0
+catch_error E_TAR_FILES tar --no-same-owner --no-same-permissions --warning=no-timestamp -x -C "${WORK_DIR}" <&0
 SERVICE=`head -n 1 "${WORK_DIR}/SERVICE"`
 SEND_TO_HOSTNAME=`head -n 1 "${WORK_DIR}/HOSTNAME"`
 FACILITY=`head -n 1 "${WORK_DIR}/FACILITY"`
