@@ -19,7 +19,7 @@ fi
 if [ -z "$DESTINATION_TYPE" ]; then
 	echo "Destination type of this service can't be empty" >&2
 	exit 255;
-else 
+else
 	TYPE="service-specific"
 	if [ "$DESTINATION_TYPE" != "$TYPE" ]; then
 		echo "Destination type of this service need to be $TYPE" >&2
@@ -112,6 +112,8 @@ fi
 
 ERR_CODE=$?
 
-echo "Slave script ends with return code: $ERR_CODE" >&2
+if [ $ERR_CODE -ne 0 ]; then
+    echo "Slave script ends with return code: $ERR_CODE" >&2
+fi
 
 exit $ERR_CODE
