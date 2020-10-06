@@ -178,7 +178,7 @@ else
 	#In all other cases we need to resolve if 'ssh' or 'curl' was used
 	if [ "$DESTINATION_TYPE" = "$DESTINATION_TYPE_URL" ]; then
 		#In this situation 'curl' was used
-		if [ $ERR_CODE -eq "0" ]; then 
+		if [ $ERR_CODE -eq "0" ]; then
 			#Check if curl ended without an error (ERR_CODE = 0) (if not, we can continue as usual, because there is an error on STDERR)
 			if [ 200 -ne "$STDOUT" ]; then
 				#Check if HTTP_CODE is different from OK (200)
@@ -196,8 +196,10 @@ else
 		#In this situation 'ssh' was used, STDOUT has to be printed
 		echo "$STDOUT"
 	fi
-	#For all situations different from timouted by our side we can return value from ERR_CODE as the result
-	echo "Communication with slave script ends with return code: $ERR_CODE" >&2
+	#For all situations different from time-out by our side we can return value from ERR_CODE as the result
+  if [ $ERR_CODE -ne 0 ]; then
+    echo "Communication with slave script ends with return code: $ERR_CODE" >&2
+  fi
 fi
 
 exit $ERR_CODE

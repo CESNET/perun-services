@@ -39,7 +39,9 @@ ERR_CODE=$?
 if [ $ERR_CODE -eq 124 ]; then
 	echo "Communication with the peer has timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
 else
-	echo "Communication with the peer ends with return code: $ERR_CODE" >&2
+	if [ $ERR_CODE -ne 0 ]; then
+    echo "Communication with the peer ends with return code: $ERR_CODE" >&2
+  fi
 fi
 
 # HTTP Request with timeout for GROUPS
@@ -48,9 +50,11 @@ cat "$GROUP_FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $GROUP_TRANSPORT_COMMAND
 ERR_CODE=$?
 #Error code 124 means - timed out
 if [ $ERR_CODE -eq 124 ]; then
-	echo "Communication with the peer has timed out with return code: $ERR_CODE" >&2
-else
 	echo "Communication with the peer ends with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
+else
+	if [ $ERR_CODE -ne 0 ]; then
+    echo "Communication with the peer ends with return code: $ERR_CODE" >&2
+  fi
 fi
 
 exit $ERR_CODE

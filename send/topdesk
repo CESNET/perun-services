@@ -35,7 +35,9 @@ ERR_CODE=$?
 if [ $ERR_CODE -eq 124 ]; then
 	echo "Communication with slave script has timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from slave script!)" >&2
 else
-	echo "Communication with slave script ends with return code: $ERR_CODE" >&2
+	if [ $ERR_CODE -ne 0 ]; then
+    echo "Slave script ends with return code: $ERR_CODE" >&2
+  fi
 fi
 
 exit $ERR_CODE
