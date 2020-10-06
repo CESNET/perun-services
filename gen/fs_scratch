@@ -37,6 +37,7 @@ our $A_SCRATCH_MOUNTPOINT;        *A_SCRATCH_MOUNTPOINT =        \'urn:perun:fac
 our $A_GID;                       *A_GID =                       \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
 our $A_UID;                       *A_UID =                       \'urn:perun:user_facility:attribute-def:virt:UID';
 our $A_USER_STATUS;               *A_USER_STATUS =               \'urn:perun:member:attribute-def:core:status';
+our $A_MEMBER_IS_SUSPENDED;       *A_MEMBER_IS_SUSPENDED =       \'urn:perun:member:attribute-def:virt:isSuspended';
 our $A_F_SCRATCH_DIR_PERMISSIONS; *A_F_SCRATCH_DIR_PERMISSIONS = \'urn:perun:facility:attribute-def:def:scratchDirPermissions';
 
 my $memberAttributesByLogin= {};
@@ -54,9 +55,11 @@ foreach my $rData (@resourcesData) {
 	my @membersData = $rData->getChildElements;
 	foreach my $mData (@membersData) {
 		my %memberAttributes = attributesToHash $mData->getAttributes;
+		my $status = $memberAttributes{$A_USER_STATUS};
+		if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = "SUSPENDED"; }
 				
 		$memberAttributes{$A_SCRATCH_MOUNTPOINT} = $facilityAttributes{$A_SCRATCH_MOUNTPOINT};
-		$memberAttributes{$A_USER_STATUS} = mergeStatuses $memberAttributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{$A_USER_STATUS}, $memberAttributes{$A_USER_STATUS};
+		$memberAttributes{$A_USER_STATUS} = mergeStatuses $memberAttributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{$A_USER_STATUS}, $status;
 
 		#store to global structure
 		$memberAttributesByLogin->{$memberAttributes{$A_USER_LOGIN}} = \%memberAttributes;

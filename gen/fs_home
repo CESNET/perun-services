@@ -47,6 +47,7 @@ our $A_USER_LOGIN;                 *A_USER_LOGIN =                   \'urn:perun
 our $A_UF_DATA_QUOTAS;             *A_UF_DATA_QUOTAS =               \'urn:perun:user_facility:attribute-def:virt:dataQuotas';
 our $A_UF_FILE_QUOTAS;             *A_UF_FILE_QUOTAS =               \'urn:perun:user_facility:attribute-def:virt:fileQuotas';
 our $A_USER_STATUS;                *A_USER_STATUS =                  \'urn:perun:member:attribute-def:core:status';
+our $A_MEMBER_IS_SUSPENDED;        *A_MEMBER_IS_SUSPENDED =          \'urn:perun:member:attribute-def:virt:isSuspended';
 our $A_HOME_MOUNTPOINT;            *A_HOME_MOUNTPOINT =              \'urn:perun:resource:attribute-def:def:fsHomeMountPoint';
 our $A_R_VOLUME;                   *A_R_VOLUME =                     \'urn:perun:resource:attribute-def:def:fsVolume';
 our $A_GID;                        *A_GID =                          \'urn:perun:resource:attribute-def:virt:unixGID';
@@ -93,6 +94,8 @@ foreach my $rData (@resourcesData) {
 	foreach my $mData (@membersData) {
 		my %memberAttributes = attributesToHash $mData->getAttributes;
 		my $login = $memberAttributes{$A_USER_LOGIN};
+		my $status = $memberAttributes{$A_USER_STATUS};
+		if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = "SUSPENDED"; }
 
 		unless(defined $dataForUserHomeByLogin->{$login}->{$volume}) { $dataForUserHomeByLogin->{$login}->{$volume} = {}; }
 		my $alreadyStoredMemberAttrByMount = $dataForUserHomeByLogin->{$login}->{$volume};
@@ -101,7 +104,7 @@ foreach my $rData (@resourcesData) {
 		$alreadyStoredMemberAttrByMount->{$A_USER_LOGIN} = $login;
 		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_GID} = $resourceAttributes{$A_GID};
 		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_UID} = $memberAttributes{$A_UID};
-		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_USER_STATUS} = mergeStatuses $memberAttributes{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_USER_STATUS}, $memberAttributes{$A_USER_STATUS};
+		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_USER_STATUS} = mergeStatuses $memberAttributes{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_USER_STATUS}, $status;
 	}
 
 	foreach my $groupData (($rData->getChildElements)[0]->getChildElements) {

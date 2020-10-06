@@ -24,6 +24,7 @@ sub processMemberships;
 #Constants
 our $A_USER_ID;                   *A_USER_ID =               \'urn:perun:user:attribute-def:core:id';
 our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:attribute-def:core:status';
+our $A_MEMBER_IS_SUSPENDED;       *A_MEMBER_IS_SUSPENDED =   \'urn:perun:member:attribute-def:virt:isSuspended';
 our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_LOGIN;                *A_USER_LOGIN =            \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_D_NAME;               *A_USER_D_NAME =           \'urn:perun:user:attribute-def:core:displayName';
@@ -109,6 +110,7 @@ sub processUsers {
         my %memberAttributes = attributesToHash $memberData->getAttributes;
         my $uid = $memberAttributes{$A_USER_ID};
         my $status = $memberAttributes{$A_USER_STATUS};
+        if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = STATUS_SUSPENDED; }
         my $email = $memberAttributes{$A_USER_EMAIL};
         my $d_name = $memberAttributes{$A_USER_D_NAME};
         my $login = $memberAttributes{$A_USER_LOGIN};
