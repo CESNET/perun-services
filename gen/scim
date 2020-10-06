@@ -85,8 +85,8 @@ my @groups;
 foreach my $gid (sort keys %$groupStruc) {
         my $group = {};
         $group->{"id"} = $gid;
-        $group->{"name"} = $groupStruc->{$gid}->{$g_name};
-        $group->{"parentGroupId"} = $groupStruc->{$gid}->{$g_par_id};
+        $group->{"name"} = $groupStruc->{$gid}->{$A_GROUP_NAME};
+        $group->{"parentGroupId"} = $groupStruc->{$gid}->{$A_GROUP_PAR_ID};
 
         my @members;
         foreach my $uid (sort keys %{$membershipStruc->{$gid}}){
@@ -157,8 +157,8 @@ sub processGroups {
                 my $groupParId = $groupAttributes{$A_GROUP_PAR_ID};
 
                 unless(exists $groupStruc->{$gid}) {
-                        $groupStruc->{$gid}->{$groupName} = $groupName;
-                        $groupStruc->{$gid}->{$groupParentId} = $groupParId;
+                        $groupStruc->{$gid}->{$A_GROUP_NAME} = $groupName;
+                        $groupStruc->{$gid}->{$A_GROUP_PAR_ID} = $groupParId;
                 }
 
                 foreach my $memberData ($membersElement->getChildElements) {
