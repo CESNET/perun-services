@@ -114,7 +114,7 @@ sub processUsers {
 	my %memberAttributes = attributesToHash $memberData->getAttributes;
 	my $uid = $memberAttributes{$A_USER_ID};
 	my $status = $memberAttributes{$A_USER_STATUS};
-	if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = STATUS_SUSPENDED; }
+	if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = $STATUS_SUSPENDED; }
 	my $email = $memberAttributes{$A_USER_EMAIL};
 	my $d_name = $memberAttributes{$A_USER_D_NAME};
 	my $lf_name = $memberAttributes{$A_USER_LF_NAME};
@@ -137,7 +137,7 @@ sub processUsers {
 		$userStruc->{$uid}->{$u_status} = $status;
 		$userStruc->{$uid}->{$u_email} = $email;
 		$userStruc->{$uid}->{$u_name} = $d_name;
-		$userStruc->{$uid}->{$u_lf_name} = $lf_name; 
+		$userStruc->{$uid}->{$u_lf_name} = $lf_name;
 	}
 
 	processMemberships $gid, $uid;

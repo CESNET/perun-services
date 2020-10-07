@@ -117,7 +117,7 @@ sub processUsers {
         my %memberAttributes = attributesToHash $memberData->getAttributes;
         my $uid = $memberAttributes{$A_USER_ID};
         my $status = $memberAttributes{$A_USER_STATUS};
-        if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = STATUS_SUSPENDED; }
+        if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = $STATUS_SUSPENDED; }
         my $email = $memberAttributes{$A_USER_EMAIL};
         my $d_name = $memberAttributes{$A_USER_D_NAME};
         my $login = $memberAttributes{$A_USER_LOGIN};

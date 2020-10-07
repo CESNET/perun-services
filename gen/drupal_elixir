@@ -132,7 +132,7 @@ sub processUsers {
 	my $uid = $memberAttributes{$A_USER_ID};
 	my $login = $memberAttributes{$A_USER_LOGIN};
 	my $status = $memberAttributes{$A_USER_STATUS};
-	if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = STATUS_SUSPENDED; }
+	if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = $STATUS_SUSPENDED; }
 	my $email = $memberAttributes{$A_USER_EMAIL};
 	my $d_name = $memberAttributes{$A_USER_D_NAME};
 
@@ -142,12 +142,12 @@ sub processUsers {
 
 	#select first eppn which ends with '@elixir-europe.org', if there is no one matching select first eppn, if there is no eppn at all use empty string
 	my $eppn = (grep /\@elixir-europe.org$/, @eppns)[0] || $eppns[0] || "";
-	
+
 	if(exists $userStruc->{$uid}) {
 		my $memberStatus = $userStruc->{$uid}->{$u_status};
 
 		if ($memberStatus eq $STATUS_EXPIRED && $status eq $STATUS_VALID){
-			# change from EXPIRED to VALID  
+			# change from EXPIRED to VALID
 			$userStruc->{$uid}->{$u_status} = $status;
 		} elsif ($memberStatus eq $STATUS_SUSPENDED && $status eq $STATUS_VALID){
 			# change from SUSPENDED to VALID
