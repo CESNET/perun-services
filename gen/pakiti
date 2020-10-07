@@ -52,7 +52,7 @@ my $userStruc = {};
 my $directoryName = "$DIRECTORY/data/";
 mkdir $directoryName or die "Cannot create $directoryName";
 
-my @resourcesData = $data->getChildElements; 
+my @resourcesData = $data->getChildElements;
 foreach my $resourceData (@resourcesData) {
 	my %resourceAttributes= attributesToHash $resourceData->getAttributes;
 
@@ -110,7 +110,7 @@ sub processUser {
 	my $displayName = $memberAttributes{$A_USER_NAME};
 	my $eppns = $memberAttributes{$A_USER_EPPNS};
 	my $status = $memberAttributes{$A_USER_STATUS};
-	if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = STATUS_SUSPENDED; }
+	if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = $STATUS_SUSPENDED; }
 
 	if(!$userStruc->{$pakitiInstance}->{$uid}) {
 		$userStruc->{$pakitiInstance}->{$uid}->{$HEADER_EMAIL} = $email;
@@ -128,7 +128,7 @@ sub processUser {
 		} elsif ($actualStatus eq $STATUS_SUSPENDED && $status eq $STATUS_EXPIRED){
 			# change from SUSPENDED to EXPIRED
 			$userStruc->{$pakitiInstance}->{$uid}->{$HEADER_STATUS} = $status;
-		}	
+		}
 	}
 
 	#always add pakiti admin info if it is set to true
