@@ -1,0 +1,102 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use JSON::XS;
+
+#forward declaration
+sub processGroupData;
+sub processMembersData;
+sub processResourceData;
+
+our $SERVICE_NAME = "feudal";
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getDataWithGroups;
+
+#Constants
+our $A_GROUP_NAME;                      *A_GROUP_NAME =                   \'urn:perun:group:attribute-def:core:name';
+our $A_GROUP_VO_NAME;                   *A_GROUP_VO_NAME =                \'urn:perun:group:attribute-def:virt:voShortName';
+our $A_USER_LOGIN;                      *A_USER_LOGIN =                   \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_USER_FIRST_NAME;                 *A_USER_FIRST_NAME =              \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LAST_NAME;                  *A_USER_LAST_NAME =               \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_MAIL;                       *A_USER_MAIL =                    \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_DISPLAY_NAME;               *A_USER_DISPLAY_NAME =            \'urn:perun:user:attribute-def:core:displayName';
+our $A_USER_SSHKEYS;                    *A_USER_SSHKEYS =                 \'urn:perun:user:attribute-def:def:sshPublicKey';
+our $A_USER_AFFILIATIONS;               *A_USER_AFFILIATIONS =            \'urn:perun:user:attribute-def:virt:eduPersonScopedAffiliations';
+our $A_F_FEUDAL_ISSUER;                 *A_F_FEUDAL_ISSUER =              \'urn:perun:facility:attribute-def:def:feudalIssuer';
+our $A_F_FEUDAL_ENTITLEMENT_PREFIX;     *A_F_FEUDAL_ENTITLEMENT_PREFIX =  \'urn:perun:facility:attribute-def:def:feudalGroupEntitlementPrefix';
+our $A_F_FEUDAL_ENTITLEMENT_SUFIX;      *A_F_FEUDAL_ENTITLEMENT_SUFIX =   \'urn:perun:facility:attribute-def:def:feudalGroupEntitlementSufix';
+
+#main data structure
+my $userInfo = {};
+
+my %facilityAttributes = attributesToHash $data->getAttributes;
+
+foreach my $resourceData ($data->getChildElements) {
+	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
+
+	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
+		my $groupMembersLogins = processGroupData $groupData;
+	}
+}
+
+my $usersDirectory = "$DIRECTORY/users";
+mkdir $usersDirectory or die "Can't mkdir $usersDirectory $!";
+
+
+for my $user (keys %$userInfo) {
+	my $outputStruc = { "userinfo" => $userInfo->{$user} };
+	my $fileName = "$usersDirectory/$user";
+	open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
+	print FILE JSON::XS->new->utf8->pretty->encode($outputStruc);
+	close FILE or die "Cannot close $fileName: $! \n";
+}
+
+
+perunServicesInit::finalize;
+
+##############################################################################
+#   Only subs definitions down there
+##############################################################################
+
+sub processGroupData {
+	my $groupData = shift;
+	my $membersElement = ($groupData->getChildElements)[1];
+	my %groupAttributes = attributesToHash $groupData->getAttributes;
+
+	my $groupName = $groupAttributes{$A_GROUP_NAME};
+	my $voName = $groupAttributes{$A_GROUP_VO_NAME};
+
+	processMembersData $membersElement, $groupName, $voName;
+}
+
+sub processMembersData {
+	my ($membersElement, $groupName, $voName) = @_;
+	for my $memberData ($membersElement->getChildElements) {
+		my %memberAttributes = attributesToHash $memberData->getAttributes;
+		my $login = $memberAttributes{$A_USER_LOGIN};
+		unless($userInfo->{$login}) {
+			$userInfo->{$login}->{"sub"} = $login;
+			$userInfo->{$login}->{"name"} = $memberAttributes{$A_USER_DISPLAY_NAME} if $memberAttributes{$A_USER_DISPLAY_NAME};
+			$userInfo->{$login}->{"given_name"} = $memberAttributes{$A_USER_FIRST_NAME} if $memberAttributes{$A_USER_FIRST_NAME};
+			$userInfo->{$login}->{"family_name"} = $memberAttributes{$A_USER_LAST_NAME} if $memberAttributes{$A_USER_LAST_NAME};
+			$userInfo->{$login}->{"email"} = $memberAttributes{$A_USER_MAIL} if $memberAttributes{$A_USER_MAIL};
+			$userInfo->{$login}->{"ssh_key"} = $memberAttributes{$A_USER_SSHKEYS} if $memberAttributes{$A_USER_SSHKEYS};
+			$userInfo->{$login}->{"eduperson_scoped_affiliation"} = $memberAttributes{$A_USER_AFFILIATIONS};
+			$userInfo->{$login}->{"eduperson_entitlement"} = [];
+			$userInfo->{$login}->{"iss"} = $facilityAttributes{$A_F_FEUDAL_ISSUER};
+		}
+
+		push @{$userInfo->{$login}->{"eduperson_entitlement"}}, $facilityAttributes{$A_F_FEUDAL_ENTITLEMENT_PREFIX} . $voName . ':' . $groupName . $facilityAttributes{$A_F_FEUDAL_ENTITLEMENT_SUFIX};
+		if($groupName eq 'members') {
+			push @{$userInfo->{$login}->{"eduperson_entitlement"}}, $facilityAttributes{$A_F_FEUDAL_ENTITLEMENT_PREFIX} . $voName . $facilityAttributes{$A_F_FEUDAL_ENTITLEMENT_SUFIX};
+		}
+
+	}
+}
