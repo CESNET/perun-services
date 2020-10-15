@@ -1,7 +1,7 @@
 package ADConnector;
 use Exporter 'import';
 @ISA = ('Exporter');
-@EXPORT = qw(init_config resolve_domain_controlers ldap_connect_multiple_options resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members compare_entry enable_uac disable_uac is_uac_enabled clone_entry_with_specific_attributes);
+@EXPORT = qw(init_config resolve_domain_controlers ldap_connect_multiple_options resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members compare_entry enable_uac disable_uac is_uac_enabled clone_entry_with_specific_attributes add_members_to_entry remove_members_from_entry update_group_membership);
 
 use strict;
 use warnings;
@@ -85,6 +85,18 @@ Log message to file. Takes service name and message string params.
 
 Create clone of an existing ldap entry with specified attributes.
 
+=head2 add_members_to_entry($ldap, $service_name, $ad_entry, $to_be_added)
+
+Add members to the ldap entry and returns the appropriate result code.
+
+=head2 remove_members_from_entry($ldap, $service_name, $ad_entry, $to_be_removed)
+
+Remove members from the ldap entry and returns the appropriate result code.
+
+=head2 update_group_membership($ldap, $service_name, $ad_entry, $ad_members_state, $perun_members_state)
+
+Update group membership in the ldap entry, according to the ad and perun member state. Returns result of the update.
+
 =head1 AUTHOR
 
 Pavel Zlámal - <zlamal@cesnet.cz>
@@ -98,6 +110,13 @@ use Net::LDAP::Message;
 use Net::LDAP::LDIF;
 use Net::LDAP::Control::Paged;
 use Net::LDAP::Constant qw( LDAP_CONTROL_PAGED );
+
+# operations results
+my $RESULT_ERRORS = "errors";
+my $RESULT_CHANGED = "changed";
+my $RESULT_UNCHANGED = "unchanged";
+my $SUCCESS = 1;
+my $FAIL = 0;
 
 #
 # Load username and password for selected namespace and return it as a array
@@ -530,6 +549,116 @@ sub clone_entry_with_specific_attributes($$) {
 	}
 
 	return $clone;
+}
+
+#
+# Add members to the ldap entry and returns the appropriate result code.
+#
+sub add_members_to_entry($$$$) {
+
+	my $ldap = shift;
+	my $service_name = shift;
+	my $ad_entry = shift;
+	my $to_be_added = shift;
+	my $return_code = $SUCCESS;
+
+	# chunks of size less than 5000 have to be used, because LDAP cannot process more than 5000 operations at once.
+	my @chunks_to_add = ();
+
+	push @chunks_to_add, [ splice @$to_be_added, 0, 4999 ] while @$to_be_added;
+
+	foreach (@chunks_to_add) {
+		$ad_entry->add(
+			'member' => $_
+		);
+		my $response = $ad_entry->update($ldap);
+		if ($response) {
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
+			} else {
+				ldap_log($service_name, "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
+				$return_code = $FAIL;
+			}
+		}
+	}
+
+	return $return_code;
+}
+
+#
+# Remove members from the ldap entry and returns the appropriate result code.
+#
+sub remove_members_from_entry($$$$) {
+
+	my $ldap = shift;
+	my $service_name = shift;
+	my $ad_entry = shift;
+	my $to_be_removed = shift;
+	my $return_code = $SUCCESS;
+
+	# chunks of size less than 5000 have to be used, because LDAP cannot process more than 5000 operations at once.
+	my @chunks_to_remove = ();
+
+	push @chunks_to_remove, [ splice @$to_be_removed, 0, 4999 ] while @$to_be_removed;
+
+	foreach (@chunks_to_remove) {
+		$ad_entry->delete(
+			'member' => $_
+		);
+		my $response = $ad_entry->update($ldap);
+		if ($response) {
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
+			} else {
+				ldap_log($service_name, "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
+				$return_code = $FAIL;
+			}
+		}
+	}
+
+	return $return_code;
+}
+
+#
+# Update group membership in the ldap entry, according to the ad and perun member state. Returns result of the update.
+#
+sub update_group_membership($$$$$) {
+
+	my $ldap = shift;
+	my $service_name = shift;
+	my $ad_entry = shift;
+	my $ad_members_state = shift;
+	my $perun_members_state = shift;
+
+	my @to_be_added = ();
+	my @to_be_removed = ();
+
+	foreach (keys %{$perun_members_state}) {
+		unless (defined $ad_members_state->{$_}) {
+			push (@to_be_added, $_);
+		}
+	}
+
+	foreach (keys %{$ad_members_state}) {
+		unless (defined $perun_members_state->{$_}) {
+			push (@to_be_removed, $_);
+		}
+	}
+
+	if (@to_be_added or @to_be_removed) {
+		@to_be_added = sort @to_be_added;
+		@to_be_removed = sort @to_be_removed;
+
+		my $response_add = add_members_to_entry($ldap, $service_name, $ad_entry, \@to_be_added);
+		my $response_remove = remove_members_from_entry($ldap, $service_name, $ad_entry, \@to_be_removed);
+
+		if ($response_add == $SUCCESS and $response_remove == $SUCCESS) {
+			return $RESULT_CHANGED;
+		} else {
+			return $RESULT_ERRORS;
+		}
+	}
+	return $RESULT_UNCHANGED;
 }
 
 1;
