@@ -28,8 +28,12 @@ my $counter_group_members_not_updated = 0;
 # define service
 my $service_name = "ad_group_mu_ucn";
 
-my $FAIL = 0;
+# operations results
+my $RESULT_ERRORS = "errors";
+my $RESULT_CHANGED = "changed";
+my $RESULT_UNCHANGED = "unchanged";
 my $SUCCESS = 1;
+my $FAIL = 0;
 
 # GEN folder location
 my $facility_name = $ARGV[0];
@@ -165,7 +169,7 @@ sub process_remove() {
 			# clear members
 			# load members of a group from AD
 			my @to_be_removed = load_group_members($ldap, $ad_entry->dn(), $filter);
-			my $response_remove = remove_members_from_entry($ad_entry, \@to_be_removed);
+			my $response_remove = remove_members_from_entry($ldap, $service_name, $ad_entry, \@to_be_removed);
 			unless ($response_remove == $SUCCESS) {
 				ldap_log($service_name, "Failed to remove all members from group during the group removal process: ".$ad_entry->dn());
 				$counter_group_not_emptied++;
@@ -220,7 +224,9 @@ sub process_update() {
 			unless ($response_ad->is_error()) {
 				# SUCCESS
 				my $ad_entry = $response_ad->entry(0);
-				update_group_membership($ad_entry, \%ad_val_map, \%per_val_map);
+				my $result = update_group_membership($ldap, $service_name, $ad_entry, \%ad_val_map, \%per_val_map);
+				$counter_group_members_updated++ if ($result eq $RESULT_CHANGED);
+				$counter_group_members_updated_with_errors++ if ($result eq $RESULT_ERRORS);
 			} else {
 				# FAIL (to get group from AD)
 				$counter_group_members_not_updated++;
@@ -232,98 +238,4 @@ sub process_update() {
 
 	}
 
-}
-
-sub add_members_to_entry {
-
-	my $ad_entry = shift;
-	my $to_be_added = shift;
-	my $return_code = $SUCCESS;
-
-	# chunks of size less than 5000 have to be used, because LDAP cannot process more than 5000 operations at once.
-	my @chunks_to_add = ();
-
-	push @chunks_to_add, [ splice @$to_be_added, 0, 4999 ] while @$to_be_added;
-
-	foreach (@chunks_to_add) {
-		$ad_entry->add(
-			'member' => $_
-		);
-		my $response = $ad_entry->update($ldap);
-		if ($response) {
-			unless ($response->is_error()) {
-				ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
-			} else {
-				ldap_log($service_name, "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
-				$return_code = $FAIL;
-			}
-		}
-	}
-
-	return $return_code;
-}
-
-sub remove_members_from_entry {
-
-	my $ad_entry = shift;
-	my $to_be_removed = shift;
-	my $return_code = $SUCCESS;
-
-	# chunks of size less than 5000 have to be used, because LDAP cannot process more than 5000 operations at once.
-	my @chunks_to_remove = ();
-
-	push @chunks_to_remove, [ splice @$to_be_removed, 0, 4999 ] while @$to_be_removed;
-
-	foreach (@chunks_to_remove) {
-		$ad_entry->delete(
-			'member' => $_
-		);
-		my $response = $ad_entry->update($ldap);
-		if ($response) {
-			unless ($response->is_error()) {
-				ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
-			} else {
-				ldap_log($service_name, "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
-				$return_code = $FAIL;
-			}
-		}
-	}
-
-	return $return_code;
-}
-
-sub update_group_membership {
-
-	my $ad_entry = shift;
-	my $ad_members_state = shift;
-	my $perun_members_state = shift;
-
-	my @to_be_added = ();
-	my @to_be_removed = ();
-
-	foreach (keys %{$perun_members_state}) {
-		unless (defined $ad_members_state->{$_}) {
-			push (@to_be_added, $_);
-		}
-	}
-
-	foreach (keys %{$ad_members_state}) {
-		unless (defined $perun_members_state->{$_}) {
-			push (@to_be_removed, $_);
-		}
-	}
-
-	if (@to_be_added or @to_be_removed) {
-		@to_be_added = sort @to_be_added;
-		@to_be_removed = sort @to_be_removed;
-
-		my $response_add = add_members_to_entry($ad_entry, \@to_be_added);
-		my $response_remove = remove_members_from_entry($ad_entry, \@to_be_removed);
-
-		if ($response_add == $SUCCESS and $response_remove == $SUCCESS) {
-			$counter_group_members_updated++;
-		} else {
-			$counter_group_members_updated_with_errors++;
-		}
-	}
 }
