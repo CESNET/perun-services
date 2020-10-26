@@ -1,4 +1,0 @@
-#!/bin/bash
-SERVICE_NAME="opennebula_egi"
-
-. generic_send
