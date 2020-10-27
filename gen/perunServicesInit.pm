@@ -3,7 +3,7 @@ package perunServicesInit;
 
 use Exporter 'import';
 @EXPORT_OK = qw(init);
-@EXPORT= qw(getDirectory getDestinationDirectory getHierarchicalData getDataWithGroups getDataWithVos);
+@EXPORT= qw(getDirectory getDestinationDirectory getHierarchicalData getDataWithGroups getDataWithVos, getHashedDataWithGroups, getHashedHierarchicalData);
 
 use strict;
 use warnings;
@@ -19,12 +19,16 @@ use Storable;
 
 # variables define possible getData methods what can be execute
 our $DATA_TYPE_HIERARCHICAL="hierarchical";
+our $DATA_TYPE_HASHED_HIERARCHICAL="hashedhierarchical";
 our $DATA_TYPE_FLAT="flat";
+our $DATA_TYPE_HASHED_WITH_GROUPS="hashedwithgroups";
 our $DATA_TYPE_WITH_GROUPS="withgroups";
 our $DATA_TYPE_WITH_VOS="withvos";
 our $DATA_TYPE = {
+	$DATA_TYPE_HASHED_HIERARCHICAL => sub {getHashedHierarchicalData(@_)},
 	$DATA_TYPE_HIERARCHICAL => sub {getHierarchicalData(@_)},
 	$DATA_TYPE_FLAT => sub {getFlatData(@_)},
+	$DATA_TYPE_HASHED_WITH_GROUPS => sub {getHashedDataWithGroups(@_)},
 	$DATA_TYPE_WITH_GROUPS => sub {getDataWithGroups(@_)},
 	$DATA_TYPE_WITH_VOS => sub {getDataWithVos(@_)},
 };
@@ -59,7 +63,7 @@ sub init {
 	if(defined($DATA_TYPE->{$getDataType})) {
 		$::GET_DATA_METHOD = $DATA_TYPE->{$getDataType};
 	} else {
-		die "Not supported getData type $getDataType! Use one of these: '$DATA_TYPE_HIERARCHICAL', '$DATA_TYPE_FLAT', '$DATA_TYPE_WITH_GROUPS' or '$DATA_TYPE_WITH_VOS'.";
+		die "Not supported getData type $getDataType! Use one of these: '$DATA_TYPE_HIERARCHICAL', '$DATA_TYPE_HASHED_HIERARCHICAL', '$DATA_TYPE_FLAT', '$DATA_TYPE_WITH_GROUPS', '$DATA_TYPE_HASHED_WITH_GROUPS' or '$DATA_TYPE_WITH_VOS'.";
 	}
 
 	if(defined $local_data_file) {
@@ -135,6 +139,15 @@ sub getFacility {
 	return $facility;
 }
 
+sub getHashedHierarchicalData {
+	if(defined $local_data) { return $local_data; }
+  my $filterExpiredMembers = shift;
+  unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
+  my $data = $servicesAgent->getHashedHierarchicalData(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
+  logData $data, 'hashedHierarchicalData';
+  return $data;
+}
+
 sub getHierarchicalData {
 	if(defined $local_data) { return $local_data; }
 	my $filterExpiredMembers = shift;
@@ -150,6 +163,15 @@ sub getFlatData {
 	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
 	my $data = $servicesAgent->getFlatData(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
 	logData $data, 'flatData';
+	return $data;
+}
+
+sub getHashedDataWithGroups {
+	if(defined $local_data) { return $local_data; }
+	my $filterExpiredMembers = shift;
+	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
+	my $data = $servicesAgent->getHashedDataWithGroups(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
+	logData $data, 'hashedDataWithGroups';
 	return $data;
 }
 
