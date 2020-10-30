@@ -4,8 +4,6 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
-use Perun::Agent;
-use Perun::GroupsAgent;
 use open qw/:std :utf8/;
 use JSON::XS;
 use utf8;
@@ -47,17 +45,12 @@ my $userEmail = {};
 my $userDisplayName = {};
 my $userLogin = {};
 
-my $groupName = {};
-my $groupParentId = {};
-
 my $fileUsers = $DIRECTORY . "/users.scim";
 my $fileGroups = $DIRECTORY . "/groups.scim";
 
-my $agent = perunServicesInit->getAgent;
-
 foreach my $resourceData ($data->getChildElements) {
         foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-                my $groupMembersLogins = processGroups $groupData;
+                processGroups $groupData;
         }
 }
 
