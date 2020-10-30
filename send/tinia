@@ -8,22 +8,22 @@ DESTINATION_TYPE=$3
 
 if [ -z "$DESTINATION" ]; then
 	echo "Missing Destination argument (DB NAME there)" >&2
-	exit 257
+	exit 231
 fi
 
 if [ -z "$FACILITY_NAME" ]; then
 	echo "Missing FacilityName argument" >&2
-	exit 256
+	exit 232
 fi
 
 if [ -z "$DESTINATION_TYPE" ]; then
 	echo "Destination type of this service can't be empty" >&2
-	exit 255;
+	exit 233;
 else
 	TYPE="service-specific"
 	if [ "$DESTINATION_TYPE" != "$TYPE" ]; then
 		echo "Destination type of this service need to be $TYPE" >&2
-		exit 254;
+		exit 234;
 	fi
 fi
 
