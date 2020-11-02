@@ -4,7 +4,6 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
-use Data::Dumper;
 
 sub processResourceMember;
 sub processGroupMember;
@@ -22,7 +21,7 @@ my $SCRIPT_VERSION = "3.0.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data      = perunServicesInit::getDataWithGroups;
+my $data      = perunServicesInit::getHashedDataWithGroups;
 
 #-------------------------------------------------------------------------
 # CONSTANTS AND DEFINITIONS
@@ -30,7 +29,7 @@ my $data      = perunServicesInit::getDataWithGroups;
 
 our $A_G_AD_NAME;                            *A_G_AD_NAME =                            \'urn:perun:group:attribute-def:def:adName:o365mu';
 our $A_F_DOMAIN_NAME;                        *A_F_DOMAIN_NAME =                        \'urn:perun:facility:attribute-def:def:o365DomainName';
-our $A_MR_O365_SEND_AS;                      *A_MR_O365_SEND_AS =                      \'urn:perun:member_group:attribute-def:def:o365SendAs';
+our $A_MG_O365_SEND_AS;                      *A_MG_O365_SEND_AS =                      \'urn:perun:member_group:attribute-def:def:o365SendAs';
 our $A_U_O365_MAIL_ADDRS;                    *A_U_O365_MAIL_ADDRS =                    \'urn:perun:user:attribute-def:def:o365EmailAddresses:mu';
 our $A_UF_DISABLE_MAIL_FORWARD;              *A_UF_DISABLE_MAIL_FORWARD =              \'urn:perun:user_facility:attribute-def:def:disableO365MailForward';
 our $A_UF_LOGIN;                             *A_UF_LOGIN =                             \'urn:perun:user_facility:attribute-def:virt:login';
@@ -117,10 +116,8 @@ our $resourceMails = {};
 # PROCESSING FACILITY
 #-------------------------------------------------------------------------
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-
-my $facilityId = $facilityAttributes{$A_F_ID};
-my $domainName = $facilityAttributes{$A_F_DOMAIN_NAME};
+my $facilityId = $data->getFacilityId;
+my $domainName = $data->getFacilityAttributeValue( attrName => $A_F_DOMAIN_NAME );
 
 unless($facilityId) { die "Facility id can't be empty, it is used to find directory with cache and active users from AD!\n"; }
 unless($domainName) { die "Domain name can't be empty for service o365_mu!\n"; }
@@ -129,8 +126,8 @@ unless($domainName) { die "Domain name can't be empty for service o365_mu!\n"; }
 # PROCESSING RESOURCES
 #-------------------------------------------------------------------------
 
-foreach my $resource ( $data->getChildElements ) {
-	processResource $resource, $domainName;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	processResource $resourceId, $domainName;
 }
 
 #-------------------------------------------------------------------------
@@ -163,18 +160,16 @@ perunServicesInit::finalize;
 # process data about a resource (it also process data about its members and groups)
 sub processResource {
 
-	my $resourceData = shift;
+	my $resourceId = shift;
 	my $domainName = shift;
 
-	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
-
 	#define attributes for processing o365 groups and o365 resource maling lists
-	my $isForO365Group = $resourceAttributes{$A_R_IS_FOR_O365_GROUP};
-	my $resName = $resourceAttributes{$A_R_O365_RES_NAME};
+	my $isForO365Group = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_IS_FOR_O365_GROUP );
+	my $resName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_NAME );
 
 	#process all members from resource (users data)
-	foreach my $member (($resourceData->getChildElements)[1]->getChildElements) {
-		processResourceMember $member;
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+		processResourceMember $memberId;
 	}
 
 	#if resource mail name exists, process it as resource mail (resource-mails data)
@@ -182,13 +177,13 @@ sub processResource {
 		#prevent duplicity in resource name
 		if($resourceMails->{$resName}) { die "There is a duplicity of two Resources with the same resourceMailName: $resName\n"; }
 
-		processResourceMail $resourceData;
+		processResourceMail $resourceId;
 	}
 
 	#if resource is set as o365 resource, process it with all it's groups (groups data)
 	if($isForO365Group) {
-		foreach my $group (($resourceData->getChildElements)[0]->getChildElements){
-			processGroup $group;
+		foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId )){
+			processGroup $groupId, $resourceId;
 		}
 	}
 
@@ -197,52 +192,72 @@ sub processResource {
 # input: resourceData structure
 # process data about resource mailing list
 sub processResourceMail {
-	my $resourceData = shift;
+	my $resourceId = shift;
 
-	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
-	my $resName = $resourceAttributes{$A_R_O365_RES_NAME};
+	my $resName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_NAME );
 
 	#process all resource mail attributes
 	$resourceMails->{$resName}->{$RES_NAME_TEXT} = $resName;
-	$resourceMails->{$resName}->{$RES_ALIAS_TEXT}  = $resourceAttributes{$A_R_O365_RES_ALIAS} ? $resourceAttributes{$A_R_O365_RES_ALIAS} : "";
-	$resourceMails->{$resName}->{$RES_EMAIL_ADDRESES_TEXT} = $resourceAttributes{$A_R_O365_RES_EMAIL_ADDRESES} ? join(' ', sort @{$resourceAttributes{$A_R_O365_RES_EMAIL_ADDRESES}}) : "";
-	$resourceMails->{$resName}->{$RES_DISPLAY_NAME_TEXT} = $resourceAttributes{$A_R_O365_RES_DISPLAY_NAME} ? $resourceAttributes{$A_R_O365_RES_DISPLAY_NAME} : "";
-	$resourceMails->{$resName}->{$RES_TYPE_TEXT} = $resourceAttributes{$A_R_O365_RES_TYPE} ? $resourceAttributes{$A_R_O365_RES_TYPE} : "";
-	$resourceMails->{$resName}->{$RES_CAPACITY_TEXT} = $resourceAttributes{$A_R_O365_RES_CAPACITY} ? $resourceAttributes{$A_R_O365_RES_CAPACITY} : "";
-	$resourceMails->{$resName}->{$RES_ADDITIONAL_RESPONSE_TEXT} = $resourceAttributes{$A_R_O365_RES_ADDITIONAL_RESPONSE} ? $resourceAttributes{$A_R_O365_RES_ADDITIONAL_RESPONSE} : "";
-	$resourceMails->{$resName}->{$RES_EXT_MEETING_MSG_TEXT} = $resourceAttributes{$A_R_O365_RES_EXT_MEETING_MSG} ? "1" : "0";
-	$resourceMails->{$resName}->{$RES_ALLOW_CONFLICTS_TEXT} = $resourceAttributes{$A_R_O365_RES_ALLOW_CONFLICTS} ? "1" : "0";
-	$resourceMails->{$resName}->{$RES_BOOKING_WINDOW_TEXT} = $resourceAttributes{$A_R_O365_RES_BOOKING_WINDOW} ? $resourceAttributes{$A_R_O365_RES_BOOKING_WINDOW} : "";
-	$resourceMails->{$resName}->{$RES_PERCENTAGE_ALLOWED_TEXT} = $resourceAttributes{$A_R_O365_RES_PERCENTAGE_ALLOWED} ? $resourceAttributes{$A_R_O365_RES_PERCENTAGE_ALLOWED} : "";
-	$resourceMails->{$resName}->{$RES_ENFORCE_SCHED_HORIZON_TEXT} = $resourceAttributes{$A_R_O365_RES_ENFORCE_SCHED_HORIZON} ? "1" : "0";
-	$resourceMails->{$resName}->{$RES_MAX_CONFLICT_INSTANCES_TEXT} = $resourceAttributes{$A_R_O365_RES_MAX_CONFLICT_INSTANCES} ? $resourceAttributes{$A_R_O365_RES_MAX_CONFLICT_INSTANCES} : "";
-	$resourceMails->{$resName}->{$RES_MAX_DURATION_TEXT} = $resourceAttributes{$A_R_O365_RES_MAX_DURATION} ? $resourceAttributes{$A_R_O365_RES_MAX_DURATION} : "";
-	$resourceMails->{$resName}->{$RES_SCHED_DURING_WORK_HOURS_TEXT} = $resourceAttributes{$A_R_O365_RES_SCHED_DURING_WORK_HOURS} ? "1" : "0";
-	$resourceMails->{$resName}->{$RES_ALL_BOOK_IN_POLICY_TEXT} = $resourceAttributes{$A_R_O365_RES_ALL_BOOK_IN_POLICY} ? "1" : "0";
-	$resourceMails->{$resName}->{$RES_ALL_REQ_IN_POLICY_TEXT} = $resourceAttributes{$A_R_O365_RES_ALL_REQ_IN_POLICY} ? "1" : "0";
-	$resourceMails->{$resName}->{$RES_ALL_REQ_OUT_OF_POLICY_TEXT} = $resourceAttributes{$A_R_O365_RES_ALL_REQ_OUT_OF_POLICY} ? "1" : "0";
-	$resourceMails->{$resName}->{$RES_WORKDAYS_TEXT} = $resourceAttributes{$A_R_O365_RES_WORKDAYS} ? join(' ', sort @{$resourceAttributes{$A_R_O365_RES_WORKDAYS}}) : "";
-	$resourceMails->{$resName}->{$RES_WORKING_HOURS_START_TIME_TEXT} = $resourceAttributes{$A_R_O365_RES_WORKING_HOURS_START_TIME} ? $resourceAttributes{$A_R_O365_RES_WORKING_HOURS_START_TIME} : "";
-	$resourceMails->{$resName}->{$RES_WORKING_HOURS_END_TIME_TEXT} = $resourceAttributes{$A_R_O365_RES_WORKING_HOURS_END_TIME} ? $resourceAttributes{$A_R_O365_RES_WORKING_HOURS_END_TIME} : "";
-	$resourceMails->{$resName}->{$RES_ALLOW_RECURRING_MEETINGS_TEXT} = $resourceAttributes{$A_R_O365_RES_ALLOW_RECURRING_MEETINGS} ? "1" : "0";
-	$resourceMails->{$resName}->{$RES_ADD_ADDITIONAL_RESPONSE_TEXT} = $resourceAttributes{$A_R_O365_RES_ADD_ADDITIONAL_RESPONSE} ? "1" : "0";
+	my $alias = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_ALIAS );
+	my $emailAddreses = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_EMAIL_ADDRESES );
+	my $displayName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_DISPLAY_NAME );
+	my $type = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_TYPE );
+	my $capacity = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_CAPACITY );
+	my $additionalResponse = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_ADDITIONAL_RESPONSE );
+	my $extMeetingMsg = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_EXT_MEETING_MSG );
+	my $allowConflicts = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_ALLOW_CONFLICTS );
+	my $bookingWindow = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_BOOKING_WINDOW );
+	my $percentageAllowed = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_PERCENTAGE_ALLOWED );
+	my $enforceSchedHorizon = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_ENFORCE_SCHED_HORIZON );
+	my $maxConflictInstances = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_MAX_CONFLICT_INSTANCES );
+	my $maxDuration = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_MAX_DURATION );
+	my $schedDuringWorkHours = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_SCHED_DURING_WORK_HOURS );
+	my $allBookInPolicy = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_ALL_BOOK_IN_POLICY );
+	my $allReqInPolicy = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_ALL_REQ_IN_POLICY );
+	my $allReqOutPolicy = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_ALL_REQ_OUT_OF_POLICY );
+	my $workdays = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_WORKDAYS );
+	my $workingHoursStartTime = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_WORKING_HOURS_START_TIME );
+	my $workingHoursEndTime = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_WORKING_HOURS_END_TIME );
+	my $allowRecurringMeetings = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_ALLOW_RECURRING_MEETINGS );
+	my $addAdditionalResponse = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_ADD_ADDITIONAL_RESPONSE );
+
+	$resourceMails->{$resName}->{$RES_ALIAS_TEXT}  = $alias ? $alias : "";
+	$resourceMails->{$resName}->{$RES_EMAIL_ADDRESES_TEXT} = $emailAddreses ? join(' ', sort @{$emailAddreses}) : "";
+	$resourceMails->{$resName}->{$RES_DISPLAY_NAME_TEXT} = $displayName ? $displayName : "";
+	$resourceMails->{$resName}->{$RES_TYPE_TEXT} = $type ? $type : "";
+	$resourceMails->{$resName}->{$RES_CAPACITY_TEXT} = $capacity ? $capacity : "";
+	$resourceMails->{$resName}->{$RES_ADDITIONAL_RESPONSE_TEXT} = $additionalResponse ? $additionalResponse : "";
+	$resourceMails->{$resName}->{$RES_EXT_MEETING_MSG_TEXT} = $extMeetingMsg ? "1" : "0";
+	$resourceMails->{$resName}->{$RES_ALLOW_CONFLICTS_TEXT} = $allowConflicts ? "1" : "0";
+	$resourceMails->{$resName}->{$RES_BOOKING_WINDOW_TEXT} = $bookingWindow ? $bookingWindow : "";
+	$resourceMails->{$resName}->{$RES_PERCENTAGE_ALLOWED_TEXT} = $percentageAllowed ? $percentageAllowed : "";
+	$resourceMails->{$resName}->{$RES_ENFORCE_SCHED_HORIZON_TEXT} = $enforceSchedHorizon ? "1" : "0";
+	$resourceMails->{$resName}->{$RES_MAX_CONFLICT_INSTANCES_TEXT} = $maxConflictInstances ? $maxConflictInstances : "";
+	$resourceMails->{$resName}->{$RES_MAX_DURATION_TEXT} = $maxDuration ? $maxDuration : "";
+	$resourceMails->{$resName}->{$RES_SCHED_DURING_WORK_HOURS_TEXT} = $schedDuringWorkHours ? "1" : "0";
+	$resourceMails->{$resName}->{$RES_ALL_BOOK_IN_POLICY_TEXT} = $allBookInPolicy ? "1" : "0";
+	$resourceMails->{$resName}->{$RES_ALL_REQ_IN_POLICY_TEXT} = $allReqInPolicy ? "1" : "0";
+	$resourceMails->{$resName}->{$RES_ALL_REQ_OUT_OF_POLICY_TEXT} = $allReqOutPolicy ? "1" : "0";
+	$resourceMails->{$resName}->{$RES_WORKDAYS_TEXT} = $workdays ? join(' ', sort @{$workdays}) : "";
+	$resourceMails->{$resName}->{$RES_WORKING_HOURS_START_TIME_TEXT} = $workingHoursStartTime ? $workingHoursStartTime : "";
+	$resourceMails->{$resName}->{$RES_WORKING_HOURS_END_TIME_TEXT} = $workingHoursEndTime ? $workingHoursEndTime : "";
+	$resourceMails->{$resName}->{$RES_ALLOW_RECURRING_MEETINGS_TEXT} = $allowRecurringMeetings ? "1" : "0";
+	$resourceMails->{$resName}->{$RES_ADD_ADDITIONAL_RESPONSE_TEXT} = $addAdditionalResponse ? "1" : "0";
 
 	my @resDelegates = ();
 	my @resBookInPolicy = ();
 	my @resReqInPolicy = ();
 	my @resReqOutOfPolicy = ();
 
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		my %groupAttributes = attributesToHash $groupData->getAttributes;
+	foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId )) {
 
-		my $onResourceBookInPolicy = $groupAttributes{$A_GR_O365_RES_BOOK_IN_POLICY};
-		my $onResourceRequestInPolicy = $groupAttributes{$A_GR_O365_RES_REQUEST_IN_POLICY};
-		my $onResourceRequestOutOfPolicy = $groupAttributes{$A_GR_O365_RES_REQUEST_OUT_OF_POLICY};
-		my $onResourceDelegates = $groupAttributes{$A_GR_O365_RES_DELEGATES};
+		my $onResourceBookInPolicy = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_GR_O365_RES_BOOK_IN_POLICY );
+		my $onResourceRequestInPolicy = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_GR_O365_RES_REQUEST_IN_POLICY );
+		my $onResourceRequestOutOfPolicy = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_GR_O365_RES_REQUEST_OUT_OF_POLICY );
+		my $onResourceDelegates = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_GR_O365_RES_DELEGATES );
 
-		foreach my $memberData(($groupData->getChildElements)[1]->getChildElements) {
-			my %memberAttributes = attributesToHash $memberData->getAttributes;
-			my $UCO = $memberAttributes{$A_UF_LOGIN};
+		foreach my $memberId($data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
+			my $UCO = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
 			my $UPN = $users->{$UCO}->{$UPN_TEXT};
 
 			if($onResourceBookInPolicy) { push @resBookInPolicy, $UPN; }
@@ -261,13 +276,11 @@ sub processResourceMail {
 # input: memberData structure from resource
 # process data for member on resource (it is used for users data in o365)
 sub processResourceMember {
-		my $memberData = shift;
+		my $memberId = shift;
 
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
-
-		my $UCO = $memberAttributes{$A_UF_LOGIN};
-		my $disableForward = $memberAttributes{$A_UF_DISABLE_MAIL_FORWARD};
-		my $licence = $memberAttributes{$A_UF_O365_LICENCE};
+		my $UCO = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
+		my $disableForward = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_DISABLE_MAIL_FORWARD );
+		my $licence = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_O365_LICENCE );
 
 		#if member has no licence, skip him
 		unless($licence) {
@@ -276,13 +289,13 @@ sub processResourceMember {
 		}
 
 		#if mail forward is not set use the default value unless forwarding is disabled for that user
-		my $mailForward = $memberAttributes{$A_UF_O365_MAIL_FORWARD} || $UCO . $DEFAULT_FORWARDING_DOMAIN unless $disableForward;
+		my $mailForward = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_O365_MAIL_FORWARD ) || $UCO . $DEFAULT_FORWARDING_DOMAIN unless $disableForward;
 
-		my $archive = $memberAttributes{$A_UF_O365_ARCHIVE};
-		my $storeAndForward = $memberAttributes{$A_UF_O365_STORE_AND_FORWARD};
+		my $archive = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_O365_ARCHIVE );
+		my $storeAndForward = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_O365_STORE_AND_FORWARD );
 		my @emailsArray = ();
-		if(defined($memberAttributes{$A_U_O365_MAIL_ADDRS})) {
-			@emailsArray = @{$memberAttributes{$A_U_O365_MAIL_ADDRS}};
+		if(defined($data->getUserAttributeValue( member => $memberId, attrName => $A_U_O365_MAIL_ADDRS))) {
+			@emailsArray = @{$data->getUserAttributeValue( member => $memberId, attrName => $A_U_O365_MAIL_ADDRS)};
 		} else {
 			warn "Can't find emails for user with UCO: $UCO \n";
 		}
@@ -300,18 +313,18 @@ sub processResourceMember {
 # input: groupData from resource (defined as o365 group)
 # process group from resource defined as o365
 sub processGroup {
-	my $groupData = shift;
+	my $groupId = shift;
+	my $resourceId = shift;
 
-	my %groupAttributes = attributesToHash $groupData->getAttributes;
-	my $groupADName = $groupAttributes{$A_G_AD_NAME};
+	my $groupADName = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_AD_NAME );
 
 	if($groupADName) {
 		#all groups for mu should have specific part of name
-		my $groupADName = $groupAttributes{$A_G_AD_NAME} . '_group.muni.cz';
+		$groupADName = $groupADName . '_group.muni.cz';
 		$groups->{$groupADName} = undef;
 
-		foreach my $member(($groupData->getChildElements)[1]->getChildElements) {
-			processGroupMember $member, $groupADName;
+		foreach my $memberId($data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
+			processGroupMember $memberId, $groupId, $resourceId, $groupADName;
 		}
 	}
 }
@@ -319,18 +332,19 @@ sub processGroup {
 # input: memberData from group assigned to resource, group ad name
 # process member of the group
 sub processGroupMember {
-	my $memberData = shift;
+	my $memberId = shift;
+	my $groupId = shift;
+	my $resourceId = shift;
 	my $groupADName = shift;
 
-
-	my %memberAttributes = attributesToHash $memberData->getAttributes;
-	my $UCO = $memberAttributes{$A_UF_LOGIN};
+	my $UCO = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
 	#skipped user which has no licence
 	if($skippedUsers->{$UCO}) {
 		return;
 	}
 	my $UPN = $users->{$UCO}->{$UPN_TEXT};
-	my $sendAsGroup = $memberAttributes{$A_MR_O365_SEND_AS};
+	my $sendAsGroup = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_MG_O365_SEND_AS );
+
 	if($sendAsGroup) { $groups->{$groupADName}->{$UPN} = 1; }
 }
 
