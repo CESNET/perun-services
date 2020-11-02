@@ -160,8 +160,8 @@ sub processExtendedLicenses() {
 		my %memberAttributes = attributesToHash $memberData->getAttributes;
 		my $login = $memberAttributes{$A_LOGIN};
 
-		#if($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID){ #FIXME
-		if(1){
+		#if($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/){ #FIXME
+		if($login =~ /^[0-9]+$/){
 
 			my $dn = "CN=" . $login . "," . $baseDNUsers;
 			# if user has no active relation and is manually extended - put him to employees too
@@ -193,8 +193,8 @@ sub processMembers() {
 		my %memberAttributes = attributesToHash $memberData->getAttributes;
 		my $login = $memberAttributes{$A_LOGIN};
 
-		#if($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID){ #FIXME
-		if(1){
+		#if($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/){ #FIXME
+		if($login =~ /^[0-9]+$/){
 
 			# store users relations
 			my $dn = "CN=" . $memberAttributes{$A_LOGIN} . "," . $baseDNUsers;
@@ -238,15 +238,16 @@ sub processGroups {
 			# resolve groups members
 			for my $memberData ($membersElement->getChildElements) {
 				my %memberAttributes = attributesToHash $memberData->getAttributes;
+				my $login = $memberAttributes{$A_LOGIN};
 
-				#if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID) {  FIXME
-				if (1) {
-					$groups->{$ouName}->{$key}->{"MEMBERS"}->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers} = 1;
+				#if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/) {  FIXME
+				if ($login =~ /^[0-9]+$/) {
+					$groups->{$ouName}->{$key}->{"MEMBERS"}->{"CN=".$login.",".$baseDNUsers} = 1;
 					# get o365SendOnBehalf for non-license groups
 					if (defined $memberAttributes{$A_M_G_O365_SEND_ON_BEHALF} and $memberAttributes{$A_M_G_O365_SEND_ON_BEHALF} == 1) {
 						#FIXME ukladat DN
 						#$groups->{$ouName}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}->{$memberAttributes{$A_LOGIN}."\@muni.cz"} = 1;
-						$groups->{$ouName}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers} = 1;
+						$groups->{$ouName}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}->{"CN=".$login.",".$baseDNUsers} = 1;
 						
 					}
 				}
@@ -272,26 +273,28 @@ sub processGroups {
 			# resolve groups members
 			for my $memberData ($membersElement->getChildElements) {
 				my %memberAttributes = attributesToHash $memberData->getAttributes;
-				#if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID) { FIXME
-				if (1) {
+				my $login = $memberAttributes{$A_LOGIN};
+
+				#if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/) { FIXME
+				if ($login =~ /^[0-9]+$/) {
 
 					# if person is employee (or student+employee)
-					if (defined $usersRelation->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers}->{"ZAM"}) {
+					if (defined $usersRelation->{"CN=".$login.",".$baseDNUsers}->{"ZAM"}) {
 						# emplyees will be placed only to employee groups
 						if ($rel eq "Employee") {
-							$groups->{$ouName}->{$key}->{"MEMBERS"}->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers} = 1;
+							$groups->{$ouName}->{$key}->{"MEMBERS"}->{"CN=".$login.",".$baseDNUsers} = 1;
 						}
 
 						# if person is only student
-					} elsif (defined $usersRelation->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers}->{"STU"}) {
+					} elsif (defined $usersRelation->{"CN=".$login.",".$baseDNUsers}->{"STU"}) {
 						# students will be placed only to student groups
 						if ($rel eq "Student") {
-							$groups->{$ouName}->{$key}->{"MEMBERS"}->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers} = 1;
+							$groups->{$ouName}->{$key}->{"MEMBERS"}->{"CN=".$login.",".$baseDNUsers} = 1;
 						}
 					}
 
 					# store basic licenses of users (might contain users, which are no longer employee/student - it's resolved by send script)
-					$licenses->{"CN=".$memberAttributes{$A_LOGIN}.",".$baseDNUsers}->{$groupAttributes{$A_G_AD_NAME}} = 1;
+					$licenses->{"CN=".$login.",".$baseDNUsers}->{$groupAttributes{$A_G_AD_NAME}} = 1;
 
 				}
 			}
