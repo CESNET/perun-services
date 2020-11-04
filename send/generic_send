@@ -11,7 +11,6 @@ TIMEOUT_KILL="60" # 60 sec to kill after timeout
 FACILITY_NAME=$1
 DESTINATION=$2
 DESTINATION_TYPE=$3
-KEY_PATH="`echo ~`/.ssh/id_rsa"
 
 PERUN_CERT="/etc/perun/ssl/perun-send.pem"
 PERUN_KEY="/etc/perun/ssl/perun-send.key"
@@ -43,7 +42,7 @@ fi
 
 #choose transport command, only url type has different transport command at this moment
 if [ "$DESTINATION_TYPE" != "$DESTINATION_TYPE_URL" ]; then
-	TRANSPORT_COMMAND="ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5  -i $KEY_PATH"
+	TRANSPORT_COMMAND="ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5"
 else
 	#add certificate to the curl if cert file and key file exists and they are readable
 	if [ -r "${PERUN_CERT}" -a -r "${PERUN_KEY}" ]; then
