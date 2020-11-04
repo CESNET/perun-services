@@ -82,12 +82,12 @@ my %ad_entries_map = ();
 my %perun_entries_map = ();
 
 foreach my $ad_entry (@ad_entries) {
-        my $cn = $ad_entry->get_value('cn');
-        $ad_entries_map{ lc $cn } = $ad_entry;
+	my $cn = $ad_entry->get_value('cn');
+	$ad_entries_map{ lc $cn } = $ad_entry;
 }
 foreach my $perun_entry (@perun_entries) {
-        my $cn = $perun_entry->get_value('cn');
-        $perun_entries_map{ lc $cn } = $perun_entry;
+	my $cn = $perun_entry->get_value('cn');
+	$perun_entries_map{ lc $cn } = $perun_entry;
 }
 
 # process data
@@ -145,10 +145,8 @@ sub process_add() {
 	foreach my $perun_entry (@perun_entries) {
 
 		my $cn = $perun_entry->get_value('cn');
-		unless (exists $ad_entries_map{$cn}) {
-
-			my @attrs_to_add = ('cn', 'samAccountName', 'objectClass');
-			my $new_ad_entry = clone_entry_with_specific_attributes($perun_entry, \@attrs_to_add);
+		unless (exists $ad_entries_map{lc $cn}) {
+			my $new_ad_entry = clone_entry_with_specific_attributes($perun_entry, \@baseAttrs);
 			# Add new entry to AD
 			my $response = $new_ad_entry->update($ldap);
 			unless ($response->is_error()) {
@@ -161,27 +159,10 @@ sub process_add() {
 				ldap_log($service_name, $new_ad_entry->ldif());
 				$counter_group_not_added++;
 			}
-		} else {
-			# Group Exists; set info that the group is managed by Perun.
-			my $ad_entry = $ad_entries_map{$cn};
-			foreach (@attrs) {
-				next if($_ eq 'cn');
-				unless ($ad_entry->get_value($_) ~~ $perun_entry->get_value($_)){
-					$ad_entry->add(
-						"$_" => $perun_entry->get_value($_)
-					);
-					my $response = $ad_entry->update($ldap);
-					if ($response) {
-						unless ($response->is_error()) {
-							ldap_log($service_name, "Group Attributes Updated: " . $ad_entry->dn() . " | \n");
-						} else {
-							ldap_log($service_name, "Group NOT updated: " . $ad_entry->dn() . " | " . $response->error() . " | \n");
-						}
-					}
-				}
-			}
+
 		}
 	}
+
 }
 
 #
@@ -191,33 +172,33 @@ sub process_remove() {
 
 	foreach my $ad_entry (@ad_entries) {
 		my $cn = $ad_entry->get_value('cn');
-		# In the attribute we store who manages the group /AccMgr = null, perun = perun@muni.cz/
-		my $info = $ad_entry->get_value('info') || "null";
-		# Do not remove groups that are not managed by Perun.
-		if ($info ne "perun\@muni.cz") {
-			update_not_managed_group($ad_entry);
-			next;
-		};
+		unless (exists $perun_entries_map{ lc $cn }) {
 
 			# clear members
 			# load members of a group from AD
 			my @to_be_removed = load_group_members($ldap, $ad_entry->dn(), $filter);
+
+			## HACK: do not remove GUEST- or L- accounts from groups
+			@to_be_removed = grep(!/CN=(Guest|L).*/, @to_be_removed);
 			my $response_remove = remove_members_from_entry($ldap, $service_name, $ad_entry, \@to_be_removed);
 			unless ($response_remove == $SUCCESS) {
 				ldap_log($service_name, "Failed to remove all members from group during the group removal process: ".$ad_entry->dn());
 				$counter_group_not_emptied++;
-			} else {
-				my $response = $ldap->delete($ad_entry->dn());
-				unless ($response->is_error()) {
-					ldap_log($service_name, "Group removed: " . $ad_entry->dn());
-					$counter_group_removed++;
-				}
-				else {
-					ldap_log($service_name, "Group NOT removed: " . $ad_entry->dn() . " | " . $response->error());
-					ldap_log($service_name, $ad_entry->ldif());
-					$counter_group_not_removed++;
-				}
 			}
+			# NOT REMOVING GROUPS IN UCN AD
+			# else {
+			#         my $response = $ldap->delete($ad_entry->dn());
+			#         unless ($response->is_error()) {
+			#                 ldap_log($service_name, "Group removed: " . $ad_entry->dn());
+			#                 $counter_group_removed++;
+			#         }
+			#         else {
+			#                 ldap_log($service_name, "Group NOT removed: " . $ad_entry->dn() . " | " . $response->error());
+			#                 ldap_log($service_name, $ad_entry->ldif());
+			#                 $counter_group_not_removed++;
+			#         }
+			# }
+
 		}
 	}
 
@@ -227,13 +208,24 @@ sub process_remove() {
 # Update group members in AD
 #
 sub process_update() {
+		my %params;
+		foreach my $perun_entry (@perun_entries) {
 
-	foreach my $perun_entry (@perun_entries) {
+		%params = (
+		    info => $perun_entry->get_value('info'),
+		    description => $perun_entry->get_value('description')
+		);
+
+		if (exists $ad_entries_map{ lc $perun_entry->get_value('cn') }){
+			update_info(clone_entry_with_specific_attributes($perun_entry, \@baseAttrs), $ad_entries_map{ lc $perun_entry->get_value('cn') }, \%params);
+		}
 
 		my @per_val = $perun_entry->get_value('member');
 
 		# load members of a group from AD based on DN in Perun => Group must exists in AD
 		my @ad_val = load_group_members($ldap, $perun_entry->dn(), $filter);
+		## HACK: do not remove GUEST- or L- accounts from groups
+		@ad_val = grep(!/CN=(Guest|L).*/, @ad_val);
 
 		if ($? != 0) {
 			ldap_log($service_name, "Unable to load Perun group members from AD: " . $perun_entry->dn());
@@ -252,7 +244,7 @@ sub process_update() {
 
 			# members of group are not equals
 			# we must get reference to real group from AD in order to call "replace"
-			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'sub' );
+			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'base' );
 			unless ($response_ad->is_error()) {
 				# SUCCESS
 				my $ad_entry = $response_ad->entry(0);
@@ -265,9 +257,34 @@ sub process_update() {
 				ldap_log($service_name, "Group members NOT updated: " . $perun_entry->dn() . " | " . $response_ad->error());
 			}
 		}
-
 		# group is unchanged
-
 	}
+}
 
+sub update_info {
+	my $entry = shift;
+	my $update_entry = shift;
+	my $params = shift;
+
+	my $params_udapted = 0;
+	foreach (keys %{$params}){
+		if (compare_entry($update_entry, $entry, $_) == 1){
+			$update_entry->replace(
+					"$_" => $params->{$_},
+			);
+			$params_udapted = 1;
+		}
+	}
+	if ($params_udapted == 1){
+		my $response = $update_entry->update($ldap);
+		if ($response) {
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Group Attributes Updated: " . $update_entry->dn() . " | ");
+				return 0;
+			} else {
+				ldap_log($service_name, "Group Attributes NOT updated: " . $update_entry->ldif("change" => "true") . " | " . $response->error() . " | ");
+				return 1;
+			}
+		}
+	}
 }
