@@ -58,27 +58,36 @@ my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespa
 # init configuration
 my @conf = init_config($namespace);
 my @ldap_locations = resolve_domain_controlers($conf[0]);
+
 my $ldap = ldap_connect_multiple_options(\@ldap_locations);
 my $filter = '(objectClass=group)';
+my @baseAttrs = ('cn', 'samAccountName', 'objectClass', 'info', 'description');
+
 
 # connect
 ldap_bind($ldap, $conf[1], $conf[2]);
 
 # load all data
-my @attrs = ('cn', 'info');
+my @attributes_from_ad = ('cn', 'info', 'description');
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
-my @ad_entries = load_ad($ldap, "OU=MU,DC=fabrikam,DC=muni,DC=cz", $filter, \@attrs);
+# Load groups from various OUs 
+#TODO facility attribute for OUs
+my @types_ad_entries = load_ad($ldap, "OU=Groups,OU=MU,DC=ucn,DC=muni,DC=cz", $filter, \@attributes_from_ad);
+my @groups_ad_entries = load_ad($ldap, "OU=Types,OU=MU,DC=ucn,DC=muni,DC=cz", $filter, \@attributes_from_ad);
+my @perun_groups_ad_entries = load_ad($ldap, "OU=Groups,OU=Perun,OU=MU,DC=ucn,DC=muni,DC=cz", $filter, \@attributes_from_ad);
+my @ad_entries = (@groups_ad_entries, @perun_groups_ad_entries);
+@ad_entries = (@ad_entries, @types_ad_entries);
 
 my %ad_entries_map = ();
 my %perun_entries_map = ();
 
 foreach my $ad_entry (@ad_entries) {
-	my $cn = $ad_entry->get_value('cn');
-	$ad_entries_map{ $cn } = $ad_entry;
+        my $cn = $ad_entry->get_value('cn');
+        $ad_entries_map{ lc $cn } = $ad_entry;
 }
 foreach my $perun_entry (@perun_entries) {
-	my $cn = $perun_entry->get_value('cn');
-	$perun_entries_map{ $cn } = $perun_entry;
+        my $cn = $perun_entry->get_value('cn');
+        $perun_entries_map{ lc $cn } = $perun_entry;
 }
 
 # process data
@@ -212,26 +221,6 @@ sub process_remove() {
 		}
 	}
 
-}
-sub update_not_managed_group {
-	my $ad_entry = shift;
-
-	my @ad_val = load_group_members($ldap, $ad_entry->dn(), $filter);
-	my %ad_val_map = map { $_ => 1 } @ad_val;
-	my %per_val_map = ();
-
-	my $response_ad = $ldap->search( base => $ad_entry->dn(), filter => $filter, scope => 'sub' );
-	unless ($response_ad->is_error()) {
-		# SUCCESS
-		my $ad_entry = $response_ad->entry(0);
-		update_group_membership($ad_entry, \%ad_val_map, \%per_val_map);
-	} else {
-		# FAIL (to get group from AD)
-		$counter_fail++;
-		ldap_log($service_name, "Unmanaged Group members NOT updated: " . $ad_entry->dn() . " | " . $response_ad->error());
-		return;
-	}
-	$counter_emptied_unmanaged++;
 }
 
 #
