@@ -27,7 +27,7 @@ my $fileNameLicGroupNames = "$DIRECTORY/licGroupNames";
 my $fileNameFID = "$DIRECTORY/facilityId";
 my $fileNameManualEmployees = "$DIRECTORY/manualEmployees";
 
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 # Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
@@ -42,7 +42,7 @@ our $A_R_OU_NAME;  *A_R_OU_NAME = \'urn:perun:resource:attribute-def:def:adOuNam
 our $A_R_RELATION_TYPE;  *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType'; # STU/ZAM/ABS
 
 our $A_G_AD_NAME;    *A_G_AD_NAME = \'urn:perun:group:attribute-def:def:adName:o365mu';
-our $A_G_AD_DISPLAY_NAME;  *A_G_AD_DISPLAY_NAME = \'urn:perun:group:attribute-def:def:adDisplayName:o365mu';
+our $A_G_AD_DISPLAY_NAME;  *A_G_AD_DISPLAY_NAME = \'urn:perun:group:attribute-def:virt:adDisplayName:o365mu';
 our $A_G_R_msExchRequireAuthToSendTo;  *A_G_R_msExchRequireAuthToSendTo = \'urn:perun:group_resource:attribute-def:def:adRequireSenderAuthenticationEnabled';
 our $A_G_AD_EMAIL_ADDRESSES;  *A_G_AD_EMAIL_ADDRESSES = \'urn:perun:group:attribute-def:def:o365EmailAddresses:o365mu';
 
@@ -68,32 +68,31 @@ my $licGroupNames; # licGroupNames->{partLicName} = 1;
 my $manualEmployees; # $manualEmployees->{user DN} = timestamp/date
 
 # CHECK ON FACILITY ATTRIBUTES
-my %facilityAttributes = attributesToHash $data->getAttributes;
+my $facilityId = $data->getFacilityId();
 
-if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_GROUP_BASE_DN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_DOMAIN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_DOMAIN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_UAC})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_UAC ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_ID})) {
-	exit 1;
-}
-if (!defined($facilityAttributes{$A_F_AZURE_DOMAIN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_AZURE_DOMAIN ))) {
 	exit 1;
 }
 
 #
 # PRINT BASE_DN FILEs
-#
-my $baseDNUsers = $facilityAttributes{$A_F_BASE_DN};
-my $baseDNGroups = $facilityAttributes{$A_F_GROUP_BASE_DN};
+my $domain = $data->getFacilityAttributeValue( attrName => $A_F_DOMAIN );
+my $azureDomain = $data->getFacilityAttributeValue( attrName => $A_F_AZURE_DOMAIN );
+my $adUac = $data->getFacilityAttributeValue( attrName => $A_F_UAC );
+my $baseDNUsers = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+my $baseDNGroups = $data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN );
 
 open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
 print FILE $baseDNUsers;
@@ -104,41 +103,39 @@ print FILE $baseDNGroups;
 close(FILE);
 
 open FILE,">:encoding(UTF-8)","$fileNameFID" or die "Cannot open $fileNameFID: $! \n";
-print FILE $facilityAttributes{$A_F_ID};
+print FILE $facilityId;
 close(FILE);
 
 #
 # AGGREGATE DATA ABOUT MEMBERS from all resources
 #
-foreach my $resourceData ($data->getChildElements) {
+foreach my $resourceId ( $data->getResourceIds() ) {
 
-	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
-	my $relationType = $resourceAttrs{$A_R_RELATION_TYPE} || 0;
+	my $relationType = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_RELATION_TYPE ) || 0;
 
-	processMembers($relationType , ($resourceData->getChildElements)[1]);
-
+	processMembers($relationType , $resourceId );
 }
 
 #
 # AGGREGATE DATA ABOUT EXTENDED LICENSES (MEMBERS from all resources)
 #
-foreach my $resourceData ($data->getChildElements) {
-	processExtendedLicenses(($resourceData->getChildElements)[1]);
+foreach my $resourceId ( $data->getResourceIds() ) {
+
+	processExtendedLicenses( $resourceId );
 }
 
 #
 # AGGREGATE DATA ABOUT GROUPS from OU resources
 #
-foreach my $resourceData ($data->getChildElements) {
+foreach my $resourceId ( $data->getResourceIds() ) {
 
-	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
-	my $ouName = $resourceAttrs{$A_R_OU_NAME};
+	my $ouName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_OU_NAME );
 
 	if ($ouName) {
 
 		# groups resources (per-each end-service)
-		foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-			processGroups($ouName, $groupData);
+		foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
+			processGroups($ouName, $groupId, $resourceId);
 		}
 
 		# Store to the list of OUs
@@ -153,22 +150,23 @@ foreach my $resourceData ($data->getChildElements) {
 #
 sub processExtendedLicenses() {
 
-	my $membersElement = shift;
+	my $resourceId = shift;
 
-	for my $memberData ($membersElement->getChildElements) {
+	for my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
-		my $login = $memberAttributes{$A_LOGIN};
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 
-		#if($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/){ #FIXME
-		if($login =~ /^[0-9]+$/){
+
+		#if($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/ ){ #FIXME
+		if ($login =~ /^[0-9]+$/) {
 
 			my $dn = "CN=" . $login . "," . $baseDNUsers;
 			# if user has no active relation and is manually extended - put him to employees too
+			my $accountExtension = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_U_F_O365_ACCOUNT_EXTENSION );
 			if (!defined $usersRelation->{$dn}->{"ZAM"} and !defined $usersRelation->{$dn}->{"STU"} and
-				defined $memberAttributes{$A_U_F_O365_ACCOUNT_EXTENSION} and length $memberAttributes{$A_U_F_O365_ACCOUNT_EXTENSION}) {
+				defined $accountExtension and length $accountExtension) {
 				my $currentDate = Time::Piece->strptime(localtime->ymd, "%Y-%m-%d");
-				my $employeeExtendedDate = Time::Piece->strptime($memberAttributes{$A_U_F_O365_ACCOUNT_EXTENSION}, "%Y-%m-%d");
+				my $employeeExtendedDate = Time::Piece->strptime($accountExtension, "%Y-%m-%d");
 				if ($employeeExtendedDate->epoch >= $currentDate->epoch) {
 					$usersRelation->{$dn}->{"ZAM"} = 1;
 					$manualEmployees->{$dn} = $employeeExtendedDate->ymd;
@@ -186,26 +184,25 @@ sub processExtendedLicenses() {
 sub processMembers() {
 
 	my $relationType = shift;
-	my $membersElement = shift;
+	my $resourceId = shift;
 
-	for my $memberData ($membersElement->getChildElements) {
+	for my $memberId ( $data->getMemberIdsForResource( resource => $resourceId )) {
 
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
-		my $login = $memberAttributes{$A_LOGIN};
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 
-		#if($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/){ #FIXME
-		if($login =~ /^[0-9]+$/){
+		#if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/ ) { #FIXME
+		if ($login =~ /^[0-9]+$/) {
 
 			# store users relations
-			my $dn = "CN=" . $memberAttributes{$A_LOGIN} . "," . $baseDNUsers;
+			my $dn = "CN=" . $login . "," . $baseDNUsers;
 			$usersRelation->{$dn}->{$relationType} = 1 if($relationType);  # store relation if resource define it
 
 			# store standard user attributes
 			$users->{$login}->{"DN"} = $dn;
-			$users->{$login}->{$A_FIRST_NAME} = $memberAttributes{$A_FIRST_NAME};
-			$users->{$login}->{$A_LAST_NAME} = $memberAttributes{$A_LAST_NAME};
-			$users->{$login}->{$A_M_MAILS} = $memberAttributes{$A_M_MAILS};
-			$users->{$login}->{$A_U_F_O365_PREFERRED_LANGUAGE} = $memberAttributes{$A_U_F_O365_PREFERRED_LANGUAGE};
+			$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
+			$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
+			$users->{$login}->{$A_M_MAILS} = $data->getMemberAttributeValue( member => $memberId, attrName => $A_M_MAILS );
+			$users->{$login}->{$A_U_F_O365_PREFERRED_LANGUAGE} = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_U_F_O365_PREFERRED_LANGUAGE );
 
 		}
 	}
@@ -218,35 +215,39 @@ sub processMembers() {
 sub processGroups {
 
 	my $ouName = shift;
-	my $groupData = shift;
-	my $subGroupsElement = ($groupData->getChildElements)[0];
-	my $membersElement = ($groupData->getChildElements)[1];
-	my %groupAttributes = attributesToHash $groupData->getAttributes;
+	my $groupId = shift;
+	my $resourceId = shift;
+
+	my $adName = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_AD_NAME );
+	my $displayName = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_AD_DISPLAY_NAME );
+	#if displayName is missing, use adName instead
+	my $finalDisplayName = $displayName ? $displayName : $adName;
 
 	# process normal groups
 	unless ($ouName eq 'licenses') {
 
-		if(defined $groupAttributes{$A_G_AD_NAME}) {
+		if (defined $adName) {
 			# create group entry
-			my $key = "CN=".$groupAttributes{$A_G_AD_NAME}."_group.muni.cz,OU=".$ouName.",".$baseDNGroups;
+			my $key = "CN=".$adName."_group.muni.cz,OU=".$ouName.",".$baseDNGroups;
 
-			$groups->{$ouName}->{$key}->{$A_G_AD_NAME} = $groupAttributes{$A_G_AD_NAME};
-			$groups->{$ouName}->{$key}->{$A_G_AD_DISPLAY_NAME} = $groupAttributes{$A_G_AD_DISPLAY_NAME};
-			$groups->{$ouName}->{$key}->{$A_G_R_msExchRequireAuthToSendTo} = $groupAttributes{$A_G_R_msExchRequireAuthToSendTo};
-			$groups->{$ouName}->{$key}->{$A_G_AD_EMAIL_ADDRESSES} = $groupAttributes{$A_G_AD_EMAIL_ADDRESSES};
+			$groups->{$ouName}->{$key}->{$A_G_AD_NAME} = $adName;
+			$groups->{$ouName}->{$key}->{$A_G_AD_DISPLAY_NAME} = $finalDisplayName;
+			$groups->{$ouName}->{$key}->{$A_G_R_msExchRequireAuthToSendTo} = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_G_R_msExchRequireAuthToSendTo );
+			$groups->{$ouName}->{$key}->{$A_G_AD_EMAIL_ADDRESSES} = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_AD_EMAIL_ADDRESSES );
 
 			# resolve groups members
-			for my $memberData ($membersElement->getChildElements) {
-				my %memberAttributes = attributesToHash $memberData->getAttributes;
-				my $login = $memberAttributes{$A_LOGIN};
 
-				#if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/) {  FIXME
+			for my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
+
+				#if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/ ) {  FIXME
+				my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 				if ($login =~ /^[0-9]+$/) {
 					$groups->{$ouName}->{$key}->{"MEMBERS"}->{"CN=".$login.",".$baseDNUsers} = 1;
 					# get o365SendOnBehalf for non-license groups
-					if (defined $memberAttributes{$A_M_G_O365_SEND_ON_BEHALF} and $memberAttributes{$A_M_G_O365_SEND_ON_BEHALF} == 1) {
+					my $sendOnBehalf = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_M_G_O365_SEND_ON_BEHALF );
+					if (defined $sendOnBehalf and $sendOnBehalf == 1) {
 						#FIXME ukladat DN
-						#$groups->{$ouName}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}->{$memberAttributes{$A_LOGIN}."\@muni.cz"} = 1;
+						#$groups->{$ouName}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}->{$login."\@muni.cz"} = 1;
 						$groups->{$ouName}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}->{"CN=".$login.",".$baseDNUsers} = 1;
 						
 					}
@@ -262,20 +263,18 @@ sub processGroups {
 		for my $rel (@rels) {
 
 			# create group entry
-			my $key = "CN=O365Lic_" . $rel . "_" . $groupAttributes{$A_G_AD_NAME} . "_group.muni.cz,OU=" . $ouName . "," . $baseDNGroups;
+			my $key = "CN=O365Lic_" . $rel . "_" . $adName . "_group.muni.cz,OU=" . $ouName . "," . $baseDNGroups;
 
-			$groups->{$ouName}->{$key}->{$A_G_AD_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_AD_NAME};
-			$groups->{$ouName}->{$key}->{$A_G_AD_DISPLAY_NAME} = "O365Lic_" . $rel . "_" . $groupAttributes{$A_G_AD_NAME};
+			$groups->{$ouName}->{$key}->{$A_G_AD_NAME} = "O365Lic_" . $rel . "_" . $adName;
+			$groups->{$ouName}->{$key}->{$A_G_AD_DISPLAY_NAME} = "O365Lic_" . $rel . "_" . $finalDisplayName;
 
 			# store between possible partial license groups
 			$licGroupNames->{$key} = 1;
 
 			# resolve groups members
-			for my $memberData ($membersElement->getChildElements) {
-				my %memberAttributes = attributesToHash $memberData->getAttributes;
-				my $login = $memberAttributes{$A_LOGIN};
-
-				#if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/) { FIXME
+			for my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
+				#if ($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID and $login =~ /^[0-9]+$/ ) { FIXME
+				my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 				if ($login =~ /^[0-9]+$/) {
 
 					# if person is employee (or student+employee)
@@ -294,7 +293,7 @@ sub processGroups {
 					}
 
 					# store basic licenses of users (might contain users, which are no longer employee/student - it's resolved by send script)
-					$licenses->{"CN=".$login.",".$baseDNUsers}->{$groupAttributes{$A_G_AD_NAME}} = 1;
+					$licenses->{"CN=".$login.",".$baseDNUsers}->{$adName} = 1;
 
 				}
 			}
@@ -304,9 +303,9 @@ sub processGroups {
 	}
 
 	# process all sub-groups
-	foreach my $subGroupData ($subGroupsElement->getChildElements) {
-		processGroups($ouName, $subGroupData);
-	}
+	#foreach my $subGroupData ($subGroupsElement->getChildElements) {
+	#	processGroups($ouName, $subGroupData);
+	#}
 
 }
 
@@ -456,7 +455,7 @@ my @logins = sort keys %{$users};
 for my $login (@logins) {
 
 	# Localy defined attributes
-	my $userPrincipalName = "$login\@$facilityAttributes{$A_F_DOMAIN}";
+	my $userPrincipalName = "$login\@$domain";
 	my $samAccountName = $login;
 
 	# print attributes, which are never empty
@@ -518,19 +517,19 @@ for my $login (@logins) {
 
 	print FILE "c: CZ\n";
 
-	if($users->{$login}->{$A_U_F_O365_PREFERRED_LANGUAGE}) {
+	if ($users->{$login}->{$A_U_F_O365_PREFERRED_LANGUAGE}) {
 		print FILE "preferredLanguage: " . $users->{$login}->{$A_U_F_O365_PREFERRED_LANGUAGE} . "\n";
 	}
 
 	print FILE "targetaddress: " . $login . '@mail.muni.cz' . "\n";
 
-	print FILE "msDS-cloudExtensionAttribute1: " . $login . '@' . $facilityAttributes{$A_F_AZURE_DOMAIN} . "\n";
+	print FILE "msDS-cloudExtensionAttribute1: " . $login . '@' . $azureDomain . "\n";
 
 	# msDS-cloudExtensionAttribute2 - is set in send script based on resulting o365 licenses
 
 	print FILE "msDS-cloudExtensionAttribute3: TRUE\n";
 
-	print FILE "userAccountControl: $facilityAttributes{$A_F_UAC}\n";
+	print FILE "userAccountControl: $adUac\n";
 
 	# print classes
 	print FILE "objectclass: top\n";
