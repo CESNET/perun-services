@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="arcgis_licenses_mu"
+
+. generic_send
