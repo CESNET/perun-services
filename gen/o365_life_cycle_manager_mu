@@ -142,6 +142,9 @@ sub processUsers {
 
 	my %memberAttributes = attributesToHash $memberData->getAttributes;
 	my $userId = $memberAttributes{$A_USER_ID};
+	my $login = $memberAttributes{$A_USER_LOGIN_MU};
+	#skip service accounts (login like 's-*')
+	if( $login =~ /s-/ ) { return; }
 
 	#if user was already processed in another group, we can skip same attributes
 	if (exists $userStruc->{$userId}) {
@@ -175,7 +178,6 @@ sub processUsers {
 	#this is the first time user as occured in any processed group so we need to create a new full record
 	} else {
 		my $memberId = $memberAttributes{$A_MEMBER_ID};
-		my $login = $memberAttributes{$A_USER_LOGIN_MU};
 		my $preferredMail = $memberAttributes{$A_USER_PREFERRED_MAIL};
 		my $o365AlumniAccountEnabled = $memberAttributes{$A_USER_FAC_ALLUMNI_ACC_ENABLED};
 		my $o365GracePeriodExtension = $memberAttributes{$A_USER_FAC_GRACE_PERIOD_EXT};
