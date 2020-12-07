@@ -1,0 +1,6 @@
+perun-slave-process-mailman-cesnet-user-mail (3.0.0) stable; urgency=low
+
+  * Copied implementation of perun-slave-process-mailman-cesnet
+    but we use user mail on input.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 07 Dec 2020 09:40:00 +0100
