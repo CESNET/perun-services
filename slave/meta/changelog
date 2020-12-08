@@ -1,3 +1,9 @@
+perun-slave-full (3.1.10) stable; urgency=medium
+
+  * added new service mailman-cesnet-user-mail
+
+ -- Martin Kuba <makub@ics.muni.cz>  Tue, 08 Dec 2020 15:28:09 +0100
+
 perun-slave-full (3.1.9) stable; urgency=medium
 
   * added new service perun-slave-process-o365-mail-forward-export
