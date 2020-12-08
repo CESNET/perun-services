@@ -68,13 +68,11 @@ my @baseAttrs = ('cn', 'samAccountName', 'objectClass', 'info', 'description');
 ldap_bind($ldap, $conf[1], $conf[2]);
 
 # load all data
-my @attributes_from_ad = ('cn', 'info', 'description');
+my @attributes_from_ad = ['cn', 'info', 'description'];
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
-# Load groups from various OUs 
-#TODO facility attribute for OUs
-my @types_ad_entries = load_ad($ldap, "OU=Groups,OU=MU,DC=ucn,DC=muni,DC=cz", $filter, \@attributes_from_ad);
-my @groups_ad_entries = load_ad($ldap, "OU=Types,OU=MU,DC=ucn,DC=muni,DC=cz", $filter, \@attributes_from_ad);
-my @perun_groups_ad_entries = load_ad($ldap, "OU=Groups,OU=Perun,OU=MU,DC=ucn,DC=muni,DC=cz", $filter, \@attributes_from_ad);
+my @types_ad_entries = load_ad($ldap, "OU=Groups,OU=MU,DC=ucn,DC=muni,DC=cz", $filter, ['cn', 'info', 'description']);
+my @groups_ad_entries = load_ad($ldap, "OU=Types,OU=MU,DC=ucn,DC=muni,DC=cz", $filter, ['cn', 'info', 'description']);
+my @perun_groups_ad_entries = load_ad($ldap, "OU=Groups,OU=Perun,OU=MU,DC=ucn,DC=muni,DC=cz", $filter, ['cn', 'info', 'description']);
 my @ad_entries = (@groups_ad_entries, @perun_groups_ad_entries);
 @ad_entries = (@ad_entries, @types_ad_entries);
 
@@ -180,6 +178,8 @@ sub process_remove() {
 
 			## HACK: do not remove GUEST- or L- accounts from groups
 			@to_be_removed = grep(!/CN=(Guest|L).*/, @to_be_removed);
+			# Focus only on users
+			#@to_be_removed = grep(/OU=(Users).*/, @to_be_removed);
 			my $response_remove = remove_members_from_entry($ldap, $service_name, $ad_entry, \@to_be_removed);
 			unless ($response_remove == $SUCCESS) {
 				ldap_log($service_name, "Failed to remove all members from group during the group removal process: ".$ad_entry->dn());
@@ -259,6 +259,7 @@ sub process_update() {
 		}
 		# group is unchanged
 	}
+
 }
 
 sub update_info {
@@ -269,22 +270,22 @@ sub update_info {
 	my $params_udapted = 0;
 	foreach (keys %{$params}){
 		if (compare_entry($update_entry, $entry, $_) == 1){
-			$update_entry->replace(
-					"$_" => $params->{$_},
-			);
-			$params_udapted = 1;
+				$update_entry->replace(
+						"$_" => $params->{$_},
+				);
+				$params_udapted = 1;
 		}
 	}
 	if ($params_udapted == 1){
-		my $response = $update_entry->update($ldap);
-		if ($response) {
-			unless ($response->is_error()) {
-				ldap_log($service_name, "Group Attributes Updated: " . $update_entry->dn() . " | ");
-				return 0;
-			} else {
-				ldap_log($service_name, "Group Attributes NOT updated: " . $update_entry->ldif("change" => "true") . " | " . $response->error() . " | ");
-				return 1;
+			my $response = $update_entry->update($ldap);
+			if ($response) {
+					unless ($response->is_error()) {
+							ldap_log($service_name, "Group Attributes Updated: " . $update_entry->dn() . " | ");
+							return 0;
+					} else {
+							ldap_log($service_name, "Group Attributes NOT updated: " . $update_entry->ldif("change" => "true") . " | " . $response->error() . " | ");
+							return 1;
+					}
 			}
-		}
 	}
 }
