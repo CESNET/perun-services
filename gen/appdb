@@ -9,11 +9,11 @@ use XML::Simple;
 
 local $::SERVICE_NAME = "appDB";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.1.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithVos;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_VO_SHORT_NAME;        *A_VO_SHORT_NAME =          \'urn:perun:vo:attribute-def:core:shortName';
@@ -38,88 +38,104 @@ my $vosStruc = {};
 my $userVoMap = {};
 my $voContacts = {};
 
+# Get all VOS data
+foreach my $voId ( $data->getVoIds() ) {
 
-my @membersAttributes;
-my @vosData = $data->getChildElements;
-for my $voData (@vosData) {
-	my %vosAttributes = attributesToHash $voData->getAttributes;
-	my $voShortName = $vosAttributes{$A_VO_SHORT_NAME};
+	my $shortName = $data->getVoAttributeValue(vo => $voId, attrName => $A_VO_SHORT_NAME);
+	my $description = $data->getVoAttributeValue(vo => $voId, attrName => $A_VO_DESCRIPTION);
+	my $applicationUrl = $data->getVoAttributeValue(vo => $voId, attrName => $A_VO_APPLICATION_URL);
+	my $createdAt = $data->getVoAttributeValue(vo => $voId, attrName => $A_VO_CREATED_AT);
+	my $dashboardLink = $data->getVoAttributeValue(vo => $voId, attrName => $A_VO_DASHBOARD_LINK);
 
-	unless(defined $vosStruc->{$voShortName}) {
-		$vosStruc->{$voShortName} = {
-			name => $voShortName,
-			status => "Production",
-			alias => $voShortName,
-			enrollmentUrl => [ $vosAttributes{$A_VO_APPLICATION_URL} ],
-			homepageUrl => [ $vosAttributes{$A_VO_DASHBOARD_LINK} ],
-			description => [ $vosAttributes{$A_VO_DESCRIPTION} ],
-			validationDate => { timezone => "UTC+1",
-			                    content  => $vosAttributes{$A_VO_CREATED_AT},
-			                  },
-		}
+	$vosStruc->{$shortName} = {
+		name => $shortName,
+		status => "Production",
+		alias => $shortName,
+		enrollmentUrl => [ $applicationUrl ],
+		homepageUrl => [ $dashboardLink ],
+		description => [ $description ],
+		validationDate => { timezone => "UTC+1",
+			content  => $createdAt,
+		},
 	}
 
-	for my $rData ($voData->getChildElements) {
-		my %resourcesAttributes = attributesToHash $rData->getAttributes;
+}
 
+# process members from resources
 
+foreach my $resourceId ( $data->getResourceIds() ) {
 
-		for my $mData (($rData->getChildElements)[1]->getChildElements) {
-			my %memberAttributes = attributesToHash $mData->getAttributes;
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 
-			next unless $memberAttributes{$A_USER_STATUS} eq $STATUS_VALID;
+		# skip non-valid members
+		my $memberStatus = $data->getMemberAttributeValue(member => $memberId, attrName => $A_USER_STATUS);
+		next unless $memberStatus eq $STATUS_VALID;
 
-			# prepare DNs
-			my @dn = ();
-			foreach my $subjectDN (keys %{$memberAttributes{$A_USER_CERT_DNS}}) {
-				my $subjectDNWithoutPrefix = $subjectDN;
-				$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
-				push @dn, { "content" => $subjectDNWithoutPrefix,
-				            "ca" => $memberAttributes{$A_USER_CERT_DNS}->{$subjectDN},
-				          };
-			}
+		# prepare DNs
+		my $userCertDNs = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_CERT_DNS);
 
-			my $userName = "";
-			if($memberAttributes{$A_USER_FIRST_NAME}) {
-				$userName = $memberAttributes{$A_USER_FIRST_NAME};
-				$userName.= " " . $memberAttributes{$A_USER_LAST_NAME} if $memberAttributes{$A_USER_LAST_NAME};
-			} else {
-				$userName.= $memberAttributes{$A_USER_LAST_NAME} if $memberAttributes{$A_USER_LAST_NAME};
-			}
-	
-			# add user to contact role  (for VOs xml)
-			if(defined $resourcesAttributes{$A_R_APPDB_CONTACT_ROLE}) {
-				$voContacts->{$voShortName}->{$resourcesAttributes{$A_R_APPDB_CONTACT_ROLE} . "-" . $memberAttributes{$A_USER_ID}} = {
-						"name" => [ $userName ],
-						"role" => [ $resourcesAttributes{$A_R_APPDB_CONTACT_ROLE} ],
-						"email" => [ $memberAttributes{$A_USER_MAIL} ],
-						"sso" => [ {} ],
-						"eppn" => $memberAttributes{$A_USER_EPPNS},
-						"dn" => \@dn,
-				}
-			}
-
-			#skip user if he was already processed for this VO
-			next if $userVoMap->{$memberAttributes{$A_USER_ID}}->{$vosAttributes{$A_VO_SHORT_NAME}}++;
-
-			#prepare user record  (for users xml)
-			my @row = {
-									"uservo" => [ $userName ],
-									"vo" => [ $vosAttributes{$A_VO_SHORT_NAME} ],
-									"email" => [ $memberAttributes{$A_USER_MAIL} ],
-									"sso" => [ {} ],
-									"last_update" => [ "" ],
-									"first_update" => [ "" ],
-									"eppn" => $memberAttributes{$A_USER_EPPNS},
-									"dn" => \@dn,
-			          };
-
-
-			#add user to global structure
-			push @{$usersXml->{"result"}}, { "row" => \@row };
-
+		my @dn = ();
+		foreach my $subjectDN (keys %{$userCertDNs}) {
+			my $subjectDNWithoutPrefix = $subjectDN;
+			$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
+			push @dn, { "content" => $subjectDNWithoutPrefix,
+				"ca" => $userCertDNs->{$subjectDN},
+			};
 		}
+
+		# prepare name
+		my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_FIRST_NAME);
+		my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_LAST_NAME);
+
+		my $userName = "";
+		if($firstName) {
+			$userName = $firstName;
+			$userName.= " " . $lastName if $lastName;
+		} else {
+			$userName.= $lastName if $lastName;
+		}
+
+		my $appDbContactRole = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_APPDB_CONTACT_ROLE);
+
+		my $voId = $data->getVoIdForResource(resource => $resourceId);
+		my $voShortName = $data->getVoAttributeValue(vo => $voId, attrName => $A_VO_SHORT_NAME);
+
+		my $userId = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_ID);
+		my $mail = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_MAIL);
+		my $eppns = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_EPPNS);
+
+		# add user to contact role  (for VOs xml)
+		if(defined $appDbContactRole) {
+			$voContacts->{$voShortName}->{$appDbContactRole . "-" . $userId} = {
+				"name" => [ $userName ],
+				"role" => [ $appDbContactRole ],
+				"email" => [ $mail ],
+				"sso" => [ {} ],
+				"eppn" => $eppns,
+				"dn" => \@dn,
+			}
+		}
+
+		#skip user if he was already processed for this VO
+		next if $userVoMap->{$userId}->{$voShortName}++;
+
+		#prepare user record  (for users xml)
+		my @row = {
+			"uservo" => [ $userName ],
+			"vo" => [ $voShortName ],
+			"email" => [ $mail ],
+			"sso" => [ {} ],
+			"last_update" => [ "" ],
+			"first_update" => [ "" ],
+			"eppn" => $eppns,
+			"dn" => \@dn,
+		};
+
+		#add user to global structure
+		push @{$usersXml->{"result"}}, { "row" => \@row };
+
 	}
+
 }
 
 #prepare VOs xml from $vosStruc
@@ -129,7 +145,6 @@ for my $shortName (keys %$vosStruc) {
 
 my $vosXml = {};
 push @{$vosXml->{"IDCard"}}, values %$vosStruc;
-
 
 #print users xml
 my $fileName = "$DIRECTORY/users";
