@@ -59,7 +59,7 @@ for my $listName (keys %$mailinglistStruc) {
     # As a first line, print header
     print FILE "#MANAGERS_MAIL=", $mailinglistAdminMailStruc->{$listName},"\n";
 
-    for my $mail (keys %{$mailinglistStruc->{$listName}}) {
+    for my $mail (sort keys %{$mailinglistStruc->{$listName}}) {
       print FILE "\"", unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME});
       print FILE "\" <", $mail, ">\n";
     }

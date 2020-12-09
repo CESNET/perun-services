@@ -87,7 +87,7 @@ for my $listName (keys %$mailinglistStruc) {
 	my $fileName = "$mailinglistsDirectory/$listName";
 	open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 
-	for my $mail (keys %{$mailinglistStruc->{$listName}}) {
+	for my $mail (sort keys %{$mailinglistStruc->{$listName}}) {
 		print FILE "\"", unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME});
 		print FILE "\" <", $mail, ">\n";
 	}
