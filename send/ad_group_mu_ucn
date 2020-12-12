@@ -208,12 +208,12 @@ sub process_remove() {
 # Update group members in AD
 #
 sub process_update() {
-		my %params;
-		foreach my $perun_entry (@perun_entries) {
+	my %params;
+	foreach my $perun_entry (@perun_entries) {
 
 		%params = (
-		    info => $perun_entry->get_value('info'),
-		    description => $perun_entry->get_value('description')
+			info => $perun_entry->get_value('info'),
+			description => $perun_entry->get_value('description')
 		);
 
 		if (exists $ad_entries_map{ lc $perun_entry->get_value('cn') }){
@@ -277,15 +277,15 @@ sub update_info {
 		}
 	}
 	if ($params_udapted == 1){
-			my $response = $update_entry->update($ldap);
-			if ($response) {
-					unless ($response->is_error()) {
-							ldap_log($service_name, "Group Attributes Updated: " . $update_entry->dn() . " | ");
-							return 0;
-					} else {
-							ldap_log($service_name, "Group Attributes NOT updated: " . $update_entry->ldif("change" => "true") . " | " . $response->error() . " | ");
-							return 1;
-					}
+		my $response = $update_entry->update($ldap);
+		if ($response) {
+			unless ($response->is_error()) {
+			ldap_log($service_name, "Group Attributes Updated: " . $update_entry->dn() . " | ");
+			return 0;
+		} else {
+			ldap_log($service_name, "Group Attributes NOT updated: " . $update_entry->ldif("change" => "true") . " | " . $response->error() . " | ");
+			return 1;
 			}
+		}
 	}
 }
