@@ -17,7 +17,7 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
-my $data = perunServicesInit::getHierarchicalData(1);
+my $data = perunServicesInit::getHashedHierarchicalData(1);
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
@@ -29,24 +29,31 @@ our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:disp
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_CHIPNUMBERS; *A_CHIPNUMBERS = \'urn:perun:user:attribute-def:def:chipNumbers';
+our $A_MEMBER_STATUS; *A_MEMBER_STATUS = \'urn:perun:member:attribute-def:core:status';
+our $ALLOW_NOT_VALID_MEMBERS; *ALLOW_NOT_VALID_MEMBERS = \'urn:perun:resource:attribute-def:def:AllowNotValidMembers';
 
 our $A_R_NAME; *A_R_NAME = \'urn:perun:resource:attribute-def:core:name';
 
+our $STATUS_VALID; *STATUS_VALID = \'VALID';
+our $STATUS_EXPIRED; *STATUS_EXPIRED = \'EXPIRED';
+
+# Get the facility ID
+my $facilityId = $data->getFacilityId();
+
 # CHECK ON FACILITY ATTRIBUTES
-my %facilityAttributes = attributesToHash $data->getAttributes;
-if (!defined($facilityAttributes{$A_F_BASE_DN})) {
-        exit 1;
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
+	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_DOMAIN})) {
-        exit 1;
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_DOMAIN ))) {
+	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_UAC})) {
-        exit 1;
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_UAC ))) {
+	exit 1;
 }
 
-my $baseDN = $facilityAttributes{$A_F_BASE_DN};
-my $domain = $facilityAttributes{$A_F_DOMAIN};
-my $uac = $facilityAttributes{$A_F_UAC};
+my $baseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+my $domain = $data->getFacilityAttributeValue( attrName => $A_F_DOMAIN );
+my $uac = $data->getFacilityAttributeValue( attrName => $A_F_UAC );
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
@@ -64,27 +71,30 @@ my $serviceAccountsDN = "OU=Services,OU=Perun,OU=MU,DC=ucn,DC=muni,DC=cz";
 # AGGREGATE DATA
 #
 # FOR EACH RESOURCE
-foreach my $resource ($data->getChildElements){
-        # EACH USER ON RESOURCE
-        my %rAttributes = attributesToHash $resource->getAttributes;
+foreach my $resourceId ( $data->getResourceIds() ){
+        
+        my $allowNotValidMembers = $data->getResourceAttributeValue( resource => $resourceId, attrName => $ALLOW_NOT_VALID_MEMBERS);
+	# EACH USER ON RESOURCE
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 
-        foreach my $user ($resource->getChildElements) {
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
+                my $memberStatus = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+                print $login . " is " . $memberStatus . "\n";
+		#next unless ( $uAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID || ( $uAttributes{$A_MEMBER_STATUS} eq $STATUS_EXPIRED && $rAttributes{$ALLOW_NOT_VALID_MEMBERS}));
+		next unless ( ($memberStatus eq $STATUS_VALID) || ( ($memberStatus eq $STATUS_EXPIRED) && $allowNotValidMembers));
 
-                my %uAttributes = attributesToHash $user->getAttributes;
-                my $login = $uAttributes{$A_LOGIN};
-
-                unless ($login =~ /^s-/){
-                        $users->{$login}->{"DN"} = "CN=" . $uAttributes{$A_LOGIN} . "," . $baseDN;
-                } else {
-                        $users->{$login}->{"DN"} = "CN=" . $uAttributes{$A_LOGIN} . "," . $serviceAccountsDN;
-                }
-                # store standard attrs
-                $users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
-                $users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
-                $users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
-                $users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
-                $users->{$login}->{$A_CHIPNUMBERS} = $uAttributes{$A_CHIPNUMBERS};
-        }
+		unless ($login =~ /^s-/){
+			$users->{$login}->{"DN"} = "CN=" . $login . "," . $baseDN;
+		} else {
+			$users->{$login}->{"DN"} = "CN=" . $login . "," . $serviceAccountsDN;
+		}
+		# store standard attrs
+		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+		$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_DISPLAY_NAME);
+		$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
+		$users->{$login}->{$A_CHIPNUMBERS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_CHIPNUMBERS);
+	}
 }
 
 #
@@ -97,58 +107,58 @@ binmode FILE, ":utf8";
 my @logins = sort keys %{$users};
 for my $login (@logins) {
 
-        # print attributes, which are never empty
-        print FILE "dn: " . $users->{$login}->{"DN"} . "\n";
+	# print attributes, which are never empty
+	print FILE "dn: " . $users->{$login}->{"DN"} . "\n";
 
-        print FILE "cn: " . $login . "\n";
-        print FILE "samAccountName: " . $login . "\n";
-        print FILE "userPrincipalName: " . $login . "\@" . $domain . "\n";
-        # enable accounts (if not) using service propagation
-        print FILE "userAccountControl: " . $uac . "\n";
+	print FILE "cn: " . $login . "\n";
+	print FILE "samAccountName: " . $login . "\n";
+	print FILE "userPrincipalName: " . $login . "\@" . $domain . "\n";
+	# enable accounts (if not) using service propagation
+	print FILE "userAccountControl: " . $uac . "\n";
 
-        # skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
-        my $sn = $users->{$login}->{$A_LAST_NAME};
-        my $givenName = $users->{$login}->{$A_FIRST_NAME};
-        my $displayName = ($users->{$login}->{$A_FIRST_NAME} || "") . " " . ($users->{$login}->{$A_LAST_NAME} || "");
-        my $mail = $users->{$login}->{$A_MAIL};
+	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
+	my $sn = $users->{$login}->{$A_LAST_NAME};
+	my $givenName = $users->{$login}->{$A_FIRST_NAME};
+	my $displayName = ($users->{$login}->{$A_FIRST_NAME} || "") . " " . ($users->{$login}->{$A_LAST_NAME} || "");
+	my $mail = $users->{$login}->{$A_MAIL};
 
-        if (defined $displayName and length $displayName) {
-                print FILE "displayName: " . $displayName . "\n";
-        }
-        if (defined $sn and length $sn) {
-                print FILE "sn: " . $sn . "\n";
-        }
-        if (defined $givenName and length $givenName) {
-                print FILE "givenName: " . $givenName . "\n";
-        }
-        if (defined $mail and length $mail) {
-                print FILE "mail: " . $mail . "\n";
-        }
-        foreach (@{$users->{$login}->{$A_CHIPNUMBERS}}){
-                next if ($_ eq "");
-                print FILE "houseIdentifier: " . checkBase64($_) . "\n";
-        }
+	if (defined $displayName and length $displayName) {
+		print FILE "displayName: " . $displayName . "\n";
+	}
+	if (defined $sn and length $sn) {
+		print FILE "sn: " . $sn . "\n";
+	}
+	if (defined $givenName and length $givenName) {
+		print FILE "givenName: " . $givenName . "\n";
+	}
+	if (defined $mail and length $mail) {
+		print FILE "mail: " . $mail . "\n";
+	}
+	foreach (@{$users->{$login}->{$A_CHIPNUMBERS}}){
+		next if ($_ eq "");
+		print FILE "houseIdentifier: " . checkBase64($_) . "\n";
+	}
 
-        # print classes
-        print FILE "objectclass: top\n";
-        print FILE "objectclass: person\n";
-        print FILE "objectclass: user\n";
-        print FILE "objectclass: organizationalPerson\n";
+	# print classes
+	print FILE "objectclass: top\n";
+	print FILE "objectclass: person\n";
+	print FILE "objectclass: user\n";
+	print FILE "objectclass: organizationalPerson\n";
 
-        # There MUST be an empty line after each entry, so entry sorting and diff works on slave part
-        print FILE "\n";
+	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
+	print FILE "\n";
 
 }
 
 close(FILE);
 
 sub checkBase64 {
-        my $value = shift;
+	my $value = shift;
 
-        if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
-                return " ", $value;
-        }
-        return ": ", encode_base64(Encode::encode_utf8($value), '');
+	if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
+		return " ", $value;
+	}
+	return ": ", encode_base64(Encode::encode_utf8($value), '');
 }
 
 perunServicesInit::finalize;
