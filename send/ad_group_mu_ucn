@@ -208,8 +208,17 @@ sub process_remove() {
 # Update group members in AD
 #
 sub process_update() {
-	my %params;
-	foreach my $perun_entry (@perun_entries) {
+		my %params;
+		foreach my $perun_entry (@perun_entries) {
+
+		%params = (
+		    info => $perun_entry->get_value('info'),
+		    description => $perun_entry->get_value('description')
+		);
+
+		if (exists $ad_entries_map{ lc $perun_entry->get_value('cn') }){
+			update_info(clone_entry_with_specific_attributes($perun_entry, \@baseAttrs), $ad_entries_map{ lc $perun_entry->get_value('cn') }, \%params);
+		}
 
 		%params = (
 			info => $perun_entry->get_value('info'),
