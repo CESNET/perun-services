@@ -1,0 +1,220 @@
+#!/usr/bin/perl
+use strict;
+use warnings FATAL => 'all';
+use DBI;
+use Getopt::Long qw(:config no_ignore_case);
+use Data::Dumper;
+use Encode qw(encode);
+use ScriptLock;
+
+sub appendParam;
+
+my $username;
+my $password;
+my $tableName = 'idm_osoby';
+
+# define service
+my $service_name = "vsup_web_apps";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+my $service_file = "$service_files_dir/$service_name.csv";
+
+# propagation destination
+my $destination = $ARGV[1];
+chomp($destination);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $destination);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# parse destination
+my ($db_machine,$db_port,$db_name) = split(/:/, $destination);
+
+# load authz
+my $configPath = "/etc/perun/services/$service_name/$db_name";
+open FILE, $configPath or die "Could not open config file $configPath: $!";
+while(my $line = <FILE>) {
+	if($line =~ /^username: .*/) {
+		$username = ($line =~ m/^username: (.*)$/)[0];
+	} elsif($line =~ /^password: .*/) {
+		$password = ($line =~ m/^password: (.*)$/)[0];
+	}
+}
+
+if(!defined($password) || !defined($username) || !defined($tableName)) {
+	print "Can't get config data from config file.\n";
+	exit 14;
+}
+
+#Main Structure
+my $dataByUco = {};
+
+open FILE, $service_file or die "Could not open $service_file: $!";
+while(my $line = <FILE>) {
+	my @parts = split /\t/, $line;
+	chomp(@parts);
+	$dataByUco->{$parts[0]}->{'LOGIN'} = $parts[1];
+	$dataByUco->{$parts[0]}->{'EMAIL'} = $parts[2];
+	$dataByUco->{$parts[0]}->{'FIRST_NAME'} = (($parts[3] ne '') ? $parts[3] : undef);
+	$dataByUco->{$parts[0]}->{'LAST_NAME'} = (($parts[4] ne '') ? $parts[4] : undef);
+	$dataByUco->{$parts[0]}->{'TITLE_BEFORE'} = (($parts[5] ne '') ? $parts[5] : undef);
+	$dataByUco->{$parts[0]}->{'TITLE_AFTER'} = (($parts[6] ne '') ? $parts[6] : undef);
+	$dataByUco->{$parts[0]}->{'EMAIL_PRIV'} = (($parts[7] ne '') ? $parts[7] : undef);
+	$dataByUco->{$parts[0]}->{'PHONE'} = (($parts[8] ne '') ? $parts[8] : undef);
+	$dataByUco->{$parts[0]}->{'PHONE_PRIV'} = (($parts[9] ne '') ? $parts[9] : undef);
+	$dataByUco->{$parts[0]}->{'MOBILE'} = (($parts[10] ne '') ? $parts[10] : undef);
+	$dataByUco->{$parts[0]}->{'PHOTO'} = (($parts[11] ne '') ? $parts[11] : undef);
+}
+close FILE;
+
+my $dbh = DBI->connect("dbi:mysql:$db_name:$db_machine:$db_port", $username, $password,{ RaiseError=>1, AutoCommit=>0, mysql_enable_utf8 => 1}) or die "Connect to database $db_name Error!\n";
+
+my $DEBUG=0;
+my $DUMMY=0;
+
+#statistic and information variables
+my $inserted = 0;
+my $foundAndUpdated = 0;
+my $foundAndSkipped = 0;
+
+# for each incoming UCO
+foreach my $UCO (sort keys %$dataByUco) {
+
+	my $LOGIN = $dataByUco->{$UCO}->{'LOGIN'};
+	my $JMENO = $dataByUco->{$UCO}->{'FIRST_NAME'};
+	my $PRIJMENI = $dataByUco->{$UCO}->{'LAST_NAME'};
+	my $TITUL_PRED = $dataByUco->{$UCO}->{'TITLE_BEFORE'};
+	my $TITUL_ZA = $dataByUco->{$UCO}->{'TITLE_AFTER'};
+	my $FOTO = $dataByUco->{$UCO}->{'PHOTO'};
+	my $EMAIL_SKOLNI = $dataByUco->{$UCO}->{'EMAIL'};
+	my $EMAIL_SOUKR = $dataByUco->{$UCO}->{'EMAIL_PRIV'};
+	my $TEL_PRAC_LINKA = $dataByUco->{$UCO}->{'PHONE'};
+	my $TEL_PRAC_MOB = $dataByUco->{$UCO}->{'MOBILE'};
+	my $TEL_SOUKR = $dataByUco->{$UCO}->{'PHONE_PRIV'};
+
+	# check if person exists in destination
+	my $personExists = $dbh->prepare(qq{select 1 from $tableName where UCO=?});
+	$personExists->execute($UCO);
+
+	if($personExists->fetch) {
+
+		if($DEBUG == 1) { print "Found person: $UCO\n"; }
+
+		# we need to know if these two records are without changes, if yes, skip them
+
+		my $select = "SELECT 1 from $tableName where UCO=? and LOGIN=?";
+		my @params = ($UCO, $LOGIN);
+		appendParam(select => $select, params => \@params, paramName => 'JMENO', paramValue => $JMENO);
+		appendParam(select => $select, params => \@params, paramName => 'PRIJMENI', paramValue => $PRIJMENI);
+		appendParam(select => $select, params => \@params, paramName => 'TITUL_PRED', paramValue => $TITUL_PRED);
+		appendParam(select => $select, params => \@params, paramName => 'TITUL_ZA', paramValue => $TITUL_ZA);
+		appendParam(select => $select, params => \@params, paramName => 'FOTO', paramValue => $FOTO);
+		appendParam(select => $select, params => \@params, paramName => 'EMAIL_SKOLNI', paramValue => $EMAIL_SKOLNI);
+		appendParam(select => $select, params => \@params, paramName => 'EMAIL_SOUKR', paramValue => $EMAIL_SOUKR);
+		appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_LINKA', paramValue => $TEL_PRAC_LINKA);
+		appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_MOB', paramValue => $TEL_PRAC_MOB);
+		appendParam(select => $select, params => \@params, paramName => 'TEL_SOUKR', paramValue => $TEL_SOUKR);
+
+		my $recordAreEquals = $dbh->prepare($select);
+		$recordAreEquals->execute(@params);
+
+		if(!$recordAreEquals->fetch) {
+
+			unless($DUMMY) {
+				my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET JMENO=? , PRIJMENI=? , TITUL_PRED=? , TITUL_ZA=? , FOTO=? , EMAIL_SKOLNI=? , EMAIL_SOUKR=? , TEL_PRAC_LINKA=? , TEL_PRAC_MOB=? , TEL_SOUKR=? WHERE UCO=?});
+				$updatePerson->execute($JMENO, $PRIJMENI, $TITUL_PRED, $TITUL_ZA, $FOTO, $EMAIL_SKOLNI, $EMAIL_SOUKR, $TEL_PRAC_LINKA , $TEL_PRAC_MOB, $TEL_SOUKR, $UCO);
+				if($DEBUG == 1) { print "Update existing person: $UCO\n"; }
+			} else {
+				if($DEBUG == 1) { print "Would update existing person: $UCO\n"; }
+			}
+			$foundAndUpdated++;
+
+		} else {
+
+			unless($DUMMY) {
+				if ($DEBUG == 1) {print "Skip person: $UCO\n";}
+			} else {
+				if($DEBUG == 1) { print "Would skip existing person: $UCO\n"; }
+			}
+			$foundAndSkipped++;
+
+		}
+
+	} else {
+
+		# we will do insert
+		unless($DUMMY) {
+			if($DEBUG == 1) { print "Insert new person: $UCO\n"; }
+			my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, JMENO, PRIJMENI, TITUL_PRED, TITUL_ZA, FOTO , EMAIL_SKOLNI, EMAIL_SOUKR, TEL_PRAC_LINKA, TEL_PRAC_MOB, TEL_SOUKR) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)});
+			$insertPerson->execute($UCO, $LOGIN, $JMENO, $PRIJMENI, $TITUL_PRED, $TITUL_ZA, $FOTO, $EMAIL_SKOLNI, $EMAIL_SOUKR, $TEL_PRAC_LINKA, $TEL_PRAC_MOB, $TEL_SOUKR);
+		} else {
+			if($DEBUG == 1) { print "Would insert new person: $UCO\n"; }
+		}
+		$inserted++;
+
+	}
+
+}
+
+#
+# CLEAR all data for People removed from the WEB
+#
+my $deletedUsers = 0;
+my $ary_ref_users = $dbh->selectcol_arrayref(qq{select distinct UCO from $tableName where UCO is not null});
+my @web_ucos = @$ary_ref_users;
+my $deleteUser = $dbh->prepare(qq{DELETE from $tableName where UCO=?});
+my $deleteDC2 = $dbh->prepare(qq{DELETE from idm_dc2_vztahy WHERE UCO=?});
+my $deleteKOS = $dbh->prepare(qq{DELETE from idm_kos_vztahy WHERE UCO=?});
+
+foreach my $UCO (@web_ucos) {
+	unless (exists $dataByUco->{$UCO}) {
+		unless($DUMMY) {
+			if($DEBUG == 1) { print "Delete person: $UCO (including all relations etc.)\n"; }
+			# delete all relations
+			$deleteDC2->execute($UCO);
+			$deleteKOS->execute($UCO);
+			$deleteUser->execute($UCO);
+		} else {
+			if($DEBUG == 1) { print "Would delete person: $UCO\n"; }
+		}
+		$deletedUsers++;
+	}
+}
+
+
+commit $dbh;
+$dbh->disconnect();
+
+# print info about operations
+print "=======================================\n";
+if ($DUMMY) {
+	print "DUMMY RUN - no changes were actually done!\n"
+}
+print "Inserted:\t$inserted\n";
+print "Updated:\t$foundAndUpdated\n";
+print "Deleted:\t$deletedUsers\n";
+print "Skipped:\t$foundAndSkipped\n";
+print "=======================================\n";
+
+$lock->unlock();
+
+sub appendParam() {
+
+	my %args = @_;
+	my $select = $args{select};
+	my @params = $args{params};
+	my $paramName = $args{paramName};
+	my $paramValue = $args{paramValue};
+
+	if (defined($paramValue)) {
+		$select = $select . " and $paramName=?";
+		push(@params, $paramValue);
+	} else {
+		$select = $select . " and $paramName is NULL";
+	}
+
+}
