@@ -3,7 +3,7 @@ package perunServicesInit;
 
 use Exporter 'import';
 @EXPORT_OK = qw(init);
-@EXPORT= qw(getDirectory getDestinationDirectory getHierarchicalData getDataWithGroups getDataWithVos, getHashedDataWithGroups, getHashedHierarchicalData);
+@EXPORT= qw(getDirectory getDestinationDirectory getHierarchicalData getDataWithGroups getDataWithVos getHashedDataWithGroups getHashedHierarchicalData);
 
 use strict;
 use warnings;
