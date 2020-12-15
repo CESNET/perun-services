@@ -1,0 +1,91 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+
+local $::SERVICE_NAME = "vsup_web_apps";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
+our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
+our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
+our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
+our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
+our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMail';
+our $A_EMAIL_PRIV_KOS;  *A_EMAIL_PRIV_KOS = \'urn:perun:user:attribute-def:opt:privateMailKos';
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phoneDc2';
+our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
+our $A_MOBILE;  *A_MOBILE = \'urn:perun:user:attribute-def:opt:mobilePhone';
+our $A_FOTO;  *A_FOTO = \'urn:perun:user:attribute-def:def:cardPhoto';
+
+# GATHER USERS
+my $users;  # $users->{$uco}->{ATTR} = $attrValue;
+
+#
+# AGGREGATE DATA
+#
+# FOR EACH USER
+foreach my $memberId ($data->getMemberIdsForFacility) {
+
+	my $uco = $data->getUserAttributeValue(member => $memberId , attrName => $A_UCO);
+	my $login = $data->getUserFacilityAttributeValue(member => $memberId , attrName => $A_LOGIN);
+	my $vsupPrefMail = $data->getUserAttributeValue(member => $memberId , attrName => $A_VSUP_PREF_MAIL);
+	my $vsupMail = $data->getUserAttributeValue(member => $memberId , attrName => $A_VSUP_MAIL);
+	my $vsupBackupMail = $login . '@vsup.cz';
+	my $titleBefore = $data->getUserAttributeValue(member => $memberId , attrName => $A_TITLE_BEFORE);
+	my $artisticFirstName = $data->getUserAttributeValue(member => $memberId , attrName => $A_ARTISTIC_FIRST_NAME);
+	my $artisticLastName = $data->getUserAttributeValue(member => $memberId , attrName => $A_ARTISTIC_LAST_NAME);
+	my $firstName = $data->getUserAttributeValue(member => $memberId , attrName => $A_FIRST_NAME);
+	my $lastName = $data->getUserAttributeValue(member => $memberId , attrName => $A_LAST_NAME);
+	my $titleAfter = $data->getUserAttributeValue(member => $memberId , attrName => $A_TITLE_AFTER);
+	my $emailPrivDC2 = $data->getUserAttributeValue(member => $memberId , attrName => $A_EMAIL_PRIV);
+	my $emailPrivKOS = $data->getUserAttributeValue(member => $memberId , attrName => $A_EMAIL_PRIV_KOS);
+	my $phone = $data->getUserAttributeValue(member => $memberId , attrName => $A_PHONE);
+	my $phonePriv = $data->getUserAttributeValue(member => $memberId , attrName => $A_PHONE_PRIV);
+	my $mobile = $data->getUserAttributeValue(member => $memberId , attrName => $A_MOBILE);
+	my $foto = $data->getUserAttributeValue(member => $memberId , attrName => $A_FOTO);
+
+	$users->{$uco}->{$A_LOGIN} = $login;
+	$users->{$uco}->{$A_VSUP_MAIL} = $vsupPrefMail || ($vsupMail || $vsupBackupMail);
+	$users->{$uco}->{$A_FIRST_NAME} = $artisticFirstName || ($firstName || '');
+	$users->{$uco}->{$A_LAST_NAME} = $artisticLastName || ($lastName || '');
+	$users->{$uco}->{$A_TITLE_BEFORE} = $titleBefore || '';
+	$users->{$uco}->{$A_TITLE_AFTER} = $titleAfter || '';
+	$users->{$uco}->{$A_EMAIL_PRIV} = $emailPrivDC2 || ($emailPrivKOS || '');
+	$users->{$uco}->{$A_PHONE} = $phone || '';
+	$users->{$uco}->{$A_PHONE_PRIV} = $phonePriv || '';
+	$users->{$uco}->{$A_MOBILE} = $mobile || '';
+	$users->{$uco}->{$A_FOTO} = $foto || '';
+
+}
+
+#
+# PRINT user data CSV
+#
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+my @keys = sort keys %{$users};
+for my $uco (@keys) {
+	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{$A_VSUP_MAIL} . "\t" . $users->{$uco}->{$A_FIRST_NAME}
+		. "\t" . $users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_TITLE_AFTER}
+		. "\t" . $users->{$uco}->{$A_EMAIL_PRIV} . "\t" . $users->{$uco}->{$A_PHONE}. "\t" . $users->{$uco}->{$A_PHONE_PRIV}. "\t" . $users->{$uco}->{$A_MOBILE}
+		. "\t" . $users->{$uco}->{$A_FOTO} ."\n";
+}
+
+close(FILE);
+
+perunServicesInit::finalize;
+
