@@ -1,9 +1,7 @@
 #!/usr/bin/perl
-use feature "switch";
 use strict;
 use warnings;
 use perunServicesInit;
-use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_web_apps";
 local $::PROTOCOL_VERSION = "3.0.0";
