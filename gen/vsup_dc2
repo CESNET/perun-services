@@ -7,12 +7,12 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_dc2";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
-my $data = perunServicesInit::getFlatData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
@@ -28,14 +28,18 @@ my $users;  # $users->{$osbIddc2}->{ATTR} = $attrValue;
 # AGGREGATE DATA
 #
 # FOR EACH USER
-foreach my $user (($data->getChildElements)[1]->getChildElements) {
+foreach my $memberId ($data->getMemberIdsForFacility()) {
 
-	my %uAttributes = attributesToHash $user->getAttributes;
+	my $osbIddc2 = $data->getUserAttributeValue(member => $memberId, attrName => $A_OSB_ID_DC2);
+	my $userLogin = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_LOGIN);
 
-	my $osbIddc2 = $uAttributes{$A_OSB_ID_DC2};
-	$users->{$osbIddc2}->{$A_UCO} = $uAttributes{$A_UCO};
-	$users->{$osbIddc2}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
-	$users->{$osbIddc2}->{'EMAIL'} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
+	$users->{$osbIddc2}->{$A_UCO} = $data->getUserAttributeValue(member => $memberId, attrName => $A_UCO);
+	$users->{$osbIddc2}->{$A_LOGIN} = $userLogin;
+
+	my $prefMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_VSUP_PREF_MAIL);
+	my $vsupMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_VSUP_MAIL);
+
+	$users->{$osbIddc2}->{'EMAIL'} = ($prefMail || ($vsupMail || $userLogin . '@vsup.cz'));
 
 }
 
