@@ -12,17 +12,16 @@ sub getStatus;
 
 local $::SERVICE_NAME = "vsup_zimbra";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 my $agent = Perun::Agent->new();
 my $attributesAgent = $agent->getAttributesAgent;
 
 # Constants
-our $A_USER_ID; *A_USER_ID = \'urn:perun:user:attribute-def:core:id';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_UCO; *A_UCO = \'urn:perun:user:attribute-def:def:ucoVsup';
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
@@ -54,32 +53,41 @@ my $users;  # $users->{$uco}->{ATTR} = $attrValue;
 # AGGREGATE DATA
 #
 # FOR EACH USER
-foreach my $rData ($data->getChildElements) {
+foreach my $resourceId ($data->getResourceIds()) {
 
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-	my $relationType = $resourceAttributes{$A_R_RELATION_TYPE};
+	my $relationType = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_RELATION_TYPE);
 
 	# Users from Resource must be in a relation
 	unless ($relationType) {
 		next;
 	}
 
-	my @membersData = $rData->getChildElements;
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 
-	foreach my $member (@membersData) {
-
-		my %uAttributes = attributesToHash $member->getAttributes;
+		my $login  = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN);
 
 		# SKIP MEMBERS WHICH SUPPOSED TO BE SYSTEM WIDE ACCOUNTS => IGNORED BY PERUN
-		if (exists $ignoredAccounts{$uAttributes{$A_LOGIN}}) {
+		if (exists $ignoredAccounts{$login}) {
 			next;
 		}
 
-		my $uco = $uAttributes{$A_UCO};
-		$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
-		$users->{$uco}->{'EMAIL'} = ($uAttributes{$A_EMAIL_VSUP} || $uAttributes{$A_LOGIN} . '@vsup.cz');
+		my $uco  = $data->getUserAttributeValue(member => $memberId, attrName => $A_UCO);
+		my $vsupMail  = $data->getUserAttributeValue(member => $memberId, attrName => $A_EMAIL_VSUP);
+		my $userId  = $data->getUserIdForMember(member => $memberId);
+		my $artisticFirstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_ARTISTIC_FIRST_NAME);
+		my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+		my $artisticLastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_ARTISTIC_LAST_NAME);
+		my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+		my $displayName = $data->getUserAttributeValue(member => $memberId, attrName => $A_ZIMBRA_DISPLAY_NAME);
+		my $blacklisted = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_BLACKLISTED);
+		my $expirationKOS = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_KOS);
+		my $expirationDC2 = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_DC2);
+		my $expirationManual = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_MANUAL);
 
-		$users->{$uco}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
+		$users->{$uco}->{$A_LOGIN} = $login;
+		$users->{$uco}->{'EMAIL'} = ($vsupMail || $login . '@vsup.cz');
+
+		$users->{$uco}->{'USER_ID'} = $userId;
 
 		# determine user account type
 		if ($relationType eq "ZAM") {
@@ -110,7 +118,7 @@ foreach my $rData ($data->getChildElements) {
 				$users->{$uco}->{'TYPE'} = $relationType;
 				$users->{$uco}->{'COS'} = 'e69e98ba-e16b-4bdd-bc2c-0ae5e697337d';
 			} else {
-				die "User: '$uAttributes{$A_LOGIN}' was both GENERIC type and $users->{$uco}->{'TYPE'} type.";
+				die "User: '$login' was both GENERIC type and $users->{$uco}->{'TYPE'} type.";
 			}
 		} elsif ($relationType eq "MML") {
 			# CAN'T OVERLAP WITH ANOTHER
@@ -118,17 +126,17 @@ foreach my $rData ($data->getChildElements) {
 				$users->{$uco}->{'TYPE'} = $relationType;
 				$users->{$uco}->{'COS'} = '867a2875-136f-40be-aab8-751658db0300';
 			} else {
-				die "User: '$uAttributes{$A_LOGIN}' was both MAILMAN-LIST type and $users->{$uco}->{'TYPE'} type.";
+				die "User: '$login' was both MAILMAN-LIST type and $users->{$uco}->{'TYPE'} type.";
 			}
 		}
 
 		# get users name
-		my $firstName = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
-		my $lastName = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
+		$firstName = ($artisticFirstName || ($firstName || ''));
+		$lastName = ($artisticLastName || ($lastName || ''));
 		# use custom zimbra displayName
-		my $displayName = $uAttributes{$A_ZIMBRA_DISPLAY_NAME} || undef;
+		$displayName = $displayName || '';
 		# if custom name not present, create it from givenName and sn
-		unless($displayName) {
+		unless(defined $displayName and length $displayName) {
 			if (defined $firstName and length $firstName and defined $lastName and length $lastName) {
 				$displayName = $firstName . " " . $lastName;
 			} elsif (defined $firstName and length $firstName and !(defined $lastName and length $lastName)) {
@@ -142,11 +150,11 @@ foreach my $rData ($data->getChildElements) {
 		$users->{$uco}->{"LAST_NAME"} = ($lastName || '');
 		$users->{$uco}->{"DISPLAY_NAME"} = ($displayName || '');
 
-		if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
+		if (defined $blacklisted and ($blacklisted == 1)) {
 			# blacklisted users !security ban! are locked
 			$users->{$uco}->{"STATUS"} = 'locked';
 		} else {
-			$users->{$uco}->{"STATUS"} = getStatus($uAttributes{$A_EXPIRATION_KOS},$uAttributes{$A_EXPIRATION_DC2},$uAttributes{$A_EXPIRATION_MANUAL});
+			$users->{$uco}->{"STATUS"} = getStatus($expirationKOS, $expirationDC2, $expirationManual);
 		}
 
 	}
@@ -156,7 +164,7 @@ foreach my $rData ($data->getChildElements) {
 my @uco_keys = sort keys %{$users};
 for my $uco (@uco_keys) {
 
-	my $uid = $users->{$uco}->{$A_USER_ID};
+	my $uid = $users->{$uco}->{'USER_ID'};
 	my @attrNames = ($A_EMAIL_VSUP_ALIAS, $A_EMAIL_VSUP_ALIASES);
 
 	my @attributes = $attributesAgent->getAttributes( user => $uid , attrNames => \@attrNames );
