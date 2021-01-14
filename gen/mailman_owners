@@ -13,11 +13,11 @@ use POSIX qw/strftime/;
 
 local $::SERVICE_NAME = "mailman_owners";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_MAIL;                        *A_USER_MAIL =                       \'urn:perun:user:attribute-def:def:preferredMail';
@@ -29,17 +29,13 @@ our $A_RESOURCE_MAILING_LIST_VARIANTS;   *A_RESOURCE_MAILING_LIST_VARIANTS =  \'
 my $mailinglistsDirectory = "$DIRECTORY/mailman_owners";
 mkdir $mailinglistsDirectory or die "Can't mkdir $mailinglistsDirectory: $!";
 
+foreach my $resourceId ($data->getResourceIds()) {
 
-my @membersAttributes;
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes  = attributesToHash $rData->getAttributes;
-	local *FILE;
+	my $listVariantsAttribute = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_VARIANTS);
+	my $useLangVariants = (defined($listVariantsAttribute) && ($listVariantsAttribute eq "true") );
 
-	my @membersData = $rData->getChildElements;
-	my $useLangVariants = (defined($resourceAttributes{$A_RESOURCE_MAILING_LIST_VARIANTS}) && ($resourceAttributes{$A_RESOURCE_MAILING_LIST_VARIANTS} eq "true") );
-
-	my $listName = "$resourceAttributes{$A_RESOURCE_MAILING_LIST_NAME}";
+	my $listNameAttribute = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_NAME);
+	my $listName = "$listNameAttribute";
 	my $fileName = "$mailinglistsDirectory/$listName";
 	if($useLangVariants) {
 		# uses separate lists for czech and English
@@ -52,15 +48,18 @@ foreach my $rData (@resourcesData) {
 		open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 	}
 
-	foreach my $memberAttributes (dataToAttributesHashes @membersData) {
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 		#list only VALID owners
-		next unless($memberAttributes->{$A_USER_STATUS} eq "VALID");
+		my $memberStatus = $data->getMemberAttributeValue(member => $memberId, attrName => $A_USER_STATUS);
+		my $userMailAttribute = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_MAIL);
+
+		next unless($memberStatus eq "VALID");
 
 		if($useLangVariants) {
-			print FILECS "", $memberAttributes->{$A_USER_MAIL}, "\n";
-			print FILEEN "", $memberAttributes->{$A_USER_MAIL}, "\n";
+			print FILECS "", $userMailAttribute, "\n";
+			print FILEEN "", $userMailAttribute, "\n";
 		} else {
-			print FILE "", $memberAttributes->{$A_USER_MAIL}, "\n";
+			print FILE "", $userMailAttribute, "\n";
 		}
 	}
 
