@@ -7,12 +7,12 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_rav_ns";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
@@ -29,26 +29,23 @@ my $groups;
 #
 # FOR EACH NS GROUP AND ITS MEMBERS
 #
-foreach my $rData ($data->getChildElements) {
+foreach my $resourceId ($data->getResourceIds()) {
 
-	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
 
-	foreach my $group (@groupsData) {
+		my $groupNamespaceId = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_NS_ID);
+		my $groupNamespaceName = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_NS_NAME);
 
-		my %gAttributes = attributesToHash $group->getAttributes;
+		if (defined $groupNamespaceId and defined $groupNamespaceName) {
 
-		if (defined $gAttributes{$A_G_NS_ID} and defined $gAttributes{$A_G_NS_NAME}) {
+			$groups->{$groupNamespaceId}->{"NAME"} = $groupNamespaceName;
 
-			$groups->{$gAttributes{$A_G_NS_ID}}->{"NAME"} = $gAttributes{$A_G_NS_NAME};
+			foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
 
-			my @membersData = ($group->getChildElements)[1]->getChildElements;
-			foreach my $member (@membersData) {
-
-				my %uAttributes = attributesToHash $member->getAttributes;
-				my $uco = $uAttributes{$A_UCO};
+				my $uco  = $data->getUserAttributeValue(member => $memberId, attrName => $A_UCO);
 
 				# fill person to NS
-				$groups->{$gAttributes{$A_G_NS_ID}}->{"USERS"}->{$uco} = 1;
+				$groups->{$groupNamespaceId}->{"USERS"}->{$uco} = 1;
 
 			}
 
