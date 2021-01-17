@@ -9,11 +9,11 @@ sub isExpired;
 
 our $SERVICE_NAME     = "vsup_google_groups";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 # Constants
 our $A_F_GOOGLE_GROUP_DOMAIN;		*A_F_GOOGLE_GROUP_DOMAIN =			\'urn:perun:facility:attribute-def:def:googleGroupDomain';
@@ -36,22 +36,20 @@ our $users = {};
 # $groups->{name}->{"members"}->{$login} = 1;
 our $groups = {};
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-if (!defined($facilityAttributes{$A_F_GOOGLE_GROUP_DOMAIN})) {
+my $domainName = $data->getFacilityAttributeValue(attrName => $A_F_GOOGLE_GROUP_DOMAIN);
+
+if (!defined($domainName)) {
 	exit 1;
 }
-my $domainName = $facilityAttributes{$A_F_GOOGLE_GROUP_DOMAIN};
 
 #
 # AGGREGATE DATA
 #
 # FOR EACH RESOURCE
-foreach my $rData ($data->getChildElements) {
+foreach my $resourceId ($data->getResourceIds()) {
 
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-
-	my $groupName = $resourceAttributes{$A_R_GOOGLE_GROUP_NAME};
-	my $groupDisplayName = $resourceAttributes{$A_R_GOOGLE_GROUP_DISPLAY_NAME};
+	my $groupName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_GOOGLE_GROUP_NAME);
+	my $groupDisplayName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_GOOGLE_GROUP_DISPLAY_NAME);
 
 	if (defined $groupName and length $groupName) {
 		unless(exists $groups->{$groupName}) {
@@ -60,17 +58,21 @@ foreach my $rData ($data->getChildElements) {
 		}
 	}
 
-	my @membersData = $rData->getChildElements;
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 
-	foreach my $member (@membersData) {
-
-		my %uAttributes = attributesToHash $member->getAttributes;
-		my $login = $uAttributes{$A_U_GOOGLE_GROUP_LOGIN};
+		my $login = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_GOOGLE_GROUP_LOGIN);
+		my $artisticFirstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_ARTISTIC_FIRST_NAME);
+		my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_FIRST_NAME);
+		my $artisticLastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_ARTISTIC_LAST_NAME);
+		my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_LAST_NAME);
+		my $expirationKOS = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_KOS);
+		my $expirationDC2 = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_DC2);
+		my $expirationManual = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_MANUAL);
 
 		# create user entry
-		$users->{$login}->{$A_U_FIRST_NAME} = ($uAttributes{$A_U_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_U_FIRST_NAME} || ''));
-		$users->{$login}->{$A_U_LAST_NAME} = ($uAttributes{$A_U_ARTISTIC_LAST_NAME} || ($uAttributes{$A_U_LAST_NAME} || ''));
-		$users->{$login}->{"suspended"} = (isExpired($uAttributes{$A_EXPIRATION_KOS}, $uAttributes{$A_EXPIRATION_DC2}, $uAttributes{$A_EXPIRATION_MANUAL}) == 1) ? "suspended" : "";
+		$users->{$login}->{$A_U_FIRST_NAME} = ($artisticFirstName || ($firstName || ''));
+		$users->{$login}->{$A_U_LAST_NAME} = ($artisticLastName || ($lastName || ''));
+		$users->{$login}->{"suspended"} = (isExpired($expirationKOS, $expirationDC2, $expirationManual) == 1) ? "suspended" : "";
 
 		# put member in a group
 		if (defined $groupName and length $groupName) {
