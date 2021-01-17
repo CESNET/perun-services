@@ -11,13 +11,13 @@ sub isExpired;
 
 local $::SERVICE_NAME = "vsup_k4";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
 my $groupFileName = "$DIRECTORY/$::SERVICE_NAME"."_groups.csv";
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 # Constants
 our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
@@ -50,14 +50,13 @@ my $groups; # $groups->{$id}->{name|code|priority|members} = $value;
 # AGGREGATE DATA
 #
 # FOR EACH RESOURCE
-foreach my $rData ($data->getChildElements) {
+foreach my $resourceId ($data->getResourceIds()) {
 
 	# RESOURCE => GROUP in K4
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-	my $k4GroupId = $resourceAttributes{$A_R_ID};
-	my $k4GroupName = $resourceAttributes{$A_R_NAME};
-	my $k4GroupCode = $resourceAttributes{$A_R_CODE};
-	my $k4GroupPriority = $resourceAttributes{$A_R_PRIORITY};
+	my $k4GroupId = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_ID);
+	my $k4GroupName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_NAME);
+	my $k4GroupCode = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_CODE);
+	my $k4GroupPriority = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_PRIORITY);
 
 	if (exists $groups->{$k4GroupId}->{"code"}) {
 		if ($groups->{$k4GroupId}->{"code"} ne $k4GroupCode) {
@@ -85,44 +84,55 @@ foreach my $rData ($data->getChildElements) {
 	}
 
 	# GET MEMBERS FROM PERUN GROUPS TO DETERMINE EXPIRATION
-	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
 
-	foreach my $group (@groupsData) {
+	foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId )) {
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
 
-		my @membersData = ($group->getChildElements)[1]->getChildElements;
-		foreach my $member (@membersData) {
+			my $blacklisted = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_BLACKLISTED);
 
-			my %uAttributes = attributesToHash $member->getAttributes;
-
-			if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
+			if (defined $blacklisted and ($blacklisted == 1)) {
 				# skip blacklisted users !security ban!
 				next;
 			}
 
-			my $key = $uAttributes{$A_UCO};
+			my $key = $data->getUserAttributeValue( member => $memberId, attrName => $A_UCO);
+			my $expired = $data->getMemberGroupAttributeValue(member => $memberId, group => $groupId, attrName => $A_EXPIRED);
 
-			if (isExpired($uAttributes{$A_EXPIRED})) {
+			if (isExpired($expired)) {
 				# skip expired members from group
 				next;
 			}
 
-			$users->{$key}->{$A_TITLE_BEFORE} = (defined $uAttributes{$A_TITLE_BEFORE}) ? substr($uAttributes{$A_TITLE_BEFORE}, 0, 15) : '';
-			$users->{$key}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
-			$users->{$key}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
-			$users->{$key}->{$A_GENDER} = $uAttributes{$A_GENDER} || '';
-			$users->{$key}->{$A_NAV} = $uAttributes{$A_NAV} || '0';
-			$users->{$key}->{$A_STALEAKT} = $uAttributes{$A_STALEAKT} || '0';
-			$users->{$key}->{$A_IFIS_ID} = $uAttributes{$A_IFIS_ID} || '';
-			$users->{$key}->{"EXPIRATION"} = calculateExpiration($uAttributes{$A_EXPIRATION_KOS}, $uAttributes{$A_EXPIRATION_DC2}, $uAttributes{$A_EXPIRATION_MANUAL});
+			my $titleBefore = $data->getUserAttributeValue(member => $memberId, attrName => $A_TITLE_BEFORE);
+			my $artisticFirstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_ARTISTIC_FIRST_NAME);
+			my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+			my $artisticLastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_ARTISTIC_LAST_NAME);
+			my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+			my $gender = $data->getUserAttributeValue(member => $memberId, attrName => $A_GENDER);
+			my $nav = $data->getUserAttributeValue(member => $memberId, attrName => $A_NAV);
+			my $staleakt = $data->getUserAttributeValue(member => $memberId, attrName => $A_STALEAKT);
+			my $ifisId = $data->getUserAttributeValue(member => $memberId, attrName => $A_IFIS_ID);
+			my $expirationKOS = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_KOS);
+			my $expirationDC2 = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_DC2);
+			my $expirationManual = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_MANUAL);
+
+			$users->{$key}->{$A_TITLE_BEFORE} = (defined $titleBefore) ? substr($titleBefore, 0, 15) : '';
+			$users->{$key}->{$A_FIRST_NAME} = ($artisticFirstName || ($firstName || ''));
+			$users->{$key}->{$A_LAST_NAME} = ($artisticLastName || ($lastName || ''));
+			$users->{$key}->{$A_GENDER} = $gender || '';
+			$users->{$key}->{$A_NAV} = $nav || '0';
+			$users->{$key}->{$A_STALEAKT} = $staleakt || '0';
+			$users->{$key}->{$A_IFIS_ID} = $ifisId || '';
+			$users->{$key}->{"EXPIRATION"} = calculateExpiration($expirationKOS, $expirationDC2, $expirationManual);
 
 			if (length $users->{$key}->{$A_FIRST_NAME} > 20) {
-				$users->{$key}->{$A_FIRST_NAME} = substr($uAttributes{$A_FIRST_NAME}, 0, 20);
+				$users->{$key}->{$A_FIRST_NAME} = substr($firstName, 0, 20);
 			}
 			if (length $users->{$key}->{$A_LAST_NAME} > 20) {
-				$users->{$key}->{$A_LAST_NAME} = substr($uAttributes{$A_LAST_NAME}, 0, 20);
+				$users->{$key}->{$A_LAST_NAME} = substr($lastName, 0, 20);
 			}
 			if (length $users->{$key}->{$A_TITLE_BEFORE} > 15) {
-				$users->{$key}->{$A_TITLE_BEFORE} = substr($uAttributes{$A_TITLE_BEFORE}, 0, 15);
+				$users->{$key}->{$A_TITLE_BEFORE} = substr($titleBefore, 0, 15);
 			}
 
 			$groups->{$k4GroupId}->{"members"}->{$key} = 1;
