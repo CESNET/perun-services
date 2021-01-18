@@ -1,5 +1,4 @@
 #!/usr/bin/perl
-use feature "switch";
 use strict;
 use warnings;
 use perunServicesInit;
@@ -164,6 +163,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 			$users->{$key}->{'BANK_ACCOUNT'} = '';
 		}
 
+		# relation ID for "Externista - pedagog"
 		$users->{$key}->{'USER_ID'} = $data->getUserIdForMember(member => $memberId);
 
 	}
