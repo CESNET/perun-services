@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "vsup_web";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.7";
+my $SCRIPT_VERSION = "3.0.8";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -16,7 +16,7 @@ my $fileNameCAO = "$DIRECTORY/$::SERVICE_NAME"."_cao.csv";
 my $fileNameEXT = "$DIRECTORY/$::SERVICE_NAME"."_ext.csv";
 my $fileNamePass = "$DIRECTORY/$::SERVICE_NAME"."_pass.csv";
 my $fileNameNS = "$DIRECTORY/$::SERVICE_NAME"."_ns.csv";
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
@@ -48,7 +48,6 @@ our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-de
 our $A_JOB;  *A_JOB = \'urn:perun:user:attribute-def:def:job';
 our $A_JOB_ID;  *A_JOB_ID = \'urn:perun:user:attribute-def:def:jobId';
 our $A_NS;  *A_NS = \'urn:perun:user:attribute-def:def:ns';
-our $A_USER_ID;  *A_USER_ID = \'urn:perun:user:attribute-def:core:id';
 
 our $A_G_NAME;  *A_G_NAME = \'urn:perun:group:attribute-def:core:name';
 our $A_G_CAO_ORGAN;  *A_G_CAO_ORGAN = \'urn:perun:group:attribute-def:def:caoOrgan';
@@ -74,59 +73,84 @@ my $groups;  # $groups->{ID}->{NAME/USERS} = name/{uco} = 1;
 # AGGREGATE DATA
 #
 # FOR EACH USER
-foreach my $rData ($data->getChildElements) {
+foreach my $resourceId ($data->getResourceIds()) {
 
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-	my $relationType = $resourceAttributes{$A_R_RELATION_TYPE};
+	my $relationType = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_RELATION_TYPE);
 
-	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
 
-	foreach my $group (@groupsData) {
+		my $groupNamespaceId = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_NS_ID);
+		my $groupNamespaceName = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_NS_NAME);
+		my $groupCAOOrgan = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_CAO_ORGAN);
+		my $groupCAOFunkce = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_CAO_FUNKCE);
+		my $groupCAOFunkceId = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_CAO_FUNKCE_ID);
 
-		my %gAttributes = attributesToHash $group->getAttributes;
-
-		if (defined $gAttributes{$A_G_NS_ID} and defined $gAttributes{$A_G_NS_NAME}) {
-			$groups->{$gAttributes{$A_G_NS_ID}}->{"NAME"} = $gAttributes{$A_G_NS_NAME};
+		if (defined $groupNamespaceId and defined $groupNamespaceName) {
+			$groups->{$groupNamespaceId}->{"NAME"} = $groupNamespaceName;
 		}
 
-		my @membersData = ($group->getChildElements)[1]->getChildElements;
-		foreach my $member (@membersData) {
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
 
-			my %uAttributes = attributesToHash $member->getAttributes;
+			my $excluded = $data->getUserAttributeValue( member => $memberId, attrName => $A_EXCLUDED );
 
-			if ($uAttributes{$A_EXCLUDED}) {
+			if ($excluded) {
 				# skip users, which shouldn't be displayed on the web
 				next;
 			}
 
-			my $uco = $uAttributes{$A_UCO};
-			$users->{$uco}->{$A_LOGIN} = $uAttributes{$A_LOGIN};
-			$users->{$uco}->{'EMAIL'} = ($uAttributes{$A_VSUP_PREF_MAIL} || ($uAttributes{$A_VSUP_MAIL} || $uAttributes{$A_LOGIN} . '@vsup.cz'));
+			my $uco  = $data->getUserAttributeValue(member => $memberId, attrName => $A_UCO);
+			my $login  = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN);
+			my $prefMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_VSUP_PREF_MAIL);
+			my $vsupMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_VSUP_MAIL);
+			my $titleBefore = $data->getUserAttributeValue(member => $memberId, attrName => $A_TITLE_BEFORE);
+			my $artisticFirstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_ARTISTIC_FIRST_NAME);
+			my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+			my $artisticLastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_ARTISTIC_LAST_NAME);
+			my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+			my $titleAfter = $data->getUserAttributeValue(member => $memberId, attrName => $A_TITLE_AFTER);
+			my $studyId = $data->getUserAttributeValue(member => $memberId, attrName => $A_STUDY_ID);
+			my $studySince = $data->getUserAttributeValue(member => $memberId, attrName => $A_STUDY_SINCE);
+			my $studyRocnik = $data->getUserAttributeValue(member => $memberId, attrName => $A_STUDY_ROCNIK);
+			my $studyPrihlaska = $data->getUserAttributeValue(member => $memberId, attrName => $A_STUDY_PRIHLASKA);
+			my $birthDate = $data->getUserAttributeValue(member => $memberId, attrName => $A_BIRTH_DATE);
+			my $foto = $data->getUserAttributeValue(member => $memberId, attrName => $A_FOTO);
+			my $phone = $data->getUserAttributeValue(member => $memberId, attrName => $A_PHONE);
+			my $mobile = $data->getUserAttributeValue(member => $memberId, attrName => $A_MOBILE);
+			my $emailPriv = $data->getUserAttributeValue(member => $memberId, attrName => $A_EMAIL_PRIV);
+			my $emailPrivKOS = $data->getUserAttributeValue(member => $memberId, attrName => $A_EMAIL_PRIV_KOS);
+			my $phonePriv = $data->getUserAttributeValue(member => $memberId, attrName => $A_PHONE_PRIV);
+			my $job = $data->getUserAttributeValue(member => $memberId, attrName => $A_JOB);
+			my $jobId = $data->getUserAttributeValue(member => $memberId, attrName => $A_JOB_ID);
+			my $ns = $data->getUserAttributeValue(member => $memberId, attrName => $A_NS);
+			my $userId = $data->getUserIdForMember(member => $memberId);
+
+			$users->{$uco}->{$A_LOGIN} = $login;
+			$users->{$uco}->{'EMAIL'} = ($prefMail || ($vsupMail || $login . '@vsup.cz'));
 
 			# personal
-			$users->{$uco}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE} || '';
-			$users->{$uco}->{$A_FIRST_NAME} = ($uAttributes{$A_ARTISTIC_FIRST_NAME} || ($uAttributes{$A_FIRST_NAME} || ''));
-			$users->{$uco}->{$A_LAST_NAME} = ($uAttributes{$A_ARTISTIC_LAST_NAME} || ($uAttributes{$A_LAST_NAME} || ''));
-			$users->{$uco}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER} || '';
+			$users->{$uco}->{$A_TITLE_BEFORE} = $titleBefore || '';
+			$users->{$uco}->{$A_FIRST_NAME} = ($artisticFirstName || ($firstName || ''));
+			$users->{$uco}->{$A_LAST_NAME} = ($artisticLastName || ($lastName || ''));
+			$users->{$uco}->{$A_TITLE_AFTER} = $titleAfter || '';
 
-			$users->{$uco}->{$A_STUDY_ID} = $uAttributes{$A_STUDY_ID} || '';
-			$users->{$uco}->{$A_STUDY_SINCE} = $uAttributes{$A_STUDY_SINCE} || '';
-			$users->{$uco}->{$A_STUDY_ROCNIK} = $uAttributes{$A_STUDY_ROCNIK} || '';
-			$users->{$uco}->{$A_STUDY_PRIHLASKA} = $uAttributes{$A_STUDY_PRIHLASKA} || '';
+			$users->{$uco}->{$A_STUDY_ID} = $studyId || '';
+			$users->{$uco}->{$A_STUDY_SINCE} = $studySince || '';
+			$users->{$uco}->{$A_STUDY_ROCNIK} = $studyRocnik || '';
+			$users->{$uco}->{$A_STUDY_PRIHLASKA} = $studyPrihlaska || '';
 
 			# Convert BirthNumber to birth date
-			if (defined $uAttributes{$A_BIRTH_DATE}) {
+			if (defined $birthDate) {
 
-				my $YY = substr($uAttributes{$A_BIRTH_DATE}, 0, 2);
-				my $MM = substr($uAttributes{$A_BIRTH_DATE}, 2, 2);
-				my $DD = substr($uAttributes{$A_BIRTH_DATE}, 4, 2);
+				my $YY = substr($birthDate, 0, 2);
+				my $MM = substr($birthDate, 2, 2);
+				my $DD = substr($birthDate, 4, 2);
 
 				# fix womans birth number month
 				if (substr($MM, 0, 1) eq "5") {
-					$MM = "0" . substr($uAttributes{$A_BIRTH_DATE}, 3, 1);
+					$MM = "0" . substr($birthDate, 3, 1);
 				}
 				if (substr($MM, 0, 1) eq "6") {
-					$MM = "1" . substr($uAttributes{$A_BIRTH_DATE}, 3, 1);
+					$MM = "1" . substr($birthDate, 3, 1);
 				}
 
 				$users->{$uco}->{$A_BIRTH_DATE} = $DD . $MM . $YY;
@@ -135,33 +159,33 @@ foreach my $rData ($data->getChildElements) {
 				$users->{$uco}->{$A_BIRTH_DATE} = '';
 			}
 
-			$users->{$uco}->{$A_FOTO} = $uAttributes{$A_FOTO} || '';
+			$users->{$uco}->{$A_FOTO} = $foto || '';
 
 			# work contacts
-			$users->{$uco}->{$A_PHONE} = $uAttributes{$A_PHONE} || '';
-			$users->{$uco}->{$A_MOBILE} = $uAttributes{$A_MOBILE} || '';
-			$users->{$uco}->{$A_EMAIL_PRIV} = $uAttributes{$A_EMAIL_PRIV} || ($uAttributes{$A_EMAIL_PRIV_KOS} || '');
-			$users->{$uco}->{$A_PHONE_PRIV} = $uAttributes{$A_PHONE_PRIV} || '';
+			$users->{$uco}->{$A_PHONE} = $phone || '';
+			$users->{$uco}->{$A_MOBILE} = $mobile || '';
+			$users->{$uco}->{$A_EMAIL_PRIV} = $emailPriv || ($emailPrivKOS || '');
+			$users->{$uco}->{$A_PHONE_PRIV} = $phonePriv || '';
 
 			# cao membership
-			if (defined $gAttributes{$A_G_CAO_ORGAN} and length $gAttributes{$A_G_CAO_ORGAN}) {
-				$cao->{$gAttributes{$A_G_CAO_ORGAN}}->{$gAttributes{$A_G_CAO_FUNKCE}.":".$gAttributes{$A_G_CAO_FUNKCE_ID}}->{$uco} = 1;
+			if (defined $groupCAOOrgan and length $groupCAOOrgan) {
+				$cao->{$groupCAOOrgan}->{$groupCAOFunkce.":".$groupCAOFunkceId}->{$uco} = 1;
 			}
 
 			# external workers
 			if (defined $relationType) {
 				$ext->{$uco}->{"TYPE"} = $relationType;
-				$ext->{$uco}->{$A_JOB} = $uAttributes{$A_JOB} || '';
-				$ext->{$uco}->{$A_JOB_ID} = $uAttributes{$A_JOB_ID} || '';
-				$ext->{$uco}->{$A_NS} = $uAttributes{$A_NS} || '';
-				$ext->{$uco}->{$A_USER_ID} = $uAttributes{$A_USER_ID};
+				$ext->{$uco}->{$A_JOB} = $job || '';
+				$ext->{$uco}->{$A_JOB_ID} = $jobId || '';
+				$ext->{$uco}->{$A_NS} = $ns || '';
+				$ext->{$uco}->{"USER_ID"} = $userId;
 			}
 
 			# is from NS group
-			if (defined $gAttributes{$A_G_NS_ID} and defined $gAttributes{$A_G_NS_NAME}) {
+			if (defined $groupNamespaceId and defined $groupNamespaceName) {
 
 				# fill person to NS
-				$groups->{$gAttributes{$A_G_NS_ID}}->{"USERS"}->{$uco} = 1;
+				$groups->{$groupNamespaceId}->{"USERS"}->{$uco} = 1;
 
 			}
 
@@ -242,7 +266,7 @@ my @ext_keys = sort keys %{$ext};
 for my $uco (@ext_keys) {
 
 	# print attributes, which are never empty
-	print FILE $uco . "\t" . $ext->{$uco}->{$A_USER_ID} . "\t" . $ext->{$uco}->{"TYPE"} . "\t" .
+	print FILE $uco . "\t" . $ext->{$uco}->{"USER_ID"} . "\t" . $ext->{$uco}->{"TYPE"} . "\t" .
 		$ext->{$uco}->{$A_JOB} . "\t" . $ext->{$uco}->{$A_JOB_ID} . "\t" . $ext->{$uco}->{$A_NS}  . "\n";
 
 }
