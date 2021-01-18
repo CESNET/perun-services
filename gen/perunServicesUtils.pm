@@ -27,7 +27,7 @@ sub attributesToHash {
 	return %attributesHash;
 }
 
-# Get "data" from getData function and convert them into array of attributes. Attributes is represented by REFERENCE to hash. 
+# Get "data" from getData function and convert them into array of attributes. Attributes is represented by REFERENCE to hash.
 #
 # Usage:
 # my $data = perunServicesInit::getHierarchicalData;
@@ -48,14 +48,14 @@ sub dataToAttributesHashes {
 
 # First param is key (i.e. AttributeName) and hashes will be sorted by values which responds this key
 
-# Second argument afect the sorting behavior.
-#     If it's ommited or it's 0 the function compare values as numbers.
-#     If it's equals 1 function compare valeus as strings - case-insesitive.
+# Second argument affect the sorting behavior.
+#     If it's omitted or it's 0 the function compare values as numbers.
+#     If it's equals 1 function compare values as strings - case-insensitive.
 #
 # Usage:
 sub getAttributeSorting {
 	my $param = shift;
-	if(shift) { 
+	if(shift) {
 		return sub ($$) {uc($_[0]->{$param}) cmp uc($_[1]->{$param}) }
 	} else {
 		return sub ($$) {$_[0]->{$param} <=> $_[1]->{$param} }
@@ -138,13 +138,13 @@ sub quotaToKb($) {
 	return $quota;
 }
 
-# input: list of items 
+# input: list of items
 # output: array with uniq items
 sub uniqList(@) {
 		return keys %{{ map { $_ => 1 } @_ }};
 }
 
-#input: string 
+#input: string
 #output: sting where non-ascii characters are substituted for utf8 escape characters (for example 'á' = '\xC3\xA1')
 sub convertNonAsciiToEscapedUtf8Form($) {
 	local($_) = shift;
