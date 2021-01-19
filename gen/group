@@ -18,26 +18,26 @@ sub processResourceData;
 
 our $SERVICE_NAME = "group";
 our $PROTOCOL_VERSION = "3.2.0";
-my $SCRIPT_VERSION = "3.1.2";
+my $SCRIPT_VERSION = "3.1.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
-our $A_RESOURCE_UNIX_GROUP_NAME;         *A_RESOURCE_UNIX_GROUP_NAME =         \'urn:perun:resource:attribute-def:virt:unixGroupName';
-our $A_RESOURCE_UNIX_GID;                *A_RESOURCE_UNIX_GID =                \'urn:perun:resource:attribute-def:virt:unixGID';
-our $A_GROUP_UNIX_GROUP_NAME;            *A_GROUP_UNIX_GROUP_NAME =            \'urn:perun:group_resource:attribute-def:virt:unixGroupName';
-our $A_GROUP_UNIX_GID;                   *A_GROUP_UNIX_GID =                   \'urn:perun:group_resource:attribute-def:virt:unixGID';
-our $A_MEMBER_LOGIN;                     *A_MEMBER_LOGIN =                     \'urn:perun:user_facility:attribute-def:virt:login';
-our $A_USER_STATUS;                      *A_USER_STATUS =                      \'urn:perun:member:attribute-def:core:status';
-our $A_GROUP_IS_SYSTEM_UNIX_GROUP;       *A_GROUP_IS_SYSTEM_UNIX_GROUP =       \'urn:perun:group_resource:attribute-def:def:isSystemUnixGroup';
-our $A_GROUP_SYSTEM_UNIX_GID_SYSTEM;     *A_GROUP_SYSTEM_UNIX_GID_SYSTEM =     \'urn:perun:group_resource:attribute-def:def:systemUnixGID';
-our $A_GROUP_SYSTEM_UNIX_GROUP_NAME;     *A_GROUP_SYSTEM_UNIX_GROUP_NAME =     \'urn:perun:group_resource:attribute-def:def:systemUnixGroupName';
-our $A_FACILITY_GID_RANGES;              *A_FACILITY_GID_RANGES =              \'urn:perun:facility:attribute-def:virt:GIDRanges';
-our $A_FACILITY_EXCLUDE_NON_VALID_USERS; *A_FACILITY_EXCLUDE_NON_VALID_USERS = \'urn:perun:facility:attribute-def:def:excludeNonValidUsersFromUnixGroups';
+our $A_RESOURCE_UNIX_GROUP_NAME;              *A_RESOURCE_UNIX_GROUP_NAME =              \'urn:perun:resource:attribute-def:virt:unixGroupName';
+our $A_RESOURCE_UNIX_GID;                     *A_RESOURCE_UNIX_GID =                     \'urn:perun:resource:attribute-def:virt:unixGID';
+our $A_GROUP_RESOURCE_UNIX_GROUP_NAME;        *A_GROUP_RESOURCE_UNIX_GROUP_NAME =        \'urn:perun:group_resource:attribute-def:virt:unixGroupName';
+our $A_GROUP_RESOURCE_UNIX_GID;               *A_GROUP_RESOURCE_UNIX_GID =               \'urn:perun:group_resource:attribute-def:virt:unixGID';
+our $A_USER_FACILITY_LOGIN;                   *A_USER_FACILITY_LOGIN =                   \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_MEMBER_STATUS;                         *A_MEMBER_STATUS =                         \'urn:perun:member:attribute-def:core:status';
+our $A_GROUP_RESOURCE_IS_SYSTEM_UNIX_GROUP;   *A_GROUP_RESOURCE_IS_SYSTEM_UNIX_GROUP =   \'urn:perun:group_resource:attribute-def:def:isSystemUnixGroup';
+our $A_GROUP_RESOURCE_SYSTEM_UNIX_GID;        *A_GROUP_RESOURCE_SYSTEM_UNIX_GID =        \'urn:perun:group_resource:attribute-def:def:systemUnixGID';
+our $A_GROUP_RESOURCE_SYSTEM_UNIX_GROUP_NAME; *A_GROUP_RESOURCE_SYSTEM_UNIX_GROUP_NAME = \'urn:perun:group_resource:attribute-def:def:systemUnixGroupName';
+our $A_FACILITY_GID_RANGES;                   *A_FACILITY_GID_RANGES =                   \'urn:perun:facility:attribute-def:virt:GIDRanges';
+our $A_FACILITY_EXCLUDE_NON_VALID_USERS;      *A_FACILITY_EXCLUDE_NON_VALID_USERS =      \'urn:perun:facility:attribute-def:def:excludeNonValidUsersFromUnixGroups';
 
-our $STATUS_VALID;											*STATUS_VALID =												\'VALID';
+our $STATUS_VALID;                            *STATUS_VALID =                            \'VALID';
 
 #Global data structure
 our $STRUC_GID;          *STRUC_GID = \0;
@@ -47,14 +47,13 @@ our $groupStruc = {};     #$groupStruc->{$groupName}->{$STRUC_GID} = $gid;      
                           #$groupStruc->{$groupName}->{$STRUC_USERS}->{$login} = 1;  #this mean user exists in group
                           #$groupStruc->{$groupName}->{$STRUC_SYSTEM} = 1;         # group is system group
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-my $excludeNonValidUsers = $facilityAttributes{$A_FACILITY_EXCLUDE_NON_VALID_USERS};
+my $excludeNonValidUsers = $data->getFacilityAttributeValue(attrName => $A_FACILITY_EXCLUDE_NON_VALID_USERS);
 
-foreach my $resourceData ($data->getChildElements) {
-	processResourceData $resourceData;
+foreach my $resourceId ($data->getResourceIds()) {
+	processResourceData $resourceId;
 
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		my $groupMembersLogins = processGroupData $groupData;
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
+		processGroupData $groupId, $resourceId;
 	}
 }
 
@@ -64,7 +63,7 @@ my $gid_ranges_file_name = "$DIRECTORY/gid_ranges";
 open FILE,">$group_file_name" or die "Cannot open $group_file_name: $! \n";
 open GID_RANGES,">$gid_ranges_file_name" or die "Cannot open $gid_ranges_file_name\n";
 
-my %gidRanges = %{$facilityAttributes{$A_FACILITY_GID_RANGES}};
+my %gidRanges = %{$data->getFacilityAttributeValue(attrName => $A_FACILITY_GID_RANGES)};
 foreach my $minimum (sort { $a <=> $b } keys  %gidRanges) {
 	my $maximum = $gidRanges{$minimum};
 	print GID_RANGES $minimum . "-" . $maximum . "\n";
@@ -83,14 +82,14 @@ perunServicesInit::finalize;
 #   Only subs definitions down there
 ##############################################################################
 
-# input: resource serviceAttributes
+# input: resource id
 # stores resource members logins into $groupStruc structure
 sub processResourceData {
-	my $resourceData = shift;
+	my $resourceId = shift;
 
-	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
-	my $groupName = $resourceAttrs{$A_RESOURCE_UNIX_GROUP_NAME};
-	my $gid = $resourceAttrs{$A_RESOURCE_UNIX_GID};
+	my $groupName = $data->getResourceAttributeValue(attrName => $A_RESOURCE_UNIX_GROUP_NAME, resource => $resourceId);
+	my $gid = $data->getResourceAttributeValue(attrName => $A_RESOURCE_UNIX_GID, resource => $resourceId);
+
 	unless(exists $groupStruc->{$groupName}) {
 		$groupStruc->{$groupName} = {};
 		$groupStruc->{$groupName}->{$STRUC_GID} = $gid;
@@ -99,18 +98,16 @@ sub processResourceData {
 		if($groupStruc->{$groupName}->{$STRUC_GID} != $gid) { die "Consistency error! Two resources or groups which represents same unix group have different GID"; }
 	}
 
-	my $membersElement = ($resourceData->getChildElements)[1];
+	my @memberIds = $data->getMemberIdsForResource(resource => $resourceId);
 
-	processMembersData $membersElement, $groupName;
+	processMembersData $groupName, @memberIds;
 }
 
-# input: groups serviceAttributes
+# input: (group id, resource id)
 # stores groups members logins into $groupStruc structure
 sub processGroupData {
-	my $groupData = shift;
-	my $subGroupsElement = ($groupData->getChildElements)[0];
-	my $membersElement = ($groupData->getChildElements)[1];
-	my %groupAttributes = attributesToHash $groupData->getAttributes;
+	my ($groupId, $resourceId) = @_;
+	my @memberIds = $data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId);
 
 	# XXX We don't want to process subgroups which are not assigned directly.
 	#
@@ -119,9 +116,10 @@ sub processGroupData {
 	#}
 
 	#check if this group is flagged as unix group
-	if($groupAttributes{$A_GROUP_UNIX_GROUP_NAME}) {
-		my $groupName = $groupAttributes{$A_GROUP_UNIX_GROUP_NAME};
-		my $gid = $groupAttributes{$A_GROUP_UNIX_GID};
+	my $unixGroupName = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_RESOURCE_UNIX_GROUP_NAME, resource => $resourceId, group => $groupId);
+	if($unixGroupName) {
+		my $groupName = $unixGroupName;
+		my $gid = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_RESOURCE_UNIX_GID, resource => $resourceId, group => $groupId);
 
 		if(exists $groupStruc->{$groupName}) { 
 			if($groupStruc->{$groupName}->{$STRUC_SYSTEM}) {
@@ -132,12 +130,12 @@ sub processGroupData {
 		}
 		$groupStruc->{$groupName}->{$STRUC_GID} = $gid;
 
-		processMembersData $membersElement, $groupName;
+		processMembersData $groupName, @memberIds;
 
 		#process system unix groups
-	} elsif($groupAttributes{$A_GROUP_IS_SYSTEM_UNIX_GROUP}) {
-		my $groupName = $groupAttributes{$A_GROUP_SYSTEM_UNIX_GROUP_NAME};
-		my $gid = $groupAttributes{$A_GROUP_SYSTEM_UNIX_GID_SYSTEM};
+	} elsif($data->getGroupResourceAttributeValue(attrName => $A_GROUP_RESOURCE_IS_SYSTEM_UNIX_GROUP, resource => $resourceId, group => $groupId)) {
+		my $groupName = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_RESOURCE_SYSTEM_UNIX_GROUP_NAME, resource => $resourceId, group => $groupId);
+		my $gid = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_RESOURCE_SYSTEM_UNIX_GID, resource => $resourceId, group => $groupId);
 
 		if(exists $groupStruc->{$groupName}) { 
 			if(!$groupStruc->{$groupName}->{$STRUC_SYSTEM}) {
@@ -149,23 +147,23 @@ sub processGroupData {
 		$groupStruc->{$groupName}->{$STRUC_GID} = $gid;
 		$groupStruc->{$groupName}->{$STRUC_SYSTEM} = 1;
 
-		processMembersData $membersElement, $groupName;
+		processMembersData $groupName, @memberIds;
 	}
 }
 
-# input: (members serviceAttributes, groupName)
+# input: (groupName, member ids)
 # stores members logins into $groupStruc structure
 sub processMembersData {
-	my ($membersElement, $groupName) = @_;
-	for my $memberData ($membersElement->getChildElements) {
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
+	my ($groupName, @memberIds) = @_;
+	for my $memberId (@memberIds) {
 
 		# if exlude non valid users is true, then need to check status of member
 		if(defined $excludeNonValidUsers && $excludeNonValidUsers eq "true") {
 			# if member is not valid, skip him
-			next if $memberAttributes{$A_USER_STATUS} ne 'VALID';
+			next if $data->getMemberAttributeValue(attrName => $A_MEMBER_STATUS, member => $memberId) ne 'VALID';
 		}
 
-		$groupStruc->{$groupName}->{$STRUC_USERS}->{$memberAttributes{$A_MEMBER_LOGIN}} = 1;
+		my $login = $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_LOGIN, member => $memberId);
+		$groupStruc->{$groupName}->{$STRUC_USERS}->{$login} = 1;
 	}
 }
