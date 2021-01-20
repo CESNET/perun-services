@@ -11,15 +11,15 @@ sub processMemberData;
 
 local $::SERVICE_NAME = "fs_replicas";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
-our $A_USER_LOGIN;                              *A_USER_LOGIN =                              \'urn:perun:user_facility:attribute-def:virt:login';
-our $A_USER_LOGIN_NAMESPACE;                    *A_USER_LOGIN_NAMESPACE =                    \'urn:perun:facility:attribute-def:def:loginNamespace';
+our $A_UF_LOGIN;                                *A_UF_LOGIN =                                \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UF_LOGIN_NAMESPACE;                      *A_UF_LOGIN_NAMESPACE =                      \'urn:perun:facility:attribute-def:def:loginNamespace';
 our $A_R_DESTINATION;                           *A_R_DESTINATION =                           \'urn:perun:resource:attribute-def:def:replicaDestination';
 our $A_R_DESTINATION_PATH;                      *A_R_DESTINATION_PATH =                      \'urn:perun:resource:attribute-def:def:replicaDestinationPath';
 our $A_R_SOURCE_PATH;                           *A_R_SOURCE_PATH =                           \'urn:perun:resource:attribute-def:def:replicaSourcePath';
@@ -31,8 +31,8 @@ our $struc = {};
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 
-foreach my $resourceData ( $data->getChildElements ) {
-	processResourceData $resourceData;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	processResourceData $resourceId;
 }
 
 foreach my $replicaDestinationPath (sort keys %$struc) {
@@ -58,7 +58,7 @@ close(FILE) or die "Cannot close $fileName: $! \n";
 # Only subs definitions down there
 ##############################################################################
 
-# INPUT: replica's destination name, replica's destination path, replica's source path, member's data
+# INPUT: replica's destination name, replica's destination path, replica's source path, member's id
 # stores replica's destination name, replica's destination path, replica's source path 
 # and user's login into $struc structure
 sub processMemberData {
@@ -66,15 +66,14 @@ sub processMemberData {
 	my $replicaDestinationPath = shift;
 	my $replicaSourcePath = shift;
 	my $isReplicaStandAloneDir = shift;
-	my $memberData = shift;
+	my $memberId = shift;
 
-	my %memberAttributes = attributesToHash $memberData->getAttributes;
 	my $login;
 	#use empty login if this replica is standalone directory
 	if($isReplicaStandAloneDir) {
 		$login = "";
 	} else {
-		$login = $memberAttributes{$A_USER_LOGIN};
+		$login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
 	}
 
 	unless(exists $struc->{$replicaDestinationPath}->{$replicaSourcePath}->{$replicaDestination}->{$login}) {
@@ -82,17 +81,16 @@ sub processMemberData {
 	}
 }
 
-# INPUT: resource's data
+# INPUT: resource's id
 # calls processMemberData to assign REPLICA_DESTINATION, REPLICA_DESTINATION_PATH 
 # and REPLICA_SOURCE_PATH to the member of resource in $struc structure
 sub processResourceData {
-	my $resource = shift;
-	my %resourceAttributes = attributesToHash $resource->getAttributes;
+	my $resourceId = shift;
 
-	my $replicaDestination = $resourceAttributes{$A_R_DESTINATION};
-	my $replicaDestinationPath = $resourceAttributes{$A_R_DESTINATION_PATH};
-	my $replicaSourcePath = $resourceAttributes{$A_R_SOURCE_PATH};
-	my $isReplicaStandAloneDir = $resourceAttributes{$A_R_IS_REPLICA_SOURCE_PATH_STANDALONE_DIR};
+	my $replicaDestination = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_DESTINATION );
+	my $replicaDestinationPath = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_DESTINATION_PATH );
+	my $replicaSourcePath = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_SOURCE_PATH );
+	my $isReplicaStandAloneDir = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_IS_REPLICA_SOURCE_PATH_STANDALONE_DIR );
 
 	unless((substr $replicaDestinationPath, -1) eq "/") {
 		$replicaDestinationPath = $replicaDestinationPath . "/";
@@ -102,8 +100,8 @@ sub processResourceData {
 		$replicaSourcePath = $replicaSourcePath . "/";
 	}
 
-	foreach my $memberData(($resource->getChildElements)[1]->getChildElements) {
-		processMemberData $replicaDestination, $replicaDestinationPath, $replicaSourcePath, $isReplicaStandAloneDir, $memberData;
+	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
+		processMemberData $replicaDestination, $replicaDestinationPath, $replicaSourcePath, $isReplicaStandAloneDir, $memberId;
 	}
 }
 
