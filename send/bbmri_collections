@@ -26,7 +26,7 @@ fi
 [ -r /etc/perun/services/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME
 
 # Specify command to transfer the data
-TRANSPORT_COMMAND="curl -i -H Content-Type:application/json -f -X POST"
+TRANSPORT_COMMAND="curl -Ss -i -H Content-Type:application/json -f -X POST"
 USER_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- $USERNAME_AND_PASSWORD $DESTINATION$USER_ENDPOINT"
 GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- $USERNAME_AND_PASSWORD $DESTINATION$GROUP_ENDPOINT"
 
