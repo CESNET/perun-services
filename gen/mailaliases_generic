@@ -7,11 +7,11 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "mailaliases_generic";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 
@@ -22,19 +22,20 @@ our $A_USER_MAIL;                        *A_USER_MAIL =                        \
 my $fileName = "$DIRECTORY/perun_generic";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 
-my $sortingFunction = getAttributeSorting $A_RESOURCE_MAILALIASES_TARGET_USER, 1;
-
 my %mailByLogin;
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
+foreach my $resourceId ($data->getResourceIds()) {
 
-	my @membersData = $rData->getChildElements;
-	for my $memberAttributes (dataToAttributesHashes @membersData) {
-		if (defined $memberAttributes->{$A_USER_MAILALIASES_GENERIC_MAIL}) {
-			$mailByLogin{$resourceAttributes{$A_RESOURCE_MAILALIASES_TARGET_USER}}->{$memberAttributes->{$A_USER_MAILALIASES_GENERIC_MAIL}} = 1;
+	my $resourceMailAliasesTargetUser = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILALIASES_TARGET_USER);
+
+	for my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+
+		my $genericMail = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_MAILALIASES_GENERIC_MAIL);
+		my $userMail = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_MAIL);
+
+		if (defined $genericMail) {
+			$mailByLogin{$resourceMailAliasesTargetUser}->{$genericMail} = 1;
 		} else {
-			$mailByLogin{$resourceAttributes{$A_RESOURCE_MAILALIASES_TARGET_USER}}->{$memberAttributes->{$A_USER_MAIL}} = 1;
+			$mailByLogin{$resourceMailAliasesTargetUser}->{$userMail} = 1;
 		}
 	}
 }
