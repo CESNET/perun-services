@@ -27,7 +27,7 @@ fi
 
 # Specify command to tranfer the data
 #TRANSPORT_COMMAND="curl --cacert /etc/ssl/chain_TERENA_SSL_CA_3.pem -i -H Content-Type:application/json -f -X POST"
-TRANSPORT_COMMAND="curl -i -H Content-Type:application/json -f -X POST"
+TRANSPORT_COMMAND="curl -Ss -i -H Content-Type:application/json -f -X POST"
 USER_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- $USERNAME_AND_PASSWORD $DESTINATION$USER_ENDPOINT"
 GROUP_TRANSPORT_COMMAND="$TRANSPORT_COMMAND -d @- $USERNAME_AND_PASSWORD $DESTINATION$GROUP_ENDPOINT"
 
