@@ -9,7 +9,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.5.0";
-our $SCRIPT_VERSION = "3.0.1";
+our $SCRIPT_VERSION = "3.0.2";
 
 sub mergeStatuses {
 	my ($finalStatus, $memberStatus) = @_;
@@ -29,15 +29,15 @@ sub mergeStatuses {
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
-our $A_USER_LOGIN;                *A_USER_LOGIN =                \'urn:perun:user_facility:attribute-def:virt:login';
-our $A_SCRATCH_MOUNTPOINT;        *A_SCRATCH_MOUNTPOINT =        \'urn:perun:facility:attribute-def:def:fsScratchMountPoint';
-our $A_GID;                       *A_GID =                       \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
-our $A_UID;                       *A_UID =                       \'urn:perun:user_facility:attribute-def:virt:UID';
-our $A_USER_STATUS;               *A_USER_STATUS =               \'urn:perun:member:attribute-def:core:status';
+our $A_UF_LOGIN;                  *A_UF_LOGIN =                  \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UF_GID;                    *A_UF_GID =                    \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
+our $A_UF_UID;                    *A_UF_UID =                    \'urn:perun:user_facility:attribute-def:virt:UID';
+our $A_MEMBER_STATUS;             *A_MEMBER_STATUS =             \'urn:perun:member:attribute-def:core:status';
 our $A_MEMBER_IS_SUSPENDED;       *A_MEMBER_IS_SUSPENDED =       \'urn:perun:member:attribute-def:virt:isSuspended';
+our $A_F_SCRATCH_MOUNTPOINT;      *A_F_SCRATCH_MOUNTPOINT =      \'urn:perun:facility:attribute-def:def:fsScratchMountPoint';
 our $A_F_SCRATCH_DIR_PERMISSIONS; *A_F_SCRATCH_DIR_PERMISSIONS = \'urn:perun:facility:attribute-def:def:scratchDirPermissions';
 
 my $memberAttributesByLogin= {};
@@ -45,40 +45,47 @@ my $memberAttributesByLogin= {};
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 my $permissionsFileName = "$DIRECTORY/umask";
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
 #####################################
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-		my $status = $memberAttributes{$A_USER_STATUS};
-		if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = "SUSPENDED"; }
-				
-		$memberAttributes{$A_SCRATCH_MOUNTPOINT} = $facilityAttributes{$A_SCRATCH_MOUNTPOINT};
-		$memberAttributes{$A_USER_STATUS} = mergeStatuses $memberAttributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{$A_USER_STATUS}, $status;
+my $scratchMountPoint = $data->getFacilityAttributeValue( attrName => $A_F_SCRATCH_MOUNTPOINT );
+foreach my $resourceId ( $data->getResourceIds() ) {
 
-		#store to global structure
-		$memberAttributesByLogin->{$memberAttributes{$A_USER_LOGIN}} = \%memberAttributes;
+	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
+		
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
+		my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+		my $memberIsSuspended = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_IS_SUSPENDED );
+		if($memberIsSuspended) { $status = "SUSPENDED"; }
+
+		unless( defined($memberAttributesByLogin->{$login}) ) {
+			my $gid = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_GID );
+			my $uid = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_UID );
+			$memberAttributesByLogin->{$login}->{$A_UF_LOGIN} = $login;
+			$memberAttributesByLogin->{$login}->{$A_UF_GID} = $gid;
+			$memberAttributesByLogin->{$login}->{$A_UF_UID} = $uid;
+			$memberAttributesByLogin->{$login}->{$A_MEMBER_STATUS} = $status;
+			$memberAttributesByLogin->{$login}->{$A_F_SCRATCH_MOUNTPOINT} = $scratchMountPoint;
+		} else {
+			$memberAttributesByLogin->{$login}->{$A_MEMBER_STATUS} = mergeStatuses $memberAttributesByLogin->{$login}->{$A_MEMBER_STATUS}, $status;
+		}
 	}
 }
 
 for my $userAttributes (values %$memberAttributesByLogin) {
-	print SERVICE_FILE $userAttributes->{$A_SCRATCH_MOUNTPOINT} . "\t";
-	print SERVICE_FILE $userAttributes->{$A_USER_LOGIN} . "\t";
-	print SERVICE_FILE $userAttributes->{$A_UID} . "\t";
-	print SERVICE_FILE $userAttributes->{$A_GID} . "\t";
-	print SERVICE_FILE $userAttributes->{$A_USER_STATUS} . "\n";
+	print SERVICE_FILE $userAttributes->{$A_F_SCRATCH_MOUNTPOINT} . "\t";
+	print SERVICE_FILE $userAttributes->{$A_UF_LOGIN} . "\t";
+	print SERVICE_FILE $userAttributes->{$A_UF_UID} . "\t";
+	print SERVICE_FILE $userAttributes->{$A_UF_GID} . "\t";
+	print SERVICE_FILE $userAttributes->{$A_MEMBER_STATUS} . "\n";
 }
 
 close(SERVICE_FILE);
 
-if(defined $facilityAttributes{$A_F_SCRATCH_DIR_PERMISSIONS}) {
+my $scratchDirPermissions = $data->getFacilityAttributeValue( attrName => $A_F_SCRATCH_DIR_PERMISSIONS );
+if(defined $scratchDirPermissions) {
 	open PERM_FH, ">$permissionsFileName" or die "Cannot open $permissionsFileName: $!\n";
-	print PERM_FH $facilityAttributes{$A_F_SCRATCH_DIR_PERMISSIONS}, "\n";
+	print PERM_FH $scratchDirPermissions, "\n";
 	close PERM_FH;
 }
 #####################################################

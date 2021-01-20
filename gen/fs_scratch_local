@@ -8,52 +8,48 @@ use File::Basename;
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.4.0";
-our $SCRIPT_VERSION = "3.0.0";
+our $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
-our $A_USER_LOGIN;          *A_USER_LOGIN =          \'urn:perun:user_facility:attribute-def:virt:login';
-our $A_SCRATCH_MOUNTPOINT;  *A_SCRATCH_MOUNTPOINT =  \'urn:perun:facility:attribute-def:def:fsScratchLocalMountPoint';
-our $A_GID;                  *A_GID =                \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
-our $A_UID;                  *A_UID =                \'urn:perun:user_facility:attribute-def:virt:UID';
+our $A_UF_LOGIN;                        *A_UF_LOGIN =                        \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UF_GID;                          *A_UF_GID =                          \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
+our $A_UF_UID;                          *A_UF_UID =                          \'urn:perun:user_facility:attribute-def:virt:UID';
+our $A_F_SCRATCH_MOUNTPOINT;            *A_F_SCRATCH_MOUNTPOINT =            \'urn:perun:facility:attribute-def:def:fsScratchLocalMountPoint';
 our $A_F_SCRATCH_LOCAL_DIR_PERMISSIONS; *A_F_SCRATCH_LOCAL_DIR_PERMISSIONS = \'urn:perun:facility:attribute-def:def:scratchLocalDirPermissions';
 
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 my $scratchMountPoint_file_name = "$DIRECTORY/scratch_mountpoint";
 my $permissionsFileName = "$DIRECTORY/umask";
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-#####################################
-
 ####### output file ######################
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 open SCRATCH_MOUNTPOINT_FILE,">$scratchMountPoint_file_name" or die "Cannot open $scratchMountPoint_file_name: $! \n";
 
-print SCRATCH_MOUNTPOINT_FILE $facilityAttributes{$A_SCRATCH_MOUNTPOINT};
+my $scratchMountPoint = $data->getFacilityAttributeValue( attrName => $A_F_SCRATCH_MOUNTPOINT );
+print SCRATCH_MOUNTPOINT_FILE $scratchMountPoint;
 close SCRATCH_MOUNTPOINT_FILE;
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	
+	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
 
 		# Print attributes
-		print SERVICE_FILE $memberAttributes{$A_USER_LOGIN} . "\t";
-		print SERVICE_FILE $memberAttributes{$A_UID} . "\t";
-		print SERVICE_FILE $memberAttributes{$A_GID} . "\n";
+		print SERVICE_FILE $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN ) . "\t";
+		print SERVICE_FILE $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_UID ) . "\t";
+		print SERVICE_FILE $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_GID ) . "\n";
 	}
 }
 
 close(SERVICE_FILE);
 
-if(defined $facilityAttributes{$A_F_SCRATCH_LOCAL_DIR_PERMISSIONS}) {
+my $scratchDirPermissions = $data->getFacilityAttributeValue( attrName => $A_F_SCRATCH_LOCAL_DIR_PERMISSIONS );
+if(defined $scratchDirPermissions) {
 	open PERM_FH, ">$permissionsFileName" or die "Cannot open $permissionsFileName: $!\n";
-	print PERM_FH $facilityAttributes{$A_F_SCRATCH_LOCAL_DIR_PERMISSIONS}, "\n";
+	print PERM_FH $scratchDirPermissions, "\n";
 	close PERM_FH;
 }
 #####################################################
