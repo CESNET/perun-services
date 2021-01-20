@@ -8,7 +8,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 sub mergeQuotas {
 	my ($sumQuota, $resourceQuota, $memberQuota) = @_;
@@ -40,22 +40,22 @@ sub mergeStatuses {
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
-our $A_USER_OPTIONAL_LOGIN;        *A_USER_OPTIONAL_LOGIN =          \'urn:perun:user:attribute-def:virt:optionalLogin-namespace:mu';
-our $A_USER_LOGIN;                 *A_USER_LOGIN =                   \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_USER_OPTIONAL_LOGIN;        *A_USER_OPTIONAL_LOGIN =         \'urn:perun:user:attribute-def:virt:optionalLogin-namespace:mu';
+our $A_UF_LOGIN;                   *A_UF_LOGIN =                     \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_UF_DATA_QUOTAS;             *A_UF_DATA_QUOTAS =               \'urn:perun:user_facility:attribute-def:virt:dataQuotas';
 our $A_UF_FILE_QUOTAS;             *A_UF_FILE_QUOTAS =               \'urn:perun:user_facility:attribute-def:virt:fileQuotas';
-our $A_USER_STATUS;                *A_USER_STATUS =                  \'urn:perun:member:attribute-def:core:status';
+our $A_MEMBER_STATUS;              *A_MEMBER_STATUS =                \'urn:perun:member:attribute-def:core:status';
 our $A_MEMBER_IS_SUSPENDED;        *A_MEMBER_IS_SUSPENDED =          \'urn:perun:member:attribute-def:virt:isSuspended';
-our $A_HOME_MOUNTPOINT;            *A_HOME_MOUNTPOINT =              \'urn:perun:resource:attribute-def:def:fsHomeMountPoint';
+our $A_R_HOME_MOUNTPOINT;          *A_R_HOME_MOUNTPOINT =            \'urn:perun:resource:attribute-def:def:fsHomeMountPoint';
 our $A_R_VOLUME;                   *A_R_VOLUME =                     \'urn:perun:resource:attribute-def:def:fsVolume';
-our $A_GID;                        *A_GID =                          \'urn:perun:resource:attribute-def:virt:unixGID';
-our $A_UID;                        *A_UID =                          \'urn:perun:user_facility:attribute-def:virt:UID';
+our $A_R_GID;                      *A_R_GID =                        \'urn:perun:resource:attribute-def:virt:unixGID';
+our $A_UF_UID;                     *A_UF_UID =                       \'urn:perun:user_facility:attribute-def:virt:UID';
 our $A_F_UMASK;                    *A_F_UMASK =                      \'urn:perun:facility:attribute-def:def:homeDirUmask';
 our $A_F_QUOTAENABLED;             *A_F_QUOTAENABLED =               \'urn:perun:facility:attribute-def:def:quotaEnabled';
-our $A_GROUP_UNIX_GROUP_NAME;      *A_GROUP_UNIX_GROUP_NAME =        \'urn:perun:group_resource:attribute-def:virt:unixGroupName';
+our $A_GR_UNIX_GROUP_NAME;         *A_GR_UNIX_GROUP_NAME =           \'urn:perun:group_resource:attribute-def:virt:unixGroupName';
 our $A_GROUP_GROUP_NAME;           *A_GROUP_GROUP_NAME =             \'urn:perun:group:attribute-def:core:name';
 our $A_R_VO_NAME;                  *A_R_VO_NAME =                    \'urn:perun:resource:attribute-def:virt:voShortName';
 
@@ -72,9 +72,6 @@ my $quotas_file_name = "$DIRECTORY/quotas";
 my $umask_file_name = "$DIRECTORY/umask";
 my $quota_enabled_file_name = "$DIRECTORY/quota_enabled";
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-my @resourcesData = $data->getChildElements;
-
 #----------------------------------------------------------
 # HOME DATA
 #----------------------------------------------------------
@@ -85,41 +82,39 @@ my $dataForUserHomeByLogin = {};
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 
 #prepare home data
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	my $volumeAttr = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_VOLUME );
+	my $homeMountPointAttr = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_HOME_MOUNTPOINT );
+	my $volume = $volumeAttr || $homeMountPointAttr;
+	my $voName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_VO_NAME );
+	my $gid = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_GID );
 
-	my $volume = $resourceAttributes{$A_R_VOLUME} || $resourceAttributes{$A_HOME_MOUNTPOINT};
-
-	my @membersData = ($rData->getChildElements)[1]->getChildElements;
-
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-		my $login = $memberAttributes{$A_USER_LOGIN};
-		my $status = $memberAttributes{$A_USER_STATUS};
-		if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = "SUSPENDED"; }
+	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
+		my $optionalLogin = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_OPTIONAL_LOGIN );
+		my $uid = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_UID );
+		my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+		my $isSuspended = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_IS_SUSPENDED );
+		if($isSuspended) { $status = "SUSPENDED"; }
 
 		unless(defined $dataForUserHomeByLogin->{$login}->{$volume}) { $dataForUserHomeByLogin->{$login}->{$volume} = {}; }
 		my $alreadyStoredMemberAttrByMount = $dataForUserHomeByLogin->{$login}->{$volume};
 
 		$alreadyStoredMemberAttrByMount->{$A_R_VOLUME} = $volume;
-		$alreadyStoredMemberAttrByMount->{$A_USER_LOGIN} = $login;
-		$alreadyStoredMemberAttrByMount->{$A_USER_OPTIONAL_LOGIN} = $memberAttributes{$A_USER_OPTIONAL_LOGIN};
-		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_GID} = $resourceAttributes{$A_GID};
-		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_UID} = $memberAttributes{$A_UID};
-		$alreadyStoredMemberAttrByMount->{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_USER_STATUS} = mergeStatuses $memberAttributes{$A_HOME_MOUNTPOINT}->{$resourceAttributes{$A_HOME_MOUNTPOINT}}->{$A_USER_STATUS}, $status;
+		$alreadyStoredMemberAttrByMount->{$A_UF_LOGIN} = $login;
+		$alreadyStoredMemberAttrByMount->{$A_USER_OPTIONAL_LOGIN} = $optionalLogin;
+		$alreadyStoredMemberAttrByMount->{$A_R_HOME_MOUNTPOINT}->{$homeMountPointAttr}->{$A_R_GID} = $gid;
+		$alreadyStoredMemberAttrByMount->{$A_R_HOME_MOUNTPOINT}->{$homeMountPointAttr}->{$A_UF_UID} = $uid;
+		$alreadyStoredMemberAttrByMount->{$A_R_HOME_MOUNTPOINT}->{$homeMountPointAttr}->{$A_MEMBER_STATUS} = mergeStatuses $alreadyStoredMemberAttrByMount->{$A_R_HOME_MOUNTPOINT}->{$homeMountPointAttr}->{$A_MEMBER_STATUS}, $status;
 	}
 
-	foreach my $groupData (($rData->getChildElements)[0]->getChildElements) {
-		my $membersElement = ($groupData->getChildElements)[1];
-		my %groupAttributes = attributesToHash $groupData->getAttributes;
+	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
+		my $groupName = $data->getGroupAttributeValue( group => $groupId, attrName => $A_GROUP_GROUP_NAME );
+		my $groupNameWithVo = $voName . ":" . $groupName;
+		my $unixGroupName = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_GR_UNIX_GROUP_NAME );
 
-		my $groupName = $groupAttributes{$A_GROUP_GROUP_NAME};
-		my $groupNameWithVo = $resourceAttributes{$A_R_VO_NAME} . ":" . $groupName;
-		my $unixGroupName = $groupAttributes{$A_GROUP_UNIX_GROUP_NAME};
-
-		foreach my $mData ($membersElement->getChildElements) {
-			my %memberAttributes = attributesToHash $mData->getAttributes;
-			my $login = $memberAttributes{$A_USER_LOGIN};
+		foreach my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId ) ) {
+			my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
 			$dataForUserHomeByLogin->{$login}->{$volume}->{$STRUC_GROUPS}->{$groupNameWithVo} = $unixGroupName;
 		}
 	}
@@ -130,12 +125,12 @@ foreach my $login (sort keys %$dataForUserHomeByLogin) {
 
 	for my $userAttributes (values %$userAttributesByMount) {
 
-		for my $mountPoint (sort keys %{$userAttributes->{$A_HOME_MOUNTPOINT}}) {
+		for my $mountPoint (sort keys %{$userAttributes->{$A_R_HOME_MOUNTPOINT}}) {
 			print SERVICE_FILE $mountPoint . "\t";
 			print SERVICE_FILE $login . "\t";
-			print SERVICE_FILE $userAttributes->{$A_HOME_MOUNTPOINT}->{$mountPoint}->{$A_UID} . "\t";
-			print SERVICE_FILE $userAttributes->{$A_HOME_MOUNTPOINT}->{$mountPoint}->{$A_GID} . "\t";
-			print SERVICE_FILE $userAttributes->{$A_HOME_MOUNTPOINT}->{$mountPoint}->{$A_USER_STATUS} . "\t";
+			print SERVICE_FILE $userAttributes->{$A_R_HOME_MOUNTPOINT}->{$mountPoint}->{$A_UF_UID} . "\t";
+			print SERVICE_FILE $userAttributes->{$A_R_HOME_MOUNTPOINT}->{$mountPoint}->{$A_R_GID} . "\t";
+			print SERVICE_FILE $userAttributes->{$A_R_HOME_MOUNTPOINT}->{$mountPoint}->{$A_MEMBER_STATUS} . "\t";
 
 			print SERVICE_FILE join ',', map { $_ . ">" . ($userAttributes->{$STRUC_GROUPS}->{$_} || "") } sort keys %{$userAttributes->{$STRUC_GROUPS}};
 			if(defined($userAttributes->{$A_USER_OPTIONAL_LOGIN})) {
@@ -159,18 +154,17 @@ my $dataForUserQuotasByUID = {};
 open QUOTAS_FILE,">$quotas_file_name" or die "Cannot open $quotas_file_name: $! \n";
 
 #prepare quotas data
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-	my @membersData = ($rData->getChildElements)[1]->getChildElements;
+foreach my $resourceId ( $data->getResourceIds() ) {
 
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-		my $uid = $memberAttributes{$A_UID};
+	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
+		my $uid = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_UID );
+		my $dataQuotas = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_DATA_QUOTAS );
+		my $fileQuotas = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_FILE_QUOTAS );
 
 		unless($dataForUserQuotasByUID->{$uid}) {
 			#First process data quotas
-			foreach my $volume (keys %{$memberAttributes{$A_UF_DATA_QUOTAS}}) {
-				my $dataQuota = $memberAttributes{$A_UF_DATA_QUOTAS}{$volume};
+			foreach my $volume (keys %{$dataQuotas}) {
+				my $dataQuota = $dataQuotas->{$volume};
 
 				my $softDataQuota = $dataQuota;
 				$softDataQuota =~ s/:.*$//;
@@ -183,8 +177,8 @@ foreach my $rData (@resourcesData) {
 			}
 
 			#Then process file quotas
-			foreach my $volume (keys %{$memberAttributes{$A_UF_FILE_QUOTAS}}) {
-				my $fileQuota = $memberAttributes{$A_UF_FILE_QUOTAS}{$volume};
+			foreach my $volume (keys %{$fileQuotas}) {
+				my $fileQuota = $fileQuotas->{$volume};
 
 				my $softFileQuota = $fileQuota;
 				$softFileQuota =~ s/:.*$//;
@@ -219,9 +213,10 @@ close(QUOTAS_FILE);
 # UMASK DATA
 #----------------------------------------------------------
 
-if(defined $facilityAttributes{$A_F_UMASK}) {
+my $umask = $data->getFacilityAttributeValue( attrName => $A_F_UMASK );
+if(defined $umask) {
 	open UMASK_FH, ">$umask_file_name" or die "Cannot open $umask_file_name: $!\n";
-	print UMASK_FH $facilityAttributes{$A_F_UMASK}, "\n";
+	print UMASK_FH $umask, "\n";
 	close UMASK_FH;
 }
 
@@ -229,9 +224,10 @@ if(defined $facilityAttributes{$A_F_UMASK}) {
 # QUOTA ENABLED DATA
 #----------------------------------------------------------
 
-if(defined $facilityAttributes{$A_F_QUOTAENABLED}) {
+my $quotaEnabled = $data->getFacilityAttributeValue( attrName => $A_F_QUOTAENABLED );
+if(defined $quotaEnabled) {
 	open QUOTA_FH, ">$quota_enabled_file_name" or die "Cannot open $quota_enabled_file_name: $!\n";
-	print QUOTA_FH $facilityAttributes{$A_F_QUOTAENABLED}, "\n";
+	print QUOTA_FH $quotaEnabled, "\n";
 	close QUOTA_FH;
 }
 
