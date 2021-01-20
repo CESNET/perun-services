@@ -8,18 +8,18 @@ use Text::Unidecode;
 
 our $SERVICE_NAME = "passwd_scp";
 our $PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.1.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_FACILITY_MIN_UID;                       *A_FACILITY_MIN_UID =                      \'urn:perun:facility:attribute-def:virt:minUID';
 our $A_FACILITY_MAX_UID;                       *A_FACILITY_MAX_UID =                      \'urn:perun:facility:attribute-def:virt:maxUID';
 our $A_FACILITY_HOME_MOUNT_POINT;              *A_FACILITY_HOME_MOUNT_POINT =             \'urn:perun:facility:attribute-def:def:homeMountPoint_passwd-scp';
 our $A_FACILITY_DESTINATION_FILE;              *A_FACILITY_DESTINATION_FILE =             \'urn:perun:facility:attribute-def:def:passwdScpDestinationFile';
-our $A_USER_LOGIN;                             *A_USER_LOGIN =                            \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_USER_FACILITY_LOGIN;                    *A_USER_FACILITY_LOGIN =                   \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_FACILITY_UID;                      *A_USER_FACILITY_UID =                     \'urn:perun:user_facility:attribute-def:virt:UID';
 our $A_USER_FACILITY_GID;                      *A_USER_FACILITY_GID =                     \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
 our $A_USER_FACILITY_SHELL;                    *A_USER_FACILITY_SHELL =                   \'urn:perun:user_facility:attribute-def:def:shell_passwd-scp';
@@ -35,42 +35,50 @@ my $max_uid_file_name = "$DIRECTORY/max_uid";
 ###### min_uid and max_uid file #####
 open MIN_UID,">$min_uid_file_name" or die "Cannot open $min_uid_file_name: $! \n";
 open MAX_UID,">$max_uid_file_name" or die "Cannot open $max_uid_file_name: $! \n";
-
-my %facilityAttributes = attributesToHash $data->getAttributes;
-print MIN_UID $facilityAttributes{$A_FACILITY_MIN_UID}, "\n";
-print MAX_UID $facilityAttributes{$A_FACILITY_MAX_UID}, "\n";
+print MIN_UID $data->getFacilityAttributeValue(attrName => $A_FACILITY_MIN_UID), "\n";
+print MAX_UID $data->getFacilityAttributeValue(attrName => $A_FACILITY_MAX_UID), "\n";
 close MIN_UID;
 close MAX_UID;
 #####################################
 open DESTINATION,">$passwd_file_destination_file_name" or die "Cannot open $passwd_file_destination_file_name: $! \n";
-print DESTINATION $facilityAttributes{$A_FACILITY_DESTINATION_FILE}, "\n";
+print DESTINATION $data->getFacilityAttributeValue(attrName => $A_FACILITY_DESTINATION_FILE), "\n";
 close DESTINATION;
-
-my $userAttributesByLogin = {};
 
 ####### passswd and shadow file ######################
 open PASSWD,">$passwd_file_name" or die "Cannot open $passwd_file_name: $! \n";
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
+
+#hash memberAttributesByLogin to eliminate duplicities
+#logins contain a reference to a hash of the attributes used to print files, e.g.:
+#$memberAttributesByLogin->{$login}->{$A_USER_FACILITY_UID} = $uid;
+my $memberAttributesByLogin = {};
+foreach my $resourceId ($data->getResourceIds()) {
 	my %values;
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-		$userAttributesByLogin->{$memberAttributes{$A_USER_LOGIN}} = \%memberAttributes unless exists $userAttributesByLogin->{$memberAttributes{$A_USER_LOGIN}};
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		my $login = $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_LOGIN, member => $memberId);
+		unless(exists $memberAttributesByLogin->{$login}) {
+			$memberAttributesByLogin->{$login} = {};
+			$memberAttributesByLogin->{$login}->{$A_USER_FACILITY_LOGIN} = $login;
+			$memberAttributesByLogin->{$login}->{$A_USER_FACILITY_UID} = $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_UID, member => $memberId);
+			$memberAttributesByLogin->{$login}->{$A_USER_FACILITY_GID} = $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_GID, member => $memberId);
+			$memberAttributesByLogin->{$login}->{$A_USER_FIRST_NAME} = $data->getUserAttributeValue(attrName => $A_USER_FIRST_NAME, member => $memberId);
+			$memberAttributesByLogin->{$login}->{$A_USER_LAST_NAME} = $data->getUserAttributeValue(attrName => $A_USER_LAST_NAME, member => $memberId);
+			$memberAttributesByLogin->{$login}->{$A_USER_FACILITY_HOME_MOUNT_POINT} = $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_HOME_MOUNT_POINT, member => $memberId);
+			$memberAttributesByLogin->{$login}->{$A_USER_FACILITY_SHELL} = $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_SHELL, member => $memberId);
+		}
 	}
 }
 
-for my $login (sort keys %$userAttributesByLogin) {
-	my %memberAttributes = %{$userAttributesByLogin->{$login}};
+for my $login (sort keys %$memberAttributesByLogin) {
+	my %memberAttributes = %{$memberAttributesByLogin->{$login}};
 	$memberAttributes{$A_USER_FACILITY_HOME_MOUNT_POINT} =~ s#^.*/\./#/#;
 
-	print PASSWD $memberAttributes{$A_USER_LOGIN}.":x:";
+	print PASSWD $memberAttributes{$A_USER_FACILITY_LOGIN}.":x:";
 	print PASSWD $memberAttributes{$A_USER_FACILITY_UID}.":";
 	print PASSWD $memberAttributes{$A_USER_FACILITY_GID}.":";
 
 	my $userName = "";
-	if($memberAttributes{$A_USER_FIRST_NAME}) { 
+	if($memberAttributes{$A_USER_FIRST_NAME}) {
 		$userName = $memberAttributes{$A_USER_FIRST_NAME};
 		$userName.= " " . $memberAttributes{$A_USER_LAST_NAME} if $memberAttributes{$A_USER_LAST_NAME};
 	} else {
@@ -78,7 +86,7 @@ for my $login (sort keys %$userAttributesByLogin) {
 	}
 
 	print PASSWD unidecode($userName) . ":";
-	print PASSWD $memberAttributes{$A_USER_FACILITY_HOME_MOUNT_POINT}."/".$memberAttributes{$A_USER_LOGIN}.":";
+	print PASSWD $memberAttributes{$A_USER_FACILITY_HOME_MOUNT_POINT}."/".$memberAttributes{$A_USER_FACILITY_LOGIN}.":";
 
 	print PASSWD $memberAttributes{$A_USER_FACILITY_SHELL};
 	print PASSWD "\n";

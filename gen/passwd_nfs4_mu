@@ -8,18 +8,18 @@ use Text::Unidecode;
 
 our $SERVICE_NAME = "passwd_nfs4_mu";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_FACILITY_MIN_UID;                *A_FACILITY_MIN_UID =                      \'urn:perun:facility:attribute-def:virt:minUID';
 our $A_FACILITY_MAX_UID;                *A_FACILITY_MAX_UID =                      \'urn:perun:facility:attribute-def:virt:maxUID';
-our $A_MEMBER_KERBEROS_LOGINS;          *A_MEMBER_KERBEROS_LOGINS =                \'urn:perun:user:attribute-def:def:kerberosLogins';
-our $A_MEMBER_UID;                      *A_MEMBER_UID =                            \'urn:perun:user_facility:attribute-def:virt:UID';
-our $A_MEMBER_GID;                      *A_MEMBER_GID =                            \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
+our $A_USER_KERBEROS_LOGINS;            *A_USER_KERBEROS_LOGINS =                  \'urn:perun:user:attribute-def:def:kerberosLogins';
+our $A_USER_FACILITY_UID;               *A_USER_FACILITY_UID =                     \'urn:perun:user_facility:attribute-def:virt:UID';
+our $A_USER_FACILITY_GID;               *A_USER_FACILITY_GID =                     \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
 our $A_MEMBER_STATUS;                   *A_MEMBER_STATUS =                         \'urn:perun:member:attribute-def:core:status';
 our $A_USER_OPTIONAL_LOGIN;             *A_USER_OPTIONAL_LOGIN =                   \'urn:perun:user:attribute-def:virt:optionalLogin-namespace:mu';
 
@@ -32,10 +32,8 @@ my $max_uid_file_name = "$DIRECTORY/max_uid";
 ###### min_uid and max_uid file #####
 open MIN_UID,">$min_uid_file_name" or die "Cannot open $min_uid_file_name: $! \n";
 open MAX_UID,">$max_uid_file_name" or die "Cannot open $max_uid_file_name: $! \n";
-
-my %facilityAttributes = attributesToHash $data->getAttributes;
-print MIN_UID $facilityAttributes{$A_FACILITY_MIN_UID}, "\n";
-print MAX_UID $facilityAttributes{$A_FACILITY_MAX_UID}, "\n";
+print MIN_UID $data->getFacilityAttributeValue(attrName => $A_FACILITY_MIN_UID), "\n";
+print MAX_UID $data->getFacilityAttributeValue(attrName => $A_FACILITY_MAX_UID), "\n";
 close MIN_UID;
 close MAX_UID;
 #####################################
@@ -44,19 +42,15 @@ close MAX_UID;
 my %lines;
 my %nfsLines;
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
+foreach my $resourceId ($data->getResourceIds()) {
 	my %values;
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-
-		if($memberAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID){
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		if($data->getMemberAttributeValue(attrName => $A_MEMBER_STATUS, member => $memberId) eq $STATUS_VALID) {
 			my %logins = ();
 			my %nfsLogins = ();
 			# login can have 2 possible variant "login" and "nfs/login"
 			# we don't want to have duplicits and for every login without 'nfs/' have a variant with 'nfs/'
-			foreach my $kerberosLogin (@{$memberAttributes{$A_MEMBER_KERBEROS_LOGINS}}) {
+			foreach my $kerberosLogin (@{$data->getUserAttributeValue(attrName => $A_USER_KERBEROS_LOGINS, member => $memberId)}) {
 				if($kerberosLogin =~ /^nfs\//) {
 					$nfsLogins{$kerberosLogin} = 1;
 				} else {
@@ -65,17 +59,22 @@ foreach my $rData (@resourcesData) {
 					$nfsLogins{$nfsKerberosLogin} = 1;
 				}
 			}
+
+			my $uid = $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_UID, member => $memberId);
+			my $gid = $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_GID, member => $memberId);
+			my $optionalLogin = $data->getUserAttributeValue(attrName => $A_USER_OPTIONAL_LOGIN, member => $memberId);
+
 			for my $login (keys %logins) {
-				my $passwdLine = $login . ":x:" . $memberAttributes{$A_MEMBER_UID} . ":" . $memberAttributes{$A_MEMBER_GID};
-				if(defined($memberAttributes{$A_USER_OPTIONAL_LOGIN})) {
-					$passwdLine .= ":" . $memberAttributes{$A_USER_OPTIONAL_LOGIN};
+				my $passwdLine = $login . ":x:" . $uid . ":" . $gid;
+				if(defined $optionalLogin) {
+					$passwdLine .= ":" . $optionalLogin;
 				}
 				$lines{$passwdLine} = 1;
 			}
 			for my $nfsLogin (keys %nfsLogins) {
-				my $passwdLine = $nfsLogin . ":x:" . $memberAttributes{$A_MEMBER_UID} . ":" . $memberAttributes{$A_MEMBER_GID};
-				if(defined($memberAttributes{$A_USER_OPTIONAL_LOGIN})) {
-					$passwdLine .= ":" . $memberAttributes{$A_USER_OPTIONAL_LOGIN};
+				my $passwdLine = $nfsLogin . ":x:" . $uid . ":" . $gid;
+				if(defined $optionalLogin) {
+					$passwdLine .= ":" . $optionalLogin;
 				}
 				$nfsLines{$passwdLine} = 1;
 			}
