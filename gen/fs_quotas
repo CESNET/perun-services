@@ -7,15 +7,14 @@ use File::Basename;
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
-#our $A_USER_STATUS;                *A_USER_STATUS =                  \'urn:perun:member:attribute-def:core:status';
-our $A_UID;                        *A_UID =                          \'urn:perun:user_facility:attribute-def:virt:UID';
+our $A_UF_UID;                     *A_UF_UID =                       \'urn:perun:user_facility:attribute-def:virt:UID';
 our $A_UF_DATA_QUOTAS;             *A_UF_DATA_QUOTAS =               \'urn:perun:user_facility:attribute-def:virt:dataQuotas';
 our $A_UF_FILE_QUOTAS;             *A_UF_FILE_QUOTAS =               \'urn:perun:user_facility:attribute-def:virt:fileQuotas';
 
@@ -25,17 +24,13 @@ our %uniqueUID = ();
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	
+	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
+		my $UID = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_UID );
+		my $dataQuotas = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_DATA_QUOTAS );
+		my $fileQuotas = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_FILE_QUOTAS );
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-	my @membersData = ($rData->getChildElements);  #[1]->getChildElements;
-
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-		my $UID = $memberAttributes{$A_UID};
-		
 		if($uniqueUID{$UID}) {
 			#if already added, then continue
 			next;
@@ -45,9 +40,9 @@ foreach my $rData (@resourcesData) {
 
 		#First go through data quota map and read file quota if exists or set unlimited
 		my %uniquePaths = ();
-		foreach my $path (keys %{$memberAttributes{$A_UF_DATA_QUOTAS}}) {
+		foreach my $path (keys %{$dataQuotas}) {
 			$uniquePaths{$path} = 1;
-			my $quota = $memberAttributes{$A_UF_DATA_QUOTAS}{$path};
+			my $quota = $dataQuotas->{$path};
 
 			my $softQuota = $quota;
 			$softQuota =~ s/:.*$//g;
@@ -60,8 +55,8 @@ foreach my $rData (@resourcesData) {
 			print SERVICE_FILE quotaToKb $hardQuota;
 			print SERVICE_FILE "\t";
 
-			if($memberAttributes{$A_UF_FILE_QUOTAS}{$path}) {
-				$quota = $memberAttributes{$A_UF_FILE_QUOTAS}{$path};
+			if($fileQuotas->{$path}) {
+				$quota = $fileQuotas->{$path};
 				$softQuota = $quota;
 				$softQuota =~ s/:.*$//g;
 				$hardQuota = $quota;
@@ -76,7 +71,7 @@ foreach my $rData (@resourcesData) {
 		}
 
 		#Then go through file quota map and for not used files quota set unlimited data quota 
-		foreach my $path (keys %{$memberAttributes{$A_UF_FILE_QUOTAS}}) {
+		foreach my $path (keys %{$fileQuotas}) {
 			if($uniquePaths{$path}) {
 				next;
 			}
@@ -84,7 +79,7 @@ foreach my $rData (@resourcesData) {
 			print SERVICE_FILE $UID . "\t";
 			print SERVICE_FILE "0\t0\t";
 
-			my $quota = $memberAttributes{$A_UF_FILE_QUOTAS}{$path};
+			my $quota = $fileQuotas->{$path};
       my $softQuota = $quota;
       $softQuota =~ s/:.*$//g;
       my $hardQuota = $quota;
