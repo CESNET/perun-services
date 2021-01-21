@@ -13,11 +13,11 @@ use POSIX qw/strftime/;
 
 local $::SERVICE_NAME = "mailman_meta";
 local $::PROTOCOL_VERSION = "3.1.1";
-my $SCRIPT_VERSION = "3.2.1";
+my $SCRIPT_VERSION = "3.2.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_NAME;                            *A_USER_NAME =                             \'urn:perun:user:attribute-def:core:displayName';
@@ -36,17 +36,18 @@ my $mailinglistStruc = {};  # $mailinglistStruc->{"mailing list name including l
 my $mailinglistsDirectory = "$DIRECTORY/mailinglists";
 mkdir $mailinglistsDirectory or die "Can't mkdir $mailinglistsDirectory: $!";
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes  = attributesToHash $rData->getAttributes;
-	local *FILE;
+foreach my $resourceId ($data->getResourceIds()) {
 
-	my @membersData = $rData->getChildElements;
-	my $useLangVariants = (defined($resourceAttributes{$A_RESOURCE_MAILING_LIST_VARIANTS}) && ($resourceAttributes{$A_RESOURCE_MAILING_LIST_VARIANTS} eq "true") );
-	my $allowNonvalidUsers = (defined($resourceAttributes{$A_RESOURCE_MAILING_LIST_NONVALID_USERS}) && ($resourceAttributes{$A_RESOURCE_MAILING_LIST_NONVALID_USERS} eq "true") );
-	my $disableOptOut = (defined($resourceAttributes{$A_RESOURCE_DISABLE_OPT_OUT}) && ($resourceAttributes{$A_RESOURCE_DISABLE_OPT_OUT} eq "true") );
+	my $listVariantsAttribute = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_VARIANTS);
+	my $nonValidUsersAttribute = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_NONVALID_USERS);
+	my $disableOptOutAttribute = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_DISABLE_OPT_OUT);
+	my $listNameAttribute = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_NAME);
 
-	my $listName = "$resourceAttributes{$A_RESOURCE_MAILING_LIST_NAME}";
+	my $useLangVariants = (defined($listVariantsAttribute) && ($listVariantsAttribute eq "true") );
+	my $allowNonvalidUsers = (defined($nonValidUsersAttribute) && ($nonValidUsersAttribute eq "true") );
+	my $disableOptOut = (defined($disableOptOutAttribute) && ($disableOptOutAttribute eq "true") );
+
+	my $listName = "$listNameAttribute";
 	my $listNameEN = $listName . "-en";
 	my $listNameCS = $listName . "-cs";
 
@@ -58,27 +59,33 @@ foreach my $rData (@resourcesData) {
 		$mailinglistStruc->{$listName} = {} unless $mailinglistStruc->{$listName};
 	}
 
-	foreach my $memberAttributes (dataToAttributesHashes @membersData) {
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+
+		my $memberStatus = $data->getMemberAttributeValue(member => $memberId, attrName => $A_USER_STATUS);
+		my $userOptOut = $data->getMemberResourceAttributeValue(resource => $resourceId, member => $memberId, attrName => $A_USER_OPT_OUT);
+		my $userLang = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_LANG);
+		my $userMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_MAIL);
+		my $userName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_NAME);
 
 		#list only VALID members except if allowNonvalidUsers is true
-		next unless(($memberAttributes->{$A_USER_STATUS} eq "VALID") || ($allowNonvalidUsers));
+		next unless(($memberStatus eq "VALID") || ($allowNonvalidUsers));
 
 		# check if mailing list respect opt-out
 		unless ($disableOptOut) {
 			# list only members that did not opt out
-			next if defined $memberAttributes->{$A_USER_OPT_OUT};
+			next if defined $userOptOut;
 		}
 
 		my $listNameWithLang = $listName;
 		if($useLangVariants) {
-			if(defined($memberAttributes->{$A_USER_LANG}) && $memberAttributes->{$A_USER_LANG} eq "cs") {
+			if(defined($userLang) && $userLang eq "cs") {
 				$listNameWithLang = $listNameCS;
 			} else {
 				$listNameWithLang = $listNameEN;
 			}
 		}
 
-		$mailinglistStruc->{$listNameWithLang}->{$memberAttributes->{$A_USER_MAIL}}->{$A_USER_NAME} = $memberAttributes->{$A_USER_NAME};
+		$mailinglistStruc->{$listNameWithLang}->{$userMail}->{$A_USER_NAME} = $userName;
 	}
 }
 
@@ -87,7 +94,7 @@ for my $listName (keys %$mailinglistStruc) {
 	my $fileName = "$mailinglistsDirectory/$listName";
 	open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 
-	for my $mail (keys %{$mailinglistStruc->{$listName}}) {
+	for my $mail (sort keys %{$mailinglistStruc->{$listName}}) {
 		print FILE "\"", unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME});
 		print FILE "\" <", $mail, ">\n";
 	}
