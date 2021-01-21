@@ -8,11 +8,11 @@ use POSIX qw/strftime/;
 
 local $::SERVICE_NAME = "mailman_mu";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.2.0";
+my $SCRIPT_VERSION = "3.2.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_NAME;                            *A_USER_NAME =                            \'urn:perun:user:attribute-def:core:displayName';
@@ -32,15 +32,13 @@ my $mailinglistsDirectory = "$DIRECTORY/mailinglists";
 mkdir $mailinglistsDirectory or die "Can't mkdir $mailinglistsDirectory: $!";
 
 
-my @membersAttributes;
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes  = attributesToHash $rData->getAttributes;
+foreach my $resourceId ($data->getResourceIds()) {
 
-	my @membersData = $rData->getChildElements;
+	my $listNameAttribute = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_NAME);
+	my $listManagerNameAttribute = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_MANAGER_MAIL);
 
-	my $listName = "$resourceAttributes{$A_RESOURCE_MAILING_LIST_NAME}";
-	my $adminMail = "$resourceAttributes{$A_RESOURCE_MAILING_LIST_MANAGER_MAIL}";
+	my $listName = "$listNameAttribute";
+	my $adminMail = "$listManagerNameAttribute";
 
 	# Store the admin's mail
 	$mailinglistAdminMailStruc->{$listName} = $adminMail;
@@ -49,11 +47,16 @@ foreach my $rData (@resourcesData) {
 	$mailinglistStruc->{$listName} = ();
 
 	# fill mailing list
-	foreach my $memberAttributes (dataToAttributesHashes @membersData) {
-		#list only VALID members except if allowNonvalidUsers is true
-		next unless($memberAttributes->{$A_USER_STATUS} eq "VALID");
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 
-		$mailinglistStruc->{$listName}->{$memberAttributes->{$A_USER_MAIL}}->{$A_USER_NAME} = $memberAttributes->{$A_USER_NAME};
+		my $memberStatus = $data->getMemberAttributeValue(member => $memberId, attrName => $A_USER_STATUS);
+		my $userMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_MAIL);
+		my $userName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_NAME);
+
+		#list only VALID members except if allowNonvalidUsers is true
+		next unless($memberStatus eq "VALID");
+
+		$mailinglistStruc->{$listName}->{$userMail}->{$A_USER_NAME} = $userName;
 	}
 }
 
@@ -65,7 +68,7 @@ for my $listName (keys %$mailinglistStruc) {
 	# As a first line, print header
 	print FILE "#MANAGERS_MAIL=", $mailinglistAdminMailStruc->{$listName},"\n";
 
-	for my $mail (keys %{$mailinglistStruc->{$listName}}) {
+	for my $mail (sort keys %{$mailinglistStruc->{$listName}}) {
 		print FILE "\"", unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME});
 		print FILE "\" <", $mail, ">\n";
 	}
