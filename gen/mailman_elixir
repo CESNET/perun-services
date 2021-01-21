@@ -11,11 +11,11 @@ use POSIX qw/strftime/;
 
 local $::SERVICE_NAME = "mailman_elixir";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.2.0";
+my $SCRIPT_VERSION = "3.2.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_NAME;                        *A_USER_NAME =                       \'urn:perun:user:attribute-def:core:displayName';
@@ -36,27 +36,28 @@ mkdir $mailinglistsDirectory or die "Can't mkdir $mailinglistsDirectory: $!";
 
 
 my @membersAttributes;
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-    my %resourceAttributes  = attributesToHash $rData->getAttributes;
+foreach my $resourceId ($data->getResourceIds()) {
 
-    my @membersData = $rData->getChildElements;
+	my $listName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_NAME);
+	my $adminMail = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_MANAGER_MAIL);
 
-    my $listName = $resourceAttributes{$A_RESOURCE_MAILING_LIST_NAME};
-    my $adminMail = $resourceAttributes{$A_RESOURCE_MAILING_LIST_MANAGER_MAIL};
+	# Store the admin's mail
+	$mailinglistAdminMailStruc->{$listName} = $adminMail;
 
-    # Store the admin's mail
-    $mailinglistAdminMailStruc->{$listName} = $adminMail;
+	# Init mailinglistStruct with the listName
+	$mailinglistStruc->{$listName} = {};
 
-    # Init mailinglistStruct with the listName
-    $mailinglistStruc->{$listName} = {};
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 
-    foreach my $memberAttributes (dataToAttributesHashes @membersData) {
-        #list only VALID members except if allowNonvalidUsers is true
-        next unless($memberAttributes->{$A_USER_STATUS} eq "VALID");
+		my $memberStatus = $data->getMemberAttributeValue(member => $memberId, attrName => $A_USER_STATUS);
+		my $userMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_MAIL);
+		my $userName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_NAME);
 
-        $mailinglistStruc->{$listName}->{$memberAttributes->{$A_USER_MAIL}}->{$A_USER_NAME} = $memberAttributes->{$A_USER_NAME};
-    }
+		#list only VALID members
+		next unless($memberStatus eq "VALID");
+
+		$mailinglistStruc->{$listName}->{$userMail}->{$A_USER_NAME} = $userName;
+	}
 }
 
 
@@ -75,7 +76,7 @@ for my $listName (keys %$mailinglistStruc) {
        }
        print FILE "\n";
 
-       for my $mail (keys %{$mailinglistStruc->{$listName}}) {
+       for my $mail (sort keys %{$mailinglistStruc->{$listName}}) {
          print FILE '"', unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME});
          print FILE '" <', $mail, ">\n";
        }
