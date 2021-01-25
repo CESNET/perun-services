@@ -268,9 +268,9 @@ foreach my $uco (@ucos) {
 
 # prepared statements
 my $addressExists = $dbh->prepare(qq{select 1 from $tableNameAdr where OSB_ID=?});
-my $insertAdr = $dbh->prepare(qq{INSERT INTO $tableNameAdr (OSB_ID, ULICE, MST_NAZEV, PSC, ZME_ID, VAD_TYP_OSB) VALUES (?,?,?,?,?,?)});
-my $addressAreEquals = $dbh->prepare(qq{SELECT 1 FROM $tableNameAdr WHERE ULICE=? and MST_NAZEV=? and PSC=? and ZME_ID=? and VAD_TYP_OSB=? and OSB_ID=?});
-my $updateAdr = $dbh->prepare(qq{UPDATE $tableNameAdr SET ULICE=?, MST_NAZEV=?, PSC=?, ZME_ID=?, VAD_TYP_OSB=? WHERE OSB_ID=?});
+my $insertAdr = $dbh->prepare(qq{INSERT INTO $tableNameAdr (OSB_ID, ULICE, MST_NAZEV, PSC, ZME_ID, VAD_TYP_OSB, HLAVNI) VALUES (?,?,?,?,?,?,?)});
+my $addressAreEquals = $dbh->prepare(qq{SELECT 1 FROM $tableNameAdr WHERE ULICE=? and MST_NAZEV=? and PSC=? and ZME_ID=? and VAD_TYP_OSB=? and HLAVNI=? and OSB_ID=?});
+my $updateAdr = $dbh->prepare(qq{UPDATE $tableNameAdr SET ULICE=?, MST_NAZEV=?, PSC=?, ZME_ID=?, VAD_TYP_OSB=?, HLAVNI=? WHERE OSB_ID=?});
 my $deleteAdr = $dbh->prepare(qq{DELETE FROM $tableNameAdr where OSB_ID=?});
 
 foreach my $uco (sort keys %$dataByKey) {
@@ -287,10 +287,10 @@ foreach my $uco (sort keys %$dataByKey) {
 
 		if ($addressExists->fetch) {
 
-			$addressAreEquals->execute($ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE, $uco);
+			$addressAreEquals->execute($ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE, '+', $uco);
 
 			if(!$addressAreEquals->fetch) {
-				$updateAdr->execute($ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE, $uco);
+				$updateAdr->execute($ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE, '+', $uco);
 				if($DEBUG == 1) { print "UPDATING EXISTING ADR RECORD: $uco\n"; }
 				$foundAndUpdatedAdr++;
 				handleAkt($uco, 'ADR');
@@ -303,7 +303,7 @@ foreach my $uco (sort keys %$dataByKey) {
 			if($DEBUG == 1) { print "INSERT NEW ADR: $uco\n"; }
 			$insertedAdr++;
 			# we will do insert
-			$insertAdr->execute($uco, $ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE);
+			$insertAdr->execute($uco, $ULICE, $MST_NAZEV, $PSC, $COUNTRY_CODE, $ADR_TYPE, '+');
 			handleAkt($uco, 'ADR');
 		}
 
