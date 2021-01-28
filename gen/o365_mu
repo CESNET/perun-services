@@ -222,7 +222,7 @@ sub processResourceMail {
 	my $addAdditionalResponse = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_ADD_ADDITIONAL_RESPONSE );
 
 	$resourceMails->{$resName}->{$RES_ALIAS_TEXT}  = $alias ? $alias : "";
-	$resourceMails->{$resName}->{$RES_EMAIL_ADDRESES_TEXT} = $emailAddreses ? join(' ', sort @{$emailAddreses}) : "";
+	$resourceMails->{$resName}->{$RES_EMAIL_ADDRESES_TEXT} = $emailAddreses ? join(' ', @{$emailAddreses}) : "";
 	$resourceMails->{$resName}->{$RES_DISPLAY_NAME_TEXT} = $displayName ? $displayName : "";
 	$resourceMails->{$resName}->{$RES_TYPE_TEXT} = $type ? $type : "";
 	$resourceMails->{$resName}->{$RES_CAPACITY_TEXT} = $capacity ? $capacity : "";
