@@ -19,7 +19,7 @@ my $SCRIPT_VERSION = "3.0.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 our $A_USER_FIRST_NAME;           *A_USER_FIRST_NAME =           \'urn:perun:user:attribute-def:core:firstName';
 our $A_USER_LAST_NAME;            *A_USER_LAST_NAME =            \'urn:perun:user:attribute-def:core:lastName';
@@ -35,14 +35,15 @@ our $USER_TYPE = 'member';
 our $outputData = {value => []};
 our $members = {};
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-our $usageLocation = $facilityAttributes{$A_FACILITY_USAGE_LOCATION};
+our $usageLocation = $data->getFacilityAttributeValue( attrName => $A_FACILITY_USAGE_LOCATION );
 
-foreach my $resourceData ($data->getChildElements) {
-	my @membersData = $resourceData->getChildElements;
-	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
+foreach my $resourceId ($data->getResourceIds()) {
 
-	processMembers(\@membersData, $resourceAttributes{$A_RESOURCE_ASSIGNED_LICENSE}, $facilityAttributes{$A_FACILITY_DOMAIN_NAME});
+	my $assignedLicense = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RESOURCE_ASSIGNED_LICENSE );
+	my $facilityDomain = $data->getFacilityAttributeValue( attrName => $A_FACILITY_DOMAIN_NAME );
+	my @memberIds = $data->getMemberIdsForResource( resource => $resourceId ); 
+	
+	processMembers(\@memberIds, $assignedLicense, $facilityDomain );
 }
 
 # format of 1 line in photos.csv file:
@@ -88,12 +89,13 @@ perunServicesInit::finalize;
 ##############################################################################
 
 sub processMembers {
-	my @membersData =  @{$_[0]};
+	#X my @membersData =  @{$_[0]};
+	my $memberIds = $_[0];
 	my $license =  $_[1];
 	my $domainName = $_[2];
 
-	foreach my $memberData (dataToAttributesHashes @membersData) {
-		my $mail = $memberData->{$A_USER_FACILITY_LOGIN} . '@' . $domainName;
+	foreach my $memberId (@{$memberIds}) {
+		my $mail = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FACILITY_LOGIN ) . '@' . $domainName;
 
 		if($members->{$mail}) {
 			push @{$members->{$mail}->{'assignedLicenses'}}, $license;
@@ -102,14 +104,14 @@ sub processMembers {
 			my $member = {
 				accountEnabled => \1,
 				assignedLicenses => \@licenses,
-				displayName => $memberData->{$A_USER_DISPLAY_NAME},
-				givenName => $memberData->{$A_USER_FIRST_NAME},
+				displayName => $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_DISPLAY_NAME ),
+				givenName => $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_FIRST_NAME ),
 				mail => $mail,
-				surname => $memberData->{$A_USER_LAST_NAME},
+				surname => $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LAST_NAME ),
 				usageLocation => $usageLocation,
 				userPrincipalName => $mail,
 				userType => $USER_TYPE,
-				photo => $memberData->{$A_USER_PHOTO}
+				photo => $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_PHOTO )
 			};
 
 			$members->{$mail} = $member;
