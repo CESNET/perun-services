@@ -12,11 +12,11 @@ sub processGroupData;
 
 our $SERVICE_NAME = "pbsmon_users";
 our $PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_USER_NAME;           *A_USER_NAME =           \'urn:perun:user:attribute-def:core:displayName';
@@ -32,13 +32,12 @@ our $A_VO_NAME;             *A_VO_NAME =             \'urn:perun:vo:attribute-de
 
 my $attributesByLogin = {};
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
+foreach my $resourceId ($data->getResourceIds) {
 
-	my %resourceAttrs = attributesToHash $rData->getAttributes;
+	my $voName = $data->getVoAttributeValue( vo => $data->getVoIdForResource( resource => $resourceId ), attrName => $A_VO_NAME );
 
-	foreach my $groupData (($rData->getChildElements)[0]->getChildElements) {
-		processGroupData $groupData, $resourceAttrs{$A_VO_NAME}, $attributesByLogin;
+	foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId )) {
+		processGroupData $groupId, $resourceId, $voName, $attributesByLogin;
 	}
 }
 
@@ -64,39 +63,37 @@ perunServicesInit::finalize;
 ############
 
 sub processGroupData {
-	my ($groupData, $voName, $attributesByLogin) = @_;
+	my ($groupId, $resourceId, $voName, $attributesByLogin) = @_;
 
-	my $subGroupsElement = ($groupData->getChildElements)[0];
-	my $membersElement = ($groupData->getChildElements)[1];
-	my %groupAttributes = attributesToHash $groupData->getAttributes;
+	for my $memberId ($data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
 
-	for my $memberData ($membersElement->getChildElements) {
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
+		my $userLogin = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_LOGIN);
 		
-		unless($attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}) {
-			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"logname"} = $memberAttributes{$A_USER_LOGIN};
-			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"name"} = $memberAttributes{$A_USER_NAME};
-			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"org"} = $memberAttributes{$A_USER_ORG};
-			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{"publications"} = $memberAttributes{$A_USER_PUBLICATIONS};
+		unless($attributesByLogin->{$userLogin}) {
+			$attributesByLogin->{$userLogin}->{"logname"} = $userLogin;
+			$attributesByLogin->{$userLogin}->{"name"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_NAME);
+			$attributesByLogin->{$userLogin}->{"org"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ORG);
+			$attributesByLogin->{$userLogin}->{"publications"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_PUBLICATIONS);
 		}
 
-		unless($attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}) {
-			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"org"} = $memberAttributes{$A_MEMBER_ORG};
-			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"expires"} = $memberAttributes{$A_MEMBER_EXPIRES};
-			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"status"} = $memberAttributes{$A_MEMBER_STATUS};
+		unless($attributesByLogin->{$userLogin}->{'vos'}->{$voName}) {
+			$attributesByLogin->{$userLogin}->{'vos'}->{$voName}->{"org"} = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_ORG);
+			$attributesByLogin->{$userLogin}->{'vos'}->{$voName}->{"expires"} = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_EXPIRES);
+			$attributesByLogin->{$userLogin}->{'vos'}->{$voName}->{"status"} = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS);
 		}
 
 		#membership in groups
-		unless($attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"groups"}) {
-			my @groups = ( $groupAttributes{$A_GROUP_NAME} );
-			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"groups"} = \@groups;
+		unless($attributesByLogin->{$userLogin}->{'vos'}->{$voName}->{"groups"}) {
+			my @groups = ( $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_NAME ) );
+			$attributesByLogin->{$userLogin}->{'vos'}->{$voName}->{"groups"} = \@groups;
 		} else {
-			my @groups = uniqList( @{$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"groups"}}, $groupAttributes{$A_GROUP_NAME} );
-			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"groups"} = \@groups;
+			my @groups = uniqList( @{$attributesByLogin->{$userLogin}->{'vos'}->{$voName}->{"groups"}}, $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_NAME ) );
+			@groups = sort @groups;
+			$attributesByLogin->{$userLogin}->{'vos'}->{$voName}->{"groups"} = \@groups;
 		}
 
-		if($groupAttributes{$A_GROUP_STATISTIC}) {
-			$attributesByLogin->{$memberAttributes{$A_USER_LOGIN}}->{'vos'}->{$voName}->{"statistic_groups"}->{$groupAttributes{$A_GROUP_NAME}} = 1;
+		if($data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_STATISTIC )) {
+			$attributesByLogin->{$userLogin}->{'vos'}->{$voName}->{"statistic_groups"}->{$data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_NAME )} = 1;
 		}
 	}
 }
