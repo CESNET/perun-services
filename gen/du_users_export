@@ -9,11 +9,11 @@ use Tie::IxHash;
 
 our $SERVICE_NAME = "du_users_export";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.1.1";
+my $SCRIPT_VERSION = "3.1.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 my $agent = perunServicesInit->getAgent;
 my $vosAgent = $agent->getVosAgent;
@@ -47,11 +47,10 @@ our $A_U_RESEARCH_GROUP;         *A_U_RESEARCH_GROUP =         \'urn:perun:user:
 
 our $A_RESOURCE_UNIX_GROUP_NAME; *A_RESOURCE_UNIX_GROUP_NAME = \'urn:perun:resource:attribute-def:virt:unixGroupName';
 our $A_RESOURCE_UNIX_GID;        *A_RESOURCE_UNIX_GID =        \'urn:perun:resource:attribute-def:virt:unixGID';
-our $A_GROUP_UNIX_GROUP_NAME;    *A_GROUP_UNIX_GROUP_NAME =    \'urn:perun:group_resource:attribute-def:virt:unixGroupName';
-our $A_GROUP_UNIX_GID;           *A_GROUP_UNIX_GID =           \'urn:perun:group_resource:attribute-def:virt:unixGID';
+our $A_G_R_UNIX_GROUP_NAME;      *A_G_R_UNIX_GROUP_NAME =      \'urn:perun:group_resource:attribute-def:virt:unixGroupName';
+our $A_G_R_UNIX_GID;             *A_G_R_UNIX_GID =             \'urn:perun:group_resource:attribute-def:virt:unixGID';
 our $A_GROUP_NAME;               *A_GROUP_NAME =               \'urn:perun:group:attribute-def:core:name';
 
-our $A_RESOURCE_ID;              *A_RESOURCE_ID =              \'urn:perun:resource:attribute-def:core:id';
 our $A_RESOURCE_VO_ID;           *A_RESOURCE_VO_ID =           \'urn:perun:resource:attribute-def:core:voId';
 our $A_M_STATUS;                 *A_M_STATUS =                 \'urn:perun:member:attribute-def:core:status';
 our $A_USER_ID;                  *A_USER_ID =                  \'urn:perun:user:attribute-def:core:id';
@@ -66,42 +65,40 @@ our $A_VO_NAME;                  *A_VO_NAME =                  \'urn:perun:vo:at
 my %attributesByLogin;
 my %attributesByVo;
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-my $facilityName = $facilityAttributes{$A_F_NAME};
+my $facilityName = $data->getFacilityAttributeValue(attrName => $A_F_NAME);
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %resourcesAttributes = attributesToHash $rData->getAttributes;
-	my @membersData = ($rData->getChildElements)[1]->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-		unless(defined $attributesByLogin{$memberAttributes{$A_USER_LOGIN_EINFRA}}) {
+foreach my $resourceId ($data->getResourceIds()) {
+	my $resourceName = $data->getResourceAttributeValue(attrName => $A_RESOURCE_NAME, resource => $resourceId);
+
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		my $einfraLogin = $data->getUserAttributeValue(attrName => $A_USER_LOGIN_EINFRA, member => $memberId);
+
+		unless(defined $attributesByLogin{$einfraLogin}) {
 
 			#prepare kerberos logins in required format
 			my @kerberosLogins = ();
-			for my $kerberosLogin (@{$memberAttributes{$A_U_KERBEROS_LOGINS}}) {
+			for my $kerberosLogin (@{$data->getUserAttributeValue(attrName => $A_U_KERBEROS_LOGINS, member => $memberId)}) {
 				my $realm = $kerberosLogin;
 				$realm =~ s/^.*@//;
-				push @kerberosLogins, { "src" => $realm, 
-																"id"  => $kerberosLogin, 
-															};
+				push @kerberosLogins, { "src" => $realm, "id" => $kerberosLogin, };
 			}
 
 			#prepare shibboleth logins in required format
 			my @shibbolethLogins = ();
-			for my $idpIdentifier (keys %{$memberAttributes{$A_U_SHIBBOLETH_EXT_SOURCES}}) {
+			my $shibbolethExtSources = $data->getUserAttributeValue(attrName => $A_U_SHIBBOLETH_EXT_SOURCES, member => $memberId);
+			for my $idpIdentifier (keys %$shibbolethExtSources) {
 				#strip prefix from the identifier
 				my $idpIdentifierWithoutPrefix = $idpIdentifier;
 				$idpIdentifierWithoutPrefix =~ s/^\d+[:]//;
-				push @shibbolethLogins, { "src" => $idpIdentifierWithoutPrefix, 
-																	"id"  => $memberAttributes{$A_U_SHIBBOLETH_EXT_SOURCES}->{$idpIdentifier},
-																};
+				push @shibbolethLogins, { "src" => $idpIdentifierWithoutPrefix, "id" => $shibbolethExtSources->{$idpIdentifier}};
 			}			
 
 			#prepare all associated users (TODO)
 			my @associatedUsers = ();
-			if($memberAttributes{$A_USER_SERVICE_USER}) {
-				my @specificUsers = $usersAgent->getUsersBySpecificUser(specificUser => $memberAttributes{$A_USER_ID});
+			my $userId = $data->getUserAttributeValue(attrName => $A_USER_ID, member => $memberId);
+			my $serviceUser = $data->getUserAttributeValue(attrName => $A_USER_SERVICE_USER, member => $memberId);
+			if($serviceUser) {
+				my @specificUsers = $usersAgent->getUsersBySpecificUser(specificUser => $userId);
 				my @richAssocUsersWithAttributes = $usersAgent->getRichUsersFromListOfUsersWithAttributes(users => \@specificUsers);
 				foreach my $richUser (@richAssocUsersWithAttributes) {
 				
@@ -144,82 +141,91 @@ foreach my $rData (@resourcesData) {
 				}
 			}
 			#End of associated users structure
-
-			$attributesByLogin{$memberAttributes{$A_USER_LOGIN_EINFRA}} = 
+			my $researchGroup = $data->getUserAttributeValue(attrName => $A_U_RESEARCH_GROUP, member => $memberId);
+			my $organization = $data->getUserAttributeValue(attrName => $A_U_ORGANIZATION, member => $memberId);
+			$attributesByLogin{$einfraLogin} =
 								{
-									"LoginInEINFRA"   => $memberAttributes{$A_USER_LOGIN_EINFRA},
-									"PreferredMail"   => $memberAttributes{$A_USER_MAIL},
-									"IsServiceUser"   => $memberAttributes{$A_USER_SERVICE_USER},
+									"LoginInEINFRA"   => $einfraLogin,
+									"PreferredMail"   => $data->getUserAttributeValue(attrName => $A_USER_MAIL, member => $memberId),
+									"IsServiceUser"   => $serviceUser,
 									"AssociatedUsers" => \@associatedUsers,
 									"Kerberos"        => \@kerberosLogins,
 									"Shibboleth"      => \@shibbolethLogins,
-									"PerunUserID"     => $memberAttributes{$A_USER_ID},
-									"FirstName"       => $memberAttributes{$A_USER_FIRSTNAME} || "",
-									"LastName"        => $memberAttributes{$A_USER_LASTNAME} || "",
-									"ResearchGroup"   => defined $memberAttributes{$A_U_RESEARCH_GROUP} ? $memberAttributes{$A_U_RESEARCH_GROUP} : "",
-									"Organization"    => defined $memberAttributes{$A_U_ORGANIZATION} ? $memberAttributes{$A_U_ORGANIZATION} : "",
+									"PerunUserID"     => $userId,
+									"FirstName"       => $data->getUserAttributeValue(attrName => $A_USER_FIRSTNAME, member => $memberId) || "",
+									"LastName"        => $data->getUserAttributeValue(attrName => $A_USER_LASTNAME, member => $memberId) || "",
+									"ResearchGroup"   => defined $researchGroup ? $researchGroup : "",
+									"Organization"    => defined $organization ? $organization : "",
 								};
 
 		}
 
-		push @{$attributesByLogin{$memberAttributes{$A_USER_LOGIN_EINFRA}}->{"Resources"}}, 
+		my $dataQuotas = $data->getMemberResourceAttributeValue(attrName => $A_MR_DATAQUOTAS, member => $memberId, resource => $resourceId);
+		my $fileQuotas = $data->getMemberResourceAttributeValue(attrName => $A_MR_FILEQUOTAS, member => $memberId, resource => $resourceId);
+		my $dataQuotasOverride = $data->getMemberResourceAttributeValue(attrName => $A_MR_DATA_QUOTAS_OVERRIDE, member => $memberId, resource => $resourceId);
+		my $fileQuotasOverride = $data->getMemberResourceAttributeValue(attrName => $A_MR_FILE_QUOTAS_OVERRIDE, member => $memberId, resource => $resourceId);
+		push @{$attributesByLogin{$einfraLogin}->{"Resources"}},
 							{ 
-								"Name"               => $resourcesAttributes{$A_RESOURCE_NAME},
-								"PerunResourceID"    => $resourcesAttributes{$A_RESOURCE_ID},
-								"UID"                => $memberAttributes{$A_USER_FACILITY_UID},
-								"Login"              => $memberAttributes{$A_USER_LOGIN_EINFRA},
-								"DataQuotas"         => defined $memberAttributes{$A_MR_DATAQUOTAS} ? $memberAttributes{$A_MR_DATAQUOTAS} : {}, 
-								"FilesQuotas"        => defined $memberAttributes{$A_MR_FILEQUOTAS} ? $memberAttributes{$A_MR_FILEQUOTAS} : {},
-								"DataQuotasOverride" => defined $memberAttributes{$A_MR_DATA_QUOTAS_OVERRIDE} ? $memberAttributes{$A_MR_DATA_QUOTAS_OVERRIDE} : {},
-								"FileQuotasOverride" => defined $memberAttributes{$A_MR_FILE_QUOTAS_OVERRIDE} ? $memberAttributes{$A_MR_FILE_QUOTAS_OVERRIDE} : {},
-								"Status"             => $memberAttributes{$A_M_STATUS},
+								"Name"               => $resourceName,
+								"PerunResourceID"    => int($resourceId),
+								"UID"                => $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_UID, member => $memberId),
+								"Login"              => $einfraLogin,
+								"DataQuotas"         => defined $dataQuotas ? $dataQuotas : {},
+								"FilesQuotas"        => defined $fileQuotas ? $fileQuotas : {},
+								"DataQuotasOverride" => defined $dataQuotasOverride ? $dataQuotasOverride : {},
+								"FileQuotasOverride" => defined $fileQuotasOverride ? $fileQuotasOverride : {},
+								"Status"             => $data->getMemberAttributeValue(attrName => $A_M_STATUS, member => $memberId),
 							};
 	}
 
-	my @unixGroups = ( { "UnixGroupName"  => $resourcesAttributes{$A_RESOURCE_UNIX_GROUP_NAME},
-											 "UnixGID"        => $resourcesAttributes{$A_RESOURCE_UNIX_GID},
+	my @unixGroups = ( { "UnixGroupName"  => $data->getResourceAttributeValue(attrName => $A_RESOURCE_UNIX_GROUP_NAME, resource => $resourceId),
+											 "UnixGID"        => $data->getResourceAttributeValue(attrName => $A_RESOURCE_UNIX_GID, resource => $resourceId),
 										 }
 									 );
 
-	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
-	foreach my $gData (@groupsData) {
-		my %groupAttributes = attributesToHash $gData->getAttributes;
-
-		if($groupAttributes{$A_GROUP_UNIX_GROUP_NAME}) {
+	my $voName = $data->getResourceAttributeValue(attrName => $A_R_VO_NAME, resource => $resourceId);
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
+		my $groupName = $data->getGroupAttributeValue(attrName => $A_GROUP_NAME, group => $groupId);
+		my $unixGroupName = $data->getGroupResourceAttributeValue(attrName => $A_G_R_UNIX_GROUP_NAME, group => $groupId, resource => $resourceId);
+		if($unixGroupName) {
 			push @unixGroups, 
 						{ 
-							"UnixGroupName" => $groupAttributes{$A_GROUP_UNIX_GROUP_NAME},
-							"UnixGID"       => $groupAttributes{$A_GROUP_UNIX_GID},
+							"UnixGroupName" => $unixGroupName,
+							"UnixGID"       => $data->getGroupResourceAttributeValue(attrName => $A_G_R_UNIX_GID, group => $groupId, resource => $resourceId),
 						};
 		}
 
-	unless($attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"Groups"}->{$groupAttributes{$A_GROUP_NAME}}) {
-		my @logins;
-		foreach my $groupMembersData (($gData->getChildElements)[1]->getChildElements) {
-			my %groupMemberAttributes = attributesToHash $groupMembersData->getAttributes;
-			push @logins, { "LoginInEINFRA"  => $groupMemberAttributes{$A_USER_LOGIN_EINFRA} };
+		unless($attributesByVo{$voName}->{"Groups"}->{$groupName}) {
+			my @logins;
+			foreach my $groupMemberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
+				push @logins, { "LoginInEINFRA"  => $data->getUserAttributeValue(attrName => $A_USER_LOGIN_EINFRA, member => $groupMemberId) };
+			}
+			$attributesByVo{$voName}->{"Groups"}->{$groupName}->{"Members"} = \@logins;
 		}
-		$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"Groups"}->{$groupAttributes{$A_GROUP_NAME}}->{"Members"} = \@logins;
-	}
-	$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"Groups"}->{$groupAttributes{$A_GROUP_NAME}}->{"Resources"}->{$resourcesAttributes{$A_RESOURCE_NAME}} = 1;
+		$attributesByVo{$voName}->{"Groups"}->{$groupName}->{"Resources"}->{$resourceName} = 1;
 
 	}
 
-	$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"PerunVOID"} = $resourcesAttributes{$A_RESOURCE_VO_ID};
-	$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"PerunVOLongName"} = $resourcesAttributes{$A_VO_NAME};
-	$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"FromEmail"} = $resourcesAttributes{$A_VO_FROMEMAIL};
-	$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"ToEmail"} = $resourcesAttributes{$A_VO_TOEMAIL};
+	my $voId = $data->getResourceAttributeValue(attrName => $A_RESOURCE_VO_ID, resource => $resourceId);
+	$attributesByVo{$voName}->{"PerunVOID"} = $voId;
+	$attributesByVo{$voName}->{"PerunVOLongName"} = $data->getVoAttributeValue(attrName => $A_VO_NAME, vo => $voId);
+	$attributesByVo{$voName}->{"FromEmail"} = $data->getVoAttributeValue(attrName => $A_VO_FROMEMAIL, vo => $voId);
+	$attributesByVo{$voName}->{"ToEmail"} = $data->getVoAttributeValue(attrName => $A_VO_TOEMAIL, vo => $voId);
 
-	push @{$attributesByVo{$resourcesAttributes{$A_R_VO_NAME}}->{"Resources"}}, 
+	my $maxDataQuotas = $data->getResourceAttributeValue(attrName => $A_R_MAX_DATA_QUOTAS, resource => $resourceId);
+	my $maxFileQuotas = $data->getResourceAttributeValue(attrName => $A_R_MAX_FILE_QUOTAS, resource => $resourceId);
+	my $defaultDataQuotas = $data->getResourceAttributeValue(attrName => $A_R_DEFAULT_DATA_QUOTAS, resource => $resourceId);
+	my $defaultFileQuotas = $data->getResourceAttributeValue(attrName => $A_R_DEFAULT_FILE_QUOTAS, resource => $resourceId);
+	push @{$attributesByVo{$voName}->{"Resources"}},
 					{
-						"Name"               => $resourcesAttributes{$A_RESOURCE_NAME},
-						"FSHomeMountPoint"   => $resourcesAttributes{$A_R_FS_HOME_MOUNT_POINT},
-						"FSVolume"           => $resourcesAttributes{$A_R_FS_VOLUME},
-						"PerunResourceID"    => $resourcesAttributes{$A_RESOURCE_ID},
-						"MaxUserDataQuotas"  => defined $resourcesAttributes{$A_R_MAX_DATA_QUOTAS} ? $resourcesAttributes{$A_R_MAX_DATA_QUOTAS} : {},
-						"MaxUserFileQuotas"  => defined $resourcesAttributes{$A_R_MAX_FILE_QUOTAS} ? $resourcesAttributes{$A_R_MAX_FILE_QUOTAS} : {},
-						"DefaultDataQuotas"  => defined $resourcesAttributes{$A_R_DEFAULT_DATA_QUOTAS} ? $resourcesAttributes{$A_R_DEFAULT_DATA_QUOTAS} : {},
-						"DefaultFilesQuotas" => defined $resourcesAttributes{$A_R_DEFAULT_FILE_QUOTAS} ? $resourcesAttributes{$A_R_DEFAULT_FILE_QUOTAS} : {},
+						"Name"               => $resourceName,
+						"FSHomeMountPoint"   => $data->getResourceAttributeValue(attrName => $A_R_FS_HOME_MOUNT_POINT, resource => $resourceId),
+						"FSVolume"           => $data->getResourceAttributeValue(attrName => $A_R_FS_VOLUME, resource => $resourceId),
+						"PerunResourceID"    => int($resourceId),
+						"MaxUserDataQuotas"  => defined $maxDataQuotas ? $maxDataQuotas : {},
+						"MaxUserFileQuotas"  => defined $maxFileQuotas ? $maxFileQuotas : {},
+						"DefaultDataQuotas"  => defined $defaultDataQuotas ? $defaultDataQuotas : {},
+						"DefaultFilesQuotas" => defined $defaultFileQuotas ? $defaultFileQuotas : {},
 						"UnixGroups"         => \@unixGroups,
 					};
 }
