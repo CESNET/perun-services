@@ -13,7 +13,7 @@ use utf8;
 
 local $::SERVICE_NAME = "o365_life_cycle_manager_mu";
 local $::PROTOCOL_VERSION = "1.2.0";
-local $::SCRIPT_VERSION = "1.2.1";
+my $SCRIPT_VERSION = "1.2.1";
 
 #get system time in miliseconds before starting getting data
 my $systemTimeInMillis = int (gettimeofday * 1000); 
