@@ -14,7 +14,7 @@ our $PROTOCOL_VERSION = "3.0.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 # Constants
 our $HOW_OLD_PUBLICATIONS;         *HOW_OLD_PUBLICATIONS       =   \3;   #in years
@@ -45,30 +45,37 @@ my $users = {};
 # load resources which are fairshare groups
 my $resources = {};
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %rAttrs = attributesToHash $rData->getAttributes;
-	if($rAttrs{$A_RESOURCE_FAIRSHARE_GNAME}) {
-		$resources->{$rAttrs{$A_RESOURCE_ID}}->{"weight"} = 1.0;
-		$resources->{$rAttrs{$A_RESOURCE_ID}}->{"name"} = "G:" . $rAttrs{$A_RESOURCE_FAIRSHARE_GNAME};
+foreach my $resourceId ($data->getResourceIds()) {
 
-		#this resource is fairshare group
+	my $fairShareGroupName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_FAIRSHARE_GNAME);
+
+	if ($fairShareGroupName) {
+
+		# this resource is a fairshare group
+		$resources->{$resourceId}->{"weight"} = 1.0;
+		$resources->{$resourceId}->{"name"} = "G:" . $fairShareGroupName;
+
 		my $publicationsIDs = ();
-		for my $mData ($rData->getChildElements) {
-			my %mAttrs = attributesToHash $mData->getAttributes;
-			$resources->{$rAttrs{$A_RESOURCE_ID}}->{"weight"}++;
-			die if($users->{$mAttrs{$A_USER_ID}} && $users->{$mAttrs{$A_USER_ID}}->{"group"} ne 'root');
-			$users->{$mAttrs{$A_USER_ID}}->{"login"} = $mAttrs{$A_USER_LOGIN};
-			$users->{$mAttrs{$A_USER_ID}}->{"weight"} = 1.0;
-			$users->{$mAttrs{$A_USER_ID}}->{"group"} = "G:" . $rAttrs{$A_RESOURCE_FAIRSHARE_GNAME};
 
-			# skip users without publications
-			my $userID = $mAttrs{$A_USER_ID};
-			next unless defined $authorsByID->{$userID};
+		foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 
-			# add all user publications
+			my $userId = $data->getUserIdForMember(member => $memberId);
+			my $userLogin = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_USER_LOGIN);
+
+			$resources->{$resourceId}->{"weight"}++;
+
+			die if($users->{$userId} && $users->{$userId}->{"group"} ne 'root');
+
+			$users->{$userId}->{"login"} = $userLogin;
+			$users->{$userId}->{"weight"} = 1.0;
+			$users->{$userId}->{"group"} = "G:" . $fairShareGroupName;
+
+			# skip users without any publication
+			next unless defined $authorsByID->{$userId};
+
+			# gather all users publications for later processing
 			my @publications = $cabinetAgent->findPublicationsByFilter(
-				userId => $userID,
+				userId => $userId,
 				yearSince => ($nowYear - $HOW_OLD_PUBLICATIONS),
 				yearTill => $nowYear);
 
@@ -82,24 +89,30 @@ foreach my $rData (@resourcesData) {
 		foreach my $publication (values %$publicationsIDs) {
 			#### Start of fairshare algorithm ####
 			my $pubWeight = $categoriesRanks{$publication->getCategoryId} * (1 - (($nowYear - $publication->getYear - 1) / $HOW_OLD_PUBLICATIONS ));
-			$resources->{$rAttrs{$A_RESOURCE_ID}}->{"weight"} += $pubWeight;
+			$resources->{$resourceId}->{"weight"} += $pubWeight;
 			#### End of fairshare algorithm ####
 		}
 
 	} else {
-		# this resource is not fairshare group
-		for my $mData ($rData->getChildElements) {
-			my %mAttrs = attributesToHash $mData->getAttributes;
-			#if user is already there, we can skip him (take the one from the group instead)
-			next if($users->{$mAttrs{$A_USER_ID}});
-			$users->{$mAttrs{$A_USER_ID}}->{"login"} = $mAttrs{$A_USER_LOGIN};
-			$users->{$mAttrs{$A_USER_ID}}->{"weight"} = 1.0;
-			$users->{$mAttrs{$A_USER_ID}}->{"group"} = 'root';
+
+		# this resource is not a fairshare group
+		foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+
+			#if user is already there, we can skip him (take the one from the fairshare group instead)
+			my $userId = $data->getUserIdForMember(member => $memberId);
+			next if($users->{$userId});
+
+			$users->{$userId}->{"login"} = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_USER_LOGIN);
+			$users->{$userId}->{"weight"} = 1.0;
+			$users->{$userId}->{"group"} = 'root';
+
 		}
+
 	}
+
 }
 
-#Count all root users fairshares
+# Count all 'root' group users fairshares
 for my $author (@authors) {
 	next unless defined $users->{$author->getId}; #filter out users which are not assigned on the facility for which this script is executed right now
 	next unless ($users->{$author->getId}->{'group'} eq 'root');
