@@ -12,14 +12,14 @@ local $::PROTOCOL_VERSION = "3.1.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_R_VO_SHORT_NAME; *A_R_VO_SHORT_NAME =   \'urn:perun:resource:attribute-def:virt:voShortName';
 our $A_R_VOMS_VO_NAME;  *A_R_VOMS_VO_NAME =    \'urn:perun:resource:attribute-def:def:vomsVoName';
 our $A_USER_MAIL;       *A_USER_MAIL =         \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_CERT_DNS;   *A_USER_CERT_DNS =     \'urn:perun:user:attribute-def:virt:userCertDNs';
-our $A_USER_STATUS;     *A_USER_STATUS =       \'urn:perun:member:attribute-def:core:status';
+our $A_MEMBER_STATUS;   *A_MEMBER_STATUS =     \'urn:perun:member:attribute-def:core:status';
 our $A_R_VOMS_ROLES;    *A_R_VOMS_ROLES =      \'urn:perun:resource:attribute-def:def:vomsRoles';
 our $A_GR_VOMS_GR_NAME; *A_GR_VOMS_GR_NAME =   \'urn:perun:group_resource:attribute-def:def:vomsGroupName';
 our $A_GR_VOMS_ROLES;   *A_GR_VOMS_ROLES =     \'urn:perun:group_resource:attribute-def:def:vomsRoles';
@@ -29,47 +29,47 @@ my $struc = {};
 my $uniquenessMapping = {};
 
 #resource one by one
-foreach my $resourceData ($data->getChildElements) {
-	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
+foreach my $resourceId ($data->getResourceIds()) {
 	#information about VO itself (shortname and roles for every user in vo from this resource)
 	#if attribute for voms name exists, use it, if not, use VO short name instead
-	my $vomsVoName = $resourceAttrs{$A_R_VOMS_VO_NAME};
-	unless($vomsVoName) { $vomsVoName = $resourceAttrs{$A_R_VO_SHORT_NAME}; }
+	my $vomsVoName = $data->getResourceAttributeValue(attrName => $A_R_VOMS_VO_NAME, resource => $resourceId);
+	unless($vomsVoName) { $vomsVoName = $data->getResourceAttributeValue(attrName => $A_R_VO_SHORT_NAME, resource => $resourceId); }
 
 	#create info about existing vo (even if it is empty)
 	if(!defined($struc->{$vomsVoName})) { $struc->{$vomsVoName}->{'name'} = $vomsVoName; }
 	
 	my @rolesInVoForResource = ();
-	if(defined($resourceAttrs{$A_R_VOMS_ROLES})) { @rolesInVoForResource = @{$resourceAttrs{$A_R_VOMS_ROLES}} };
+	my $resourceRoles = $data->getResourceAttributeValue(attrName => $A_R_VOMS_ROLES, resource => $resourceId);
+	if(defined($resourceRoles)) { @rolesInVoForResource = @$resourceRoles; }
 	
 	#groups of resource one by one
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		my %groupAttributes = attributesToHash $groupData->getAttributes;
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
 		#get vomsGroupNameIfExists
-		my $vomsGroupName = $groupAttributes{$A_GR_VOMS_GR_NAME};
+		my $vomsGroupName = $data->getGroupResourceAttributeValue(attrName => $A_GR_VOMS_GR_NAME, group => $groupId, resource => $resourceId);
 		my @rolesInVoForGroup = ();
-		if(defined($groupAttributes{$A_GR_VOMS_ROLES})) { @rolesInVoForGroup = @{$groupAttributes{$A_GR_VOMS_ROLES}}; }
+		my $groupRoles = $data->getGroupResourceAttributeValue(attrName => $A_GR_VOMS_ROLES, group => $groupId, resource => $resourceId);
+		if(defined($groupRoles)) { @rolesInVoForGroup = @$groupRoles; }
 
 		#group members one by one
-		foreach my $memberData (($groupData->getChildElements)[1]->getChildElements) {
-			my %memberAttributes = attributesToHash $memberData->getAttributes;
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
 			my $memberUniqueIdentifier;
 			#skip member if his status is not valid
-			next unless $memberAttributes{$A_USER_STATUS} eq $STATUS_VALID;
+			next unless $data->getMemberAttributeValue(attrName => $A_MEMBER_STATUS, member => $memberId) eq $STATUS_VALID;
 			#get mail
-			my $email = $memberAttributes{$A_USER_MAIL};
+			my $email = $data->getUserAttributeValue(attrName => $A_USER_MAIL, member => $memberId);
 
 			#each DN of user is separate instance of user in voms
 			#skip users with no certificates
-			foreach my $subjectDN (sort keys %{$memberAttributes{$A_USER_CERT_DNS}}) {
+			my $userCertDns = $data->getUserAttributeValue(attrName => $A_USER_CERT_DNS, member => $memberId);
+			foreach my $subjectDN (sort keys %$userCertDns) {
 				#set uniqueIdentifier for member (his first certificate DN+CA)
-				unless($memberUniqueIdentifier) { $memberUniqueIdentifier = $subjectDN . "---------------" .  $memberAttributes{$A_USER_CERT_DNS}{$subjectDN}; }
+				unless($memberUniqueIdentifier) { $memberUniqueIdentifier = $subjectDN . "---------------" .  $userCertDns->{$subjectDN}; }
 
 				#unique user is defined by "'subjectDN+DNofCA'" without prefix, with simple white spaces, case-insensitive (lowercase there)
-				chomp $memberAttributes{$A_USER_CERT_DNS}{$subjectDN};
+				chomp $userCertDns->{$subjectDN};
 				my $subjectDNWithoutPrefix = $subjectDN;
 				$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
-				my $CADN = $memberAttributes{$A_USER_CERT_DNS}{$subjectDN};
+				my $CADN = $userCertDns->{$subjectDN};
 				my $uniqueVomsUser = $subjectDNWithoutPrefix . $CADN;
 				$uniqueVomsUser =~ s/\s+/ /g;
 				$uniqueVomsUser = lc($uniqueVomsUser);
