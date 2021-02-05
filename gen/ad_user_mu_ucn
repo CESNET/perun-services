@@ -4,6 +4,9 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
+use MIME::Base64;
+use utf8;
+use Encode;
 
 local $::SERVICE_NAME = "ad_user_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
@@ -14,7 +17,11 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
+<<<<<<< HEAD
 my $data = perunServicesInit::getHashedHierarchicalData;
+=======
+my $data = perunServicesInit::getHashedHierarchicalData(1);
+>>>>>>> ad_user_mu_ucn service refactored and added new features
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
@@ -25,6 +32,17 @@ our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_CHIPNUMBERS; *A_CHIPNUMBERS = \'urn:perun:user:attribute-def:def:chipNumbers';
+our $A_MEMBER_STATUS; *A_MEMBER_STATUS = \'urn:perun:member:attribute-def:core:status';
+our $ALLOW_NOT_VALID_MEMBERS; *ALLOW_NOT_VALID_MEMBERS = \'urn:perun:resource:attribute-def:def:AllowNotValidMembers';
+
+our $A_R_NAME; *A_R_NAME = \'urn:perun:resource:attribute-def:core:name';
+
+our $STATUS_VALID; *STATUS_VALID = \'VALID';
+our $STATUS_EXPIRED; *STATUS_EXPIRED = \'EXPIRED';
+
+# Get the facility ID
+my $facilityId = $data->getFacilityId();
 
 # CHECK ON FACILITY ATTRIBUTES
 if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
@@ -51,9 +69,12 @@ open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileN
 print FILE $baseDN;
 close(FILE);
 
+#my %allChipNumbers;  #used for consistency check - each chip number should belong to only one user
+my $serviceAccountsDN = "OU=Services,OU=Perun,OU=MU,DC=ucn,DC=muni,DC=cz";
 #
 # AGGREGATE DATA
 #
+<<<<<<< HEAD
 # FOR EACH USER
 foreach my $memberId ($data->getMemberIdsForFacility()) {
 
@@ -66,6 +87,32 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 	$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME );
 	$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_MAIL );
 
+=======
+# FOR EACH RESOURCE
+foreach my $resourceId ( $data->getResourceIds() ){
+        
+        my $allowNotValidMembers = $data->getResourceAttributeValue( resource => $resourceId, attrName => $ALLOW_NOT_VALID_MEMBERS);
+	# EACH USER ON RESOURCE
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
+                my $memberStatus = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+		#next unless ( $uAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID || ( $uAttributes{$A_MEMBER_STATUS} eq $STATUS_EXPIRED && $rAttributes{$ALLOW_NOT_VALID_MEMBERS}));
+		next unless ( ($memberStatus eq $STATUS_VALID) || ( ($memberStatus eq $STATUS_EXPIRED) && $allowNotValidMembers));
+
+		unless ($login =~ /^s-/){
+			$users->{$login}->{"DN"} = "CN=" . $login . "," . $baseDN;
+		} else {
+			$users->{$login}->{"DN"} = "CN=" . $login . "," . $serviceAccountsDN;
+		}
+		# store standard attrs
+		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+		$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_DISPLAY_NAME);
+		$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
+		$users->{$login}->{$A_CHIPNUMBERS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_CHIPNUMBERS);
+	}
+>>>>>>> ad_user_mu_ucn service refactored and added new features
 }
 
 #
@@ -77,11 +124,6 @@ binmode FILE, ":utf8";
 # FOR EACH USER ON FACILITY
 my @logins = sort keys %{$users};
 for my $login (@logins) {
-
-	unless ($login =~ /^9[0-9]{6}$/) {
-		# Allow only 9UČO users !!
-		next;
-	}
 
 	# print attributes, which are never empty
 	print FILE "dn: " . $users->{$login}->{"DN"} . "\n";
@@ -95,7 +137,7 @@ for my $login (@logins) {
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
 	my $sn = $users->{$login}->{$A_LAST_NAME};
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
-	my $displayName = $users->{$login}->{$A_DISPLAY_NAME};
+	my $displayName = ($users->{$login}->{$A_FIRST_NAME} || "") . " " . ($users->{$login}->{$A_LAST_NAME} || "");
 	my $mail = $users->{$login}->{$A_MAIL};
 
 	if (defined $displayName and length $displayName) {
@@ -110,6 +152,10 @@ for my $login (@logins) {
 	if (defined $mail and length $mail) {
 		print FILE "mail: " . $mail . "\n";
 	}
+	foreach (@{$users->{$login}->{$A_CHIPNUMBERS}}){
+		next if ($_ eq "");
+		print FILE "houseIdentifier: " . checkBase64($_) . "\n";
+	}
 
 	# print classes
 	print FILE "objectclass: top\n";
@@ -123,5 +169,14 @@ for my $login (@logins) {
 }
 
 close(FILE);
+
+sub checkBase64 {
+	my $value = shift;
+
+	if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
+		return " ", $value;
+	}
+	return ": ", encode_base64(Encode::encode_utf8($value), '');
+}
 
 perunServicesInit::finalize;
