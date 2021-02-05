@@ -7,10 +7,11 @@ use perunServicesUtils;
 
 our $SERVICE_NAME = "o365_contacts_export";
 our $PROTOCOL_VERSION = "3.0.0";
+our $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_LOGIN_MU;                          *A_USER_LOGIN_MU =                         \'urn:perun:user:attribute-def:def:login-namespace:mu';
@@ -21,31 +22,24 @@ our $A_FACILITY_O365_ALLOWED_DOMAINS;          *A_FACILITY_O365_ALLOWED_DOMAINS 
 my $file_name = "$DIRECTORY/$::SERVICE_NAME";
 open FILE,">$file_name" or die "Cannot open $file_name: $! \n";
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-my %allowedDomains = map { $_ => 1 } @{$facilityAttributes{$A_FACILITY_O365_ALLOWED_DOMAINS}};
+my %allowedDomains = map { $_ => 1 } @{$data->getFacilityAttributeValue( attrName => $A_FACILITY_O365_ALLOWED_DOMAINS )};
 
 my $memberDataByLogin;
-my @resourcesData = $data->getChildElements;
-foreach my $resourceData (@resourcesData) {
-	my @membersData = $resourceData->getChildElements;
+foreach my $memberId ($data->getMemberIdsForFacility()) {
+	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_MU );
+	my @emailAddresses = @{$data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_O365_EMAIL_ADDRESSES )};
 
-	foreach my $memberData (@membersData) {
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
-		my $login = $memberAttributes{$A_USER_LOGIN_MU};
-		my @emailAddresses = @{$memberAttributes{$A_MEMBER_O365_EMAIL_ADDRESSES}};
-
-		my @allowedEmails = ();
-		foreach my $email (@emailAddresses) {
-			my $emailDomain = $email;
-			$emailDomain =~ s/^.*@//g;
-			if($allowedDomains{$emailDomain}) {
-				push @allowedEmails, $email;
-			}
+	my @allowedEmails = ();
+	foreach my $email (@emailAddresses) {
+		my $emailDomain = $email;
+		$emailDomain =~ s/^.*@//g;
+		if($allowedDomains{$emailDomain}) {
+			push @allowedEmails, $email;
 		}
-
-		@allowedEmails = uniqList @allowedEmails, @{$memberDataByLogin->{$login}};
-		$memberDataByLogin->{$login} = \@allowedEmails;
 	}
+
+	@allowedEmails = uniqList @allowedEmails, @{$memberDataByLogin->{$login}};
+	$memberDataByLogin->{$login} = \@allowedEmails;
 }
 
 #print data to file

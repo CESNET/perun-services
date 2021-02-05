@@ -13,13 +13,14 @@ use utf8;
 
 local $::SERVICE_NAME = "o365_life_cycle_manager_mu";
 local $::PROTOCOL_VERSION = "1.2.0";
+my $SCRIPT_VERSION = "1.2.1";
 
 #get system time in miliseconds before starting getting data
 my $systemTimeInMillis = int (gettimeofday * 1000); 
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #forward declaration
 sub processUsers;
@@ -41,8 +42,6 @@ my $o365MailForwardHeader = "o365MailForward";
 my $o365DeleteAccountRequestHeader = "o365DeleteAccountRequest";
 
 #Constants
-our $A_USER_ID;                       *A_USER_ID =                       \'urn:perun:user:attribute-def:core:id';
-our $A_MEMBER_ID;                     *A_MEMBER_ID =                     \'urn:perun:member:attribute-def:core:id';
 our $A_USER_LOGIN_MU;                 *A_USER_LOGIN_MU =                 \'urn:perun:user:attribute-def:def:login-namespace:mu';
 our $A_USER_PREFERRED_MAIL;           *A_USER_PREFERRED_MAIL =           \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_RESOURCE_AFFILIATIONS;         *A_RESOURCE_AFFILIATIONS =         \'urn:perun:resource:attribute-def:def:affiliation';
@@ -68,26 +67,23 @@ my $userStruc = {};
 my $file = $DIRECTORY . "/data.json";
 
 #foreach resource in the structure
-foreach my $resourceData ($data->getChildElements) {
-	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
+foreach my $resourceId ($data->getResourceIds()) {
 	#defined affilation for whole resource
-	my $affiliation = $resourceAttributes{$A_RESOURCE_AFFILIATIONS};
+	my $affiliation = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RESOURCE_AFFILIATIONS );
 
 	#for each group assigned to the resource
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		my $membersElement = ($groupData->getChildElements)[1];
+	foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId )) {
 		
 		#and every member in such group
-		for my $memberData ($membersElement->getChildElements) {
-			my %memberAttributes = attributesToHash $memberData->getAttributes;
-			my $userId = $memberAttributes{$A_USER_ID};
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
+			my $userId = $data->getUserIdForMember( member => $memberId );
 			#skip expired membership in group
-			my $statusInGroup = $memberAttributes{$A_MEMBER_STATUS_IN_GROUP};
+			my $statusInGroup = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_MEMBER_STATUS_IN_GROUP );
 			next if $statusInGroup eq 'EXPIRED';
-			my $expirationInGroup = $memberAttributes{$A_GROUP_MEMBERSHIP_EXPIRATION};
+			my $expirationInGroup = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_GROUP_MEMBERSHIP_EXPIRATION );
 
 			#process every member|group|resource combination one by one
-			processUsers $affiliation, $expirationInGroup, $memberData;	
+			processUsers $affiliation, $expirationInGroup, $memberId;	
 		}
 	}
 }
@@ -138,11 +134,10 @@ perunServicesInit::finalize;
 ##############################################################################
 ## creates structure for users.json
 sub processUsers {
-	my ($affiliation, $expirationInGroup, $memberData) = @_;
+	my ($affiliation, $expirationInGroup, $memberId) = @_;
 
-	my %memberAttributes = attributesToHash $memberData->getAttributes;
-	my $userId = $memberAttributes{$A_USER_ID};
-	my $login = $memberAttributes{$A_USER_LOGIN_MU};
+	my $userId = $data->getUserIdForMember( member => $memberId );
+	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_MU );
 	#skip service accounts (login like 's-*')
 	if( $login =~ /s-/ ) { return; }
 
@@ -177,16 +172,15 @@ sub processUsers {
 		}
 	#this is the first time user as occured in any processed group so we need to create a new full record
 	} else {
-		my $memberId = $memberAttributes{$A_MEMBER_ID};
-		my $preferredMail = $memberAttributes{$A_USER_PREFERRED_MAIL};
-		my $o365AlumniAccountEnabled = $memberAttributes{$A_USER_FAC_ALLUMNI_ACC_ENABLED};
-		my $o365GracePeriodExtension = $memberAttributes{$A_USER_FAC_GRACE_PERIOD_EXT};
-		my $eligibleForO365AlumniLicence = $memberAttributes{$A_USER_FAC_ELIGIBLE_FOR_LICENCE};
-		my $o365PrivilegedLicence = $memberAttributes{$A_USER_FAC_PRIVILEGED_LICENCE};
-		my $o365UserEmailAddresses = $memberAttributes{$A_USER_O365_USER_EMAILS_MU};
-		my $o365PrimaryEmailAddress = $memberAttributes{$A_USER_O365_PRIMARY_EMAIL_MU};
-		my $o365MailForward = $memberAttributes{$A_USER_FAC_O365_MAIL_FORWARD};
-		my $o365DeleteAccountRequest = $memberAttributes{$A_USER_FAC_DEL_ACC_REQUEST};
+		my $preferredMail = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_PREFERRED_MAIL );
+		my $o365AlumniAccountEnabled = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FAC_ALLUMNI_ACC_ENABLED );
+		my $o365GracePeriodExtension = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FAC_GRACE_PERIOD_EXT );
+		my $eligibleForO365AlumniLicence = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FAC_ELIGIBLE_FOR_LICENCE );
+		my $o365PrivilegedLicence = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FAC_PRIVILEGED_LICENCE );
+		my $o365UserEmailAddresses = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_O365_USER_EMAILS_MU );
+		my $o365PrimaryEmailAddress = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_O365_PRIMARY_EMAIL_MU );
+		my $o365MailForward = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FAC_O365_MAIL_FORWARD );
+		my $o365DeleteAccountRequest = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FAC_DEL_ACC_REQUEST );
 		$userStruc->{$userId}->{$memberIdHeader} = $memberId;
 		$userStruc->{$userId}->{$loginHeader} = $login;
 		$userStruc->{$userId}->{$preferredMailHeader} = $preferredMail;

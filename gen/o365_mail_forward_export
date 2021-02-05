@@ -8,11 +8,11 @@ use Data::Dumper;
 
 local $::SERVICE_NAME = "o365_mail_forward_export";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_MEMBER_O365_EMAIL_ADDRESSES_MU;     *A_MEMBER_O365_EMAIL_ADDRESSES_MU =     \'urn:perun:member:attribute-def:def:o365EmailAddresses:mu';
@@ -25,45 +25,36 @@ our $A_FACILITY_FORWARD_EXPORT_DOMAINS;    *A_FACILITY_FORWARD_EXPORT_DOMAINS = 
 our $DEFAULT_FORWARDING_DOMAIN = '@mo.muni.cz';
 our $userStruc = {};
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-my %allowedForwardDomains = map { $_ => 1 } @{$facilityAttributes{$A_FACILITY_FORWARD_EXPORT_DOMAINS}};
+my %allowedForwardDomains = map { $_ => 1 } @{$data->getFacilityAttributeValue( attrName => $A_FACILITY_FORWARD_EXPORT_DOMAINS )};
 
-#go through all resources
-my @resourcesData = $data->getChildElements;
-foreach my $resourceData (@resourcesData) {
-	
-	my @membersData = $resourceData->getChildElements;
-	foreach my $memberData (@membersData) {
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
+foreach my $memberId ($data->getMemberIdsForFacility()) {
 
-		#skip this user if disabled forward is set to true
-		next if $memberAttributes{$A_USER_FACILITY_DISABLE_MAIL_FORWARD};
-		#skip this user if store and forward is set to true
-		next if $memberAttributes{$A_USER_FACILITY_STORE_AND_FORWARD};
+	#skip this user if disabled forward is set to true
+	next if $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FACILITY_DISABLE_MAIL_FORWARD );
+	#skip this user if store and forward is set to true
+	next if $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FACILITY_STORE_AND_FORWARD );
 
-		#login in MU is UCO
-		my $login = $memberAttributes{$A_USER_FACILITY_LOGIN};
+	#login in MU is UCO
+	my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FACILITY_LOGIN );
 
-		#mailForward is unique for the same login, don't need to be loaded more than once
-		unless ($userStruc->{$login}) {
-			my $mailForward = $memberAttributes{$A_USER_FACILITY_MAIL_FORWARD} || $login . $DEFAULT_FORWARDING_DOMAIN;
-			$userStruc->{$login}->{$A_USER_FACILITY_MAIL_FORWARD} = $mailForward;
+	#mailForward is unique for the same login, don't need to be loaded more than once
+	unless ($userStruc->{$login}) {
+		my $mailForward = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FACILITY_MAIL_FORWARD ) || $login . $DEFAULT_FORWARDING_DOMAIN;
+		$userStruc->{$login}->{$A_USER_FACILITY_MAIL_FORWARD} = $mailForward;
+	}
 
+	#members email addresses - for more members with same login can differ
+	my @memberEmailAddresses = @{$data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_O365_EMAIL_ADDRESSES_MU )};
+	#filter only allowed email addresses
+	foreach my $mail (@memberEmailAddresses) {
+		my $domainOfEmail = $mail;
+		$domainOfEmail =~ s/^.*@//;
+		#this email is in allowed domain, add it
+		if($allowedForwardDomains{$domainOfEmail}) {
+			$userStruc->{$login}->{$A_MEMBER_O365_EMAIL_ADDRESSES_MU}->{$mail} = 1;
 		}
-
-		#members email addresses - for more members with same login can differ
-		my @memberEmailAddresses = @{$memberAttributes{$A_MEMBER_O365_EMAIL_ADDRESSES_MU}};
-		#filter only allowed email addresses
-		foreach my $mail (@memberEmailAddresses) {
-			my $domainOfEmail = $mail;
-			$domainOfEmail =~ s/^.*@//;
-			#this email is in allowed domain, add it
-			if($allowedForwardDomains{$domainOfEmail}) {
-				$userStruc->{$login}->{$A_MEMBER_O365_EMAIL_ADDRESSES_MU}->{$mail} = 1;
-			}
-		}
-	} 
-}
+	}
+} 
 
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
