@@ -9,7 +9,7 @@ use Perun::Common qw(getSortingFunction);
 
 our $SERVICE_NAME = "pbs_phys_cluster";
 our $PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.1.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -39,16 +39,18 @@ my @facilities = $facilitiesAgent->getAssignedFacilities(service => $service->ge
 my @outputLines;
 
 my $sortingFunction = getSortingFunction("getName", 1);
+my %facilityNameAttribute;
 foreach my $facility (sort $sortingFunction @facilities) {
 
-	my $data = $servicesAgent->getHierarchicalData(service => $service->getId, facility => $facility->getId);
-	my %facilityAttributes = attributesToHash $data->getAttributes;
+	my $data = $servicesAgent->getHashedHierarchicalData(service => $service->getId, facility => $facility->getId);
+	my $facilityNameAttribute = $data->getFacilityAttributeValue(attrName => $A_FACILITY_NAME);
+	my $facilityPbsServerAttribute = $data->getFacilityAttributeValue(attrName => $A_FACILITY_PBS_SERVER);
 
-	if($facilityAttributes{$A_FACILITY_PBS_SERVER} ne $pbsServer) { next; }
+	if($facilityPbsServerAttribute ne $pbsServer) { next; }
 
 	my @hosts = $facilitiesAgent->getHosts(facility => $facility->getId);
 
-	push @outputLines,  map { $_->getHostname . ":" . $facilityAttributes{$A_FACILITY_NAME} } @hosts;
+	push @outputLines,  map { $_->getHostname . ":" . $facilityNameAttribute } @hosts;
 }
 
 #output
