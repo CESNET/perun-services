@@ -8,7 +8,7 @@ use Data::Dumper;
 
 local $::SERVICE_NAME = "o365_mail_forward_export";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;

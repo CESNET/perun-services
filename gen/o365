@@ -15,7 +15,7 @@ sub processMembers;
 
 our $SERVICE_NAME = "o365";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
