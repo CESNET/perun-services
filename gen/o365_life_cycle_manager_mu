@@ -138,7 +138,7 @@ perunServicesInit::finalize;
 sub processUsers {
 	my ($affiliation, $expirationInGroup, $memberId) = @_;
 
-	my $userId = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
+	my $userId = $data->getUserIdForMember( member => $memberId );
 	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_MU );
 	#skip service accounts (login like 's-*')
 	if( $login =~ /s-/ ) { return; }
@@ -174,7 +174,6 @@ sub processUsers {
 		}
 	#this is the first time user as occured in any processed group so we need to create a new full record
 	} else {
-		my $memberId = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_ID );
 		my $preferredMail = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_PREFERRED_MAIL );
 		my $o365AlumniAccountEnabled = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FAC_ALLUMNI_ACC_ENABLED );
 		my $o365GracePeriodExtension = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_FAC_GRACE_PERIOD_EXT );
