@@ -25,9 +25,13 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 		push @sshKeys, @{$sshkeys} if defined $sshkeys;
 }
 
+# sort output to be comparable
+@sshKeys = uniqList @sshKeys;
+@sshKeys = sort @sshKeys;
+
 ####### output file ######################
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
-foreach my $sshKey (sort uniqList @sshKeys) {
+foreach my $sshKey (@sshKeys) {
 	print SERVICE_FILE $sshKey . "\n";
 }
 close(SERVICE_FILE);
