@@ -68,8 +68,9 @@ foreach my $resourceId ($data->getResourceIds()) {
 		}
 	}
 }
-
-for my $login (sort keys %$memberAttributesByLogin) {
+#print data to files
+#case-insensitive sort of logins
+for my $login (sort {"\U$a" cmp "\U$b"} keys %$memberAttributesByLogin) {
 	my %memberAttributes = %{$memberAttributesByLogin->{$login}};
 	$memberAttributes{$A_USER_FACILITY_HOME_MOUNT_POINT} =~ s#^.*/\./#/#;
 
