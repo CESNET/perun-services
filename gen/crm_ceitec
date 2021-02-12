@@ -8,13 +8,13 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "crm_ceitec";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.5";
+my $SCRIPT_VERSION = "3.0.6";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 # User attributes
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
@@ -36,33 +36,29 @@ my $userGroups; # $userGroups->{$login}->{$groupName} = 1;
 # AGGREGATE DATA
 #
 # FOR EACH RESOURCE
-foreach my $rData ($data->getChildElements) {
+foreach my $resourceId ( $data->getResourceIds() ) {
+	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
 
-	my @groupsData = ($rData->getChildElements)[0]->getChildElements;
+		for my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
 
-	foreach my $group (@groupsData) {
-
-		my %gAttributes = attributesToHash $group->getAttributes;
-
-		my @membersData = ($group->getChildElements)[1]->getChildElements;
-		foreach my $member (@membersData) {
-			my %uAttributes = attributesToHash $member->getAttributes;
+			my $memberGroupStatus = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_M_G_GROUP_STATUS );
 
 			# skip EXPIRED members by group membership
-			if (defined $uAttributes{$A_M_G_GROUP_STATUS} and ($uAttributes{$A_M_G_GROUP_STATUS} eq "EXPIRED")) {
+			if (defined $memberGroupStatus and ($memberGroupStatus eq "EXPIRED")) {
 				next;
 			}
 
-			my $login = $uAttributes{$A_LOGIN};
+			my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_LOGIN );
+			my $groupName = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_NAME );
 
 			# store standard attrs
-			$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
-			$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
-			$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
-			$users->{$login}->{$A_O} = $uAttributes{$A_O};
-			$users->{$login}->{$A_EPPNS} = $uAttributes{$A_EPPNS};
-			$users->{$login}->{$A_U_ALT_LOGINS} = $uAttributes{$A_U_ALT_LOGINS};
-			$userGroups->{$login}->{$gAttributes{$A_G_NAME}} = 1;
+			$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
+			$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
+			$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_MAIL );
+			$users->{$login}->{$A_O} = $data->getMemberAttributeValue( member => $memberId, attrName => $A_O );
+			$users->{$login}->{$A_EPPNS} = $data->getUserAttributeValue( member => $memberId, attrName => $A_EPPNS );
+			$users->{$login}->{$A_U_ALT_LOGINS} = $data->getUserAttributeValue( member => $memberId, attrName => $A_U_ALT_LOGINS );
+			$userGroups->{$login}->{$groupName} = 1;
 
 		}
 
