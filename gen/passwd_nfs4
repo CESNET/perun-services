@@ -73,12 +73,13 @@ foreach my $resourceId ($data->getResourceIds()) {
 		}
 	}
 }
-
+#print data to files
+#case-insensitive sort of logins
 open PASSWD,">$passwd_file_name" or die "Cannot open $passwd_file_name: $! \n";
-for my $passwdLine (keys %lines) {
+for my $passwdLine (sort {"\U$a" cmp "\U$b"} keys %lines) {
 	print PASSWD $passwdLine, "\n";
 }
-for my $nfsLine (keys %nfsLines) {
+for my $nfsLine (sort {"\U$a" cmp "\U$b"} keys %nfsLines) {
 	print PASSWD $nfsLine, "\n";
 }
 close(PASSWD);
