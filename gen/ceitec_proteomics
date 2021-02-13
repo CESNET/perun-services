@@ -16,11 +16,11 @@ use perunServicesUtils;
 use Data::Dumper;
 local $::SERVICE_NAME = "ceitec_proteomics";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #forward declaration
 sub processUsers;
@@ -29,7 +29,7 @@ sub processMemberships;
 
 #Constants
 our $A_USER_ID;                   *A_USER_ID =               \'urn:perun:user:attribute-def:core:id';
-our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:attribute-def:core:status';
+our $A_MEMBER_STATUS;             *A_MEMBER_STATUS =         \'urn:perun:member:attribute-def:core:status';
 our $A_USER_NAME;                 *A_USER_NAME =             \'urn:perun:user:attribute-def:core:firstName';
 our $A_USER_SURNAME;              *A_USER_SURNAME =          \'urn:perun:user:attribute-def:core:lastName';
 our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
@@ -54,9 +54,9 @@ my $fileUsers = $DIRECTORY . "users.csv";
 my $fileGroups = $DIRECTORY . "groups.csv";
 my $fileMemberships = $DIRECTORY . "memberships.csv";
 
-foreach my $resourceData ($data->getChildElements) {
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		my $groupMembersLogins = processGroups $groupData;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
+		processGroups($groupId, $resourceId);
 	}
 }
 
@@ -97,36 +97,37 @@ perunServicesInit::finalize;
 ##############################################################################
 ## creates structure for users.csv file
 sub processUsers {
-	my ($gid, $memberData) = @_;
+	my ($gid, $memberId) = @_;
 
-	my %memberAttributes = attributesToHash $memberData->getAttributes;
-	my $uid = $memberAttributes{$A_USER_ID};
+	my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
 
 	unless(exists $userStruc->{$uid}) {
-		$userStruc->{$uid}->{$u_name} = $memberAttributes{$A_USER_NAME} || "";
-		$userStruc->{$uid}->{$u_surname} = $memberAttributes{$A_USER_SURNAME} || "";
-		$userStruc->{$uid}->{$u_email} = $memberAttributes{$A_USER_EMAIL};
-		$userStruc->{$uid}->{$u_eppns} = $memberAttributes{$A_USER_EPPN};
+		$userStruc->{$uid}->{$u_name} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_NAME ) || "";
+		$userStruc->{$uid}->{$u_surname} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_SURNAME ) || "";
+		$userStruc->{$uid}->{$u_email} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EMAIL );
+		$userStruc->{$uid}->{$u_eppns} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EPPN );
 	}
 
-	processMemberships $gid, $uid, $memberAttributes{$A_USER_STATUS};
+	my $memberStatus = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+
+	processMemberships $gid, $uid, $memberStatus;
 }
 
 ## creates structure for groups.csv file
 sub processGroups {
-	my $group = shift;
-	my %groupAttributes = attributesToHash $group->getAttributes;
-	my $membersElement = ($group->getChildElements)[1];
+	my $gid = shift;
+	my $resourceId = shift;
 
-	if($groupAttributes{$A_GROUP_NAME}) {
-		my $gid = $groupAttributes{$A_GROUP_ID};
+	my $groupName = $data->getGroupAttributeValue( group => $gid, attrName => $A_GROUP_NAME );
+
+	if($groupName) {
 
 		unless(exists $groupStruc->{$gid}) {
-			$groupStruc->{$gid}->{$g_name} = $groupAttributes{$A_GROUP_NAME};
+			$groupStruc->{$gid}->{$g_name} = $groupName;
 		}
 
-		foreach my $memberData($membersElement->getChildElements) {
-			processUsers $gid, $memberData;
+		for my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $gid )) {
+			processUsers $gid, $memberId;
 		}
 	}
 }
