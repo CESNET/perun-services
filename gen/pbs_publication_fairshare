@@ -141,13 +141,13 @@ my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $!";
 
 # first groups
-for my $resourceRef (sort { $b->{"weight"} <=> $a->{"weight"} } values %$resources) {
+for my $resourceRef (sort { $b->{"weight"} <=> $a->{"weight"} || $a->{"name"} cmp $b->{"name"} } values %$resources) {
 	printf FILE "%s\t%d\t%s\t%.0f\n", $resourceRef->{"name"}, $uid, 'root', $resourceRef->{"weight"};
 	$uid++;
 }
 
 # then users
-for my $userRef (sort { $b->{"weight"} <=> $a->{"weight"} } values %$users) {
+for my $userRef (sort { $b->{"weight"} <=> $a->{"weight"} || $a->{"login"} cmp $b->{"login"} } values %$users) {
 	printf FILE "%s\t%d\t%s\t%.0f\n", $userRef->{"login"}, $uid, $userRef->{"group"}, $userRef->{"weight"};
 	$uid++;
 }
