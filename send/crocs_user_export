@@ -1,0 +1,41 @@
+#!/bin/bash
+
+SERVICE_NAME="crocs_user_export"
+
+TIMEOUT="5400" #90s * 60 sec = 1.5h
+TIMEOUT_KILL="60" # 60 sec to kill after timeout
+
+FACILITY_NAME=$1
+DESTINATION=$2
+DESTINATION_TYPE=$3
+
+SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
+SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
+
+
+#Just safety check. This should not happen.
+if [ ! -d "$SERVICE_FILES_DIR" ]; then echo '$SERVICE_FILES_DIR: "'$SERVICE_FILES_DIR'" is not a directory' >&2 ; exit 1; fi
+
+#unless specific configuration for destination exists use common configuration for all destination
+[ -d "$SERVICE_FILES_FOR_DESTINATION" ] || SERVICE_FILES_FOR_DESTINATION="$SERVICE_FILES_DIR/_destination/all"
+
+
+#if there is no destination type, use default 'host'
+if [ -z "$DESTINATION_TYPE" ]; then
+	DESTINATION_TYPE="service-specific"
+fi
+
+case $DESTINATION_TYPE in
+	service-specific)
+		DESTINATION_DIR="$DESTINATION"
+		;;
+	*)
+		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
+		exit 1;
+		;;
+esac
+
+
+	TIMESTAMP=`date "+%F_%H.%M.%S"`
+
+	cp "$SERVICE_FILES_DIR/$SERVICE_NAME" "$DESTINATION_DIR/crocs-user-export-$TIMESTAMP"
