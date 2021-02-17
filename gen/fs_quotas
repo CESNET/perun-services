@@ -25,17 +25,17 @@ my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 
 foreach my $resourceId ( $data->getResourceIds() ) {
-	
+
 	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
-		my $UID = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_UID );
+		my $uid = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_UID );
 		my $dataQuotas = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_DATA_QUOTAS );
 		my $fileQuotas = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_FILE_QUOTAS );
 
-		if($uniqueUID{$UID}) {
+		if($uniqueUID{$uid}) {
 			#if already added, then continue
 			next;
 		} else {
-			$uniqueUID{$UID} = 1;
+			$uniqueUID{$uid} = 1;
 		}
 
 		#First go through data quota map and read file quota if exists or set unlimited
@@ -49,7 +49,7 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 			my $hardQuota = $quota;
 			$hardQuota =~ s/^.*://g;
 
-			print SERVICE_FILE $UID . "\t";
+			print SERVICE_FILE $uid . "\t";
 			print SERVICE_FILE quotaToKb $softQuota;
 			print SERVICE_FILE "\t";
 			print SERVICE_FILE quotaToKb $hardQuota;
@@ -70,13 +70,13 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 			print SERVICE_FILE $path . "\n";
 		}
 
-		#Then go through file quota map and for not used files quota set unlimited data quota 
+		#Then go through file quota map and for not used files quota set unlimited data quota
 		foreach my $path (keys %{$fileQuotas}) {
 			if($uniquePaths{$path}) {
 				next;
 			}
-			
-			print SERVICE_FILE $UID . "\t";
+
+			print SERVICE_FILE $uid . "\t";
 			print SERVICE_FILE "0\t0\t";
 
 			my $quota = $fileQuotas->{$path};
