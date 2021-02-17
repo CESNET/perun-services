@@ -82,6 +82,11 @@ open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: 
 
 #prepare home data
 foreach my $resourceId ( $data->getResourceIds() ) {
+
+	# If 2 or more Resources represents the same home mount point on the same volume, but have different GIDs,
+	# value from the last processed Resource is used. Since this service uses GIDs only on initial home creation,
+	# it shouldn't matter, if it changes for the user later. At the time of creation, any of valid GIDs is OK.
+
 	my $volumeAttr = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_VOLUME );
 	my $homeMountPointAttr = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_HOME_MOUNTPOINT );
 	my $volume = $volumeAttr || $homeMountPointAttr;
