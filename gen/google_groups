@@ -7,11 +7,11 @@ use perunServicesUtils;
 
 our $SERVICE_NAME     = "google_groups";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data      = perunServicesInit::getDataWithGroups;
+my $data      = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_FACILITY_GOOGLE_DOMAIN;            *A_FACILITY_GOOGLE_DOMAIN =             \'urn:perun:facility:attribute-def:def:googleGroupsDomain';
@@ -24,26 +24,21 @@ our $A_RESOURCE_GOOGLE_TEAM_DRIVE;        *A_RESOURCE_GOOGLE_TEAM_DRIVE =       
 our $groupStruc = {};
 our $teamDriveStruc = {};
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-my $domainName = $facilityAttributes{$A_FACILITY_GOOGLE_DOMAIN};
+my $domainName = $data->getFacilityAttributeValue(attrName => $A_FACILITY_GOOGLE_DOMAIN);
 
-foreach my $resourceData ( $data->getChildElements ) {
-	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
-	my $googleTeamDriveName = $resourceAttributes{$A_RESOURCE_GOOGLE_TEAM_DRIVE};
+foreach my $resourceId ($data->getResourceIds()) {
+	my $googleTeamDriveName = $data->getResourceAttributeValue(attrName => $A_RESOURCE_GOOGLE_TEAM_DRIVE, resource => $resourceId);
 
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements){
-		my %groupAttributes = attributesToHash $groupData->getAttributes;
-		my $membersElement = ($groupData->getChildElements)[1];
-
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
 		my $groupName = "";
-		if($groupAttributes{$A_GROUP_RESOURCE_GOOGLE_GROUP_NAME}) {
-			$groupName = $groupAttributes{$A_GROUP_RESOURCE_GOOGLE_GROUP_NAME} . "@" . $domainName;
+		my $googleGroupName = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_RESOURCE_GOOGLE_GROUP_NAME, group => $groupId, resource => $resourceId);
+		if($googleGroupName) {
+			$groupName = $googleGroupName . "@" . $domainName;
 		}
 
-		foreach my $memberData($membersElement->getChildElements) {
-			my %memberAttributes = attributesToHash $memberData->getAttributes;
-			my @logins = @{$memberAttributes{$A_USER_GOOGLE_NAMESPACE}};
-			my @mails = @{$memberAttributes{$A_USER_GOOGLE_MAILS}};
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
+			my @logins = @{$data->getUserAttributeValue(attrName => $A_USER_GOOGLE_NAMESPACE, member => $memberId)};
+			my @mails = @{$data->getUserAttributeValue(attrName => $A_USER_GOOGLE_MAILS, member => $memberId)};
 
 			# skip users without google login, might happen, when user removes his UserExtSource
 			# since google login is virtual attribute calculated from Google IdP UES.

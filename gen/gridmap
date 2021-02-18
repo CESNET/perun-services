@@ -8,11 +8,11 @@ use Text::Unidecode;
 
 local $::SERVICE_NAME = "gridmap";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_LOGINS;			*A_USER_LOGINS =       \'urn:perun:user:attribute-def:virt:kerberosLogins';
@@ -21,24 +21,18 @@ our $A_R_GRIDMAP_FILE;  *A_R_GRIDMAP_FILE =    \'urn:perun:resource:attribute-de
 
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 
-my @membersAttributes;
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my @membersData = $rData->getChildElements;
-	push @membersAttributes, dataToAttributesHashes @membersData;
-}
-
 # Create structure $map->{$login, $userCertDN}
 my @map;
 
 # "user's DN: kerberosLogin
-foreach my $memberAttributes (@membersAttributes) {
-	foreach my $login (@{$memberAttributes->{$A_USER_LOGINS}}) {
-		
-		foreach my $subjectDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
-			chomp $memberAttributes->{$A_USER_CERT_DNS}{$subjectDN};
-			my @entry = ($subjectDN, $login);
-			push(@map, \@entry);
+
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		foreach my $login (@{$data->getUserAttributeValue(attrName => $A_USER_LOGINS, member => $memberId)}) {
+			foreach my $subjectDN (keys %{$data->getUserAttributeValue(attrName => $A_USER_CERT_DNS, member => $memberId)}) {
+				my @entry = ($subjectDN, $login);
+				push(@map, \@entry);
+			}
 		}
 	}
 }
