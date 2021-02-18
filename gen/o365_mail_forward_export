@@ -44,17 +44,19 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 	}
 
 	#members email addresses - for more members with same login can differ
-	my @memberEmailAddresses = @{$data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_O365_EMAIL_ADDRESSES_MU )};
-	#filter only allowed email addresses
-	foreach my $mail (@memberEmailAddresses) {
-		my $domainOfEmail = $mail;
-		$domainOfEmail =~ s/^.*@//;
-		#this email is in allowed domain, add it
-		if($allowedForwardDomains{$domainOfEmail}) {
-			$userStruc->{$login}->{$A_MEMBER_O365_EMAIL_ADDRESSES_MU}->{$mail} = 1;
+	my $memberEmailAddresses = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_O365_EMAIL_ADDRESSES_MU );
+	if (defined $memberEmailAddresses) {
+		#filter only allowed email addresses
+		foreach my $mail (@{$memberEmailAddresses}) {
+			my $domainOfEmail = $mail;
+			$domainOfEmail =~ s/^.*@//;
+			#this email is in allowed domain, add it
+			if($allowedForwardDomains{$domainOfEmail}) {
+				$userStruc->{$login}->{$A_MEMBER_O365_EMAIL_ADDRESSES_MU}->{$mail} = 1;
+			}
 		}
 	}
-} 
+}
 
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
