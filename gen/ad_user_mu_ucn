@@ -4,9 +4,7 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
-use MIME::Base64;
 use utf8;
-use Encode;
 
 local $::SERVICE_NAME = "ad_user_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
@@ -29,7 +27,6 @@ our $A_F_DOMAIN;  *A_F_DOMAIN = \'urn:perun:facility:attribute-def:def:adDomain'
 our $A_F_UAC;  *A_F_UAC = \'urn:perun:facility:attribute-def:def:adUAC';
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
-our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_CHIPNUMBERS; *A_CHIPNUMBERS = \'urn:perun:user:attribute-def:def:chipNumbers';
@@ -69,8 +66,8 @@ open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileN
 print FILE $baseDN;
 close(FILE);
 
-#my %allChipNumbers;  #used for consistency check - each chip number should belong to only one user
 my $serviceAccountsDN = "OU=Services,OU=Perun,OU=MU,DC=ucn,DC=muni,DC=cz";
+
 #
 # AGGREGATE DATA
 #
@@ -90,13 +87,13 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 =======
 # FOR EACH RESOURCE
 foreach my $resourceId ( $data->getResourceIds() ){
-        
-        my $allowNotValidMembers = $data->getResourceAttributeValue( resource => $resourceId, attrName => $ALLOW_NOT_VALID_MEMBERS);
+
+	my $allowNotValidMembers = $data->getResourceAttributeValue( resource => $resourceId, attrName => $ALLOW_NOT_VALID_MEMBERS);
 	# EACH USER ON RESOURCE
 	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 
 		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
-                my $memberStatus = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+			my $memberStatus = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
 		#next unless ( $uAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID || ( $uAttributes{$A_MEMBER_STATUS} eq $STATUS_EXPIRED && $rAttributes{$ALLOW_NOT_VALID_MEMBERS}));
 		next unless ( ($memberStatus eq $STATUS_VALID) || ( ($memberStatus eq $STATUS_EXPIRED) && $allowNotValidMembers));
 
@@ -108,7 +105,6 @@ foreach my $resourceId ( $data->getResourceIds() ){
 		# store standard attrs
 		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
 		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
-		$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_DISPLAY_NAME);
 		$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
 		$users->{$login}->{$A_CHIPNUMBERS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_CHIPNUMBERS);
 	}
@@ -137,7 +133,18 @@ for my $login (@logins) {
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
 	my $sn = $users->{$login}->{$A_LAST_NAME};
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
-	my $displayName = ($users->{$login}->{$A_FIRST_NAME} || "") . " " . ($users->{$login}->{$A_LAST_NAME} || "");
+	my $displayName = "";
+	if (defined $givenName and length $givenName){
+		$displayName = $displayName . $givenName;
+	}
+	if (defined $sn and length $sn){
+		$displayName = $displayName . (length $displayName ? " " : "") . $sn;
+	}
+	# Use login as displayname if it's empty.
+	if (!defined $displayName and !length $displayName){
+		$displayName = $login;
+	}
+
 	my $mail = $users->{$login}->{$A_MAIL};
 
 	if (defined $displayName and length $displayName) {
@@ -154,7 +161,7 @@ for my $login (@logins) {
 	}
 	foreach (@{$users->{$login}->{$A_CHIPNUMBERS}}){
 		next if ($_ eq "");
-		print FILE "houseIdentifier: " . checkBase64($_) . "\n";
+		print FILE "houseIdentifier: " . $_ . "\n";
 	}
 
 	# print classes
@@ -169,14 +176,5 @@ for my $login (@logins) {
 }
 
 close(FILE);
-
-sub checkBase64 {
-	my $value = shift;
-
-	if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
-		return " ", $value;
-	}
-	return ": ", encode_base64(Encode::encode_utf8($value), '');
-}
 
 perunServicesInit::finalize;
