@@ -1,0 +1,120 @@
+#!/usr/bin/perl                                                                                                                     
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Text::CSV_XS;
+
+local $::SERVICE_NAME = "myq_printsvc";
+local $::PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+# Output file name
+my $output_fileName = "$DIRECTORY/import_users-perun".".csv";
+
+#Constants
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_CHIPNUMBERS; *A_CHIPNUMBERS = \'urn:perun:user:attribute-def:def:chipNumbers';
+our $A_R_NAME; *A_R_NAME = \'urn:perun:resource:attribute-def:core:name';
+
+# GATHER USERS
+my $users;  # $users->{$login}->{ATTR} = $attrValue;
+
+# AGGREGATE DATA
+#
+# FOR EACH RESOURCE
+foreach my $resourceId ( $data->getResourceIds() ){
+        
+	# EACH USER ON RESOURCE
+    my $resourceName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_NAME);
+
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
+		
+		# store standard attrs
+		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+		$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
+		$users->{$login}->{$A_CHIPNUMBERS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_CHIPNUMBERS);
+        if (exists $users->{$login}->{"groups"}){
+            push @{$users->{$login}->{"groups"}}, $resourceName;
+        } else {
+            my @userGroups = ($resourceName);
+            $users->{$login}->{"groups"} = \@userGroups;
+        }
+	}
+}
+
+#
+# PRINT user data LDIF
+#
+
+open FILE,">$output_fileName" or die "Cannot open $output_fileName: $! \n";
+binmode FILE, ":utf8";
+
+# PRINT HEADER
+print FILE '"FULLNAME";"USERNAME_ALIASES";"EMAIL";"CARDS";"GROUPS";"CODE";"SCANSTORAGE";"PIN";"MANAGED_GROUPS";"AUTHSERVER";"PHONE";"LANG";"PWD";"EXTID";"DELEGATES"' . "\n";
+
+# FOR EACH USER ON FACILITY
+my @logins = sort keys %{$users};
+for my $login (@logins) {
+
+    # FULLNAME
+    print FILE '"' . $users->{$login}->{$A_LAST_NAME} . " " . $users->{$login}->{$A_FIRST_NAME} . '";';
+    # LOGIN
+    print FILE $login . ";";
+    # MAIL
+    print FILE '"' . $users->{$login}->{$A_MAIL} . '";';
+    # CARDS
+    my @cards = grep {!($_ =~ s/^\s+|\s+$//g)} map {checkBase64($_)} @{$users->{$login}->{$A_CHIPNUMBERS}};
+    my $cards_str = join ",",@cards;
+    print FILE '"' . $cards_str . '";';
+    # GROUPS
+    my $groups_str = join ",",@{$users->{$login}->{"groups"}};
+    print FILE '"' . $groups_str . '";';
+    # CODE
+    print FILE $login . ";";
+    # SCANSTORAGE
+    print FILE '"' . "\\\\copy.ics.muni.cz\\$login\\Scan" . '";';
+    # PIN
+    print FILE $login . ";";
+    # MANAGED_GROUPS
+    print FILE ";";
+    # AUTH_SERVER
+    print FILE ";";
+    # PHONE
+    print FILE ";";
+    # LANG
+    print FILE "en;";
+    # PWD
+    print FILE ";";
+    # EXTID
+    print FILE ";";
+    # DELEGATES
+    print FILE "\n";
+
+}
+
+close(FILE);
+
+print "OK.";
+
+sub checkBase64 {
+	my $value = shift;
+
+	if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
+		return " ", $value;
+	}
+	return ": ", encode_base64(Encode::encode_utf8($value), '');
+}
+
+perunServicesInit::finalize;
