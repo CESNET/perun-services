@@ -8,7 +8,7 @@ use JSON::XS;
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.1.1";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -16,6 +16,7 @@ my $data = perunServicesInit::getHierarchicalData;
 
 #Constants
 our $A_USER_ID;                 *A_USER_ID =                   \'urn:perun:user:attribute-def:core:id';
+our $A_USER_IDENTIFIER;         *A_USER_IDENTIFIER =           \'urn:perun:user:attribute-def:def:login-namespace:bbmri-persistent-shadow';
 our $A_USER_LOGIN_BBMRI;        *A_USER_LOGIN_BBMRI =          \'urn:perun:user:attribute-def:def:login-namespace:bbmri';
 our $A_USER_PREFERRED_MAIL;     *A_USER_PREFERRED_MAIL =       \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_RT_PREF_MAIL;       *A_USER_RT_PREF_MAIL =         \'urn:perun:user:attribute-def:def:rtPreferredMail';
@@ -30,6 +31,7 @@ our $A_FAC_OUTPUT_FILE_NAME;    *A_FAC_OUTPUT_FILE_NAME =      \'urn:perun:facil
 
 #Headers
 our $LOGIN_HEADER = 'login';
+our $IDENTIFIER_HEADER = 'identifier';
 our $PREF_MAIL_HEADER = 'preferredMail';
 our $LAST_NAME_HEADER = 'lastName';
 our $MIDDLE_NAME_HEADER = 'middleName';
@@ -60,6 +62,7 @@ foreach my $rData (@resourcesData) {
 		my $userId = $memberAttributes->{$A_USER_ID};
 		unless(defined $usersStructureByUserId->{$userId}) {
 			my $login = $memberAttributes->{$A_USER_LOGIN_BBMRI};
+			my $identifier = $memberAttributes->{$A_USER_IDENTIFIER};
 			my $userPrefMail = $memberAttributes->{$A_USER_RT_PREF_MAIL} || $memberAttributes->{$A_USER_PREFERRED_MAIL};
 			my $lastName = $memberAttributes->{$A_USER_LAST_NAME};
 			my $middleName = $memberAttributes->{$A_USER_MIDDLE_NAME};
@@ -73,6 +76,7 @@ foreach my $rData (@resourcesData) {
 			$usersStructureByUserId->{$userId}->{$FIRST_NAME_HEADER} = $firstName;
 			$usersStructureByUserId->{$userId}->{$DISPLAY_NAME_HEADER} = $displayName;
 			$usersStructureByUserId->{$userId}->{$LOGIN_HEADER} = $login;
+			$usersStructureByUserId->{$userId}->{$IDENTIFIER_HEADER} = $identifier;
 			$usersStructureByUserId->{$userId}->{$ORGANIZATION_HEADER} = $organization;
 			$usersStructureByUserId->{$userId}->{$GROUPS_IN_RT_HEADER} = ();
 		}
