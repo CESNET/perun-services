@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_user_vsup_service";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.4";
+my $SCRIPT_VERSION = "3.0.5";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -15,7 +15,7 @@ my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 my $topDnFileName = "$DIRECTORY/topDN";
 
-my $data = perunServicesInit::getFlatData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adServiceBaseDN';
@@ -38,20 +38,19 @@ our $A_VSUP_PREF_MAIL;  *A_VSUP_PREF_MAIL = \'urn:perun:user:attribute-def:def:v
 our $A_VSUP_SSH_KEYS;  *A_VSUP_SSH_KEYS = \'urn:perun:user:attribute-def:def:sshPublicKey';
 
 # CHECK ON FACILITY ATTRIBUTES
-my %facilityAttributes = attributesToHash $data->getAttributes;
-if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_DOMAIN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_DOMAIN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_UAC})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_UAC ))) {
 	exit 1;
 }
 
-my $baseDN = $facilityAttributes{$A_F_BASE_DN};
-my $domain = $facilityAttributes{$A_F_DOMAIN};
-my $uac = $facilityAttributes{$A_F_UAC};
+my $baseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+my $domain = $data->getFacilityAttributeValue( attrName => $A_F_DOMAIN );
+my $uac = $data->getFacilityAttributeValue( attrName => $A_F_UAC );
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
@@ -75,32 +74,38 @@ close(FILE);
 # AGGREGATE DATA
 #
 # FOR EACH USER
-foreach my $user (($data->getChildElements)[1]->getChildElements) {
+foreach my $memberId ($data->getMemberIdsForFacility()) {
 
-	my %uAttributes = attributesToHash $user->getAttributes;
+	my $blacklisted = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_BLACKLISTED );
 
-	if (defined $uAttributes{$A_BLACKLISTED} and ($uAttributes{$A_BLACKLISTED} == 1)) {
+	if (defined $blacklisted and ($blacklisted == 1)) {
 		# skip blacklisted users !security ban!
 		next;
 	}
 
+	my $serviceUser = $data->getUserAttributeValue( member => $memberId, attrName => $A_IS_SERVICE );
+
 	# Print only service user accounts
-	if (defined $uAttributes{$A_IS_SERVICE} and ($uAttributes{$A_IS_SERVICE} == 1)) {
+	if (defined $serviceUser and ($serviceUser == 1)) {
 
-		my $login = $uAttributes{$A_LOGIN};
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
+		my $artisticFirstName = $data->getUserAttributeValue( member => $memberId, attrName => $A_ARTISTIC_FIRST_NAME );
+		my $firstName = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
+		my $artisticLastName = $data->getUserAttributeValue( member => $memberId, attrName => $A_ARTISTIC_LAST_NAME );
+		my $lastName = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
 
-		$users->{$login}->{"DN"} = "CN=" . $uAttributes{$A_LOGIN} . "," . $baseDN;
+		$users->{$login}->{"DN"} = "CN=" . $login . "," . $baseDN;
 		# store standard attrs
-		$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_ARTISTIC_FIRST_NAME} || $uAttributes{$A_FIRST_NAME};
-		$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_ARTISTIC_LAST_NAME} || $uAttributes{$A_LAST_NAME};
-		$users->{$login}->{$A_UCO} = $uAttributes{$A_UCO};
-		$users->{$login}->{$A_TITLE_BEFORE} = $uAttributes{$A_TITLE_BEFORE};
-		$users->{$login}->{$A_TITLE_AFTER} = $uAttributes{$A_TITLE_AFTER};
-		$users->{$login}->{$A_PHONE} = $uAttributes{$A_PHONE};
-		$users->{$login}->{$A_CARD_BARCODES} = $uAttributes{$A_CARD_BARCODES};
-		$users->{$login}->{$A_CARD_CHIP_NUMBERS} = $uAttributes{$A_CARD_CHIP_NUMBERS};
-		$users->{$login}->{$A_VSUP_PREF_MAIL} = $uAttributes{$A_VSUP_PREF_MAIL};
-		$users->{$login}->{$A_VSUP_SSH_KEYS} = $uAttributes{$A_VSUP_SSH_KEYS};
+		$users->{$login}->{$A_FIRST_NAME} = $artisticFirstName || $firstName;
+		$users->{$login}->{$A_LAST_NAME} = $artisticLastName || $lastName;
+		$users->{$login}->{$A_UCO} = $data->getUserAttributeValue( member => $memberId, attrName => $A_UCO );
+		$users->{$login}->{$A_TITLE_BEFORE} = $data->getUserAttributeValue( member => $memberId, attrName => $A_TITLE_BEFORE );
+		$users->{$login}->{$A_TITLE_AFTER} = $data->getUserAttributeValue( member => $memberId, attrName => $A_TITLE_AFTER );
+		$users->{$login}->{$A_PHONE} = $data->getUserAttributeValue( member => $memberId, attrName => $A_PHONE );
+		$users->{$login}->{$A_CARD_BARCODES} = $data->getUserAttributeValue( member => $memberId, attrName => $A_CARD_BARCODES );
+		$users->{$login}->{$A_CARD_CHIP_NUMBERS} = $data->getUserAttributeValue( member => $memberId, attrName => $A_CARD_CHIP_NUMBERS );
+		$users->{$login}->{$A_VSUP_PREF_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_VSUP_PREF_MAIL );
+		$users->{$login}->{$A_VSUP_SSH_KEYS} = $data->getUserAttributeValue( member => $memberId, attrName => $A_VSUP_SSH_KEYS );
 
 	}
 
@@ -133,7 +138,7 @@ for my $login (@logins) {
 	my $titleAfter = $users->{$login}->{$A_TITLE_AFTER};
 	my $phone = $users->{$login}->{$A_PHONE};
 	my $barcodes = $users->{$login}->{$A_CARD_BARCODES};
-	my $chipNumers = $users->{$login}->{$A_CARD_CHIP_NUMBERS};
+	my $chipNumbers = $users->{$login}->{$A_CARD_CHIP_NUMBERS};
 	my $vsupPrefMail = $users->{$login}->{$A_VSUP_PREF_MAIL};
 	my $sshKeys = $users->{$login}->{$A_VSUP_SSH_KEYS};
 
@@ -184,7 +189,7 @@ for my $login (@logins) {
 		print FILE "vsupPersonIdCardBarcode: " . $val . "\n";
 	}
 
-	foreach my $val (@$chipNumers) {
+	foreach my $val (@$chipNumbers) {
 		print FILE "vsupPersonIdCardChipNumber: " . $val . "\n";
 	}
 

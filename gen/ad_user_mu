@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_user_mu";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -15,7 +15,7 @@ my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 my $optAttrsFileName = "$DIRECTORY/optAttributes";
 
-my $data = perunServicesInit::getFlatData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
@@ -31,21 +31,20 @@ our $A_WORKPLACE; *A_WORKPLACE = \'urn:perun:user:attribute-def:def:workplace';
 our $A_WORKPLACE_ID; *A_WORKPLACE_ID = \'urn:perun:user:attribute-def:def:workplaceId';
 
 # CHECK ON FACILITY ATTRIBUTES
-my %facilityAttributes = attributesToHash $data->getAttributes;
-if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_DOMAIN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_DOMAIN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_UAC})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_UAC ))) {
 	exit 1;
 }
 
-my $baseDN = $facilityAttributes{$A_F_BASE_DN};
-my $domain = $facilityAttributes{$A_F_DOMAIN};
-my $uac = $facilityAttributes{$A_F_UAC};
-my $azureDomain = $facilityAttributes{$A_F_AZURE_DOMAIN};
+my $baseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+my $domain = $data->getFacilityAttributeValue( attrName => $A_F_DOMAIN );
+my $uac = $data->getFacilityAttributeValue( attrName => $A_F_UAC );
+my $azureDomain = $data->getFacilityAttributeValue( attrName => $A_F_AZURE_DOMAIN );
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
@@ -70,20 +69,18 @@ close(FILE);
 # AGGREGATE DATA
 #
 # FOR EACH USER
-foreach my $user (($data->getChildElements)[1]->getChildElements) {
+foreach my $memberId ($data->getMemberIdsForFacility()) {
 
-	my %uAttributes = attributesToHash $user->getAttributes;
+	my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 
-	my $login = $uAttributes{$A_LOGIN};
-
-	$users->{$login}->{"DN"} = "CN=" . $uAttributes{$A_LOGIN} . "," . $baseDN;
+	$users->{$login}->{"DN"} = "CN=" . $login . "," . $baseDN;
 	# store standard attrs
-	$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
-	$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
-	$users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
-	$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
-	$users->{$login}->{$A_WORKPLACE} = $uAttributes{$A_WORKPLACE};
-	$users->{$login}->{$A_WORKPLACE_ID} = $uAttributes{$A_WORKPLACE_ID};
+	$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
+	$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
+	$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME );
+	$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_MAIL );
+	$users->{$login}->{$A_WORKPLACE} = $data->getUserAttributeValue( member => $memberId, attrName => $A_WORKPLACE );
+	$users->{$login}->{$A_WORKPLACE_ID} = $data->getUserAttributeValue( member => $memberId, attrName => $A_WORKPLACE_ID );
 
 }
 

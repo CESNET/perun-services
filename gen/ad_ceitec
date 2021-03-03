@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_ceitec";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -17,7 +17,7 @@ my $baseDnFileName = "$DIRECTORY/baseDN";
 my $baseDnFileNameService = "$DIRECTORY/baseDNService";
 my $baseDnFileNameGroups = "$DIRECTORY/baseDNGroups";
 
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 # Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN'; # previously f:d:ldapBaseDN
@@ -47,33 +47,34 @@ my $users;  # $users->{$login}->{ATTR} = $attrValue;
 my $usersByResource;  # $usersByResource->{$A_R_GROUP_NAME}->{users DN} = 1
 
 # CHECK ON FACILITY ATTRIBUTES
-my %facilityAttributes = attributesToHash $data->getAttributes;
-
-if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_SERV_BASE_DN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_SERV_BASE_DN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_GROUP_BASE_DN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_DOMAIN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_DOMAIN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_UAC})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_UAC ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_UAC_SERV})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_UAC_SERV ))) {
 	exit 1;
 }
 
 #
 # PRINT BASE_DN FILEs
 #
-my $baseDNUsers = $facilityAttributes{$A_F_BASE_DN};
-my $baseDNService = $facilityAttributes{$A_F_SERV_BASE_DN};
-my $baseDNGroups = $facilityAttributes{$A_F_GROUP_BASE_DN};
+my $baseDNUsers = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+my $baseDNService = $data->getFacilityAttributeValue( attrName => $A_F_SERV_BASE_DN );
+my $baseDNGroups = $data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN );
+my $domain = $data->getFacilityAttributeValue( attrName => $A_F_DOMAIN );
+my $adUac = $data->getFacilityAttributeValue( attrName => $A_F_UAC );
+my $adUacService = $data->getFacilityAttributeValue( attrName => $A_F_UAC_SERV );
 
 open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
 print FILE $baseDNUsers;
@@ -87,49 +88,41 @@ open FILE,">:encoding(UTF-8)","$baseDnFileNameGroups" or die "Cannot open $baseD
 print FILE $baseDNGroups;
 close(FILE);
 
-#
-# AGGREGATE DATA
-#
-my @resourcesData = $data->getChildElements;
 
-# FOR EACH RESOURCE
-foreach my $rData (@resourcesData) {
+# FOR EACH MEMBER IN FACILITY
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		my $login = $data->getUserAttributeValue(member => $memberId, attrName => $A_LOGIN);
+		my $cn = $data->getUserAttributeValue(member => $memberId, attrName => $A_CN);
+		my $memberStatus = $data->getMemberAttributeValue(member => $memberId, attrName => $A_M_STATUS);
+		my $serviceUser = $data->getUserAttributeValue(member => $memberId, attrName => $A_IS_SERVICE);
 
-	my %rAttributes = attributesToHash $rData->getAttributes;
-
-	# process members
-	my @membersData = $rData->getChildElements;
-
-	# FOR EACH MEMBER ON RESOURCE
-	foreach my $mData (@membersData) {
-
-		my %mAttributes = attributesToHash $mData->getAttributes;
-		my $login = $mAttributes{$A_LOGIN};
-
-		unless ($mAttributes{$A_CN} && $mAttributes{$A_LOGIN} && ($mAttributes{$A_M_STATUS} eq $STATUS_VALID)) {
+		unless ($cn && $login && ($memberStatus eq $STATUS_VALID)) {
 			# skip users without CN or login and all not-valid members
 			next;
 		}
 
 		# store flat user structure
-		$users->{$login}->{$A_FIRST_NAME} = $mAttributes{$A_FIRST_NAME};
-		$users->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME};
-		$users->{$login}->{$A_MAIL} = $mAttributes{$A_MAIL};
-		$users->{$login}->{$A_EPPNS} = $mAttributes{$A_EPPNS};
-		$users->{$login}->{$A_O} = $mAttributes{$A_O};
-		$users->{$login}->{$A_CN} = $mAttributes{$A_CN};
-		$users->{$login}->{$A_IS_SERVICE} = $mAttributes{$A_IS_SERVICE};
+		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+		$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
+		$users->{$login}->{$A_EPPNS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_EPPNS);
+		$users->{$login}->{$A_O} = $data->getMemberAttributeValue(member => $memberId, attrName => $A_O);
+		$users->{$login}->{$A_CN} = $cn;
+		$users->{$login}->{$A_IS_SERVICE} = $serviceUser;
 
 		# store which users (their DN) are on this resource
+		my $groupName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_GROUP_NAME);
 
-		if (defined $mAttributes{$A_IS_SERVICE} and ($mAttributes{$A_IS_SERVICE} == 1)) {
+		if (defined $serviceUser and ($serviceUser == 1)) {
 			# service users
-			$users->{$login}->{"DN"} = "cn=" . $mAttributes{$A_CN} . "," . $baseDNService;
-			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $mAttributes{$A_CN} . "," . $baseDNService} = 1
-		} else {
+			$users->{$login}->{"DN"} = "cn=" . $cn . "," . $baseDNService;
+			$usersByResource->{$groupName}->{"CN=" . $cn . "," . $baseDNService} = 1
+		}
+		else {
 			# normal users
-			$users->{$login}->{"DN"} = "cn=" . $mAttributes{$A_CN} . "," . $baseDNUsers;
-			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $mAttributes{$A_CN} . "," . $baseDNUsers} = 1
+			$users->{$login}->{"DN"} = "cn=" . $cn . "," . $baseDNUsers;
+			$usersByResource->{$groupName}->{"CN=" . $cn . "," . $baseDNUsers} = 1
 		}
 
 	}
@@ -173,7 +166,7 @@ for my $login (@logins) {
 	my $cn = "$users->{$login}->{$A_CN}";
 
 	# Localy defined attributes
-	my $userPrincipalName = "$login\@$facilityAttributes{$A_F_DOMAIN}";
+	my $userPrincipalName = "$login\@$domain";
 	my $samAccountName = $login;
 	my $displayName = "$users->{$login}->{$A_LAST_NAME} $users->{$login}->{$A_FIRST_NAME}";
 
@@ -216,9 +209,9 @@ for my $login (@logins) {
 
 	# Set userAccountControl to 66048 which means Normal account + Password never expires + enabled
 	if (defined $service and ($service == 1)) {
-		print FILE "userAccountControl: $facilityAttributes{$A_F_UAC_SERV}\n";
+		print FILE "userAccountControl: $adUacService\n";
 	} else {
-		print FILE "userAccountControl: $facilityAttributes{$A_F_UAC}\n";
+		print FILE "userAccountControl: $adUac\n";
 	}
 
 	# print classes
