@@ -7,14 +7,14 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_group_vsup";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
@@ -24,21 +24,20 @@ our $A_F_SERV_BASE_DN;  *A_F_SERV_BASE_DN = \'urn:perun:facility:attribute-def:d
 our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
 our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName';
 
-# CHECK ON FACILITY ATTRIBUTES
-my %facilityAttributes = attributesToHash $data->getAttributes;
-if (!defined($facilityAttributes{$A_F_GROUP_BASE_DN})) {
+# CHECK ON FACILITY ATTRIBUTES4
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_SERV_BASE_DN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_SERV_BASE_DN ))) {
 	exit 1;
 }
 
-my $baseGroupDN = $facilityAttributes{$A_F_GROUP_BASE_DN};
-my $baseDN = $facilityAttributes{$A_F_BASE_DN};
-my $baseServiceDN = $facilityAttributes{$A_F_SERV_BASE_DN};
+my $baseGroupDN = $data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN );
+my $baseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+my $baseServiceDN = $data->getFacilityAttributeValue( attrName => $A_F_SERV_BASE_DN );
 
 #
 # PRINT BASE_DN FILE
@@ -47,37 +46,33 @@ open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileN
 print FILE $baseGroupDN;
 close(FILE);
 
-my @resourcesData = $data->getChildElements;
 my $groups = {};
 my $usersByResource = {};
 
 # FOR EACH RESOURCE
-foreach my $rData (@resourcesData) {
+foreach my $resourceId ($data->getResourceIds()) {
 
-	my %rAttributes = attributesToHash $rData->getAttributes;
-	my $group = $rAttributes{$A_R_GROUP_NAME};
+	my $group = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_GROUP_NAME );
 	$groups->{$group} = 1;
 
-	# process members
-	my @membersData = $rData->getChildElements;
-
 	# FOR EACH MEMBER ON RESOURCE
-	foreach my $mData (@membersData) {
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 
-		my %mAttributes = attributesToHash $mData->getAttributes;
-		my $login = $mAttributes{$A_LOGIN};
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 
-		unless ($mAttributes{$A_LOGIN}) {
+		unless ($login) {
 			# skip users without login = CN
 			next;
 		}
 
-		if (defined $mAttributes{$A_IS_SERVICE} and ($mAttributes{$A_IS_SERVICE} == 1)) {
+		my $serviceUser = $data->getUserAttributeValue( member => $memberId, attrName => $A_IS_SERVICE );
+
+		if (defined $serviceUser and ($serviceUser == 1)) {
 			# store which service users (their DN) are on this resource
-			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseServiceDN} = 1
+			$usersByResource->{$group}->{"CN=" . $login . "," . $baseServiceDN} = 1
 		} else {
 			# store which normal users (their DN) are on this resource
-			$usersByResource->{$rAttributes{$A_R_GROUP_NAME}}->{"CN=" . $login . "," . $baseDN} = 1
+			$usersByResource->{$group}->{"CN=" . $login . "," . $baseDN} = 1
 		}
 
 

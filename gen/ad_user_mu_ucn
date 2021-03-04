@@ -7,14 +7,14 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_user_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
-my $data = perunServicesInit::getFlatData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
@@ -27,20 +27,19 @@ our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 
 # CHECK ON FACILITY ATTRIBUTES
-my %facilityAttributes = attributesToHash $data->getAttributes;
-if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_DOMAIN})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_DOMAIN ))) {
 	exit 1;
 }
-if (!defined($facilityAttributes{$A_F_UAC})) {
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_UAC ))) {
 	exit 1;
 }
 
-my $baseDN = $facilityAttributes{$A_F_BASE_DN};
-my $domain = $facilityAttributes{$A_F_DOMAIN};
-my $uac = $facilityAttributes{$A_F_UAC};
+my $baseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+my $domain = $data->getFacilityAttributeValue( attrName => $A_F_DOMAIN );
+my $uac = $data->getFacilityAttributeValue( attrName => $A_F_UAC );
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
@@ -56,18 +55,16 @@ close(FILE);
 # AGGREGATE DATA
 #
 # FOR EACH USER
-foreach my $user (($data->getChildElements)[1]->getChildElements) {
+foreach my $memberId ($data->getMemberIdsForFacility()) {
 
-	my %uAttributes = attributesToHash $user->getAttributes;
+	my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 
-	my $login = $uAttributes{$A_LOGIN};
-
-	$users->{$login}->{"DN"} = "CN=" . $uAttributes{$A_LOGIN} . "," . $baseDN;
+	$users->{$login}->{"DN"} = "CN=" . $login . "," . $baseDN;
 	# store standard attrs
-	$users->{$login}->{$A_FIRST_NAME} = $uAttributes{$A_FIRST_NAME};
-	$users->{$login}->{$A_LAST_NAME} = $uAttributes{$A_LAST_NAME};
-	$users->{$login}->{$A_DISPLAY_NAME} = $uAttributes{$A_DISPLAY_NAME};
-	$users->{$login}->{$A_MAIL} = $uAttributes{$A_MAIL};
+	$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
+	$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
+	$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME );
+	$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_MAIL );
 
 }
 
