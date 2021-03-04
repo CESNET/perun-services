@@ -39,11 +39,11 @@ Return URL and credentials for specified namespace. Data are read from C</etc/pe
 
 =head2 resolve_domain_controlers()
 
-Return a list of available domain controlers from a domain URL. Expected format of parameter is C<protocol://host:port>. Result is a list of URLs in the same format.
+Return a list of available domain controllers from a domain URL. Expected format of parameter is C<protocol://host:port>. Result is a list of URLs in the same format.
 
 =head2 ldap_connect_multiple_options()
 
-Connect to the AD through the first possible controler from a list of controlers. Connection (Net::LDAP) object is returned.
+Connect to the AD through the first possible controller from a list of controllers. Connection (Net::LDAP) object is returned.
 
 =head2 resolve_pdc()
 
@@ -151,7 +151,7 @@ sub init_config($) {
 }
 
 #
-# Resolve available domain controlers from a URL
+# Resolve available domain controllers from a URL
 #
 sub resolve_domain_controlers($) {
 	my $ldap_location = shift;
@@ -164,33 +164,33 @@ sub resolve_domain_controlers($) {
 	}
 	my $resolver = Net::DNS::Resolver->new;
 	my $query = $resolver->search($host);
-	my @controlers = ();
+	my @controllers = ();
 
 	if ($query) {
 		foreach ($query->answer) {
 			next unless $_->type eq "A";
-			push(@controlers, $protocol . $_->address . ":" . $port);
+			push(@controllers, $protocol . $_->address . ":" . $port);
 		}
 	} else {
 		my $error = $resolver->errorstring();
 		ldap_log('ad_connection', "[AD] No answer was found for $host. DNS query returned error message: $error");
 		die "[AD] No answer was found for $host. DNS query returned error message: $error";
 	}
-	if (!@controlers) {
-		ldap_log('ad_connection', "[AD] DNS query for $host did not return any controler.");
-		die "[AD] DNS query for $host did not return any controler.";
+	if (!@controllers) {
+		ldap_log('ad_connection', "[AD] DNS query for $host did not return any controller.");
+		die "[AD] DNS query for $host did not return any controller.";
 	}
-	return @controlers;
+	return @controllers;
 }
 
 #
-# Connect to a controler from a list of controlers
+# Connect to a controller from a list of controllers
 #
 sub ldap_connect_multiple_options($) {
-	my $controlers = shift;
+	my $controllers = shift;
 	my $ldap;
 
-	foreach (@$controlers) {
+	foreach (@$controllers) {
 		$ldap = Net::LDAPS->new( "$_" , onerror => 'warn' , timeout => 15);
 		last if $ldap;
 	}
@@ -226,7 +226,7 @@ sub resolve_pdc($) {
 		print STDERR "[AD] Cannot get PDC host name. Returned $pdc_host";
 		die "[AD] Cannot get PDC host name. Returned $pdc_host";
 	}
-
+	ldap_log('ad_connection', "[AD] Resolved domain controller. Returned $pdc_host");
 	return $protocol . $pdc_host . ":" . $port;
 
 }
