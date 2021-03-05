@@ -419,6 +419,7 @@ my $counter_add = 0;
 my $counter_updated = 0;
 my $counter_disabled = 0;
 my $counter_fail = 0;
+my $counter_fail_password = 0;
 my $counter_add_ous = 0;
 my $counter_fail_ous = 0;
 my $counter_group_added = 0;
@@ -492,6 +493,7 @@ ldap_log($service_name, "User added: " . $counter_add . " entries.");
 ldap_log($service_name, "User updated: " . $counter_updated . " entries.");
 ldap_log($service_name, "User disabled: " . $counter_disabled . " entries.");
 ldap_log($service_name, "User failed: " . $counter_fail. " entries.");
+ldap_log($service_name, "Failed to set password: " . $counter_fail_password . " entries.");
 ldap_log($service_name, "-------------------------------------------------------------------------------------------------------");
 ldap_log($service_name, "OU added: " . $counter_add_ous . " entries.");
 ldap_log($service_name, "OU failed: " . $counter_fail_ous . " entries.");
@@ -517,6 +519,7 @@ print "User added: " . $counter_add . " entries.\n";
 print "User updated: " . $counter_updated . " entries.\n";
 print "User disabled: " . $counter_disabled . " entries.\n";
 print "User failed: " . $counter_fail. " entries.\n";
+print "Failed to set password: " . $counter_fail_password . " entries.\n";
 print "-------------------------------------------------------------------------------------------------------\n";
 print "OU added: " . $counter_add_ous . " entries.\n";
 print "OU failed: " . $counter_fail_ous . " entries.\n";
@@ -540,7 +543,7 @@ print "Group failed to update (members): " . $counter_group_members_not_updated 
 $lock->unlock();
 $lockManager->unlock($errorLockFile);
 
-if ($counter_fail or $counter_fail_ous or
+if ($counter_fail or $counter_fail_password or $counter_fail_ous or
 	$counter_group_not_added or $counter_group_members_not_updated or
 	$counter_group_members_updated_with_errors or $counter_group_attributes_not_updated or
 	$counter_group_not_removed or $counter_group_grace_period_not_set or $counter_group_not_emptied) {
@@ -1213,16 +1216,27 @@ sub ping_password_setter() {
 	my $dbh = DBI->connect("dbi:Oracle:$db_name",$username, $password,{RaiseError=>1,AutoCommit=>0,LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
 
 	my $changeExists = $dbh->prepare(qq{select 1 from $table_name where uin=?});
-	$changeExists->execute($login);
+	unless ($changeExists->execute($login)) {
+		ldap_log($service_name, "Couldn't execute select statement: " . $changeExists->errstr . "for login " . $login);
+		$counter_fail_password++;
+		$changeExists->finish();
+		commit $dbh;
+		$dbh->disconnect();
+		return;
+	}
 
 	unless($changeExists->fetch) {
 
 		my $insert = $dbh->prepare(qq{INSERT INTO $table_name (uin, import_time) VALUES (?, sysdate)});
-		$insert->execute($login);
+		unless ($insert->execute($login)) {
+			ldap_log($service_name, "Couldn't execute insert statement: " . $insert->errstr . "for login " . $login);
+			$counter_fail_password++;
+		}
+		$insert->finish();
 
 	}
-	$changeExists->finish();
 
+	$changeExists->finish();
 	commit $dbh;
 	$dbh->disconnect();
 

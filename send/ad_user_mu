@@ -20,6 +20,7 @@ sub ping_password_setter;
 my $counter_add = 0;
 my $counter_update = 0;
 my $counter_fail = 0;
+my $counter_fail_password = 0;
 
 # define service
 my $service_name = "ad_user_mu";
@@ -85,15 +86,18 @@ ldap_unbind($ldap);
 ldap_log($service_name, "Added: " . $counter_add . " entries.");
 ldap_log($service_name, "Updated: " . $counter_update. " entries.");
 ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
+ldap_log($service_name, "Failed to set password: " . $counter_fail_password . " entries.");
 
 # print results for TaskResults in GUI
 print "Added: " . $counter_add . " entries.\n";
 print "Updated: " . $counter_update. " entries.\n";
 print "Failed: " . $counter_fail. " entries.\n";
+print "Failed to set password: " . $counter_fail_password . " entries.\n";
 
 $lock->unlock();
 
 if ($counter_fail > 0) { die "Failed to process: " . $counter_fail . " entries.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
+if ($counter_fail_password > 0) { die "Failed to set password: " . $counter_fail_password . " entries.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
 
 # END of main script
 
@@ -242,15 +246,27 @@ sub ping_password_setter() {
 	my $dbh = DBI->connect("dbi:Oracle:$db_name",$username, $password,{RaiseError=>1,AutoCommit=>0,LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
 
 	my $changeExists = $dbh->prepare(qq{select 1 from $table_name where uin=?});
-	$changeExists->execute($login);
+	unless ($changeExists->execute($login)) {
+		ldap_log($service_name, "Couldn't execute select statement: " . $changeExists->errstr . "for login " . $login);
+		$counter_fail_password++;
+		$changeExists->finish();
+		commit $dbh;
+		$dbh->disconnect();
+		return;
+	}
 
 	unless($changeExists->fetch) {
 
 		my $insert = $dbh->prepare(qq{INSERT INTO $table_name (uin, import_time) VALUES (?, sysdate)});
-		$insert->execute($login);
+		unless ($insert->execute($login)) {
+			ldap_log($service_name, "Couldn't execute insert statement: " . $insert->errstr . "for login " . $login);
+			$counter_fail_password++;
+		}
+		$insert->finish();
 
 	}
 
+	$changeExists->finish();
 	commit $dbh;
 	$dbh->disconnect();
 
