@@ -15,11 +15,18 @@ use ScriptLock;
 sub process_add;
 sub process_update;
 sub ping_password_setter;
+sub update_group_members;
+sub add_members_to_entry;
+sub remove_members_from_entry;
+sub update_group_membership;
 
 # log counters
 my $counter_add = 0;
 my $counter_update = 0;
 my $counter_fail = 0;
+my $counter_group_updated = 0;
+my $counter_group_updated_with_errors = 0;
+my $counter_group_failed = 0;
 
 # define service
 my $service_name = "ad_user_mu_ucn";
@@ -72,6 +79,7 @@ foreach my $ad_entry (@ad_entries) {
 # process data
 process_add();
 process_update();
+update_group_members();
 
 # disconnect
 ldap_unbind($ldap);
@@ -86,9 +94,25 @@ print "Added: " . $counter_add . " entries.\n";
 print "Updated: " . $counter_update. " entries.\n";
 print "Failed: " . $counter_fail. " entries.\n";
 
+if ($counter_group_updated) {
+	ldap_log($service_name, "Members of the guest group were updated.");
+	print "Members of the guest group were updated.\n";
+} elsif ($counter_group_failed) {
+	ldap_log($service_name, "Updating members of the guest group failed.");
+	print "Updating members of the guest group failed.\n";
+} elsif ($counter_group_updated_with_errors) {
+	ldap_log($service_name, "Members of the guest group were updated with errors.");
+	print "Members of the guest group were updated with errors.\n";
+} else {
+	ldap_log($service_name, "Members of the guest group were not changed.");
+	print "Members of the guest group were not changed.\n";
+}
+
 $lock->unlock();
 
-if ($counter_fail > 0) { die "Failed to process: " . $counter_fail . " entries.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
+if ($counter_fail or $counter_group_failed or $counter_group_updated_with_errors) {
+	die "Process ended up with errors.\nSee log at: ~/perun-engine/send/logs/$service_name.log";
+}
 
 # END of main script
 
@@ -249,4 +273,141 @@ sub ping_password_setter() {
 	commit $dbh;
 	$dbh->disconnect();
 
+}
+
+sub update_group_members {
+	my $filter_groups = '(objectClass=group)';
+	my $group_dn = 'CN=HostPerun,OU=Types,OU=MU,DC=ucn,DC=muni,DC=cz';
+
+	my @per_val = ();
+	foreach my $perun_entry (@perun_entries) {
+		push (@per_val, $perun_entry->dn());
+	}
+
+	# load members of a group from AD based on DN in Perun => Group must exists in AD
+	my @ad_val = load_group_members($ldap, $group_dn, $filter_groups);
+
+	if ($? != 0) {
+		ldap_log($service_name, "Unable to load Perun group members from AD: " . $group_dn);
+		$counter_group_failed++;
+		return;
+	}
+
+	# sort to compare
+	my @sorted_ad_val = sort(@ad_val);
+	my @sorted_per_val = sort(@per_val);
+
+	# compare using smart-match (perl 5.10.1+)
+	unless(@sorted_ad_val ~~ @sorted_per_val) {
+
+		my %ad_val_map = map { $_ => 1 } @sorted_ad_val;
+		my %per_val_map = map { $_ => 1 } @sorted_per_val;
+
+		# we must get reference to real group from AD in order to call "replace"
+		my $response_ad = $ldap->search( base => $group_dn, filter => $filter_groups, scope => 'base' );
+		unless ($response_ad->is_error()) {
+			# SUCCESS
+			my $ad_entry = $response_ad->entry(0);
+			update_group_membership($ad_entry, \%ad_val_map, \%per_val_map);
+
+		} else {
+			# FAIL (to get group from AD)
+			$counter_group_failed++;
+			ldap_log($service_name, "Group members NOT updated: " . $group_dn . " | " . $response_ad->error());
+		}
+	}
+}
+
+sub add_members_to_entry {
+
+	my $ad_entry = shift;
+	my $to_be_added = shift;
+	my $return_code = 0;
+
+	# chunks of size less than 5000 have to be used, because LDAP cannot process more than 5000 operations at once.
+	my @chunks_to_add = ();
+
+	push @chunks_to_add, [ splice @$to_be_added, 0, 4999 ] while @$to_be_added;
+
+	foreach (@chunks_to_add) {
+		$ad_entry->add(
+			'member' => $_
+		);
+		my $response = $ad_entry->update($ldap);
+		if ($response) {
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
+			} else {
+				ldap_log($service_name, "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
+				$return_code = 1;
+			}
+		}
+	}
+
+	return $return_code;
+}
+
+sub remove_members_from_entry {
+
+	my $ad_entry = shift;
+	my $to_be_removed = shift;
+	my $return_code = 0;
+
+	# chunks of size less than 5000 have to be used, because LDAP cannot process more than 5000 operations at once.
+	my @chunks_to_remove = ();
+
+	push @chunks_to_remove, [ splice @$to_be_removed, 0, 4999 ] while @$to_be_removed;
+
+	foreach (@chunks_to_remove) {
+		$ad_entry->delete(
+			'member' => $_
+		);
+		my $response = $ad_entry->update($ldap);
+		if ($response) {
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
+			} else {
+				ldap_log($service_name, "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
+				$return_code = 1;
+			}
+		}
+	}
+
+	return $return_code;
+}
+
+sub update_group_membership {
+
+	my $ad_entry = shift;
+	my $ad_members_state = shift;
+	my $perun_members_state = shift;
+
+	my @to_be_added = ();
+	my @to_be_removed = ();
+
+	foreach (keys %{$perun_members_state}) {
+		unless (defined $ad_members_state->{$_}) {
+			push (@to_be_added, $_);
+		}
+	}
+
+	foreach (keys %{$ad_members_state}) {
+		unless (defined $perun_members_state->{$_}) {
+			push (@to_be_removed, $_);
+		}
+	}
+
+	if (@to_be_added or @to_be_removed) {
+		@to_be_added = sort @to_be_added;
+		@to_be_removed = sort @to_be_removed;
+
+		my $response_add = add_members_to_entry($ad_entry, \@to_be_added);
+		my $response_remove = remove_members_from_entry($ad_entry, \@to_be_removed);
+
+		if ($response_add or $response_remove) {
+			$counter_group_updated_with_errors++;
+		} else {
+			$counter_group_updated++;
+		}
+	}
 }
