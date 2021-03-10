@@ -258,6 +258,9 @@ sub processResourceMail {
 
 		foreach my $memberId($data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
 			my $UCO = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
+
+			#Skip all users without licenses (they can't be inside o365)
+			next unless( $users->{$UCO} );
 			my $UPN = $users->{$UCO}->{$UPN_TEXT};
 
 			if($onResourceBookInPolicy) { push @resBookInPolicy, $UPN; }
