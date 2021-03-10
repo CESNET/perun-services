@@ -67,7 +67,8 @@ while(my $line = <FILE>) {
 	$dataByUco->{$parts[0]}->{'PHONE'} = (($parts[8] ne '') ? $parts[8] : undef);
 	$dataByUco->{$parts[0]}->{'PHONE_PRIV'} = (($parts[9] ne '') ? $parts[9] : undef);
 	$dataByUco->{$parts[0]}->{'MOBILE'} = (($parts[10] ne '') ? $parts[10] : undef);
-	$dataByUco->{$parts[0]}->{'PHOTO'} = (($parts[11] ne '') ? $parts[11] : undef);
+	$dataByUco->{$parts[0]}->{'BANK_ACCOUNT'} = (($parts[11] ne '') ? $parts[11] : undef);
+	$dataByUco->{$parts[0]}->{'PHOTO'} = (($parts[12] ne '') ? $parts[12] : undef);
 }
 close FILE;
 
@@ -95,6 +96,7 @@ foreach my $UCO (sort keys %$dataByUco) {
 	my $TEL_PRAC_LINKA = $dataByUco->{$UCO}->{'PHONE'};
 	my $TEL_PRAC_MOB = $dataByUco->{$UCO}->{'MOBILE'};
 	my $TEL_SOUKR = $dataByUco->{$UCO}->{'PHONE_PRIV'};
+	my $BANK_UCET = $dataByUco->{$UCO}->{'BANK_ACCOUNT'};
 
 	# check if person exists in destination
 	my $personExists = $dbh->prepare(qq{select 1 from $tableName where UCO=?});
@@ -118,6 +120,7 @@ foreach my $UCO (sort keys %$dataByUco) {
 		appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_LINKA', paramValue => $TEL_PRAC_LINKA);
 		appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_MOB', paramValue => $TEL_PRAC_MOB);
 		appendParam(select => $select, params => \@params, paramName => 'TEL_SOUKR', paramValue => $TEL_SOUKR);
+		appendParam(select => $select, params => \@params, paramName => 'BANK_UCET', paramValue => $BANK_UCET);
 
 		my $recordAreEquals = $dbh->prepare($select);
 		$recordAreEquals->execute(@params);
@@ -125,8 +128,8 @@ foreach my $UCO (sort keys %$dataByUco) {
 		if(!$recordAreEquals->fetch) {
 
 			unless($DUMMY) {
-				my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET JMENO=? , PRIJMENI=? , TITUL_PRED=? , TITUL_ZA=? , FOTO=? , EMAIL_SKOLNI=? , EMAIL_SOUKR=? , TEL_PRAC_LINKA=? , TEL_PRAC_MOB=? , TEL_SOUKR=? WHERE UCO=?});
-				$updatePerson->execute($JMENO, $PRIJMENI, $TITUL_PRED, $TITUL_ZA, $FOTO, $EMAIL_SKOLNI, $EMAIL_SOUKR, $TEL_PRAC_LINKA , $TEL_PRAC_MOB, $TEL_SOUKR, $UCO);
+				my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET JMENO=? , PRIJMENI=? , TITUL_PRED=? , TITUL_ZA=? , FOTO=? , EMAIL_SKOLNI=? , EMAIL_SOUKR=? , TEL_PRAC_LINKA=? , TEL_PRAC_MOB=? , TEL_SOUKR=? , BANK_UCET=? WHERE UCO=?});
+				$updatePerson->execute($JMENO, $PRIJMENI, $TITUL_PRED, $TITUL_ZA, $FOTO, $EMAIL_SKOLNI, $EMAIL_SOUKR, $TEL_PRAC_LINKA , $TEL_PRAC_MOB, $TEL_SOUKR, $BANK_UCET, $UCO);
 				if($DEBUG == 1) { print "Update existing person: $UCO\n"; }
 			} else {
 				if($DEBUG == 1) { print "Would update existing person: $UCO\n"; }
@@ -149,8 +152,8 @@ foreach my $UCO (sort keys %$dataByUco) {
 		# we will do insert
 		unless($DUMMY) {
 			if($DEBUG == 1) { print "Insert new person: $UCO\n"; }
-			my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, JMENO, PRIJMENI, TITUL_PRED, TITUL_ZA, FOTO , EMAIL_SKOLNI, EMAIL_SOUKR, TEL_PRAC_LINKA, TEL_PRAC_MOB, TEL_SOUKR) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)});
-			$insertPerson->execute($UCO, $LOGIN, $JMENO, $PRIJMENI, $TITUL_PRED, $TITUL_ZA, $FOTO, $EMAIL_SKOLNI, $EMAIL_SOUKR, $TEL_PRAC_LINKA, $TEL_PRAC_MOB, $TEL_SOUKR);
+			my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, JMENO, PRIJMENI, TITUL_PRED, TITUL_ZA, FOTO , EMAIL_SKOLNI, EMAIL_SOUKR, TEL_PRAC_LINKA, TEL_PRAC_MOB, TEL_SOUKR, BANK_UCET) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)});
+			$insertPerson->execute($UCO, $LOGIN, $JMENO, $PRIJMENI, $TITUL_PRED, $TITUL_ZA, $FOTO, $EMAIL_SKOLNI, $EMAIL_SOUKR, $TEL_PRAC_LINKA, $TEL_PRAC_MOB, $TEL_SOUKR, $BANK_UCET);
 		} else {
 			if($DEBUG == 1) { print "Would insert new person: $UCO\n"; }
 		}
