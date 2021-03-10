@@ -1,5 +1,0 @@
-#!/bin/bash 
-
-SERVICE_NAME="pakiti"
-
-. generic_send
