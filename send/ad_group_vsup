@@ -13,9 +13,12 @@ use ScriptLock;
 
 sub process_update;
 
-# log counters
-my $counter_update = 0;
-my $counter_fail = 0;
+# Constants and counters
+my $RESULT_ERRORS = "errors";
+my $RESULT_CHANGED = "changed";
+my $counter_group_members_updated = 0;
+my $counter_group_members_updated_with_errors = 0;
+my $counter_group_members_not_updated = 0;
 
 # define service
 my $service_name = "ad_group_vsup";
@@ -65,24 +68,21 @@ process_update();
 ldap_unbind($ldap);
 
 # log results
-ldap_log($service_name, "Updated: " . $counter_update. " entries.");
-ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
+ldap_log($service_name, "Group updated (members): " . $counter_group_members_updated . " entries.");
+ldap_log($service_name, "Group updated with errors (members): " . $counter_group_members_updated_with_errors . " entries.");
+ldap_log($service_name, "Group failed to update (members): " . $counter_group_members_not_updated. " entries.");
 
 # print results for TaskResults in GUI
-print "Updated: " . $counter_update. " entries.\n";
-print "Failed: " . $counter_fail. " entries.\n";
+print "Group updated (members): " . $counter_group_members_updated . " entries.\n";
+print "Group updated with errors (members): " . $counter_group_members_updated_with_errors . " entries.\n";
+print "Group failed to update (members): " . $counter_group_members_not_updated. " entries.\n";
 
 $lock->unlock();
 
-if ($counter_fail > 0) { die "Failed to process: " . $counter_fail . " entries.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
+if ($counter_group_members_updated_with_errors > 0) { die "Failed to process: " . $counter_group_members_updated_with_errors . " entries.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
 
 # END of main script
 
-###########################################
-#
-# Main processing functions
-#
-###########################################
 
 #
 # Update group members in AD
@@ -108,34 +108,21 @@ sub process_update() {
 		# compare using smart-match (perl 5.10.1+)
 		unless(@sorted_ad_val ~~ @sorted_per_val) {
 
+			my %ad_val_map = map { $_ => 1 } @sorted_ad_val;
+			my %per_val_map = map { $_ => 1 } @sorted_per_val;
+
 			# members of group are not equals
 			# we must get reference to real group from AD in order to call "replace"
 			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'base' );
 			unless ($response_ad->is_error()) {
 				# SUCCESS
 				my $ad_entry = $response_ad->entry(0);
-				$ad_entry->replace(
-					'member' => \@per_val
-				);
-				# Update entry in AD
-				my $response = $ad_entry->update($ldap);
-
-				if ($response) {
-					unless ($response->is_error()) {
-						# SUCCESS (group updated)
-						$counter_update++;
-						ldap_log($service_name, "Group members updated: " . $ad_entry->dn() . " | \n" . join(",\n",@sorted_ad_val) .  "\n=>\n" . join(",\n",@sorted_per_val));
-					} else {
-						# FAIL (to update group)
-						$counter_fail++;
-						ldap_log($service_name, "Group members NOT updated: " . $ad_entry->dn() . " | " . $response->error());
-						ldap_log($service_name, $ad_entry->ldif());
-					}
-				}
-
+				my $result = update_group_membership($ldap, $service_name, $ad_entry, \%ad_val_map, \%per_val_map);
+				$counter_group_members_updated++ if ($result eq $RESULT_CHANGED);
+				$counter_group_members_updated_with_errors++ if ($result eq $RESULT_ERRORS);
 			} else {
 				# FAIL (to get group from AD)
-				$counter_fail++;
+				$counter_group_members_not_updated++;
 				ldap_log($service_name, "Group members NOT updated: " . $perun_entry->dn() . " | " . $response_ad->error());
 			}
 		}
