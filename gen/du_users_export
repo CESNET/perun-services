@@ -99,7 +99,11 @@ foreach my $resourceId ($data->getResourceIds()) {
 			my $serviceUser = $data->getUserAttributeValue(attrName => $A_USER_SERVICE_USER, member => $memberId);
 			if($serviceUser) {
 				my @specificUsers = $usersAgent->getUsersBySpecificUser(specificUser => $userId);
-				my @richAssocUsersWithAttributes = $usersAgent->getRichUsersFromListOfUsersWithAttributes(users => \@specificUsers);
+				my @specificUsersIds = ();
+				foreach my $user (@specificUsers) {
+					push @specificUsersIds, $user->getId();
+				}
+				my @richAssocUsersWithAttributes = $usersAgent->getRichUsersWithAttributesByIds(ids => \@specificUsersIds);
 				foreach my $richUser (@richAssocUsersWithAttributes) {
 				
 					#prepare attributes to hash
