@@ -12,7 +12,6 @@ my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $data = perunServicesInit::getHashedHierarchicalData;
-my $agent = perunServicesInit::getAgent;
 my $DIRECTORY = perunServicesInit::getDirectory;
 
 

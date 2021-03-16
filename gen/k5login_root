@@ -13,13 +13,11 @@ my $SCRIPT_VERSION = "3.1.2";
 perunServicesInit::init;
 my $data = perunServicesInit::getHashedDataWithGroups;
 
-my $agent = perunServicesInit::getAgent;
 
 our $A_PRINCIPAL;            *A_PRINCIPAL =           \'urn:perun:user:attribute-def:def:kerberosAdminPrincipal';
 our $A_USER_STATUS;          *A_USER_STATUS =         \'urn:perun:member:attribute-def:core:status';
 our $A_GROUP_DESTINATIONS;   *A_GROUP_DESTINATIONS =  \'urn:perun:group:attribute-def:def:listOfDestinations';
 
-my $sortingFunction = getAttributeSorting($A_PRINCIPAL, 1);
 my %outputByDestination = ('all' => undef);
 
 foreach my $resourceId ($data->getResourceIds()) {
@@ -30,7 +28,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 			@generatedDataDestination = @{$data->getGroupAttributeValue(group => "$groupId", attrName => "$A_GROUP_DESTINATIONS" )};
 		}
 
-		foreach my $memberId ($data->getMemberIdsForResource( resource => "$resourceId" )) {
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => "$resourceId", group => "$groupId" )) {
 			next if $data->getMemberAttributeValue( member => "$memberId", attrName => "$A_USER_STATUS" ) ne 'VALID';
 			push @{$outputByDestination{$_}}, $data->getUserAttributeValue( member => "$memberId", attrName => "$A_PRINCIPAL" ) foreach @generatedDataDestination;
 		}
