@@ -8,10 +8,10 @@ use File::Basename;
 
 local $::SERVICE_NAME = basename($0);
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.1.1";
+my $SCRIPT_VERSION = "3.1.2";
 
 perunServicesInit::init;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 my $agent = perunServicesInit::getAgent;
 
@@ -22,18 +22,17 @@ our $A_GROUP_DESTINATIONS;   *A_GROUP_DESTINATIONS =  \'urn:perun:group:attribut
 my $sortingFunction = getAttributeSorting($A_PRINCIPAL, 1);
 my %outputByDestination = ('all' => undef);
 
-my @resourcesData = $data->getChildElements;
-foreach my $resourceData (@resourcesData) {
+foreach my $resourceId ($data->getResourceIds()) {
 
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		my %groupAttributes = attributesToHash $groupData->getAttributes;
+	foreach my $groupId ($data->getGroupIdsForResource( resource => "$resourceId" )) {
 		my @generatedDataDestination = ('all');
-		if(defined $groupAttributes{$A_GROUP_DESTINATIONS}) { @generatedDataDestination = @{$groupAttributes{$A_GROUP_DESTINATIONS}}; }
+		if(defined $data->getGroupAttributeValue(group => "$groupId", attrName => "$A_GROUP_DESTINATIONS" )) {
+			@generatedDataDestination = @{$data->getGroupAttributeValue(group => "$groupId", attrName => "$A_GROUP_DESTINATIONS" )};
+		}
 
-		foreach my $memberData (($groupData->getChildElements)[1]->getChildElements) {
-			my %memberAttributes = attributesToHash $memberData->getAttributes;
-			next if $memberAttributes{$A_USER_STATUS} ne 'VALID';
-			push @{$outputByDestination{$_}}, $memberAttributes{$A_PRINCIPAL} foreach @generatedDataDestination;
+		foreach my $memberId ($data->getMemberIdsForResource( resource => "$resourceId" )) {
+			next if $data->getMemberAttributeValue( member => "$memberId", attrName => "$A_USER_STATUS" ) ne 'VALID';
+			push @{$outputByDestination{$_}}, $data->getUserAttributeValue( member => "$memberId", attrName => "$A_PRINCIPAL" ) foreach @generatedDataDestination;
 		}
 
 	}
