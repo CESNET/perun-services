@@ -110,17 +110,17 @@ foreach my $UCO (sort keys %$dataByUco) {
 
 		my $select = "SELECT 1 from $tableName where UCO=? and LOGIN=?";
 		my @params = ($UCO, $LOGIN);
-		appendParam(select => $select, params => \@params, paramName => 'JMENO', paramValue => $JMENO);
-		appendParam(select => $select, params => \@params, paramName => 'PRIJMENI', paramValue => $PRIJMENI);
-		appendParam(select => $select, params => \@params, paramName => 'TITUL_PRED', paramValue => $TITUL_PRED);
-		appendParam(select => $select, params => \@params, paramName => 'TITUL_ZA', paramValue => $TITUL_ZA);
-		appendParam(select => $select, params => \@params, paramName => 'FOTO', paramValue => $FOTO);
-		appendParam(select => $select, params => \@params, paramName => 'EMAIL_SKOLNI', paramValue => $EMAIL_SKOLNI);
-		appendParam(select => $select, params => \@params, paramName => 'EMAIL_SOUKR', paramValue => $EMAIL_SOUKR);
-		appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_LINKA', paramValue => $TEL_PRAC_LINKA);
-		appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_MOB', paramValue => $TEL_PRAC_MOB);
-		appendParam(select => $select, params => \@params, paramName => 'TEL_SOUKR', paramValue => $TEL_SOUKR);
-		appendParam(select => $select, params => \@params, paramName => 'BANK_UCET', paramValue => $BANK_UCET);
+		$select = appendParam(select => $select, params => \@params, paramName => 'JMENO', paramValue => $JMENO);
+		$select = appendParam(select => $select, params => \@params, paramName => 'PRIJMENI', paramValue => $PRIJMENI);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TITUL_PRED', paramValue => $TITUL_PRED);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TITUL_ZA', paramValue => $TITUL_ZA);
+		$select = appendParam(select => $select, params => \@params, paramName => 'FOTO', paramValue => $FOTO);
+		$select = appendParam(select => $select, params => \@params, paramName => 'EMAIL_SKOLNI', paramValue => $EMAIL_SKOLNI);
+		$select = appendParam(select => $select, params => \@params, paramName => 'EMAIL_SOUKR', paramValue => $EMAIL_SOUKR);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_LINKA', paramValue => $TEL_PRAC_LINKA);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_MOB', paramValue => $TEL_PRAC_MOB);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TEL_SOUKR', paramValue => $TEL_SOUKR);
+		$select = appendParam(select => $select, params => \@params, paramName => 'BANK_UCET', paramValue => $BANK_UCET);
 
 		my $recordAreEquals = $dbh->prepare($select);
 		$recordAreEquals->execute(@params);
@@ -205,19 +205,24 @@ print "=======================================\n";
 
 $lock->unlock();
 
+#
+# Appends PARAM with respecting to possible NULL to select
+#
 sub appendParam() {
 
 	my %args = @_;
 	my $select = $args{select};
-	my @params = $args{params};
+	my $paramsRef = $args{params};
 	my $paramName = $args{paramName};
 	my $paramValue = $args{paramValue};
 
 	if (defined($paramValue)) {
 		$select = $select . " and $paramName=?";
-		push(@params, $paramValue);
+		push(@$paramsRef, $paramValue);
 	} else {
 		$select = $select . " and $paramName is NULL";
 	}
+
+	return $select;
 
 }
