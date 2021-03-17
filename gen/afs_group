@@ -12,26 +12,24 @@ sub processResourceData;
 
 our $SERVICE_NAME = "afs_group";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
-our $A_GROUP_AFS_GROUP_NAME;      *A_GROUP_AFS_GROUP_NAME =   \'urn:perun:group_resource:attribute-def:def:afsGroupName';
+our $A_GR_AFS_GROUP_NAME;         *A_GR_AFS_GROUP_NAME =      \'urn:perun:group_resource:attribute-def:def:afsGroupName';
 our $A_USER_KERBEROS_LOGINS;      *A_USER_KERBEROS_LOGINS =   \'urn:perun:user:attribute-def:virt:kerberosLogins';
-our $A_USER_LOGIN;                *A_USER_LOGIN =             \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_USER_FACILITY_LOGIN;       *A_USER_FACILITY_LOGIN =    \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_R_DEFAULT_USERS_REALM;     *A_R_DEFAULT_USERS_REALM =  \'urn:perun:resource:attribute-def:def:afsDefaultUsersRealm';
 
 #Global data structure
 our $groupStruc = {};     #$groupStruc->{$groupName}->{$login} = 1;
 
-foreach my $resourceData ($data->getChildElements) {
-	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
-
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		my $groupMembersLogins = processGroupData $groupData, $resourceAttrs{$A_R_DEFAULT_USERS_REALM};
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
+		processGroupData $groupId, $resourceId, $data->getResourceAttributeValue(attrName => $A_R_DEFAULT_USERS_REALM, resource => $resourceId);
 	}
 }
 
@@ -52,25 +50,22 @@ perunServicesInit::finalize;
 ##############################################################################
 
 sub processGroupData {
-	my $groupData = shift;
-	my $defaultUserRealm = shift;
-	my $membersElement = ($groupData->getChildElements)[1];
-	my %groupAttributes = attributesToHash $groupData->getAttributes;
+	my ($groupId, $resourceId, $defaultUserRealm) = @_;
+	my @memberIds = $data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId);
 
-	my $groupName = $groupAttributes{$A_GROUP_AFS_GROUP_NAME};
+	my $groupName = $data->getGroupResourceAttributeValue(attrName => $A_GR_AFS_GROUP_NAME, group => $groupId, resource => $resourceId);
 
 	if(defined $groupName) {
-		processMembersData $membersElement, $groupName, $defaultUserRealm;
+		processMembersData \@memberIds, $groupName, $defaultUserRealm;
 	}
 }
 
-# input: (members serviceAttributes, groupName)
+# input: (reference to member ids array, groupName, defaultUserRealm)
 # stores memers logins into $groupStruc structure
 sub processMembersData {
-	my ($membersElement, $groupName, $defaultUserRealm) = @_;
-	for my $memberData ($membersElement->getChildElements) {
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
-		my $login = $memberAttributes{$A_USER_LOGIN} . '@' . $defaultUserRealm;
+	my ($memberIdsRef, $groupName, $defaultUserRealm) = @_;
+	for my $memberId (@$memberIdsRef) {
+		my $login = $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_LOGIN, member => $memberId) . '@' . $defaultUserRealm;
 		$groupStruc->{$groupName}->{$login} = 1;
 	}
 }

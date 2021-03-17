@@ -6,11 +6,11 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "apache_shibboleth";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 my $dir = "$DIRECTORY/$::SERVICE_NAME";
 mkdir $dir or die "Can't create dir $dir: $!";
@@ -24,15 +24,18 @@ my $i = 0;
 
 my %allApacheAuthzDirNames;
 
-foreach my $rData ($data->getChildElements) {
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-
+foreach my $resourceId ($data->getResourceIds()) {
 	# Check if there are not two same apacheAuthzDirs
-	if(defined $allApacheAuthzDirNames{$resourceAttributes{$A_R_APACHE_AUTHZ_FILE}}) {
-		die "Duplicate apacheAuthzFile detected: $resourceAttributes{$A_R_APACHE_AUTHZ_FILE}";
+	my $apacheAuthzFile = $data->getResourceAttributeValue(attrName => $A_R_APACHE_AUTHZ_FILE, resource => $resourceId);
+	if(defined $allApacheAuthzDirNames{$apacheAuthzFile}) {
+		die "Duplicate apacheAuthzFile detected: $apacheAuthzFile";
 	} else {
-		$allApacheAuthzDirNames{$resourceAttributes{$A_R_APACHE_AUTHZ_FILE}} = 1;
+		$allApacheAuthzDirNames{$apacheAuthzFile} = $resourceId;
 	}
+}
+
+foreach my $apacheAuthzFile (sort keys %allApacheAuthzDirNames) {
+	my $resourceId = $allApacheAuthzDirNames{$apacheAuthzFile};
 
 	$i++;
 	my $authzFileDir = "$dir/$i";
@@ -42,21 +45,23 @@ foreach my $rData ($data->getChildElements) {
 	my $pathFile = "$authzFileDir/path";
 
 	open FILE,">$pathFile" or die "Cannot open $pathFile: $!";
-	print FILE $resourceAttributes{$A_R_APACHE_AUTHZ_FILE};
+	print FILE $apacheAuthzFile;
 	close FILE or die "Cannot close $pathFile: $!";
 
 	my $authzFile = "$authzFileDir/authz";
 	open FILE,">$authzFile" or die "Cannot open $authzFile: $!";
 
 	my @output = ();
-	foreach my $memberAttributes (dataToAttributesHashes $rData->getChildElements) {
-		my @eppns = @{$memberAttributes->{$A_U_EPPNS}};
-		push @output, "require user " . join(" ", @eppns) . " # " . $memberAttributes->{$A_U_D_NAME};
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		my @eppns = @{$data->getUserAttributeValue(attrName => $A_U_EPPNS, member => $memberId)};
+		@eppns = sort @eppns;
+		push @output, "require user " . join(" ", @eppns) . " # " . $data->getUserAttributeValue(attrName => $A_U_D_NAME, member => $memberId);
 	}
 
 	if(@output) {
 		@output = map { convertNonAsciiToEscapedUtf8Form $_ }  @output;
 		s/\\x/\\\\x/g foreach @output;  #replace \x with \\x  (escape unicode chars)
+		@output = sort @output;
 		print FILE join "\n", @output;
 		print FILE "\n";
 	}

@@ -6,31 +6,34 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "apache_basic_auth";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 my $dir = "$DIRECTORY/$::SERVICE_NAME";
 mkdir $dir or die "Can't create dir $dir: $!";
 
 #Constants
-our $A_U_LOGIN;               *A_U_LOGIN =                 \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UF_LOGIN;              *A_UF_LOGIN =                \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_R_APACHE_AUTHZ_FILE;   *A_R_APACHE_AUTHZ_FILE =     \'urn:perun:resource:attribute-def:def:apacheAuthzFile';
 
 my $i = 0;
 my %allApacheAuthzFilesNames;
 
-foreach my $rData ($data->getChildElements) {
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-
-	# Check if there are not two same apacheAuthzFiles 
-	if(defined $allApacheAuthzFilesNames{$resourceAttributes{$A_R_APACHE_AUTHZ_FILE}}) {
-		die "Duplicate apacheAuthzFileName detected: $resourceAttributes{$A_R_APACHE_AUTHZ_FILE}";
+foreach my $resourceId ($data->getResourceIds()) {
+	# Check if there are not two same apacheAuthzFiles
+	my $apacheAuthzFile = $data->getResourceAttributeValue(attrName => $A_R_APACHE_AUTHZ_FILE, resource => $resourceId);
+	if(defined $allApacheAuthzFilesNames{$apacheAuthzFile}) {
+		die "Duplicate apacheAuthzFileName detected: $apacheAuthzFile";
 	} else {
-		$allApacheAuthzFilesNames{$resourceAttributes{$A_R_APACHE_AUTHZ_FILE}} = 1;
+		$allApacheAuthzFilesNames{$apacheAuthzFile} = $resourceId;
 	}
+}
+
+foreach my $apacheAuthzFile (sort keys %allApacheAuthzFilesNames) {
+	my $resourceId = $allApacheAuthzFilesNames{$apacheAuthzFile};
 
 	$i++;
 	my $authzFileDir = "$dir/$i";
@@ -40,18 +43,19 @@ foreach my $rData ($data->getChildElements) {
 	my $pathFile = "$authzFileDir/path";
 
 	open FILE,">$pathFile" or die "Cannot open $pathFile: $!";
-	print FILE $resourceAttributes{$A_R_APACHE_AUTHZ_FILE}, "\n";
+	print FILE $apacheAuthzFile, "\n";
 	close FILE or die "Cannot close $pathFile: $!";
 
 	my $authzFile = "$authzFileDir/authz";
 	open FILE,">$authzFile" or die "Cannot open $authzFile: $!";
 
 	my @allowedLogins = ();
-	foreach my $memberAttributes (dataToAttributesHashes $rData->getChildElements) {
-		push @allowedLogins, $memberAttributes->{$A_U_LOGIN};
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		push @allowedLogins, $data->getUserFacilityAttributeValue(attrName => $A_UF_LOGIN, member => $memberId);
 	}
 
 	print FILE "require user ";
+	@allowedLogins = sort @allowedLogins;
 	print FILE join " ", @allowedLogins;
 	print FILE "\n";
 

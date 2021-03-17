@@ -6,11 +6,11 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "apache_ssl";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 my $dir = "$DIRECTORY/$::SERVICE_NAME";
 mkdir $dir or die "Can't create dir $dir: $!";
@@ -23,15 +23,18 @@ my $i = 0;
 
 my %allApacheAuthzDirNames;
 
-foreach my $rData ($data->getChildElements) {
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-
+foreach my $resourceId ($data->getResourceIds()) {
 	# Check if there are not two same apacheAuthzDirs
-	if(defined $allApacheAuthzDirNames{$resourceAttributes{$A_R_APACHE_AUTHZ_FILE}}) {
-		die "Duplicate apacheAuthzFile detected: $resourceAttributes{$A_R_APACHE_AUTHZ_FILE}";
+	my $apacheAuthzFile = $data->getResourceAttributeValue(attrName => $A_R_APACHE_AUTHZ_FILE, resource => $resourceId);
+	if(defined $allApacheAuthzDirNames{$apacheAuthzFile}) {
+		die "Duplicate apacheAuthzFile detected: $apacheAuthzFile";
 	} else {
-		$allApacheAuthzDirNames{$resourceAttributes{$A_R_APACHE_AUTHZ_FILE}} = 1;
+		$allApacheAuthzDirNames{$apacheAuthzFile} = $resourceId;
 	}
+}
+
+foreach my $apacheAuthzFile (sort keys %allApacheAuthzDirNames) {
+	my $resourceId = $allApacheAuthzDirNames{$apacheAuthzFile};
 
 	$i++;
 	my $authzFileDir = "$dir/$i";
@@ -41,16 +44,17 @@ foreach my $rData ($data->getChildElements) {
 	my $pathFile = "$authzFileDir/path";
 
 	open FILE,">$pathFile" or die "Cannot open $pathFile: $!";
-	print FILE $resourceAttributes{$A_R_APACHE_AUTHZ_FILE}, "\n";
+	print FILE $apacheAuthzFile, "\n";
 	close FILE or die "Cannot close $pathFile: $!";
 
 	my $authzFile = "$authzFileDir/authz";
 	open FILE,">$authzFile" or die "Cannot open $authzFile: $!";
 
 	my @output = ();
-	foreach my $memberAttributes (dataToAttributesHashes $rData->getChildElements) {
-		foreach my $subjectDN (keys %{$memberAttributes->{$A_U_CERT_DNS}}) {
-			my $caDN = $memberAttributes->{$A_U_CERT_DNS}->{$subjectDN};
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		my $userCertDns = $data->getUserAttributeValue(attrName => $A_U_CERT_DNS, member => $memberId);
+		foreach my $subjectDN (keys %$userCertDns) {
+			my $caDN = $userCertDns->{$subjectDN};
 			#strip prefixes from subjectDN
 			my $subjectDNWithoutPrefix = $subjectDN;
 			$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
@@ -62,6 +66,7 @@ foreach my $rData ($data->getChildElements) {
 		@output = map { convertNonAsciiToEscapedUtf8Form $_ }  @output;
 		s/\\x/\\\\x/g foreach @output;  #replace \x with \\x  (escape unicode chars)
 		print FILE "SSLRequire \\\n";
+		@output = sort @output;
 		print FILE join " \\\n|| ", @output;
 		print FILE "\n";
 	}

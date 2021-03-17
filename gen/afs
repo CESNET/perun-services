@@ -7,14 +7,14 @@ use File::Basename;
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.1.1";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
-our $A_USER_LOGIN;                *A_USER_LOGIN =              \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UF_LOGIN;                  *A_UF_LOGIN =                \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_F_CELL;                    *A_F_CELL =                  \'urn:perun:facility:attribute-def:def:afsCell';
 our $A_F_PARTITION;               *A_F_PARTITION =             \'urn:perun:facility:attribute-def:def:afsPartition';
 our $A_F_SERVER;                  *A_F_SERVER =                \'urn:perun:facility:attribute-def:def:afsServer';
@@ -28,49 +28,45 @@ our $A_U_ORGANIZATIONSWITHLOA;    *A_U_ORGANIZATIONSWITHLOA =  \'urn:perun:user:
 
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
 #####################################
 
 ####### output file ######################
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-
-		print SERVICE_FILE $facilityAttributes{$A_F_SERVER} . "\t";
-		print SERVICE_FILE $facilityAttributes{$A_F_CELL} . "\t";
-		print SERVICE_FILE $facilityAttributes{$A_F_PARTITION} . "\t";
-		print SERVICE_FILE $resourceAttributes{$A_R_DEFAULT_USERS_REALM} . "\t";
-		print SERVICE_FILE ($resourceAttributes{$A_R_USERS_MOUNT_POINT} || '') . "\t";
-		print SERVICE_FILE ($resourceAttributes{$A_R_USERS_VOLUME} || '') . "\t";
-		print SERVICE_FILE ($resourceAttributes{$A_R_VOLUME} || '') . "\t";
-		print SERVICE_FILE $memberAttributes{$A_USER_LOGIN} . "\t";
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		print SERVICE_FILE $data->getFacilityAttributeValue(attrName => $A_F_SERVER) . "\t";
+		print SERVICE_FILE $data->getFacilityAttributeValue(attrName => $A_F_CELL) . "\t";
+		print SERVICE_FILE $data->getFacilityAttributeValue(attrName => $A_F_PARTITION) . "\t";
+		print SERVICE_FILE $data->getResourceAttributeValue(attrName => $A_R_DEFAULT_USERS_REALM, resource => $resourceId) . "\t";
+		print SERVICE_FILE ($data->getResourceAttributeValue(attrName => $A_R_USERS_MOUNT_POINT, resource => $resourceId) || '') . "\t";
+		print SERVICE_FILE ($data->getResourceAttributeValue(attrName => $A_R_USERS_VOLUME, resource => $resourceId) || '') . "\t";
+		print SERVICE_FILE ($data->getResourceAttributeValue(attrName => $A_R_VOLUME, resource => $resourceId) || '') . "\t";
+		print SERVICE_FILE $data->getUserFacilityAttributeValue(attrName => $A_UF_LOGIN, member => $memberId) . "\t";
 
 		my $quota = 0;
-		if (defined($resourceAttributes{$A_R_DEFAULT_QUOTA})) {
-			if (defined($memberAttributes{$A_UF_USER_QUOTA})) {
-				if (quotaToKb($memberAttributes{$A_UF_USER_QUOTA}) > quotaToKb($resourceAttributes{$A_R_DEFAULT_QUOTA})) {
-					$quota = quotaToKb($memberAttributes{$A_UF_USER_QUOTA});
+		my $defaultQuota = $data->getResourceAttributeValue(attrName => $A_R_DEFAULT_QUOTA, resource => $resourceId);
+		my $usersQuota = $data->getUserFacilityAttributeValue(attrName => $A_UF_USER_QUOTA, member => $memberId);
+		if (defined($defaultQuota)) {
+			if (defined($usersQuota)) {
+				if (quotaToKb($usersQuota) > quotaToKb($defaultQuota)) {
+					$quota = quotaToKb($usersQuota);
 				} else {
-					$quota = quotaToKb($resourceAttributes{$A_R_DEFAULT_QUOTA});
+					$quota = quotaToKb($defaultQuota);
 				}
 			} else {
-				$quota = quotaToKb($resourceAttributes{$A_R_DEFAULT_QUOTA});
+				$quota = quotaToKb($defaultQuota);
 			}
 		}
 		print SERVICE_FILE "$quota\t";
 
-		if(defined $memberAttributes{$A_U_ORGANIZATIONSWITHLOA}->{"University of West Bohemia"}) {
+		my $organizationsWithLoa = $data->getUserAttributeValue(attrName => $A_U_ORGANIZATIONSWITHLOA, member => $memberId);
+		if(defined $organizationsWithLoa->{"University of West Bohemia"}) {
 			print SERVICE_FILE "zcu.cz" . "\n";
-		} elsif(defined $memberAttributes{$A_U_ORGANIZATIONSWITHLOA}->{"Charles University in Prague"}) {
+		} elsif(defined $organizationsWithLoa->{"Charles University in Prague"}) {
 			print SERVICE_FILE "ruk.cuni.cz" . "\n";
 		} else {
-			print SERVICE_FILE $facilityAttributes{$A_F_CELL} . "\n";
+			print SERVICE_FILE $data->getFacilityAttributeValue(attrName => $A_F_CELL) . "\n";
 		}
 	}
 }
