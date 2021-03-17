@@ -12,28 +12,24 @@ local $::PROTOCOL_VERSION = "3.0.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_IP_ADDRESSES;        *A_USER_IP_ADDRESSES =        \'urn:perun:user:attribute-def:def:IPAddresses';
 our $A_RESOURCE_FIREWALL_RULES;  *A_RESOURCE_FIREWALL_RULES =  \'urn:perun:resource:attribute-def:def:firewallRules';
 
 my $addressesByRules = {};
-my @resourcesData = $data->getChildElements;
-foreach my $resourceData (@resourcesData) {
-	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
-	my $firewallRules = $resourceAttributes{$A_RESOURCE_FIREWALL_RULES};
+foreach my $resourceId ($data->getResourceIds()) {
+	my $firewallRules = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_FIREWALL_RULES);
 
 	#skip resources without rules
-	next unless($firewallRules);
+	next unless(defined $firewallRules);
 
-	my @membersData = $resourceData->getChildElements;
-	for my $memberData (@membersData) {
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
-		my $IPAddresses = $memberAttributes{$A_USER_IP_ADDRESSES};
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		my $IPAddresses = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_IP_ADDRESSES);
 
 		#skip users without IP addresses
-		next unless($IPAddresses);
+		next unless(defined $IPAddresses);
 
 		foreach my $firewallRule (@$firewallRules) {
 			foreach my $IPAddress (@$IPAddresses) {
@@ -59,7 +55,7 @@ $rulesFinal{'rules'} = \@rules;
 my $file = "$DIRECTORY/$::SERVICE_NAME.json";
 open FILE,">$file" or die "Cannot open $file: $! \n";
 binmode(FILE);
-print FILE JSON::XS->new->utf8->pretty->encode(\%rulesFinal);
+print FILE JSON::XS->new->utf8->pretty->canonical->encode(\%rulesFinal);
 close (FILE) or die "Cannot close $file: $! \n";
 
 perunServicesInit::finalize;

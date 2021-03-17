@@ -14,11 +14,11 @@ sub processGroupName;
 
 local $::SERVICE_NAME = "freeipa";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_FIRST_NAME;               *A_FIRST_NAME =                  \'urn:perun:user:attribute-def:core:firstName';
@@ -29,7 +29,7 @@ our $A_TITLE_AFTER;              *A_TITLE_AFTER =                 \'urn:perun:us
 our $A_USER_LOGIN;               *A_USER_LOGIN =                  \'urn:perun:user:attribute-def:def:login-namespace:czechglobe';
 our $A_USER_EMAIL;               *A_USER_EMAIL =                  \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_GROUP_NAME;               *A_GROUP_NAME =                  \'urn:perun:group:attribute-def:core:name';
-our $A_GROUP_IPA_G_NAME;         *A_GROUP_IPA_G_NAME =            \'urn:perun:group_resource:attribute-def:def:freeipaGroupName';
+our $A_G_R_IPA_G_NAME;           *A_G_R_IPA_G_NAME =              \'urn:perun:group_resource:attribute-def:def:freeipaGroupName';
 
 my $outputData = {
 						 members => [],
@@ -37,10 +37,10 @@ my $outputData = {
 my $members = {};
 my $groupNames = {};
 
-foreach my $resourceData ($data->getChildElements) {
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		processGroupData $groupData;
-		processGroupName $groupData, $groupNames;
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
+		processGroupData $groupId, $resourceId;
+		processGroupName $groupId, $groupNames, $resourceId;
 	}
 }
 
@@ -56,7 +56,7 @@ push @{$outputData->{'groups'}}, $groupNames;
 my $out_file_name = "$DIRECTORY/$::SERVICE_NAME";
 
 open FILE,">$out_file_name" or die "Cannot open $out_file_name: $! \n";
-print FILE JSON::XS->new->utf8->pretty->encode($outputData);
+print FILE JSON::XS->new->utf8->pretty->canonical->encode($outputData);
 close (FILE);
 perunServicesInit::finalize;
 
@@ -65,49 +65,48 @@ perunServicesInit::finalize;
 ##############################################################################
 
 sub processGroupName {
-	my $groupData = $_[0];
+	my $groupId = $_[0];
 	my $groupNames = $_[1];
-	
-	my %groupAttributes = attributesToHash $groupData->getAttributes;
-	my $ipaGroupName = $groupAttributes{$A_GROUP_IPA_G_NAME};
+	my $resourceId = $_[2];
+
+	my $ipaGroupName = $data->getGroupResourceAttributeValue(resource => $resourceId, group => $groupId, attrName => $A_G_R_IPA_G_NAME);
 
 	if(!defined($ipaGroupName)) {
 		#skip groups without ipa group name attribute set
-		print "Skipping: $groupAttributes{$A_GROUP_NAME} and all it's subgroups.\n";
+		print "Skipping: $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_NAME) and all it's subgroups.\n";
 		return;
 	}
 
 	if(!$groupNames->{$ipaGroupName}) {
 		$groupNames->{$ipaGroupName} = {};
 	}
-
-	for my $subgroupData (($groupData->getChildElements)[0]->getChildElements) {
-		processGroupName $subgroupData, $groupNames->{$ipaGroupName};
-	}
 }
 
 sub processGroupData {
-	my $groupData = shift;
-	my $membersElement = ($groupData->getChildElements)[1];
-	my %groupAttributes = attributesToHash $groupData->getAttributes;
+	my $groupId = shift;
+	my $resourceId = shift;
 
-	my $groupName = $groupAttributes{$A_GROUP_IPA_G_NAME};
+	my $groupName = $data->getGroupResourceAttributeValue(resource => $resourceId, group => $groupId, attrName => $A_G_R_IPA_G_NAME);
 
-	for my $memberData ($membersElement->getChildElements) {
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
-		
-		my $login = $memberAttributes{$A_USER_LOGIN};
+	foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
+		my $login = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_LOGIN);
 		if($members->{$login}) {
 			$members->{$login}->{'groups'}->{$groupName} = 1;
 		} else {
+			my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+			my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+			my $middleName = $data->getUserAttributeValue(member => $memberId, attrName => $A_MIDDLE_NAME);
+			my $titleBefore = $data->getUserAttributeValue(member => $memberId, attrName => $A_TITLE_BEFORE);
+			my $titleAfter = $data->getUserAttributeValue(member => $memberId, attrName => $A_TITLE_AFTER);
+			my $mail = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_EMAIL);
 			my $member = {
-			              first_name   => $memberAttributes{$A_FIRST_NAME} ? $memberAttributes{$A_FIRST_NAME} : '',
-			              middle_name  => $memberAttributes{$A_MIDDLE_NAME} ? $memberAttributes{$A_MIDDLE_NAME} : '',
-			              last_name    => $memberAttributes{$A_LAST_NAME} ? $memberAttributes{$A_LAST_NAME} : '',
-			              title_before => $memberAttributes{$A_TITLE_BEFORE} ? $memberAttributes{$A_TITLE_BEFORE} : '',
-			              title_after  => $memberAttributes{$A_TITLE_AFTER} ? $memberAttributes{$A_TITLE_AFTER} : '',
+			              first_name   => $firstName ? $firstName : '',
+			              middle_name  => $middleName ? $middleName : '',
+			              last_name    => $lastName ? $lastName : '',
+			              title_before => $titleBefore ? $titleBefore : '',
+			              title_after  => $titleAfter? $titleAfter: '',
 			              user_login   => $login ? $login : '',
-			              mail         => $memberAttributes{$A_USER_EMAIL} ? $memberAttributes{$A_USER_EMAIL} : '',
+			              mail         => $mail ? $mail : '',
 			              groups       => { $groupName => 1 }
 			};
 

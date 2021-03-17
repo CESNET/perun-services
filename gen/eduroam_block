@@ -6,13 +6,13 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "eduroam_block";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
-my $data = perunServicesInit::getFlatData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 
@@ -20,13 +20,8 @@ our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 
 my $users;
 
-foreach my $user (($data->getChildElements)[1]->getChildElements) {
-
-    my %uAttributes = attributesToHash $user->getAttributes;
-
-    my $login = $uAttributes{$A_LOGIN};
-
-    $users->{$login} = 1;
+foreach my $memberId ($data->getMemberIdsForFacility()) {
+	$users->{$data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_LOGIN)} = 1;
 }
 
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
