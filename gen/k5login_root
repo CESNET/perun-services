@@ -22,15 +22,15 @@ my %outputByDestination = ('all' => undef);
 
 foreach my $resourceId ($data->getResourceIds()) {
 
-	foreach my $groupId ($data->getGroupIdsForResource( resource => "$resourceId" )) {
+	foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId )) {
 		my @generatedDataDestination = ('all');
-		if(defined $data->getGroupAttributeValue(group => "$groupId", attrName => "$A_GROUP_DESTINATIONS" )) {
-			@generatedDataDestination = @{$data->getGroupAttributeValue(group => "$groupId", attrName => "$A_GROUP_DESTINATIONS" )};
+		if(defined $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_DESTINATIONS )) {
+			@generatedDataDestination = @{$data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_DESTINATIONS )};
 		}
 
-		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => "$resourceId", group => "$groupId" )) {
-			next if $data->getMemberAttributeValue( member => "$memberId", attrName => "$A_USER_STATUS" ) ne 'VALID';
-			push @{$outputByDestination{$_}}, $data->getUserAttributeValue( member => "$memberId", attrName => "$A_PRINCIPAL" ) foreach @generatedDataDestination;
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId )) {
+			next if $data->getMemberAttributeValue( member => $memberId, attrName => $A_USER_STATUS ) ne 'VALID';
+			push @{$outputByDestination{$_}}, $data->getUserAttributeValue( member => $memberId, attrName => $A_PRINCIPAL ) foreach @generatedDataDestination;
 		}
 
 	}

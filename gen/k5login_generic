@@ -26,14 +26,14 @@ my $fileStructureWithData;
 #for each resource (k5login file)
 foreach my $resourceId ($data->getResourceIds()) {
 	#get information about name of target user (file name for data)
-	my $fileName = $data->getResourceAttributeValue( resource => "$resourceId", attrName => "$A_RESOURCE_K5LOGIN_TARGET_USER" );
+	my $fileName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RESOURCE_K5LOGIN_TARGET_USER );
 	#prepare hash of users principals on resource
 	my %userPrincipals;
-	foreach my $memberId ($data->getMemberIdsForResource( resource => "$resourceId" )) {
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 		#if member is not valid, skip him
-		next if $data->getMemberAttributeValue( member => "$memberId", attrName => "$A_USER_STATUS" ) ne 'VALID';
+		next if $data->getMemberAttributeValue( member => $memberId, attrName => $A_USER_STATUS ) ne 'VALID';
 		#if member is valid, add value to hash
-		for my $principal (@{$data->getUserAttributeValue( member => "$memberId", attrName => "$A_PRINCIPALS" )}) {
+		for my $principal (@{$data->getUserAttributeValue( member => $memberId, attrName => $A_PRINCIPALS )}) {
 			$userPrincipals{$principal} = ();
 		}
 	}
@@ -49,12 +49,12 @@ foreach my $resourceId ($data->getResourceIds()) {
 }
 
 #generate file for all keys in data structure
-foreach my $file (keys %$fileStructureWithData) {
+foreach my $file (sort keys %$fileStructureWithData) {
 	my $service_file_name = "$k5loginDirectory/$file";
 	my $principals = $fileStructureWithData->{$file};
 	open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 	#for each principal add one line
-	foreach my $principal (keys %$principals) {
+	foreach my $principal (sort keys %$principals) {
 		print SERVICE_FILE $principal . "\n";
 	}
 	close(SERVICE_FILE);
