@@ -34,7 +34,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 }
 
 for my $usersHomeDir (sort keys %$kerberosLoginsStruc) {
-	print SERVICE_FILE $usersHomeDir, "\t", join("\t", keys %{$kerberosLoginsStruc->{$usersHomeDir}}), "\n";
+	print SERVICE_FILE $usersHomeDir, "\t", join("\t", sort keys %{$kerberosLoginsStruc->{$usersHomeDir}}), "\n";
 }
 
 close(SERVICE_FILE);
