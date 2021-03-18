@@ -13,16 +13,16 @@ sub processResourceData;
 
 our $SERVICE_NAME = "feudal";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_GROUP_NAME;                      *A_GROUP_NAME =                   \'urn:perun:group:attribute-def:core:name';
 our $A_GROUP_VO_NAME;                   *A_GROUP_VO_NAME =                \'urn:perun:group:attribute-def:virt:voShortName';
-our $A_USER_LOGIN;                      *A_USER_LOGIN =                   \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_U_F_LOGIN;                       *A_U_F_LOGIN =                    \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_FIRST_NAME;                 *A_USER_FIRST_NAME =              \'urn:perun:user:attribute-def:core:firstName';
 our $A_USER_LAST_NAME;                  *A_USER_LAST_NAME =               \'urn:perun:user:attribute-def:core:lastName';
 our $A_USER_MAIL;                       *A_USER_MAIL =                    \'urn:perun:user:attribute-def:def:preferredMail';
@@ -36,13 +36,9 @@ our $A_F_FEUDAL_ENTITLEMENT_SUFIX;      *A_F_FEUDAL_ENTITLEMENT_SUFIX =   \'urn:
 #main data structure
 my $userInfo = {};
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-
-foreach my $resourceData ($data->getChildElements) {
-	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
-
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		my $groupMembersLogins = processGroupData $groupData;
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
+		processGroupData $groupId, $resourceId;
 	}
 }
 
@@ -54,7 +50,7 @@ for my $user (keys %$userInfo) {
 	my $outputStruc = { "userinfo" => $userInfo->{$user} };
 	my $fileName = "$usersDirectory/$user";
 	open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
-	print FILE JSON::XS->new->utf8->pretty->encode($outputStruc);
+	print FILE JSON::XS->new->utf8->pretty->canonical->encode($outputStruc);
 	close FILE or die "Cannot close $fileName: $! \n";
 }
 
@@ -66,36 +62,43 @@ perunServicesInit::finalize;
 ##############################################################################
 
 sub processGroupData {
-	my $groupData = shift;
-	my $membersElement = ($groupData->getChildElements)[1];
-	my %groupAttributes = attributesToHash $groupData->getAttributes;
+	my $groupId = shift;
+	my $resourceId = shift;
+	my @membersIds = $data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId);
 
-	my $groupName = $groupAttributes{$A_GROUP_NAME};
-	my $voName = $groupAttributes{$A_GROUP_VO_NAME};
+	my $groupName = $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_NAME);
+	my $voName = $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_VO_NAME);
 
-	processMembersData $membersElement, $groupName, $voName;
+	processMembersData \@membersIds, $groupName, $voName;
 }
 
 sub processMembersData {
-	my ($membersElement, $groupName, $voName) = @_;
-	for my $memberData ($membersElement->getChildElements) {
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
-		my $login = $memberAttributes{$A_USER_LOGIN};
+	my ($membersIdsRef, $groupName, $voName) = @_;
+	for my $memberId (@$membersIdsRef) {
+		my $login = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_U_F_LOGIN);
+		my $displayName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_DISPLAY_NAME);
+		my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_FIRST_NAME);
+		my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_LAST_NAME);
+		my $mail = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_MAIL);
+		my $sshKeys = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_SSHKEYS);
+		my $affiliation = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_AFFILIATIONS);
 		unless($userInfo->{$login}) {
 			$userInfo->{$login}->{"sub"} = $login;
-			$userInfo->{$login}->{"name"} = $memberAttributes{$A_USER_DISPLAY_NAME} if $memberAttributes{$A_USER_DISPLAY_NAME};
-			$userInfo->{$login}->{"given_name"} = $memberAttributes{$A_USER_FIRST_NAME} if $memberAttributes{$A_USER_FIRST_NAME};
-			$userInfo->{$login}->{"family_name"} = $memberAttributes{$A_USER_LAST_NAME} if $memberAttributes{$A_USER_LAST_NAME};
-			$userInfo->{$login}->{"email"} = $memberAttributes{$A_USER_MAIL} if $memberAttributes{$A_USER_MAIL};
-			$userInfo->{$login}->{"ssh_key"} = $memberAttributes{$A_USER_SSHKEYS} if $memberAttributes{$A_USER_SSHKEYS};
-			$userInfo->{$login}->{"eduperson_scoped_affiliation"} = $memberAttributes{$A_USER_AFFILIATIONS};
+			$userInfo->{$login}->{"name"} = $displayName if defined $displayName;
+			$userInfo->{$login}->{"given_name"} = $firstName if defined $firstName;
+			$userInfo->{$login}->{"family_name"} = $lastName if defined $lastName;
+			$userInfo->{$login}->{"email"} = $mail if defined $mail;
+			$userInfo->{$login}->{"ssh_key"} = $sshKeys if defined $sshKeys;
+			$userInfo->{$login}->{"eduperson_scoped_affiliation"} = $affiliation;
 			$userInfo->{$login}->{"eduperson_entitlement"} = [];
-			$userInfo->{$login}->{"iss"} = $facilityAttributes{$A_F_FEUDAL_ISSUER};
+			$userInfo->{$login}->{"iss"} = $data->getFacilityAttributeValue(attrName => $A_F_FEUDAL_ISSUER);
 		}
 
-		push @{$userInfo->{$login}->{"eduperson_entitlement"}}, $facilityAttributes{$A_F_FEUDAL_ENTITLEMENT_PREFIX} . $voName . ':' . $groupName . $facilityAttributes{$A_F_FEUDAL_ENTITLEMENT_SUFIX};
+		my $feudalEntitlementPrefix = $data->getFacilityAttributeValue(attrName => $A_F_FEUDAL_ENTITLEMENT_PREFIX);
+		my $feudalEntitlementSufix = $data->getFacilityAttributeValue(attrName => $A_F_FEUDAL_ENTITLEMENT_SUFIX);
+		push @{$userInfo->{$login}->{"eduperson_entitlement"}}, $feudalEntitlementPrefix . $voName . ':' . $groupName . $feudalEntitlementSufix;
 		if($groupName eq 'members') {
-			push @{$userInfo->{$login}->{"eduperson_entitlement"}}, $facilityAttributes{$A_F_FEUDAL_ENTITLEMENT_PREFIX} . $voName . $facilityAttributes{$A_F_FEUDAL_ENTITLEMENT_SUFIX};
+			push @{$userInfo->{$login}->{"eduperson_entitlement"}}, $feudalEntitlementPrefix . $voName . $feudalEntitlementSufix;
 		}
 
 	}

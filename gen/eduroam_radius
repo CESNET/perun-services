@@ -8,32 +8,28 @@ use File::Basename;
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_EDUROAM_IDENTITIES;    *A_USER_EDUROAM_IDENTITIES =     \'urn:perun:user:attribute-def:def:eduroamIdentities';
 
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
 #####################################
 
 ####### passswd and shadow file ######################
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 		# Print attributes
-		if (defined($memberAttributes{$A_USER_EDUROAM_IDENTITIES})) {
-			foreach my $eduroamIdentity (@{$memberAttributes{$A_USER_EDUROAM_IDENTITIES}}) {
+		my $eduroamIdentities = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_EDUROAM_IDENTITIES);
+		if (defined $eduroamIdentities) {
+			foreach my $eduroamIdentity (@{$eduroamIdentities}) {
 				print SERVICE_FILE $eduroamIdentity."\n";
 			}
 		} 
