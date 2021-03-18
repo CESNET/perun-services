@@ -9,11 +9,11 @@ use perunServicesInit;
 
 local $::SERVICE_NAME = basename($0);
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 our $A_KERBEROS_LOGINS;       *A_KERBEROS_LOGINS =      \'urn:perun:user:attribute-def:def:kerberosLogins';
 our $A_USER_LOGIN;            *A_USER_LOGIN =           \'urn:perun:user_facility:attribute-def:virt:login';
@@ -25,21 +25,16 @@ my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 ####### output file ######################
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %values;
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-		my $homeDir = $resourceAttributes{$A_HOME_MOUNTPOINT} . "/" . $memberAttributes{$A_USER_LOGIN};
-		my %kerberosLogins = map { $_ => 1 } @{$memberAttributes{$A_KERBEROS_LOGINS}};
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+		my $homeDir = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_HOME_MOUNTPOINT ) . "/" . $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_USER_LOGIN );
+		my %kerberosLogins = map { $_ => 1 } @{$data->getUserAttributeValue( member => $memberId, attrName => $A_KERBEROS_LOGINS )};
 		$kerberosLoginsStruc->{$homeDir} = \%kerberosLogins;
 	}
 }
 
-for my $usersHomeDir (keys %$kerberosLoginsStruc) {
-	print SERVICE_FILE $usersHomeDir, "\t", join("\t", keys %{$kerberosLoginsStruc->{$usersHomeDir}}), "\n";
+for my $usersHomeDir (sort keys %$kerberosLoginsStruc) {
+	print SERVICE_FILE $usersHomeDir, "\t", join("\t", sort keys %{$kerberosLoginsStruc->{$usersHomeDir}}), "\n";
 }
 
 close(SERVICE_FILE);
