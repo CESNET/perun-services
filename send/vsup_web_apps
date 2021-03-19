@@ -166,28 +166,28 @@ foreach my $UCO (sort keys %$dataByUco) {
 #
 # CLEAR all data for People removed from the WEB
 #
+# FIXME - deletion is temporary disabled, we will mark disabled users with new flag in DB later.
 my $deletedUsers = 0;
-my $ary_ref_users = $dbh->selectcol_arrayref(qq{select distinct UCO from $tableName where UCO is not null});
-my @web_ucos = @$ary_ref_users;
-my $deleteUser = $dbh->prepare(qq{DELETE from $tableName where UCO=?});
-my $deleteDC2 = $dbh->prepare(qq{DELETE from idm_dc2_vztahy WHERE UCO=?});
-my $deleteKOS = $dbh->prepare(qq{DELETE from idm_kos_vztahy WHERE UCO=?});
+#my $ary_ref_users = $dbh->selectcol_arrayref(qq{select distinct UCO from $tableName where UCO is not null});
+#my @web_ucos = @$ary_ref_users;
+#my $deleteUser = $dbh->prepare(qq{DELETE from $tableName where UCO=?});
+#my $deleteDC2 = $dbh->prepare(qq{DELETE from idm_dc2_vztahy WHERE UCO=?});
+#my $deleteKOS = $dbh->prepare(qq{DELETE from idm_kos_vztahy WHERE UCO=?});
 
-foreach my $UCO (@web_ucos) {
-	unless (exists $dataByUco->{$UCO}) {
-		unless($DUMMY) {
-			if($DEBUG == 1) { print "Delete person: $UCO (including all relations etc.)\n"; }
-			# delete all relations
-			$deleteDC2->execute($UCO);
-			$deleteKOS->execute($UCO);
-			$deleteUser->execute($UCO);
-		} else {
-			if($DEBUG == 1) { print "Would delete person: $UCO\n"; }
-		}
-		$deletedUsers++;
-	}
-}
-
+#foreach my $UCO (@web_ucos) {
+#	unless (exists $dataByUco->{$UCO}) {
+#		unless($DUMMY) {
+#			if($DEBUG == 1) { print "Delete person: $UCO (including all relations etc.)\n"; }
+#			# delete all relations
+#			$deleteDC2->execute($UCO);
+#			$deleteKOS->execute($UCO);
+#			$deleteUser->execute($UCO);
+#		} else {
+#			if($DEBUG == 1) { print "Would delete person: $UCO\n"; }
+#		}
+#		$deletedUsers++;
+#	}
+#}
 
 commit $dbh;
 $dbh->disconnect();
