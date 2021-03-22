@@ -30,27 +30,29 @@ my $users;  # $users->{$login}->{ATTR} = $attrValue;
 
 # AGGREGATE DATA
 #
-# FOR EACH RESOURCE
 foreach my $resourceId ( $data->getResourceIds() ){
-        
-	# EACH USER ON RESOURCE
-    my $resourceName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_NAME);
+	# Iterate through resources assigned to the facility.
+
+	my $resourceName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_NAME);
 
 	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+		# Iterate through members assigned on the resource. The resource represents the role- group in target system.
 
 		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
-		
+
 		# store standard attrs
 		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
 		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
 		$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
 		$users->{$login}->{$A_CHIPNUMBERS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_CHIPNUMBERS);
-        if (exists $users->{$login}->{"groups"}){
-            push @{$users->{$login}->{"groups"}}, $resourceName;
-        } else {
-            my @userGroups = ($resourceName);
-            $users->{$login}->{"groups"} = \@userGroups;
-        }
+
+		# Add group to the user. The group is current proccessed resource.
+		if (exists $users->{$login}->{"groups"}){
+			push @{$users->{$login}->{"groups"}}, $resourceName;
+		} else {
+			my @userGroups = ($resourceName);
+			$users->{$login}->{"groups"} = \@userGroups;
+		}
 	}
 }
 
@@ -68,53 +70,49 @@ print FILE '"FULLNAME";"USERNAME_ALIASES";"EMAIL";"CARDS";"GROUPS";"CODE";"SCANS
 my @logins = sort keys %{$users};
 for my $login (@logins) {
 
-    # FULLNAME
-    print FILE '"' . $users->{$login}->{$A_LAST_NAME} . " " . $users->{$login}->{$A_FIRST_NAME} . '";';
-    # LOGIN
-    print FILE $login . ";";
-    # MAIL
-    print FILE '"' . $users->{$login}->{$A_MAIL} . '";';
-    # CARDS
-    my @cards = grep {!($_ =~ s/^\s+|\s+$//g)} map {checkBase64($_)} @{$users->{$login}->{$A_CHIPNUMBERS}};
-    my $cards_str = join ",",@cards;
-    print FILE '"' . $cards_str . '";';
-    # GROUPS
-    my $groups_str = join ",",@{$users->{$login}->{"groups"}};
-    print FILE '"' . $groups_str . '";';
-    # CODE
-    print FILE $login . ";";
-    # SCANSTORAGE
-    print FILE '"' . "\\\\copy.ics.muni.cz\\$login\\Scan" . '";';
-    # PIN
-    print FILE $login . ";";
-    # MANAGED_GROUPS
-    print FILE ";";
-    # AUTH_SERVER
-    print FILE ";";
-    # PHONE
-    print FILE ";";
-    # LANG
-    print FILE "en;";
-    # PWD
-    print FILE ";";
-    # EXTID
-    print FILE ";";
-    # DELEGATES
-    print FILE "\n";
+	# FULLNAME
+	if (defined $users->{$login}->{$A_LAST_NAME} && defined $users->{$login}->{$A_FIRST_NAME}){
+		print FILE '"' . $users->{$login}->{$A_LAST_NAME} . " " . $users->{$login}->{$A_FIRST_NAME} . '";';
+	} else {
+		print FILE '"Name undefined for: ' . $login . '";';
+	}
+	# LOGIN
+	print FILE $login . ";";
+	# MAIL
+	print FILE '"' . $users->{$login}->{$A_MAIL} . '";';
+	# CARDS
+	# Ignore empty card values.
+	my @cards = grep {!($_ =~ s/^\s+|\s+$//g)} @{$users->{$login}->{$A_CHIPNUMBERS}};
+	my $cards_str = join ",",@cards;
+	print FILE '"' . $cards_str . '";';
+	# GROUPS
+	my $groups_str = join ",",@{$users->{$login}->{"groups"}};
+	print FILE '"' . $groups_str . '";';
+	# CODE
+	print FILE $login . ";";
+	# SCANSTORAGE
+	print FILE '"' . "\\\\copy.ics.muni.cz\\$login\\Scan" . '";';
+	# PIN
+	print FILE $login . ";";
+	# MANAGED_GROUPS
+	print FILE ";";
+	# AUTH_SERVER
+	print FILE ";";
+	# PHONE
+	print FILE ";";
+	# LANG
+	print FILE "en;";
+	# PWD
+	print FILE ";";
+	# EXTID
+	print FILE ";";
+	# DELEGATES
+	print FILE "\n";
 
 }
 
 close(FILE);
 
 print "OK.";
-
-sub checkBase64 {
-	my $value = shift;
-
-	if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
-		return " ", $value;
-	}
-	return ": ", encode_base64(Encode::encode_utf8($value), '');
-}
 
 perunServicesInit::finalize;

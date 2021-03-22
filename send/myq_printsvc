@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SERVICE_NAME="safeq"
+SERVICE_NAME="myq_printsvc"
 
 TIMEOUT="5400" #90s * 60 sec = 1.5h
 TIMEOUT_KILL="60" # 60 sec to kill after timeout
