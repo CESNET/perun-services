@@ -8,14 +8,14 @@ use Data::Dumper;
 
 local $::SERVICE_NAME = "o365_mail_forward_export";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
-our $A_MEMBER_O365_EMAIL_ADDRESSES_MU;     *A_MEMBER_O365_EMAIL_ADDRESSES_MU =     \'urn:perun:member:attribute-def:def:o365EmailAddresses:mu';
+our $A_USER_O365_EMAIL_ADDRESSES_MU;       *A_USER_O365_EMAIL_ADDRESSES_MU =       \'urn:perun:user:attribute-def:def:o365EmailAddresses:mu';
 our $A_USER_FACILITY_LOGIN;                *A_USER_FACILITY_LOGIN =                \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_FACILITY_MAIL_FORWARD;         *A_USER_FACILITY_MAIL_FORWARD =         \'urn:perun:user_facility:attribute-def:def:o365MailForward';
 our $A_USER_FACILITY_DISABLE_MAIL_FORWARD; *A_USER_FACILITY_DISABLE_MAIL_FORWARD = \'urn:perun:user_facility:attribute-def:def:disableO365MailForward';
@@ -43,16 +43,16 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 		$userStruc->{$login}->{$A_USER_FACILITY_MAIL_FORWARD} = $mailForward;
 	}
 
-	#members email addresses - for more members with same login can differ
-	my $memberEmailAddresses = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_O365_EMAIL_ADDRESSES_MU );
-	if (defined $memberEmailAddresses) {
+	#user email addresses
+	my $userEmailAddresses = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_O365_EMAIL_ADDRESSES_MU );
+	if (defined $userEmailAddresses) {
 		#filter only allowed email addresses
-		foreach my $mail (@{$memberEmailAddresses}) {
+		foreach my $mail (@{$userEmailAddresses}) {
 			my $domainOfEmail = $mail;
 			$domainOfEmail =~ s/^.*@//;
 			#this email is in allowed domain, add it
 			if($allowedForwardDomains{$domainOfEmail}) {
-				$userStruc->{$login}->{$A_MEMBER_O365_EMAIL_ADDRESSES_MU}->{$mail} = 1;
+				$userStruc->{$login}->{$A_USER_O365_EMAIL_ADDRESSES_MU}->{$mail} = 1;
 			}
 		}
 	}
@@ -63,9 +63,9 @@ open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 
 #	$email $forward
 foreach my $login (sort keys %$userStruc) {
-	next unless $userStruc->{$login}->{$A_MEMBER_O365_EMAIL_ADDRESSES_MU};
+	next unless $userStruc->{$login}->{$A_USER_O365_EMAIL_ADDRESSES_MU};
 	my $mailForward = $userStruc->{$login}->{$A_USER_FACILITY_MAIL_FORWARD};
-	foreach my $email (sort keys %{$userStruc->{$login}->{$A_MEMBER_O365_EMAIL_ADDRESSES_MU}}) {
+	foreach my $email (sort keys %{$userStruc->{$login}->{$A_USER_O365_EMAIL_ADDRESSES_MU}}) {
 		print FILE $email, " ", $mailForward, "\n";
 	}
 }
