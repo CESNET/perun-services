@@ -1,4 +1,0 @@
-#!/bin/bash
-SERVICE_NAME="fedcloud_export"
-
-. generic_send
