@@ -22,7 +22,6 @@ sub processGroup;
 sub processUser;
 sub processResourceMail;
 sub readDataAboutUsers;
-sub readDataAboutActiveUsers;
 sub readDataAboutGroups;
 sub readDataAboutResourceMails;
 sub readDataAboutResourceMailsFromO365Proxy;

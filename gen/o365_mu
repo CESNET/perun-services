@@ -17,7 +17,7 @@ sub saveGroupsToFile;
 
 our $SERVICE_NAME     = "o365_mu";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -108,7 +108,6 @@ our $DEFAULT_FORWARDING_DOMAIN = '@mo.muni.cz';
 #-------------------------------------------------------------------------
 
 our $users = {};
-our $skippedUsers = {};
 our $groups = {};
 our $resourceMails = {};
 
@@ -282,15 +281,15 @@ sub processResourceMember {
 		my $memberId = shift;
 
 		my $UCO = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
-		my $disableForward = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_DISABLE_MAIL_FORWARD );
+		#skip user's with not UCO login
+		return unless ( $UCO =~ /^[0-9]+$/ );
+
 		my $licence = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_O365_LICENCE );
 
-		#if member has no licence, skip him
-		unless($licence) {
-			$skippedUsers->{$UCO} = 1;
-			return;
-		}
+		#skip user's without proper licence
+		return if ( ! defined $licence || $licence eq "0");
 
+		my $disableForward = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_DISABLE_MAIL_FORWARD );
 		#if mail forward is not set use the default value unless forwarding is disabled for that user
 		my $mailForward = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_O365_MAIL_FORWARD ) || $UCO . $DEFAULT_FORWARDING_DOMAIN unless $disableForward;
 
@@ -342,9 +341,8 @@ sub processGroupMember {
 
 	my $UCO = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
 	#skipped user which has no licence
-	if($skippedUsers->{$UCO}) {
-		return;
-	}
+	return unless( $users->{$UCO} );
+
 	my $UPN = $users->{$UCO}->{$UPN_TEXT};
 	my $sendAsGroup = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_MG_O365_SEND_AS );
 
