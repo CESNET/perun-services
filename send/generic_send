@@ -14,6 +14,7 @@ DESTINATION_TYPE=$3
 
 PERUN_CERT="/etc/perun/ssl/perun-send.pem"
 PERUN_KEY="/etc/perun/ssl/perun-send.key"
+PERUN_CHAIN="/etc/perun/ssl/perun-send.chain"
 
 #predefined different types of destination
 DESTINATION_TYPE_URL="url"
@@ -45,8 +46,8 @@ if [ "$DESTINATION_TYPE" != "$DESTINATION_TYPE_URL" ]; then
 	TRANSPORT_COMMAND="ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5"
 else
 	#add certificate to the curl if cert file and key file exists and they are readable
-	if [ -r "${PERUN_CERT}" -a -r "${PERUN_KEY}" ]; then
-		PERUN_CERT_SETTING="--cert ${PERUN_CERT} --key ${PERUN_KEY}"
+	if [ -r "${PERUN_CERT}" -a -r "${PERUN_KEY}" -a -r "${PERUN_CHAIN}" ]; then
+		PERUN_CERT_SETTING="--cert ${PERUN_CERT} --key ${PERUN_KEY} --cacert ${PERUN_CHAIN}"
 	fi
 	TMPFILE=`mktemp /tmp/perun-generic-send-script.XXXXXX`
 	if [ $? -ne 0 ]; then
