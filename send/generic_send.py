@@ -8,6 +8,7 @@ timeout_kill = "60"  # 60 sec to kill after timeout
 
 perun_cert = "/etc/perun/ssl/perun-send.pem"
 perun_key = "/etc/perun/ssl/perun-send.key"
+perun_chain = "/etc/perun/ssl/perun-send.chain"
 
 # predefined different types of destination
 destination_type_url = "url"
@@ -53,8 +54,8 @@ if __name__ == "__main__":
 	# choose transport command, only url type has different transport command at this moment
 	if destination_type == destination_type_url:
 		# add certificate to the curl if cert file and key file exists and they are readable
-		if os.access(perun_cert, os.R_OK) and os.access(perun_key, os.R_OK):
-			perun_cert_setting = "--cert " + perun_cert + " --key " + perun_key
+		if os.access(perun_cert, os.R_OK) and os.access(perun_key, os.R_OK) and os.access(perun_chain, os.R_OK):
+			perun_cert_setting = "--cert " + perun_cert + " --key " + perun_key + " --cacert " + perun_chain
 		else:
 			perun_cert_setting = ""
 		temp = tempfile.NamedTemporaryFile(mode="w+")
