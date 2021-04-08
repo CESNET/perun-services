@@ -34,9 +34,6 @@ our $A_R_NAME; *A_R_NAME = \'urn:perun:resource:attribute-def:core:name';
 our $STATUS_VALID; *STATUS_VALID = \'VALID';
 our $STATUS_EXPIRED; *STATUS_EXPIRED = \'EXPIRED';
 
-# Get the facility ID
-my $facilityId = $data->getFacilityId();
-
 # CHECK ON FACILITY ATTRIBUTES
 if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
 	exit 1;
@@ -75,7 +72,7 @@ foreach my $resourceId ( $data->getResourceIds() ){
 	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 
 		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
-			my $memberStatus = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+		my $memberStatus = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
 		#next unless ( $uAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID || ( $uAttributes{$A_MEMBER_STATUS} eq $STATUS_EXPIRED && $rAttributes{$ALLOW_NOT_VALID_MEMBERS}));
 		next unless ( ($memberStatus eq $STATUS_VALID) || ( ($memberStatus eq $STATUS_EXPIRED) && $allowNotValidMembers));
 
