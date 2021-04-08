@@ -15,11 +15,7 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
-<<<<<<< HEAD
-my $data = perunServicesInit::getHashedHierarchicalData;
-=======
 my $data = perunServicesInit::getHashedHierarchicalData(1);
->>>>>>> ad_user_mu_ucn service refactored and added new features
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
@@ -71,20 +67,6 @@ my $serviceAccountsDN = "OU=Services,OU=Perun,OU=MU,DC=ucn,DC=muni,DC=cz";
 #
 # AGGREGATE DATA
 #
-<<<<<<< HEAD
-# FOR EACH USER
-foreach my $memberId ($data->getMemberIdsForFacility()) {
-
-	my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
-
-	$users->{$login}->{"DN"} = "CN=" . $login . "," . $baseDN;
-	# store standard attrs
-	$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
-	$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
-	$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME );
-	$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_MAIL );
-
-=======
 # FOR EACH RESOURCE
 foreach my $resourceId ( $data->getResourceIds() ){
 
@@ -108,7 +90,6 @@ foreach my $resourceId ( $data->getResourceIds() ){
 		$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
 		$users->{$login}->{$A_CHIPNUMBERS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_CHIPNUMBERS);
 	}
->>>>>>> ad_user_mu_ucn service refactored and added new features
 }
 
 #
