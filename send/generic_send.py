@@ -1,4 +1,5 @@
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -18,19 +19,6 @@ destination_type_user_host = "user@host"
 destination_type_user_host_port = "user@host:port"
 destination_type_user_host_windows = "user@host-windows"
 destination_type_user_host_windows_proxy = "host-windows-proxy"
-
-
-# this function converts stdin based on DESTINATION_TYPE variable
-def destination_type_transformation(destination_type):
-	if destination_type == destination_type_user_host_windows_proxy:
-		# converts stdin to base64 and append single space and "$DESTINATION" at the end of it
-		return "base64 | sed -e \"\$s/\$/ $DESTINATION/g\""
-	elif destination_type == destination_type_user_host_windows:
-		# converts stdin to base64
-		return "base64"
-	else:
-		# just prints stdin to stdout for other destination types
-		return "cat"
 
 
 if __name__ == "__main__":
@@ -140,11 +128,28 @@ if __name__ == "__main__":
 	temp_file.write(hostname)
 
 	if os.path.isdir(service_files_for_destination):
-		tar_command = "tar " + tar_mode + " -C " + service_files_for_destination + " . -C " + service_files_dir + "  --exclude=\"_destination\" .  -C " + temp_dir.name + " . | " + destination_type_transformation(destination_type) + " | timeout -k " + timeout_kill + " " + timeout + " " + transport_command
+		tar_command = "tar " + tar_mode + " -C " + service_files_for_destination + " . -C " + service_files_dir + "  --exclude=\"_destination\" .  -C " + temp_dir.name + " ."
 	else:
-		tar_command = "tar " + tar_mode + " -C " + service_files_dir + "  --exclude=\"_destination\" .  -C " + temp_dir.name + " . | " + destination_type_transformation(destination_type) + " | timeout -k " + timeout_kill + " " + timeout + " " + transport_command
+		tar_command = "tar " + tar_mode + " -C " + service_files_dir + "  --exclude=\"_destination\" .  -C " + temp_dir.name + " ."
 
-	process = subprocess.Popen(tar_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	process_tar = subprocess.Popen(shlex.split(tar_command), stdout=subprocess.PIPE)
+
+	if destination_type == destination_type_user_host_windows_proxy:
+		# converts stdin to base64 and append single space and "$DESTINATION" at the end of it
+		transformation_process_1 = subprocess.Popen("base64", stdin=process_tar.stdout, stdout=subprocess.PIPE)
+		transformation_process = subprocess.Popen("sed -e \"\$s/\$/ $DESTINATION/g\"", stdin=transformation_process_1.stdout, stdout=subprocess.PIPE)
+		transformation_process_1.stdout.close()
+	elif destination_type == destination_type_user_host_windows:
+		# converts stdin to base64
+		transformation_process = subprocess.Popen("base64", stdin=process_tar.stdout, stdout=subprocess.PIPE)
+	else:
+		# just prints stdin to stdout for other destination types
+		transformation_process = subprocess.Popen("cat", stdin=process_tar.stdout, stdout=subprocess.PIPE)
+	process_tar.stdout.close()
+
+	timeout_command = "timeout -k " + timeout_kill + " " + timeout + " " + transport_command
+	process = subprocess.Popen(shlex.split(timeout_command), stdin=transformation_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	transformation_process.stdout.close()
 	stdout = process.communicate()[0]
 
 	if process.returncode == 124:
