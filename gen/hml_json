@@ -8,11 +8,11 @@ use JSON::XS;
 
 our $SERVICE_NAME = "hml_json";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_FIRSTNAME;            *A_USER_FIRSTNAME =        \'urn:perun:user:attribute-def:core:firstName';
@@ -20,32 +20,27 @@ our $A_USER_LASTNAME;             *A_USER_LASTNAME =         \'urn:perun:user:at
 our $A_USER_LOGIN;                *A_USER_LOGIN=             \'urn:perun:user:attribute-def:def:login-namespace:mu';
 our $A_USER_MAIL;                 *A_USER_MAIL =             \'urn:perun:user:attribute-def:def:preferredMail';
 
-my %attributesByLogin;
+my %usersByLogin;
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-		$attributesByLogin{$memberAttributes{$A_USER_LOGIN}} = \%memberAttributes;
-	}
+foreach my $memberId ($data->getMemberIdsForFacility) {
+	my $user = {};
+	$user->{"firstname"} = $data->getUserAttributeValue(attrName => $A_USER_FIRSTNAME, member => $memberId) || "";
+	$user->{"lastname"} = $data->getUserAttributeValue(attrName => $A_USER_LASTNAME, member => $memberId) || "";
+	my $login = $data->getUserAttributeValue(attrName => $A_USER_LOGIN, member => $memberId);
+	$user->{"UCO"} = $login;
+	$user->{"email"} = $data->getUserAttributeValue(attrName => $A_USER_MAIL, member => $memberId);
+	$usersByLogin{$login} = $user;
 }
 
 
 my @users;
-for my $login (sort keys %attributesByLogin) {
-	my $values = $attributesByLogin{$login};
-	my $user = {};
-	$user->{"firstname"} = $values->{$A_USER_FIRSTNAME} || "";
-	$user->{"lastname"}  = $values->{$A_USER_LASTNAME} || "";
-	$user->{"UCO"}       = $values->{$A_USER_LOGIN};
-	$user->{"email"}     = $values->{$A_USER_MAIL};
-	push @users, $user;
+for my $login (sort keys %usersByLogin) {
+	push @users, $usersByLogin{$login};
 }
 
 my $fileName = "$DIRECTORY/$SERVICE_NAME";
 open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
-print FILE JSON::XS->new->utf8->pretty->encode(\@users);
+print FILE JSON::XS->new->utf8->pretty->canonical->encode(\@users);
 close FILE or die "Cannot close $fileName: $! \n";
 
 perunServicesInit::finalize;
