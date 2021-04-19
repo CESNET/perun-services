@@ -25,7 +25,7 @@ my $baseDnFileName = "$DIRECTORY/baseDN";
 
 #Get hierarchical data without expired members
 my $data = perunServicesInit::getHashedDataWithGroups();
-my $DEBUG = 1;
+my $DEBUG = 0;
 
 #Constants
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
