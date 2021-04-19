@@ -70,15 +70,11 @@ our $usersByResource = {};
 
 # FOR EACH RESOURCE
 foreach my $resourceId ($data->getResourceIds()) {
+	# Default value for representation is "group".
+	# Possible values: Tree / Workplace / Group (Default)
 	my $representation = lc ($data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_REPRESENTATION ) || "group");
 
 	writeDebug("Resource ID: $resourceId (represented as: $representation)", 0);
-
-	if (!$representation){
-		# Default value for representation.
-		# Possible values: Tree / Workplace / Group (Default)
-		$representation = "group"
-	}
 
 	switch($representation){
 
@@ -195,7 +191,6 @@ sub createGroup {
 	my $description = shift;
 	my $adOuName = shift;
 
-	$name = validateName($name);
 	# Ensure that there is one group with specific name
 	$groups->{$name}->{"description"} =  $description || $defaultDescription;
 	$groups->{$name}->{$A_R_ADOUNAME} = $adOuName || $baseGroupDN;
@@ -223,14 +218,6 @@ sub addMember {
 		$usersByResource->{$group}->{"CN=" . $login . "," . $baseDNforSpecial} = 1
 
 	}
-}
-
-sub validateName {
-	my $name = shift;
-
-	$name =~ s/[^A-Za-z0-9]/-/g;
-	
-	return lc $name;
 }
 
 sub writeDebug {
