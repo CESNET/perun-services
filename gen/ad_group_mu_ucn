@@ -44,6 +44,8 @@ our $A_R_ID; *A_R_ID = \'urn:perun:resource:attribute-def:core:id';
 
 # Default description of group in Active Directory
 my $defaultDescription = "no-desc in Perun";
+# Default representation of resource in Active Directory
+my $defaultRepresentation = "group";
 
 # CHECK ON FACILITY ATTRIBUTES
 if (!defined($data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN ))) {
@@ -70,7 +72,7 @@ our $usersByGroups = {};
 foreach my $resourceId ($data->getResourceIds()) {
 	# Default value for representation is "group".
 	# Possible values: tree / workplace / group (Default)
-	my $representation = lc ($data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_REPRESENTATION ) || "group");
+	my $representation = lc ($data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_REPRESENTATION ) || $defaultRepresentation);
 
 	writeDebug("Resource ID: $resourceId (represented as: $representation)", 0);
 
