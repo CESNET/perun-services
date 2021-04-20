@@ -78,7 +78,6 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 	switch($representation){
 
-		# The tree will be implemented.
 		case "tree"			{processTree($resourceId)}
 		case "workplace" 	{processWorkplaces($resourceId)}
 		case "group" 		{processGroup($resourceId)}
