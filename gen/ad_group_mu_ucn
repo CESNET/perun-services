@@ -40,7 +40,6 @@ our $A_R_ADOUNAME; *A_R_ADOUNAME = \'urn:perun:resource:attribute-def:def:adOuNa
 our $A_G_INETCISPR; *A_G_INETCISPR = \'urn:perun:group:attribute-def:def:inetCispr';
 our $A_G_DESCRIPTION; *A_G_DESCRIPTION = \'urn:perun:group:attribute-def:core:description';
 our $A_R_DESCRIPTION; *A_R_DESCRIPTION = \'urn:perun:resource:attribute-def:core:description';
-our $A_R_ID; *A_R_ID = \'urn:perun:resource:attribute-def:core:id';
 
 # Default description of group in Active Directory
 my $defaultDescription = "no-desc in Perun";
