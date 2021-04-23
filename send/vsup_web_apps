@@ -121,6 +121,7 @@ foreach my $UCO (sort keys %$dataByUco) {
 		$select = appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_MOB', paramValue => $TEL_PRAC_MOB);
 		$select = appendParam(select => $select, params => \@params, paramName => 'TEL_SOUKR', paramValue => $TEL_SOUKR);
 		$select = appendParam(select => $select, params => \@params, paramName => 'BANK_UCET', paramValue => $BANK_UCET);
+		$select = appendParam(select => $select, params => \@params, paramName => 'PLATNOST_DO', paramValue => undef);
 
 		my $recordAreEquals = $dbh->prepare($select);
 		$recordAreEquals->execute(@params);
@@ -128,7 +129,7 @@ foreach my $UCO (sort keys %$dataByUco) {
 		if(!$recordAreEquals->fetch) {
 
 			unless($DUMMY) {
-				my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET JMENO=? , PRIJMENI=? , TITUL_PRED=? , TITUL_ZA=? , FOTO=? , EMAIL_SKOLNI=? , EMAIL_SOUKR=? , TEL_PRAC_LINKA=? , TEL_PRAC_MOB=? , TEL_SOUKR=? , BANK_UCET=? WHERE UCO=?});
+				my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET JMENO=? , PRIJMENI=? , TITUL_PRED=? , TITUL_ZA=? , FOTO=? , EMAIL_SKOLNI=? , EMAIL_SOUKR=? , TEL_PRAC_LINKA=? , TEL_PRAC_MOB=? , TEL_SOUKR=? , BANK_UCET=? , PLATNOST_DO=null WHERE UCO=?});
 				$updatePerson->execute($JMENO, $PRIJMENI, $TITUL_PRED, $TITUL_ZA, $FOTO, $EMAIL_SKOLNI, $EMAIL_SOUKR, $TEL_PRAC_LINKA , $TEL_PRAC_MOB, $TEL_SOUKR, $BANK_UCET, $UCO);
 				if($DEBUG == 1) { print "Update existing person: $UCO\n"; }
 			} else {
@@ -164,30 +165,24 @@ foreach my $UCO (sort keys %$dataByUco) {
 }
 
 #
-# CLEAR all data for People removed from the WEB
+# Mark missing users as expired (set PLATNOST_DO to current date if not already set)
 #
-# FIXME - deletion is temporary disabled, we will mark disabled users with new flag in DB later.
-my $deletedUsers = 0;
-#my $ary_ref_users = $dbh->selectcol_arrayref(qq{select distinct UCO from $tableName where UCO is not null});
-#my @web_ucos = @$ary_ref_users;
-#my $deleteUser = $dbh->prepare(qq{DELETE from $tableName where UCO=?});
-#my $deleteDC2 = $dbh->prepare(qq{DELETE from idm_dc2_vztahy WHERE UCO=?});
-#my $deleteKOS = $dbh->prepare(qq{DELETE from idm_kos_vztahy WHERE UCO=?});
+my $disabledUsers = 0;
+my $ary_ref_users = $dbh->selectcol_arrayref(qq{select distinct UCO from $tableName where UCO is not null and PLATNOST_DO is NULL});
+my @web_ucos = @$ary_ref_users;
+my $disableUser = $dbh->prepare(qq{UPDATE $tableName SET PLATNOST_DO=CURDATE() where UCO=? AND PLATNOST_DO is NULL});
 
-#foreach my $UCO (@web_ucos) {
-#	unless (exists $dataByUco->{$UCO}) {
-#		unless($DUMMY) {
-#			if($DEBUG == 1) { print "Delete person: $UCO (including all relations etc.)\n"; }
-#			# delete all relations
-#			$deleteDC2->execute($UCO);
-#			$deleteKOS->execute($UCO);
-#			$deleteUser->execute($UCO);
-#		} else {
-#			if($DEBUG == 1) { print "Would delete person: $UCO\n"; }
-#		}
-#		$deletedUsers++;
-#	}
-#}
+foreach my $UCO (@web_ucos) {
+	unless (exists $dataByUco->{$UCO}) {
+		unless($DUMMY) {
+			if($DEBUG == 1) { print "Disable person: $UCO\n"; }
+			$disableUser->execute($UCO);
+		} else {
+			if($DEBUG == 1) { print "Would disable person: $UCO\n"; }
+		}
+		$disabledUsers++;
+	}
+}
 
 commit $dbh;
 $dbh->disconnect();
@@ -199,7 +194,7 @@ if ($DUMMY) {
 }
 print "Inserted:\t$inserted\n";
 print "Updated:\t$foundAndUpdated\n";
-print "Deleted:\t$deletedUsers\n";
+print "Disabled:\t$disabledUsers\n";
 print "Skipped:\t$foundAndSkipped\n";
 print "=======================================\n";
 
