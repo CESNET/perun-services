@@ -1,0 +1,262 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+use Getopt::Long qw(:config no_ignore_case);
+use LWP::UserAgent;
+use HTTP::Request;
+use HTTP::Headers;
+use JSON;
+use POSIX qw(strftime);
+use Encode qw(decode_utf8);
+
+#We want to have data in UTF8 on output
+binmode STDOUT, ':utf8';
+binmode STDERR, ':utf8';
+
+#parse arguments in utf8
+@ARGV = map { decode_utf8($_, 1) } @ARGV;
+
+# define service
+my $service_name = "netbox";
+
+# facility name
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+
+# propagation destination
+my $destination = $ARGV[1];
+chomp($destination);
+
+# GEN folder location
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+my $users_file_name = "$service_files_dir/netbox_users";
+my $groups_file_name = "$service_files_dir/netbox_groups";
+
+# Authorization TOKEN
+open(my $file, '<', "/etc/perun/$service_name")
+	or die("Can't open /etc/perun/$service_name: $!\n");
+my $TOKEN = <$file>;
+chomp($TOKEN);
+close $file;
+
+#Constants
+my $URL = $destination;
+my $USERS_API = "$URL/api/users/users/";
+my $GROUPS_API = "$URL/api/users/groups/";
+my $RESULTS = "results";
+my $NEXT = "next";
+my $TYPE_GET = 'GET';
+my $TYPE_POST = 'POST';
+my $TYPE_PATCH = 'PATCH';
+
+#All possible exceptions
+my $ERROR_COM_PROBLEM = "Communication problem with server, before processing command itself!\n";
+
+###################### MAIN CODE ######################
+
+# Fetch users data from perun
+my $json_users = do {
+	open(my $json_fh, "<:encoding(UTF-8)", $users_file_name)
+		or die("Can't open \$users_file_name\": $!\n");
+	local $/;
+	<$json_fh>
+};
+
+# Fetch Groups data from perun
+my $json_groups = do {
+	open(my $json_fh, "<:encoding(UTF-8)", $groups_file_name)
+		or die("Can't open \$groups_file_name\": $!\n");
+	local $/;
+	<$json_fh>
+};
+
+# Transform data from perun into hash
+my $perun_users = JSON->new->decode($json_users);
+my $perun_groups = JSON->new->decode($json_groups);
+
+# Fetch users data from netbox
+my $response_users = call_server($USERS_API, $TYPE_GET, {});
+my @netbox_users = @{$response_users->{$RESULTS}};
+while($response_users->{$NEXT}) {
+	$response_users = call_server($response_users->{$NEXT}, $TYPE_GET, {});
+	push @netbox_users, @{$response_users->{$RESULTS}};
+}
+
+# Fetch groups data from netbox
+my $response_groups = call_server($GROUPS_API, $TYPE_GET, {});
+my @netbox_groups = @{$response_groups->{$RESULTS}};
+while($response_groups->{$NEXT}) {
+	$response_groups = call_server($response_groups->{$NEXT}, $TYPE_GET, {});
+	push @netbox_groups, @{$response_groups->{$RESULTS}};
+}
+
+# Create hash of users for easier manipulation
+my $netbox_users_hash = {};
+for my $netbox_user (@netbox_users) {
+	$netbox_users_hash->{$netbox_user->{"username"}} = $netbox_user;
+}
+
+# Create hash of groups for easier manipulation
+my $netbox_groups_hash = {};
+for my $netbox_group (@netbox_groups) {
+	$netbox_groups_hash->{$netbox_group->{"name"}} = $netbox_group->{"id"};
+}
+
+# Create groups in netbox and associate all netbox groups ids with perun group names
+foreach (keys %$perun_groups) {
+	if (exists $netbox_groups_hash->{$_}) {
+		$perun_groups->{$_} = $netbox_groups_hash->{$_};
+	} else {
+		my $created_group = call_server($GROUPS_API, $TYPE_POST, {"name" => $_});
+		$perun_groups->{$created_group->{"name"}} = $created_group->{"id"};
+	}
+}
+
+# Create users in netbox
+foreach (keys %$perun_users) {
+	unless (exists $netbox_users_hash->{$_}) {
+		my $user = $perun_users->{$_};
+		my @alphanumeric = ('a'..'z', 'A'..'Z', 0..9);
+		my $randpassword = join '', map $alphanumeric[rand @alphanumeric], 0..10;
+		$user->{"password"} = $randpassword;
+		my @groups_ids = ();
+		for my $name (@{$user->{"groups"}}) {
+			my $group_id = $perun_groups->{$name};
+			push @groups_ids, int($group_id);
+		}
+		$user->{"groups"} = \@groups_ids;
+		call_server($USERS_API, $TYPE_POST, $user);
+	}
+}
+
+# Update existing netbox users
+foreach (keys %$netbox_users_hash) {
+	my @users_to_update = ();
+	if (exists $perun_users->{$_}) {
+		my $user = $perun_users->{$_};
+		$user->{"id"} = $netbox_users_hash->{$_}->{"id"};
+		my @groups_ids = ();
+		for my $name (@{$user->{"groups"}}) {
+			my $group_id = $perun_groups->{$name};
+			push @groups_ids, int($group_id);
+		}
+		$user->{"groups"} = \@groups_ids;
+		push @users_to_update, $user;
+	} else {
+		my $user = $netbox_users_hash->{$_};
+		$user->{"is_active"} = \0;
+		$user->{"groups"} = [];
+		push @users_to_update, $user;
+	}
+	call_server($USERS_API, $TYPE_PATCH, \@users_to_update);
+}
+
+###################### SUBROUTINES ######################
+
+#Name:
+# callServer
+#-----------------------
+#Parameters:
+# url     - url of server and method address to call
+# type    - GET, POST or PATCH
+# content - hash content of request, will be encoded to json output
+#-----------------------
+#Returns:
+# hash of response content
+# die in case of an error
+#-----------------------
+#Description:
+# This method calls specific url with GET, POST or PATCH connection type and predefined content in json.
+# After that it check response, if there is correct answer or error.
+# If there is no server error, it returns resolved status of this call.
+#-----------------------
+sub call_server {
+	my $url = shift;
+	my $type = shift;
+	my $content = shift;
+
+	my $json_content = JSON->new->utf8->encode( $content );
+
+	my $server_response = create_connection( $url, $type, $json_content );
+	return check_server_response( $server_response );
+}
+
+#Name:
+# createConnection
+#-----------------------
+#Parameters:
+# url     - url of server and method address to call
+# type    - GET, POST or PATCH
+# content - json with data
+#-----------------------
+#Returns: Response of server on our request.
+#-----------------------
+#Description:
+# This method just takes all parameters and creates connection to the server.
+# Then returns it's repsonse.
+#-----------------------
+sub create_connection {
+	my $url = shift;
+	my $type = shift;
+	my $content = shift;
+
+	my $headers = HTTP::Headers->new;
+	$headers->header('Content-Type' => 'application/json');
+	$headers->header('Accept' => 'application/json,text/json');
+	$headers->header('Authorization' => 'Token ' . $TOKEN);
+
+	my $ua = LWP::UserAgent->new;
+	my $request = HTTP::Request->new( $type, $url, $headers, $content );
+	return $ua->request($request);
+}
+
+#Name:
+# checkServerResponse
+#-----------------------
+#Parameters:
+# response - response from server in JSON format
+#-----------------------
+#Returns: decoded json respons if response is success, die if response of server is not success
+#-----------------------
+#Description:
+# This method checks if response of server was success. If yes, return decoded json response,
+# if not, die with error.
+#-----------------------
+sub check_server_response {
+	my $response = shift;
+	my $response_json;
+
+	if ($response->is_success) {
+		$response_json = JSON->new->utf8->decode( $response->content );
+	} else {
+		my $response_info = $response->status_line . "\n" . $response->decoded_content . "\n";
+		die_pretty( $ERROR_COM_PROBLEM, $response_info );
+	}
+	return $response_json;
+}
+
+#Name:
+# diePretty
+#-----------------------
+#Parameters:
+# errorMessage  - basic error information (one of predefined errors)
+# moreErrorInfo - more specific information about basic error
+#-----------------------
+#Returns:
+#-----------------------
+#Description:
+# This is just exit with error with more information and human readable text formating.
+#-----------------------
+sub die_pretty {
+	my $error_message = shift;
+	my $more_error_info = shift;
+	my $date_string = strftime "%D %H:%M:%S \n", localtime;
+	my $row_delimeter = "------------------------------------------------------------------------\n";                                                    #OK
+	my $status =       "               STATUS = ERROR\n";
+
+	$error_message = "\n" . $row_delimeter . $status . $row_delimeter . $date_string . $error_message . $row_delimeter . $more_error_info  . $row_delimeter . "\n";
+
+	die $error_message;
+}

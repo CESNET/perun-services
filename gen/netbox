@@ -1,0 +1,82 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Perun::Agent;
+use JSON::XS;
+use Data::Dumper;
+
+our $SERVICE_NAME     = "netbox";
+our $PROTOCOL_VERSION = "3.0.0";
+my  $SCRIPT_VERSION   = "3.0.0";
+
+my $file_name_users = "netbox_users";
+my $file_name_groups = "netbox_groups";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data =      perunServicesInit::getHashedHierarchicalData(1);
+
+#Constants
+our $A_RESOURCE_GROUP_NAME;       *A_RESOURCE_GROUP_NAME =   \'urn:perun:resource:attribute-def:def:netboxGroupName';
+our $A_RESOURCE_IS_STAFF;         *A_RESOURCE_IS_STAFF =     \'urn:perun:resource:attribute-def:def:netboxIsStaff';
+
+our $A_USER_FACILITY_LOGIN;       *A_USER_FACILITY_LOGIN =   \'urn:perun:user_facility:attribute-def:virt:login';
+
+our $A_USER_FIRSTNAME;            *A_USER_FIRSTNAME =        \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LASTNAME;             *A_USER_LASTNAME =         \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_MAIL;                 *A_USER_MAIL =             \'urn:perun:user:attribute-def:def:preferredMail';
+
+our $IS_ACTIVE;                   *IS_ACTIVE =                \JSON::XS::true;
+
+my $users = {};
+my $groups = {};
+
+foreach my $resourceId ($data->getResourceIds()) {
+
+	my $groupName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_GROUP_NAME);
+	my $isStaff   = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_IS_STAFF) || JSON::XS::false;
+	next unless $groupName;
+	$groups->{$groupName} = 1;
+
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+
+		my $uco = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_USER_FACILITY_LOGIN);
+		my $login = "$uco\@muni.cz";
+
+		if ($users->{$login}) {
+			if ($isStaff){
+				$users->{$login}->{"is_staff"} = $isStaff;
+			}
+			push @{$users->{$login}->{"groups"}}, $groupName;
+		} else {
+			my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_FIRSTNAME);
+			my $lastName  = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_LASTNAME);
+			my $mail      = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_MAIL);
+
+			my $user = {};
+			$user->{"username"}   = $login;
+			$user->{"first_name"} = $firstName || "";
+			$user->{"last_name"}  = $lastName  || "";
+			$user->{"email"}      = $mail      || "";
+			$user->{"is_active"}  = $IS_ACTIVE;
+			$user->{"is_staff"}   = $isStaff;
+			$user->{"groups"}   = [$groupName];
+
+			$users->{$login} = $user;
+		}
+	}
+}
+
+my $file_users = "$DIRECTORY/$file_name_users";
+open FILE, ">$file_users" or die "Cannot open $file_users: $! \n";
+print FILE JSON::XS->new->utf8->pretty->canonical->encode($users);
+close FILE or die "Cannot close $file_users: $! \n";
+
+my $file_groups = "$DIRECTORY/$file_name_groups";
+open FILE, ">$file_groups" or die "Cannot open $file_groups: $! \n";
+print FILE JSON::XS->new->utf8->pretty->canonical->encode($groups);
+close FILE or die "Cannot close $file_groups: $! \n";
+
+perunServicesInit::finalize;
