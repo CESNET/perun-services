@@ -1,3 +1,9 @@
+perun-slave-process-fs-home (3.1.10) stable; urgency=low
+
+  * It is now possible to skip creating a home directory from mid hook.
+
+ -- Radoslav Cerhak <r.cerhak@gmail.com>  Fri, 30 Apr 2021 10:45:00 +0200
+
 perun-slave-process-fs-home (3.1.9) stable; urgency=high
 
   * main file with data was divided into two files - first with data to create
