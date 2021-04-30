@@ -1,3 +1,9 @@
+perun-slave-process-k5login (3.1.7) stable; urgency=low
+
+  * Skip creating k5login files in home directories that don't exist.
+
+ -- Radoslav Cerhak <r.cerhak@gmail.com>  Fri, 30 Apr 2021 10:45:00 +0200
+
 perun-slave-process-k5login (3.1.6) stable; urgency=low
 
   * Skip information about not changed k5login files. This information is

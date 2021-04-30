@@ -26,6 +26,9 @@ function process {
 		PRINCIPALS=`echo "${line}" | sed -e 's/^[^\t]*[\t]//'`
 		K5LOGIN="${HOME_DIR}/.k5login"
 
+		# skip creation if homedir does not exist
+		if [[ ! -d ${HOME_DIR} ]]; then continue; fi
+
 		#set home dir of user as current working directory
 		catch_error E_DIR_NOT_EXISTS cd "${HOME_DIR}"
 

@@ -84,7 +84,9 @@ function process {
 	while IFS=`echo -e "\t"` read U_HOME_MNT_POINT U_LOGNAME U_UID U_GID USER_STATUS USER_GROUPS REST_OF_LINE; do
 		HOME_DIR="${U_HOME_MNT_POINT}/${U_LOGNAME}"
 
+		CONT=0
 		run_mid_hooks
+		if [[ $CONT -eq 1 ]]; then continue; fi
 
 		if [ ! -d "${HOME_DIR}" ]; then
 
