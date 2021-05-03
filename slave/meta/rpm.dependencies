@@ -9,7 +9,6 @@ perun-slave-process-fs-home
 perun-slave-process-fs-project
 perun-slave-process-fs-scratch
 perun-slave-process-fs-scratch-local
-perun-slave-process-gridmap
 perun-slave-process-group
 perun-slave-process-group-nfs4
 perun-slave-process-k5login
@@ -26,8 +25,6 @@ perun-slave-process-passwd-nfs4
 perun-slave-process-passwd-scp
 perun-slave-process-pbsmon-json
 perun-slave-process-pbsmon-users
-perun-slave-process-pbs-phys-cluster
-perun-slave-process-pbs-pre
 perun-slave-process-pbs-publication-fairshare
 perun-slave-process-pkinit
 perun-slave-process-sshkeys

@@ -1,3 +1,9 @@
+perun-slave-metacentrum (3.0.7) stable; urgency=medium
+
+  * removed pbs-phys-cluster and pbs-pre
+
+ -- Martin Kuba <makub@ics.muni.cz>  Mon, 03 May 2021 11:37:36 +0200
+
 perun-slave-metacentrum (3.0.6) stable; urgency=medium
 
   * changed architecture from any to all
