@@ -15,7 +15,6 @@ my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_FACILITY_LOGIN;           *A_USER_FACILITY_LOGIN =       \'urn:perun:user_facility:attribute-def:virt:login';
-our $A_FACILITY_LOGIN_NAMESPACE;      *A_FACILITY_LOGIN_NAMESPACE  = \'urn:perun:facility:attribute-def:def:loginNamespace';
 
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
