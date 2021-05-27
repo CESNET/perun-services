@@ -1,0 +1,161 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+local $::SERVICE_NAME = "ad_group_vsup_o365";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
+my $baseDnFileName = "$DIRECTORY/baseDN";
+
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
+our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseDN';
+our $A_F_SERV_BASE_DN;  *A_F_SERV_BASE_DN = \'urn:perun:facility:attribute-def:def:adServiceBaseDN';
+our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
+our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName';
+our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:expirationKos';
+our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
+our $A_EXPIRATION_MANUAL; *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
+
+# CHECK ON FACILITY ATTRIBUTES4
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN ))) {
+	exit 1;
+}
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
+	exit 1;
+}
+if (!defined($data->getFacilityAttributeValue( attrName => $A_F_SERV_BASE_DN ))) {
+	exit 1;
+}
+
+my $baseGroupDN = $data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN );
+my $baseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+my $baseServiceDN = $data->getFacilityAttributeValue( attrName => $A_F_SERV_BASE_DN );
+
+#
+# PRINT BASE_DN FILE
+#
+open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
+print FILE $baseGroupDN;
+close(FILE);
+
+my $groups = {};
+my $usersByResource = {};
+
+# FOR EACH RESOURCE
+foreach my $resourceId ($data->getResourceIds()) {
+
+	my $group = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_GROUP_NAME );
+	$groups->{$group} = 1;
+
+	# FOR EACH MEMBER ON RESOURCE
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
+
+		unless ($login) {
+			# skip users without login = CN
+			next;
+		}
+
+		my $expirationKOS = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_KOS);
+		my $expirationDC2 = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_DC2);
+		my $expirationManual = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_MANUAL);
+
+		my $isActive = isActive($expirationKOS, $expirationDC2, $expirationManual);
+
+		# skip "vsup expired" members
+		next unless ($isActive);
+
+		my $serviceUser = $data->getUserAttributeValue( member => $memberId, attrName => $A_IS_SERVICE );
+
+		if (defined $serviceUser and ($serviceUser == 1)) {
+			# store which service users (their DN) are on this resource
+			$usersByResource->{$group}->{"CN=" . $login . "," . $baseServiceDN} = 1
+		} else {
+			# store which normal users (their DN) are on this resource
+			$usersByResource->{$group}->{"CN=" . $login . "," . $baseDN} = 1
+		}
+
+
+	}
+
+}
+
+#
+# Print group data LDIF
+#
+open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
+
+for my $group (sort keys %$groups) {
+
+	print FILE "dn: CN=" . $group . "," . $baseGroupDN . "\n";
+	print FILE "cn: " . $group . "\n";
+	print FILE "objectClass: group\n";
+	print FILE "objectClass: top\n";
+
+	my @groupMembers = sort keys %{$usersByResource->{$group}};
+	for my $member (@groupMembers) {
+		print FILE "member: " . $member . "\n";
+	}
+
+	# there must be empty line after each entry
+	print FILE "\n";
+
+}
+
+close FILE;
+
+perunServicesInit::finalize;
+
+
+#
+# returns 1 if the the latest of given expiration is either in the future, or in the 14 days grace period
+# otherwise, returns 0
+#
+sub isActive() {
+
+	# read input
+	my $expirationKos = shift;
+	my $expirationDc2 = shift;
+	my $expirationMan = shift;
+	# parse to time or undef
+	my $expirationKosTime = ($expirationKos) ? Time::Piece->strptime($expirationKos,"%Y-%m-%d") : undef;
+	my $expirationDc2Time = ($expirationDc2) ? Time::Piece->strptime($expirationDc2,"%Y-%m-%d") : undef;
+	my $expirationManTime = ($expirationMan) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
+
+	my @expirations = ();
+	if (defined $expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
+	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
+	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
+
+	# sort all expirations
+	my @sorted_expirations = sort { $a <=> $b } @expirations;
+
+	my $latest_expiration = $sorted_expirations[$#sorted_expirations];
+	my $currentDate = Time::Piece->strptime(localtime->ymd,"%Y-%m-%d");
+
+	if (!defined $expirationKos and !defined $expirationDc2 and !defined $expirationMan) {
+		# if no expiration set in source data - take as "never"
+		return 1;
+	}
+
+	# Add time 23:59:59 to the date, since we want accounts to be active on the last day
+	$latest_expiration = $latest_expiration + 86399;
+
+	if (($latest_expiration + (14*24*60*60)) > $currentDate->epoch) {
+		return 1;
+	}
+
+	return 0;
+}
