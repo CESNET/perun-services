@@ -1,0 +1,134 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+use Net::LDAPS;
+use Net::LDAP::Entry;
+use Net::LDAP::Message;
+use Net::LDAP::LDIF;
+
+# Import shared AD library
+use ADConnector;
+use ScriptLock;
+
+sub process_update;
+
+# Constants and counters
+my $RESULT_ERRORS = "errors";
+my $RESULT_CHANGED = "changed";
+my $counter_group_members_updated = 0;
+my $counter_group_members_updated_with_errors = 0;
+my $counter_group_members_not_updated = 0;
+
+# define service
+my $service_name = "ad_group_vsup_o365";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+
+# BASE DN
+open my $file, '<', "$service_files_dir/baseDN";
+my $base_dn = <$file>;
+chomp($base_dn);
+close $file;
+
+# propagation destination
+my $namespace = $ARGV[1];
+chomp($namespace);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespace);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# init configuration
+my @conf = init_config($namespace);
+my $ldap_location = resolve_pdc($conf[0]);
+my $ldap = ldap_connect($ldap_location);
+my $filter = '(objectClass=group)';
+
+# connect
+ldap_bind($ldap, $conf[1], $conf[2]);
+
+# load all data
+my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
+my %perun_entries_map = ();
+
+foreach my $perun_entry (@perun_entries) {
+    my $cn = $perun_entry->get_value('cn');
+    $perun_entries_map{ $cn } = $perun_entry;
+}
+
+# process data
+process_update();
+
+# disconnect
+ldap_unbind($ldap);
+
+# log results
+ldap_log($service_name, "Group updated (members): " . $counter_group_members_updated . " entries.");
+ldap_log($service_name, "Group updated with errors (members): " . $counter_group_members_updated_with_errors . " entries.");
+ldap_log($service_name, "Group failed to update (members): " . $counter_group_members_not_updated. " entries.");
+
+# print results for TaskResults in GUI
+print "Group updated (members): " . $counter_group_members_updated . " entries.\n";
+print "Group updated with errors (members): " . $counter_group_members_updated_with_errors . " entries.\n";
+print "Group failed to update (members): " . $counter_group_members_not_updated. " entries.\n";
+
+$lock->unlock();
+
+if ($counter_group_members_updated_with_errors > 0) { die "Failed to process: " . $counter_group_members_updated_with_errors . " entries.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
+
+# END of main script
+
+
+#
+# Update group members in AD
+#
+sub process_update() {
+
+	foreach my $perun_entry (@perun_entries) {
+
+		my @per_val = $perun_entry->get_value('member');
+
+		# load members of a group from AD based on DN in Perun => Group must exists in AD
+		my @ad_val = load_group_members($ldap, $perun_entry->dn(), $filter);
+
+		if ($? != 0) {
+			ldap_log($service_name, "Unable to load Perun group members from AD: " . $perun_entry->dn());
+			next;
+		}
+
+		# sort to compare
+		my @sorted_ad_val = sort(@ad_val);
+		my @sorted_per_val = sort(@per_val);
+
+		# compare using smart-match (perl 5.10.1+)
+		unless(@sorted_ad_val ~~ @sorted_per_val) {
+
+			my %ad_val_map = map { $_ => 1 } @sorted_ad_val;
+			my %per_val_map = map { $_ => 1 } @sorted_per_val;
+
+			# members of group are not equals
+			# we must get reference to real group from AD in order to call "replace"
+			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'base' );
+			unless ($response_ad->is_error()) {
+				# SUCCESS
+				my $ad_entry = $response_ad->entry(0);
+				my $result = update_group_membership($ldap, $service_name, $ad_entry, \%ad_val_map, \%per_val_map);
+				$counter_group_members_updated++ if ($result eq $RESULT_CHANGED);
+				$counter_group_members_updated_with_errors++ if ($result eq $RESULT_ERRORS);
+			} else {
+				# FAIL (to get group from AD)
+				$counter_group_members_not_updated++;
+				ldap_log($service_name, "Group members NOT updated: " . $perun_entry->dn() . " | " . $response_ad->error());
+			}
+		}
+
+		# group is unchanged
+
+	}
+
+}
