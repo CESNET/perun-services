@@ -2,8 +2,11 @@
 use feature "switch";
 use strict;
 use warnings;
+use Time::Piece;
 use perunServicesInit;
 use perunServicesUtils;
+
+sub isActive;
 
 local $::SERVICE_NAME = "ad_group_vsup_o365";
 local $::PROTOCOL_VERSION = "3.0.0";
