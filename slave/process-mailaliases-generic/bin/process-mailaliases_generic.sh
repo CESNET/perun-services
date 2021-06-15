@@ -6,7 +6,7 @@ PROTOCOL_VERSION='3.0.0'
 I_CHANGED=(0 'Aliases updated')
 I_NOT_CHANGED=(0 'Aliases has not changed')
 E_DUPLICITS=(50 'Duplicits: "\"${DUPLICITS}\"" have been found in "\"${FILES}\"".')
-E_NOTEXISTING_ALIASESD_DIR=(51 'Directory "\"${ETC_ALIASESD_DIR}\"" not exists.')
+E_NOTEXISTING_DST_FILE_DIR=(51 'Directory "\"${DST_FILE_DIR}\"" not exists.')
 E_PERMISSIONS=(52 'Cannot set permissions "\"${PERMISSIONS}\"" to file "\"${FROM_PERUN}\"".')
 E_NOTEXISTING_ALIASES_FILE=(53 'File "\"${ETC_ALIASES}\"" not exists.')
 E_NEWALIASES=(54 'Command newaliases failed.')
@@ -15,19 +15,27 @@ GENERIC_FILE="perun_generic"
 FROM_PERUN="${WORK_DIR}/${GENERIC_FILE}"
 
 ETC_ALIASES="/etc/aliases"
-ETC_ALIASESD_DIR="/etc/aliases.d/"
+ETC_ALIASESD_DIR="/etc/aliases.d"
 PERMISSIONS="644"
 
 function process {
+
+	### prepare destination file variables
+	if [ -z "$DST_FILE" ]; then
+		DST_FILE="${ETC_ALIASESD_DIR}/${GENERIC_FILE}"
+	fi
+	DST_FILE_DIR=$(dirname "$DST_FILE")
+	DST_FILE_NAME=$(basename "$DST_FILE")
+
 	### Create lock
 	create_lock
 
 	### Set permisson for special case if destination file not exists
 	catch_error E_PERMISSIONS chmod "${PERMISSIONS}" "${FROM_PERUN}"
 
-	### try if /etc/aliases.d/ exists, if not, end with error
-	if [ ! -d "${ETC_ALIASESD_DIR}" ]; then
-		log_msg E_NOTEXISTING_ALIASESD_DIR
+	### try if destination directory exists, if not, end with error
+	if [ ! -d "${DST_FILE_DIR}" ]; then
+		log_msg E_NOTEXISTING_DST_FILE_DIR
 	fi
 
 	### try if file /etc/aliases exists, if not, end with error
@@ -35,12 +43,22 @@ function process {
 		log_msg E_NOTEXISTING_ALIASES_FILE
 	fi
 	
-	### Looking for duplicits in possible places (except perun_generic_file)
-	### take all files from /etc/aliases.d/ except old generic_file and all files with extension .db
-	fail_if_duplicits_found "${ETC_ALIASES}" "${FROM_PERUN}" `find "${ETC_ALIASESD_DIR}" -type f -not -name ${GENERIC_FILE} -not -name "*.db" -print`
+	### Looking for duplicits in possible places
+	### Checks /etc/aliases.d/ except old generic_file, all files with extension .db and destination file (if it is set)
+	### If there is a destination file set inside different directory than /etc/aliases.d/, check that directory as well
+	DST_DIR_FILES=`find "${DST_FILE_DIR}" -type f -not -name "${DST_FILE_NAME}" -not -name "*.db" -print`
+	ETC_DIR_FILES=`find "${ETC_ALIASESD_DIR}" -type f -not -name "${DST_FILE_NAME}" -not -name "${GENERIC_FILE}" -not -name "*.db" -print`
+	ETC_DIR_FILES_SIMPLE=`find "${ETC_ALIASESD_DIR}" -type f -not -name "${GENERIC_FILE}" -not -name "*.db" -print`
+	if [ "${DST_FILE}" = "${ETC_ALIASESD_DIR}/${GENERIC_FILE}" ]; then
+		fail_if_duplicits_found "${ETC_ALIASES}" "${FROM_PERUN}" "${ETC_DIR_FILES_SIMPLE}"
+	elif [ "${DST_FILE_DIR}" = "${ETC_ALIASESD_DIR}" ]; then
+		fail_if_duplicits_found "${ETC_ALIASES}" "${FROM_PERUN}" "${ETC_DIR_FILES}"
+	else
+		fail_if_duplicits_found "${ETC_ALIASES}" "${FROM_PERUN}" "${DST_DIR_FILES}" "${ETC_DIR_FILES}"
+	fi
 
 	### If no duplicits found, move new generic_file to /etc/aliases.d/
-	diff_mv_sync "${FROM_PERUN}" "${ETC_ALIASESD_DIR}/${GENERIC_FILE}" && log_msg I_CHANGED || log_msg I_NOT_CHANGED
+	diff_mv_sync "${FROM_PERUN}" "${DST_FILE}" && log_msg I_CHANGED || log_msg I_NOT_CHANGED
 
 	### call new aliases
 	newaliases
