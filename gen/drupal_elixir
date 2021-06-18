@@ -10,11 +10,11 @@ use open qw/:std :utf8/;
 
 local $::SERVICE_NAME = "drupal_elixir";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.1.1";
+my $SCRIPT_VERSION = "3.1.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #forward declaration
 sub processUsers;
@@ -56,7 +56,6 @@ our $g_type = {};
 our $g_parent_id = {};
 
 our $membershipStruc = {};
-our $usedEmailsStruc = {};
 
 my $fileUsers = $DIRECTORY . "users.csv";
 my $fileUsersDuplicities = $DIRECTORY . "users-duplicities.csv";
@@ -67,9 +66,9 @@ my $fileMemberships = $DIRECTORY . "memberships.csv";
 my $agent = perunServicesInit->getAgent;
 my $groupAgent = $agent->getGroupsAgent;
 
-foreach my $resourceData ($data->getChildElements) {
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		my $groupMembersLogins = processGroups $groupData;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
+		processGroups $groupId, $resourceId;
 	}
 }
 
@@ -125,19 +124,20 @@ perunServicesInit::finalize;
 ##############################################################################
 ## creates structure for users.csv file
 sub processUsers {
-	my ($gid, $memberData, $admins_ref) = @_;
+	my ($groupId, $memberId, $admins_ref) = @_;
 	my @admins = @$admins_ref;
 
-	my %memberAttributes = attributesToHash $memberData->getAttributes;
-	my $uid = $memberAttributes{$A_USER_ID};
-	my $login = $memberAttributes{$A_USER_LOGIN};
-	my $status = $memberAttributes{$A_USER_STATUS};
-	if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = $STATUS_SUSPENDED; }
-	my $email = $memberAttributes{$A_USER_EMAIL};
-	my $d_name = $memberAttributes{$A_USER_D_NAME};
+	my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
+	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
+	my $status = $data->getMemberAttributeValue( member => $memberId, group => $groupId, attrName => $A_USER_STATUS );
+	if($data->getMemberAttributeValue( member => $memberId, group => $groupId, attrName => $A_MEMBER_IS_SUSPENDED )) {
+		$status = $STATUS_SUSPENDED;
+	}
+	my $email = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EMAIL );
+	my $d_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_D_NAME );
 
 	# Select right eppn from the list of eppns, TEMPORARLY get google one, then we will use elixir
-	my @eppns = @{$memberAttributes{$A_USER_EPPNS}};
+	my @eppns = @{$data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EPPNS)};
 
 
 	#select first eppn which ends with '@elixir-europe.org', if there is no one matching select first eppn, if there is no eppn at all use empty string
@@ -175,42 +175,39 @@ sub processUsers {
 	if(@admins) {
 		foreach my $user (@admins){
 			if ($user->getId() == $uid) {
-				processMemberships $gid, $uid, $A_M_TYPE_ADMIN;
+				processMemberships $groupId, $uid, $A_M_TYPE_ADMIN;
 			}
 		}
 	}
 
-	processMemberships $gid, $uid, $A_M_TYPE_MEMBER;
+	processMemberships $groupId, $uid, $A_M_TYPE_MEMBER;
 }
 
 ## creates structure for groups.csv file
 sub processGroups {
-	my $group = shift;
-	my %groupAttributes = attributesToHash $group->getAttributes;
-	my $membersElement = ($group->getChildElements)[1];
+	my ($groupId, $resourceId) = @_;
 
-	if($groupAttributes{$A_GROUP_NAME}) {
-		my $groupName = $groupAttributes{$A_GROUP_NAME};
-		my $gid = $groupAttributes{$A_GROUP_ID};
-		my $groupParentID = $groupAttributes{$A_PARENT_GROUP_ID};
+	if($data->getGroupAttributeValue( group => $groupId, attrName => $A_GROUP_NAME )) {
+		my $groupName = $data->getGroupAttributeValue( group => $groupId, attrName => $A_GROUP_NAME ),
+		my $groupParentID = $data->getGroupAttributeValue( group => $groupId, attrName => $A_PARENT_GROUP_ID );
 		my $groupType;
 
-		if($groupAttributes{$A_GROUP_TYPE}) {
-			$groupType = $groupAttributes{$A_GROUP_TYPE};
+		if($data->getGroupResourceAttributeValue( group => $groupId, resource=> $resourceId, attrName => $A_GROUP_TYPE )) {
+			$groupType = $data->getGroupResourceAttributeValue( group => $groupId, resource=> $resourceId, attrName => $A_GROUP_TYPE );
 		} else {
 			$groupType = "public";
 		}
 
-		unless(exists $groupStruc->{$gid}) {
-			$groupStruc->{$gid}->{$g_name} = $groupName;
-			$groupStruc->{$gid}->{$g_type} = $groupType;
-			$groupStruc->{$gid}->{$g_parent_id} = $groupParentID;
+		unless(exists $groupStruc->{$groupId}) {
+			$groupStruc->{$groupId}->{$g_name} = $groupName;
+			$groupStruc->{$groupId}->{$g_type} = $groupType;
+			$groupStruc->{$groupId}->{$g_parent_id} = $groupParentID;
 		}
 
-		my @admins = $groupAgent->getAdmins(group => $gid);
+		my @admins = $groupAgent->getAdmins(group => $groupId);
 
-		foreach my $memberData ($membersElement->getChildElements) {
-			processUsers $gid, $memberData, \@admins;
+		for my $memberId ($data->getMemberIdsForResourceAndGroup( resource=> $resourceId, group => $groupId )) {
+			processUsers $groupId, $memberId, \@admins;
 		}
 	}
 }
