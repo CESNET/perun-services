@@ -8,11 +8,11 @@ use Text::Unidecode;
 
 local $::SERVICE_NAME = "openvpn";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_CERT_DNS;   *A_USER_CERT_DNS =     \'urn:perun:user:attribute-def:virt:userCertDNs';
@@ -20,24 +20,17 @@ our $A_USER_CERT_DNS;   *A_USER_CERT_DNS =     \'urn:perun:user:attribute-def:vi
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 
-my @membersAttributes;
-my @resourcesData = $data->getChildElements;
-for my $rData (@resourcesData) {
-	my %resourcesAttributes = attributesToHash $rData->getAttributes;
-	for my $mData ($rData->getChildElements) {
-		my %mAttrs = attributesToHash $mData->getAttributes;
-		push @membersAttributes, \%mAttrs;
-	}
-}
-
 my %membersDNs = ();
-foreach my $memberAttributes (@membersAttributes) {
-	foreach my $subjectDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
-		chomp $memberAttributes->{$A_USER_CERT_DNS}{$subjectDN};
-		#remove prefix from subjectDN
-		my $subjectDNWithoutPrefix = $subjectDN;
-		$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
-		$membersDNs{$subjectDNWithoutPrefix} = 1;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+		my $userCertDns = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_CERT_DNS );
+		foreach my $subjectDN (keys %$userCertDns) {
+			chomp $userCertDns->{$subjectDN};
+			#remove prefix from subjectDN
+			my $subjectDNWithoutPrefix = $subjectDN;
+			$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
+			$membersDNs{$subjectDNWithoutPrefix} = 1;
+		}
 	}
 }
 

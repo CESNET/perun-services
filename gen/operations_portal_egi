@@ -7,10 +7,11 @@ use File::Basename;
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.0.0";
+our $SCRIPT_VERSION = "3.0.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_FIRST_NAME;                 *A_USER_FIRST_NAME =              \'urn:perun:user:attribute-def:core:firstName';
@@ -24,7 +25,6 @@ our $STATUS_VALID;                      *STATUS_VALID =                     \'VA
 
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
 #####################################
 
 ####### output file ######################
@@ -38,12 +38,15 @@ print SERVICE_FILE "# firstName, lastName, certDN, voName, mail\n";
 my $sortingFunction = getAttributeSorting $A_USER_LAST_NAME, 1;
 
 my @membersAttributes;
-my @resourcesData = $data->getChildElements;
-for my $rData (@resourcesData) {
-	my %resourcesAttributes = attributesToHash $rData->getAttributes;
-	for my $mData ($rData->getChildElements) {
-		my %mAttrs = attributesToHash $mData->getAttributes;
-		$mAttrs{$A_R_VO_SHORT_NAME} = $resourcesAttributes{$A_R_VO_SHORT_NAME};
+foreach my $resourceId ( $data->getResourceIds() ) {
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+		my %mAttrs = ();
+		$mAttrs{$A_R_VO_SHORT_NAME} = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_VO_SHORT_NAME);
+		$mAttrs{$A_USER_STATUS} = $data->getMemberAttributeValue(member => $memberId, attrName => $A_USER_STATUS );
+		$mAttrs{$A_USER_FIRST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_FIRST_NAME );
+		$mAttrs{$A_USER_LAST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_LAST_NAME );
+		$mAttrs{$A_USER_CERT_DN} = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_CERT_DN );
+		$mAttrs{$A_USER_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_MAIL );
 		push @membersAttributes, \%mAttrs;
 	}
 }
