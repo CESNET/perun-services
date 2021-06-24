@@ -1,3 +1,10 @@
+perun-slave-process-k5login-root (3.1.5) stable; urgency=low
+
+  * Add possibility to change destination file (default is /root/.k5login).
+    It may be set in a pre-script as a variable DST_FILE
+
+ -- Peter Balcirak <peter.balcirak@ics.muni.cz>  Tue, 15 Jun 2021 10:32:00 +0200
+
 perun-slave-process-k5login-root (3.1.4) stable; urgency=medium
 
   * Changed architecture to all
