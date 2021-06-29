@@ -11,7 +11,7 @@ sub getStatus;
 
 local $::SERVICE_NAME = "vsup_zimbra";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -252,11 +252,11 @@ sub getStatus() {
 		return 'active';
 	}
 
-	# (will) expire by studies - add 14 days grace period
+	# (will) expire by studies - add 21 days grace period
 	if ($expirationKosTime and ($latest_expiration == $expirationKosTime->epoch + 86399)) {
 
 		# within 14 days grace period - still active
-		if (($latest_expiration + (14*24*60*60)) > $currentDate->epoch) {
+		if (($latest_expiration + (21*24*60*60)) > $currentDate->epoch) {
 			return 'active';
 		} else {
 			# is within 30 days period

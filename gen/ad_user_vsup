@@ -10,7 +10,7 @@ sub calculateExpiration;
 
 local $::SERVICE_NAME = "ad_user_vsup";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.6";
+my $SCRIPT_VERSION = "3.0.7";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -234,7 +234,7 @@ perunServicesInit::finalize;
 # Returns Windows FILETIME timestamp of users account expiration
 # - in case of expiration on 1.1.4000 -> Zero is returned as "expiration = never".
 # - in case of any other exact date, pick the largest (future). If it comes from study system (KOS),
-#   add 14 days grace period.
+#   add 21 days grace period.
 #
 sub calculateExpiration() {
 
@@ -269,9 +269,9 @@ sub calculateExpiration() {
 		return 0;
 	}
 
-	# (will) expire by studies - add 14 days grace period
+	# (will) expire by studies - add 21 days grace period
 	if ($expirationKosTime and ($latest_expiration == $expirationKosTime->epoch)) {
-		$result = $latest_expiration + (14*24*60*60);
+		$result = $latest_expiration + (21*24*60*60);
 	} else {
 		# Expired by employment or manual - push exact date
 		$result = $latest_expiration;
