@@ -7,11 +7,11 @@ use File::Basename;
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_YUBIKEYS;                      *A_YUBIKEYS =                     \'urn:perun:user:attribute-def:def:yubikeys';
@@ -21,18 +21,10 @@ my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 
 my %yubikeys;
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-#####################################
-
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %values;
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
-
-		$yubikeys {$memberAttributes{$A_LOGIN}} = $memberAttributes{$A_YUBIKEYS} if defined $memberAttributes{$A_YUBIKEYS};
-	}
+foreach my $memberId ($data->getMemberIdsForFacility()) {
+	my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
+	my $yubikey = $data->getUserAttributeValue( member => $memberId, attrName => $A_YUBIKEYS );
+	$yubikeys {$login} = $yubikey if defined $yubikey;
 }
 
 ####### output file ######################

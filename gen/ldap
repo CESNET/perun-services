@@ -10,14 +10,14 @@ sub processGroupMembership;
 
 local $::SERVICE_NAME = "ldap";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDN';
@@ -37,8 +37,8 @@ our $A_M_ORGANIZATION;  *A_M_ORGANIZATION = \'urn:perun:member:attribute-def:def
 our $A_M_MAIL;  *A_M_MAIL = \'urn:perun:member:attribute-def:def:mail';
 
 # CHECK ON FACILITY ATTRIBUTES
-my %facilityAttributes = attributesToHash $data->getAttributes;
-if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+my $ldapBaseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+if (!defined($ldapBaseDN)) {
 	exit 1;
 }
 
@@ -50,52 +50,52 @@ my $usersByVo;  # $usersByVo->{$voShortName}->{$login}->{ATTR} = $attrValue;
 my $groups;  # $groups->{$login}->{$voShortName . ":" . $groupName} = 1;
 my $groupsByVo;  # $groupsByVo->{$login}->{$voShortName}->{$voShortName . ":" . $groupName} = 1;
 
-my @resourcesData = $data->getChildElements;
-
 # FOR EACH RESOURCE
-foreach my $rData (@resourcesData) {
-	my %rAttributes = attributesToHash $rData->getAttributes;
-	my $voShortName = $rAttributes{$A_R_VO_SHORT_NAME};
-	# process members
-	my @membersData = ($rData->getChildElements)[1]->getChildElements;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	my $voShortName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_VO_SHORT_NAME );
 
 	# FOR EACH MEMBER ON RESOURCE
-	foreach my $mData (@membersData) {
-		my %mAttributes = attributesToHash $mData->getAttributes;
-		my $login = $mAttributes{$A_USER_LOGIN};
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
 
 		# Store member in VOs structure (use MEMBER attributes)
-		$usersByVo->{$voShortName}->{$login}->{$A_DISPLAY_NAME} = $mAttributes{$A_DISPLAY_NAME};
-		$usersByVo->{$voShortName}->{$login}->{$A_FIRST_NAME} = $mAttributes{$A_FIRST_NAME};
-		$usersByVo->{$voShortName}->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME};
+		my $displayName = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME );
+		my $firstName = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
+		my $lastName = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
+		$usersByVo->{$voShortName}->{$login}->{$A_DISPLAY_NAME} = $displayName;
+		$usersByVo->{$voShortName}->{$login}->{$A_FIRST_NAME} = $firstName;
+		$usersByVo->{$voShortName}->{$login}->{$A_LAST_NAME} = $lastName;
 
 		# if MEMBER variant for ORGANIZATION not defined, try to use USER variant
-		my $organization = $mAttributes{$A_M_ORGANIZATION};
+		my $userOrganization = $data->getUserAttributeValue( member => $memberId, attrName => $A_ORGANIZATION );
+		my $organization = $data->getMemberAttributeValue( member => $memberId, attrName => $A_M_ORGANIZATION );
 		if (defined $organization and length $organization) {
 			$usersByVo->{$voShortName}->{$login}->{$A_M_ORGANIZATION} = $organization;
 		} else {
-			$usersByVo->{$voShortName}->{$login}->{$A_M_ORGANIZATION} = $mAttributes{$A_ORGANIZATION};
+			$usersByVo->{$voShortName}->{$login}->{$A_M_ORGANIZATION} = $userOrganization;
 		}
 		# if MEMBER variant for MAIL not defined, try to use USER variant
-		my $mail = $mAttributes{$A_M_MAIL};
+		my $userMail = $data->getUserAttributeValue( member => $memberId, attrName => $A_MAIL );
+		my $mail = $data->getMemberAttributeValue( member => $memberId, attrName => $A_M_MAIL );
 		if (defined $mail and length $mail) {
 			$usersByVo->{$voShortName}->{$login}->{$A_M_MAIL} = $mail;
 		} else {
-			$usersByVo->{$voShortName}->{$login}->{$A_M_MAIL} = $mAttributes{$A_MAIL};
+			$usersByVo->{$voShortName}->{$login}->{$A_M_MAIL} = $userMail;
 		}
 
 		# Store same member in flat structure (use USER attributes)
 		# FirstName can be undefined, display_name and last_name not (so set them to string null) to avoid it
-		$users->{$login}->{$A_DISPLAY_NAME} = (defined $mAttributes{$A_DISPLAY_NAME} and length $mAttributes{$A_DISPLAY_NAME}) ? $mAttributes{$A_DISPLAY_NAME} : "null";
-		$users->{$login}->{$A_FIRST_NAME} = $mAttributes{$A_FIRST_NAME};
-		$users->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME} || "null";
-		$users->{$login}->{$A_ORGANIZATION} = $mAttributes{$A_ORGANIZATION};
-		$users->{$login}->{$A_MAIL} = $mAttributes{$A_MAIL};
+		$users->{$login}->{$A_DISPLAY_NAME} = (defined $displayName and length $displayName) ? $displayName : "null";
+		$users->{$login}->{$A_FIRST_NAME} = $firstName;
+		$users->{$login}->{$A_LAST_NAME} = $lastName || "null";
+		$users->{$login}->{$A_ORGANIZATION} = $userOrganization;
+		$users->{$login}->{$A_MAIL} = $userMail;
 
 	}
 
-	my @groupsToProcess = ($rData->getChildElements)[0]->getChildElements;
-	processGroupMembership( @groupsToProcess , $voShortName );
+	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
+		processGroupMembership( $groupId, $resourceId, $voShortName );
+	}
 
 }
 
@@ -103,7 +103,7 @@ foreach my $rData (@resourcesData) {
 # PRINT BASE_DN FILE
 #
 open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
-print FILE $facilityAttributes{$A_F_BASE_DN};
+print FILE $ldapBaseDN;
 close(FILE);
 
 #
@@ -113,16 +113,16 @@ open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
 
 # print base entry
 
-print FILE "dn: " . $facilityAttributes{$A_F_BASE_DN} . "\n";
+print FILE "dn: " . $ldapBaseDN . "\n";
 # IF base start with dc=[something]
-if ($facilityAttributes{$A_F_BASE_DN} =~ m/^dc=/) {
+if ($ldapBaseDN =~ m/^dc=/) {
 
-	my $position = index($facilityAttributes{$A_F_BASE_DN}, ",");
-	print $facilityAttributes{$A_F_BASE_DN} . "\n";
+	my $position = index($ldapBaseDN, ",");
+	print $ldapBaseDN . "\n";
 	print $position . "\n";
 	my $dc = undef;
 	if ($position > 0) {
-		$dc = substr $facilityAttributes{$A_F_BASE_DN}, 3, $position-3;
+		$dc = substr $ldapBaseDN, 3, $position-3;
 	}
 	print FILE "dc: " . $dc . "\n";
 	print FILE "objectclass: top\n";
@@ -130,12 +130,12 @@ if ($facilityAttributes{$A_F_BASE_DN} =~ m/^dc=/) {
 	print FILE "objectclass: dcObject\n";
 }
 # IF base start with ou=[something]
-if ($facilityAttributes{$A_F_BASE_DN} =~ m/^ou=/) {
+if ($ldapBaseDN =~ m/^ou=/) {
 
-	my $position = index($facilityAttributes{$A_F_BASE_DN}, ",");
+	my $position = index($ldapBaseDN, ",");
 	my $ou = undef;
 	if ($position > 0) {
-		$ou = substr($facilityAttributes{$A_F_BASE_DN}, 3, $position-3);
+		$ou = substr($ldapBaseDN, 3, $position-3);
 	}
 	print FILE "ou: " . $ou . "\n";
 	print FILE "objectclass: organizationalunit\n"
@@ -144,7 +144,7 @@ if ($facilityAttributes{$A_F_BASE_DN} =~ m/^ou=/) {
 print FILE "\n";
 
 # PRINT ou=people entry
-print FILE "dn: ou=people," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+print FILE "dn: ou=people," . $ldapBaseDN . "\n";
 print FILE "ou: people\n";
 print FILE "description: All users propagated from Perun to this LDAP.\n";
 print FILE "objectclass: organizationalunit\n";
@@ -155,7 +155,7 @@ print FILE "\n";
 for my $login (sort keys %$users) {
 
 	# print attributes, which are never empty
-	print FILE "dn: uid=" . $login . ",ou=people," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+	print FILE "dn: uid=" . $login . ",ou=people," . $ldapBaseDN . "\n";
 	print FILE "uid: " . $login . "\n";
 	print FILE "cn: " . $users->{$login}->{$A_DISPLAY_NAME} . "\n";
 	print FILE "sn: " . $users->{$login}->{$A_LAST_NAME} . "\n";
@@ -197,7 +197,7 @@ for my $login (sort keys %$users) {
 for my $voShortName (sort keys %$usersByVo) {
 
 	# PRINT VO entry (create voShortName group in LDAP if not exists)
-	print FILE "dn: ou=" . $voShortName . "," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+	print FILE "dn: ou=" . $voShortName . "," . $ldapBaseDN . "\n";
 	print FILE "ou: " . $voShortName. "\n";
 	print FILE "description: Virtual organization " . $voShortName . " contains all it's members, which are propagated from Perun to this LDAP\n";
 	print FILE "objectclass: organizationalunit\n";
@@ -210,7 +210,7 @@ for my $voShortName (sort keys %$usersByVo) {
 	for my $login (sort keys %$voUsers) {
 
 		# HIERARCHICAL structure is stored in ou=voShortName
-		print FILE "dn: uid=" . $login . ",ou=".$voShortName."," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+		print FILE "dn: uid=" . $login . ",ou=".$voShortName."," . $ldapBaseDN . "\n";
 		print FILE "uid: " . $login . "\n";
 		print FILE "cn: " . $voUsers->{$login}->{$A_DISPLAY_NAME} . "\n";
 		print FILE "sn: " . $voUsers->{$login}->{$A_LAST_NAME} . "\n";
@@ -257,37 +257,23 @@ perunServicesInit::finalize;
 #
 # Method for gathering group membership information for each user
 #
-# @param1 = array of Groups assigned to each resource
-# @param2 = vo short name (belonging to resource)
-#
 sub processGroupMembership {
 
 	# read input
-	my $voShortName = pop @_;
-	my @resGroups = @_;
+	my $groupId = shift;
+	my $resourceId = shift;
+	my $voShortName = shift;
 
-	# process groups structure
-	for my $group (@resGroups) {
+	# get group name as attribute
+	my $groupName = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_NAME );
 
-		# get group name as attribute
-		my %gAttributes = attributesToHash $group->getAttributes;
-		my $groupName = $gAttributes{$A_G_NAME};
-
-		# process member data for each group
-		my @membersData = ($group->getChildElements)[1]->getChildElements;
-		# for each member, push groupName to storage
-		foreach my $mData (@membersData) {
-			# get login
-			my %mAttributes = attributesToHash $mData->getAttributes;
-			my $login = $mAttributes{$A_USER_LOGIN};
-			# store groupName
-			$groupsByVo->{$login}->{$voShortName}->{$voShortName . ":" . $groupName} = 1;
-			$groups->{$login}->{$voShortName . ":" . $groupName} = 1;
-
-		}
-
-		# process recursively for each sub-group in this group
-		processGroupMembership(($group->getChildElements)[0]->getChildElements , $voShortName);
+	# for each member, push groupName to storage
+	for my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
+		# get login
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
+		# store groupName
+		$groupsByVo->{$login}->{$voShortName}->{$voShortName . ":" . $groupName} = 1;
+		$groups->{$login}->{$voShortName . ":" . $groupName} = 1;
 
 	}
 

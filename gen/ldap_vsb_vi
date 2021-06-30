@@ -8,7 +8,7 @@ use Text::Unidecode;
 
 local $::SERVICE_NAME = "ldap_vsb_vi";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -17,7 +17,7 @@ my $fileName_groups = "$DIRECTORY/$::SERVICE_NAME"."_groups".".ldif";
 
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDN';
@@ -31,8 +31,8 @@ our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 
 # CHECK ON FACILITY ATTRIBUTES
-my %facilityAttributes = attributesToHash $data->getAttributes;
-if (!defined($facilityAttributes{$A_F_BASE_DN})) {
+my $ldapBaseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+if (!defined($ldapBaseDN)) {
 	exit 1;
 }
 
@@ -44,39 +44,34 @@ my $allVosAndResources; #  $allVosAndResources->{$voShortName}->{$resourceName} 
 # GATHER USERS FROM RESOURCES
 my $usersByResource;  # $usersByResource->{$resourceName}->{$login}->{ATTR} = $attrValue;
 
-my @resourcesData = $data->getChildElements;
-
 # FOR EACH RESOURCE
-foreach my $rData (@resourcesData) {
+foreach my $resourceId ( $data->getResourceIds() ) {
 
-	my %rAttributes = attributesToHash $rData->getAttributes;
-	my $voShortName = $rAttributes{$A_R_VO_SHORT_NAME};
-	my $resourceName = $rAttributes{$A_R_NAME};
+	my $voShortName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_VO_SHORT_NAME );
+	my $resourceName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_NAME );
 
 	# Fill all VOs reference
 	$allVosAndResources->{$voShortName}->{$resourceName} = 1;
 
-	# process members
-	my @membersData = $rData->getChildElements;
-
 	# FOR EACH MEMBER ON RESOURCE
-	foreach my $mData (@membersData) {
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 
-		my %mAttributes = attributesToHash $mData->getAttributes;
-		my $login = $mAttributes{$A_USER_LOGIN};
+		my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
+		my $firstName = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
+		my $lastName = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
+		my $mail = $data->getUserAttributeValue( member => $memberId, attrName => $A_MAIL );
 
 		# Store users in Resources structure
-		$usersByResource->{$resourceName}->{$login}->{$A_FIRST_NAME} = $mAttributes{$A_FIRST_NAME};
-		$usersByResource->{$resourceName}->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME};
-		my $mail = $mAttributes{$A_MAIL};
+		$usersByResource->{$resourceName}->{$login}->{$A_FIRST_NAME} = $firstName;
+		$usersByResource->{$resourceName}->{$login}->{$A_LAST_NAME} = $lastName;
 		if (defined $mail and length $mail) {
 			$usersByResource->{$resourceName}->{$login}->{$A_MAIL} = $mail;
 		}
 
 		# Store same user in flat structure
-		$users->{$login}->{$A_FIRST_NAME} = $mAttributes{$A_FIRST_NAME};
-		$users->{$login}->{$A_LAST_NAME} = $mAttributes{$A_LAST_NAME};
-		$users->{$login}->{$A_MAIL} = $mAttributes{$A_MAIL};
+		$users->{$login}->{$A_FIRST_NAME} = $firstName;
+		$users->{$login}->{$A_LAST_NAME} = $lastName;
+		$users->{$login}->{$A_MAIL} = $mail;
 
 		# Store VOS for member
 		$usersVos->{$login}->{$voShortName} = 1;
@@ -89,7 +84,7 @@ foreach my $rData (@resourcesData) {
 # PRINT BASE_DN FILE
 #
 open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
-print FILE $facilityAttributes{$A_F_BASE_DN};
+print FILE $ldapBaseDN;
 close(FILE);
 
 #
@@ -99,7 +94,7 @@ open FILE,">:encoding(UTF-8)","$fileName_users" or die "Cannot open $fileName_us
 
 # print base entry
 
-print FILE "dn: ou=perun,ou=users," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+print FILE "dn: ou=perun,ou=users," . $ldapBaseDN . "\n";
 print FILE "ou: perun\n";
 print FILE "objectClass: top\n";
 print FILE "objectClass: organizationalUnit\n";
@@ -108,7 +103,7 @@ print FILE "\n";
 # FLAT structure is stored in ou=perun,ou=users + base DN
 for my $login (sort keys %$users) {
 
-	print FILE "dn: cn=" . $login . ",ou=perun,ou=users," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+	print FILE "dn: cn=" . $login . ",ou=perun,ou=users," . $ldapBaseDN . "\n";
 	print FILE "cn: " . $login . "\n";
 	print FILE "uid: " . $login . "\n";
 
@@ -152,7 +147,7 @@ open FILE,">:encoding(UTF-8)","$fileName_groups" or die "Cannot open $fileName_g
 
 # print base entry
 
-print FILE "dn: ou=perun,ou=groups," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+print FILE "dn: ou=perun,ou=groups," . $ldapBaseDN . "\n";
 print FILE "ou: perun\n";
 print FILE "objectClass: top\n";
 print FILE "objectClass: organizationalUnit\n";
@@ -166,7 +161,7 @@ my @gs = sort keys %{$allVosAndResources};
 for my $g (@gs) {
 
 	# PRINT VO
-	print FILE "dn: ou=" . $g . ",ou=perun,ou=groups," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+	print FILE "dn: ou=" . $g . ",ou=perun,ou=groups," . $ldapBaseDN . "\n";
 	print FILE "ou: " . $g . "\n";
 	print FILE "objectclass: top\n";
 	print FILE "objectclass: organizationalUnit\n";
@@ -186,7 +181,7 @@ for my $g (@gs) {
 		}
 
 		# PRINT RESOURCE
-		print FILE "dn: cn=" . $r . ",ou=" . $g . ",ou=perun,ou=groups," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+		print FILE "dn: cn=" . $r . ",ou=" . $g . ",ou=perun,ou=groups," . $ldapBaseDN . "\n";
 		print FILE "cn: " . $r . "\n";
 		print FILE "ou: " . $g . "\n";
 		print FILE "objectclass: top\n";
@@ -194,7 +189,7 @@ for my $g (@gs) {
 
 		# PRINT ALL USERS FROM RESOURCE
 		for my $u (@usrs) {
-			print FILE "uniquemember: cn=" . $u . ",ou=perun,ou=users," . $facilityAttributes{$A_F_BASE_DN} . "\n";
+			print FILE "uniquemember: cn=" . $u . ",ou=perun,ou=users," . $ldapBaseDN . "\n";
 		}
 
 		# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
