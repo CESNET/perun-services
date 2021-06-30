@@ -10,7 +10,7 @@ sub isActive;
 
 local $::SERVICE_NAME = "ad_group_vsup_o365";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -123,7 +123,7 @@ perunServicesInit::finalize;
 
 
 #
-# returns 1 if the the latest of given expiration is either in the future, or in the 14 days grace period
+# returns 1 if the the latest of given expiration is either in the future, or in the 21 days grace period
 # otherwise, returns 0
 #
 sub isActive() {
@@ -156,7 +156,7 @@ sub isActive() {
 	# Add time 23:59:59 to the date, since we want accounts to be active on the last day
 	$latest_expiration = $latest_expiration + 86399;
 
-	if (($latest_expiration + (14*24*60*60)) > $currentDate->epoch) {
+	if (($latest_expiration + (21*24*60*60)) > $currentDate->epoch) {
 		return 1;
 	}
 
