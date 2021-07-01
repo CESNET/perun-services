@@ -9,11 +9,11 @@ use perunServicesInit;
 
 local $::SERVICE_NAME = basename($0);
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 our $A_U_UID;                     *A_U_UID =                      \'urn:perun:user_facility:attribute-def:virt:UID';
 our $A_R_VO_SHORT_NAME;           *A_R_VO_SHORT_NAME =            \'urn:perun:resource:attribute-def:virt:voShortName';
@@ -27,16 +27,16 @@ my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 ####### output file ######################
 open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my %values;
-	my %resourceAttributes = attributesToHash $rData->getAttributes;
-	my @membersData = $rData->getChildElements;
-	foreach my $mData (@membersData) {
-		my %memberAttributes = attributesToHash $mData->getAttributes;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	my $voName;
+	if ($data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_OWNCLOUD_ADMIN_RESOURCE )) {
+		$voName = $ADMINS;
+	} else {
+		$voName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_VO_SHORT_NAME );
+	}
 
-		my $voName = $resourceAttributes{$A_R_OWNCLOUD_ADMIN_RESOURCE} ?  $ADMINS : $resourceAttributes{$A_R_VO_SHORT_NAME};
-		push @{$uidsVoMapping->{$voName}}, $memberAttributes{$A_U_UID};
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+		push @{$uidsVoMapping->{$voName}}, $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_U_UID );
 	}
 }
 
