@@ -12,11 +12,11 @@ sub processMemberData;
 
 our $SERVICE_NAME     = "samba_du";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data      = perunServicesInit::getDataWithGroups;
+my $data      = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_RESOURCE_UNIX_GROUP_NAME;   *A_RESOURCE_UNIX_GROUP_NAME =  \'urn:perun:resource:attribute-def:virt:unixGroupName';
@@ -31,11 +31,11 @@ our $STRUC_UID;      *STRUC_UID = \0;
 our $STRUC_GROUPS;   *STRUC_GROUPS = \1;
 our $memberStruc = {};
 
-foreach my $resourceData ( $data->getChildElements ) {
-	processResourceData $resourceData;
+foreach my $resourceId ($data->getResourceIds()) {
+	processResourceData $resourceId;
 
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements){
-		processGroupData $groupData;
+	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
+		processGroupData $groupId, $resourceId;
 	}
 }
 
@@ -53,17 +53,16 @@ perunServicesInit::finalize;
 #   Only subs definitions down there
 ##############################################################################
 
-# INPUT: group's name, group's ID, member's data
+# INPUT: group's name, group's ID, member's id
 # stores user's login and user's ID into $memberStruc structure
 # assigns group's name and group's ID to the member in $memberStruc structure
 sub processMemberData {
 	my $groupName = shift;
 	my $gid = shift;
-	my $memberData = shift;
+	my $memberId = shift;
 
-	my %memberAttributes = attributesToHash $memberData->getAttributes;
-	my $login = $memberAttributes{$A_MEMBER_LOGIN};
-	my $uid = $memberAttributes{$A_MEMBER_ID};
+	my $login = $data->getUserFacilityAttributeValue(attrName => $A_MEMBER_LOGIN, member => $memberId);
+	my $uid = $data->getUserFacilityAttributeValue(attrName => $A_MEMBER_ID, member => $memberId);
 
 	unless(exists $memberStruc->{$login}) {
 		$memberStruc->{$login} = {};
@@ -83,33 +82,33 @@ sub processMemberData {
 	}
 }
 
-# INPUT: resource's data
+# INPUT: resource id
 # calls processMemberData to assign RESOURCE_UNIX_GROUP to the member in $memberStruc structure
 sub processResourceData {
-	my $resource = shift;
-	my %resourceAttributes = attributesToHash $resource->getAttributes;
+	my $resourceId = shift;
 
-	my $groupName = $resourceAttributes{$A_RESOURCE_UNIX_GROUP_NAME};
-	my $gid = $resourceAttributes{$A_RESOURCE_UNIX_GID};
+	my $resourceUnixGroupName = $data->getResourceAttributeValue(attrName => $A_RESOURCE_UNIX_GROUP_NAME, resource => $resourceId);
+	my $resourceUnixGID = $data->getResourceAttributeValue(attrName => $A_RESOURCE_UNIX_GID, resource => $resourceId);
 
-	foreach my $memberData(($resource->getChildElements)[1]->getChildElements) {
-		processMemberData $groupName, $gid, $memberData;
+	if (defined $resourceUnixGroupName) {
+		foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+			processMemberData $resourceUnixGroupName, $resourceUnixGID, $memberId;
+		}
 	}
 }
 
-# INPUT: group's data
+# INPUT: group id, resource id
 # calls processMemberData to assign GROUP_UNIX_GROUP to the member in $memberStruc structure
 sub processGroupData {
-	my $group = shift;
-	my %groupAttributes = attributesToHash $group->getAttributes;
-	my $membersElement = ($group->getChildElements)[1];
+	my $groupId = shift;
+	my $resourceId = shift;
 
-	if($groupAttributes{$A_GROUP_UNIX_GROUP_NAME}) {
-		my $groupName = $groupAttributes{$A_GROUP_UNIX_GROUP_NAME};
-		my $gid = $groupAttributes{$A_GROUP_UNIX_GID};
+	my $unixGroupName = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_UNIX_GROUP_NAME, group => $groupId, resource => $resourceId);
+	if(defined $unixGroupName) {
+		my $gid = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_UNIX_GID, group => $groupId, resource => $resourceId);
 
-		foreach my $memberData($membersElement->getChildElements) {
-			processMemberData $groupName, $gid, $memberData;
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
+			processMemberData $unixGroupName, $gid, $memberId;
 		}
 	}
 }

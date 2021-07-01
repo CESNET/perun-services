@@ -10,11 +10,11 @@ use utf8;
 
 local $::SERVICE_NAME = "scim";
 local $::PROTOCOL_VERSION = "1.0.0";
-my $SCRIPT_VERSION = "1.0.0";
+my $SCRIPT_VERSION = "1.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #forward declaration
 sub processUsers;
@@ -48,10 +48,10 @@ my $userLogin = {};
 my $fileUsers = $DIRECTORY . "/users.scim";
 my $fileGroups = $DIRECTORY . "/groups.scim";
 
-foreach my $resourceData ($data->getChildElements) {
-        foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-                processGroups $groupData;
-        }
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId )) {
+		processGroups $groupId, $resourceId;
+    }
 }
 
 # PREPARE USERSDATA TO JSON
@@ -70,7 +70,7 @@ foreach my $uid (sort keys %$userStruc) {
 # PRINT USERS TO JSON
 open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
 binmode(FILE_USERS);
-print FILE_USERS JSON::XS->new->utf8->pretty->encode(\@users);
+print FILE_USERS JSON::XS->new->utf8->pretty->canonical->encode(\@users);
 close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
 
 # PREPARE GROUPSDATA TO JSON
@@ -78,8 +78,8 @@ my @groups;
 foreach my $gid (sort keys %$groupStruc) {
         my $group = {};
         $group->{"id"} = $gid;
-        $group->{"name"} = $groupStruc->{$gid}->{$A_GROUP_NAME};
-        $group->{"parentGroupId"} = $groupStruc->{$gid}->{$A_GROUP_PAR_ID};
+        $group->{"name"} = $data->getGroupAttributeValue(group => $gid, attrName => $A_GROUP_NAME);
+        $group->{"parentGroupId"} = $data->getGroupAttributeValue(group => $gid, attrName => $A_GROUP_PAR_ID);
 
         my @members;
         foreach my $uid (sort keys %{$membershipStruc->{$gid}}){
@@ -95,7 +95,7 @@ foreach my $gid (sort keys %$groupStruc) {
 # PRINT GROUPS TO JSON
 open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
 binmode(FILE_GROUPS);
-print FILE_GROUPS JSON::XS->new->utf8->pretty->encode(\@groups);
+print FILE_GROUPS JSON::XS->new->utf8->pretty->canonical->encode(\@groups);
 close (FILE_GROUPS) or die "Cannot close $fileGroups: $! \n";
 
 perunServicesInit::finalize;
@@ -105,15 +105,14 @@ perunServicesInit::finalize;
 ##############################################################################
 ## creates structure for users.scim file
 sub processUsers {
-        my ($gid, $memberData) = @_;
+        my ($gid, $memberId) = @_;
 
-        my %memberAttributes = attributesToHash $memberData->getAttributes;
-        my $uid = $memberAttributes{$A_USER_ID};
-        my $status = $memberAttributes{$A_USER_STATUS};
-        if($memberAttributes{$A_MEMBER_IS_SUSPENDED}) { $status = $STATUS_SUSPENDED; }
-        my $email = $memberAttributes{$A_USER_EMAIL};
-        my $d_name = $memberAttributes{$A_USER_D_NAME};
-        my $login = $memberAttributes{$A_USER_LOGIN};
+        my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
+        my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_USER_STATUS );
+        if ($data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_IS_SUSPENDED )) { $status = $STATUS_SUSPENDED; }
+        my $email = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EMAIL );
+        my $d_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_D_NAME );
+        my $login = $data->getUserFacilityAttributeValue( attrName => $A_USER_LOGIN, member => $memberId, facility => $data->getFacilityId );
 
         if (exists $userStruc->{$uid}) {
                 my $memberStatus = $userStruc->{$uid}->{$userStatus};
@@ -140,22 +139,20 @@ sub processUsers {
 
 ## creates structure for groups.scim file
 sub processGroups {
-        my $group = shift;
-        my %groupAttributes = attributesToHash $group->getAttributes;
-        my $membersElement = ($group->getChildElements)[1];
+        my $groupId = shift;
+		my $resourceId = shift;
 
-        if ($groupAttributes{$A_GROUP_NAME}) {
-                my $groupName = $groupAttributes{$A_GROUP_NAME};
-                my $gid = $groupAttributes{$A_GROUP_ID};
-                my $groupParId = $groupAttributes{$A_GROUP_PAR_ID};
+        if ($data->getGroupAttributeValue(attrName => $A_GROUP_NAME, group => $groupId)) {
+                my $groupName = $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_NAME);
+                my $groupParId = $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_PAR_ID);
 
-                unless(exists $groupStruc->{$gid}) {
-                        $groupStruc->{$gid}->{$A_GROUP_NAME} = $groupName;
-                        $groupStruc->{$gid}->{$A_GROUP_PAR_ID} = $groupParId;
+                unless(exists $groupStruc->{$groupId}) {
+                        $groupStruc->{$groupId}->{$A_GROUP_NAME} = $groupName;
+                        $groupStruc->{$groupId}->{$A_GROUP_PAR_ID} = $groupParId;
                 }
 
-                foreach my $memberData ($membersElement->getChildElements) {
-                        processUsers $gid, $memberData;
+				foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
+                        processUsers $groupId, $memberId;
                 }
         }
 }
