@@ -7,11 +7,11 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "user_uid_mapping";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getFlatData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_LOGIN;			*A_USER_LOGIN =			\'urn:perun:user:attribute-def:def:login-namespace:einfra';
@@ -25,15 +25,15 @@ our $UID_ZCU;      *UID_ZCU = \2;
 
 our $userStruc = {};
 
-foreach my $uData (($data->getChildElements)[1]->getChildElements) {
-	my %userAttributes = attributesToHash $uData->getAttributes;
-	my $login = $userAttributes{$A_USER_LOGIN};
+foreach my $memberId ( $data->getMemberIdsForFacility() ) {
+
+	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
 
 	unless(exists $userStruc->{$login}) {
 		$userStruc->{$login} = {};
-		$userStruc->{$login}->{$UID_ICS} = $userAttributes{$A_UID_NAMESPACE_ICS};
-		$userStruc->{$login}->{$UID_RUK} = $userAttributes{$A_UID_NAMESPACE_RUK};
-		$userStruc->{$login}->{$UID_ZCU} = $userAttributes{$A_UID_NAMESPACE_ZCU};
+		$userStruc->{$login}->{$UID_ICS} = $data->getUserAttributeValue( member => $memberId, attrName => $A_UID_NAMESPACE_ICS );
+		$userStruc->{$login}->{$UID_RUK} = $data->getUserAttributeValue( member => $memberId, attrName => $A_UID_NAMESPACE_RUK );
+		$userStruc->{$login}->{$UID_ZCU} = $data->getUserAttributeValue( member => $memberId, attrName => $A_UID_NAMESPACE_ZCU );
 	}
 }
 
