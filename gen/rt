@@ -10,11 +10,11 @@ binmode STDOUT, ":utf8";
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_ID;                 *A_USER_ID =                   \'urn:perun:user:attribute-def:core:id';
@@ -49,26 +49,24 @@ my $usersStructureByUserId = {};
 
 #####################################
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-my $output_file_name = $facilityAttributes{$A_FAC_OUTPUT_FILE_NAME} || 'rt-data';
+my $output_file_name = $data->getFacilityAttributeValue(attrName => $A_FAC_OUTPUT_FILE_NAME) || 'rt-data';
 
-my @resourcesData = $data->getChildElements; 
-foreach my $rData (@resourcesData) {
-	my %resourceAttributes  = attributesToHash $rData->getAttributes;
-	
-	my $rtGroupName = $resourceAttributes{$A_RES_RT_GROUP_NAME} || $resourceAttributes{$A_RES_NAME} ;
+foreach my $resourceId ($data->getResourceIds()) {
 
-	my @membersData = $rData->getChildElements;
-	foreach my $memberAttributes (dataToAttributesHashes @membersData) {
+	my $rtGroupName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RES_RT_GROUP_NAME )
+		|| $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RES_NAME ) ;
+
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 		#skip non-valid members
-		next if $memberAttributes->{$A_MEMBER_STATUS} ne $STATUS_VALID;
+		next if $data->getMemberAttributeValue(attrName => $A_MEMBER_STATUS, member => $memberId) ne $STATUS_VALID;
 
-		my $userId = $memberAttributes->{$A_USER_ID};
+		my $userId = $data->getUserAttributeValue(attrName => $A_USER_ID, member => $memberId);
 		unless(defined $usersStructureByUserId->{$userId}) {
-			my $userPrefMail = $memberAttributes->{$A_USER_RT_PREF_MAIL} || $memberAttributes->{$A_USER_PREFERRED_MAIL};
-			my $userOrganization = $memberAttributes->{$A_USER_ORGANIZATION};
-			my $firstName = $memberAttributes->{$A_USER_FIRST_NAME};
-			my $lastName = $memberAttributes->{$A_USER_LAST_NAME};
+			my $userPrefMail = $data->getUserAttributeValue(attrName => $A_USER_RT_PREF_MAIL, member => $memberId)
+				|| $data->getUserAttributeValue(attrName => $A_USER_PREFERRED_MAIL, member => $memberId);
+			my $userOrganization = $data->getUserAttributeValue(attrName => $A_USER_ORGANIZATION, member => $memberId);
+			my $firstName = $data->getUserAttributeValue(attrName => $A_USER_FIRST_NAME, member => $memberId);
+			my $lastName = $data->getUserAttributeValue(attrName => $A_USER_LAST_NAME, member => $memberId);
 			my $userName;
 			if($firstName && $lastName) {
 				$userName = $firstName . ' ' . $lastName;
@@ -81,7 +79,7 @@ foreach my $rData (@resourcesData) {
 			}
 
 			#if user has meta eppn, he should have also einfra eppn
-			my %userEPPNs = map { $_ => 1 } @{$memberAttributes->{$A_USER_EPPN}};
+			my %userEPPNs = map { $_ => 1 } @{$data->getUserAttributeValue(attrName => $A_USER_EPPN, member => $memberId)};
 			foreach my $eppn (keys %userEPPNs) {
 				if($eppn =~ m/$META_DOMAIN/) {
 					my $neweppn = $eppn;
