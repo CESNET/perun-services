@@ -35,7 +35,6 @@ foreach my $resourceId ($data->getResourceIds()) {
 	my $listName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_NAME);
 
 	for my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
-        #list only VALID members except if allowNonvalidUsers is true
 		next unless($data->getMemberAttributeValue(member => $memberId, attrName => $A_USER_STATUS) eq "VALID");
 
 		my $userMail = $data->getUserAttributeValue(attrName => $A_USER_MAIL, member => $memberId);

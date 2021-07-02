@@ -35,10 +35,9 @@ foreach my $resourceId ($data->getResourceIds()) {
 	my $listName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_NAME);
 
 	for my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
-        #list only VALID members except if allowNonvalidUsers is true
         next unless($data->getMemberAttributeValue(member => $memberId, attrName => $A_USER_STATUS) eq "VALID");
 
-		my $userMail = $data->getUserAttributeValue(attrName => $A_USER_MAIL, member => $memberId);
+		my $userMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_MAIL);
 		my $userName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_NAME);
 
         $mailinglistStruc->{$listName}->{$userMail}->{$A_USER_NAME} = $userName;
@@ -50,7 +49,7 @@ for my $listName (keys %$mailinglistStruc) {
     my $fileName = "$mailinglistsDirectory/$listName";
     open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 
-    for my $mail (keys %{$mailinglistStruc->{$listName}}) {
+    for my $mail (sort keys %{$mailinglistStruc->{$listName}}) {
 		print FILE $mail, " ", unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME}), "\n";
     }
 

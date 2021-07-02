@@ -57,14 +57,14 @@ foreach my $resourceId ($data->getResourceIds()) {
 # PREPARE USERSDATA TO JSON
 my @users;
 foreach my $uid (sort keys %$userStruc) {
-        my $user = {};
-        $user->{"id"} = $uid;
-        $user->{"displayName"} = $userStruc->{$uid}->{$userDisplayName};
-        $user->{"status"} = $userStruc->{$uid}->{$userStatus};
-        $user->{"mail"} = $userStruc->{$uid}->{$userEmail};
-        $user->{"login"} = $userStruc->{$uid}->{$userLogin};
+	my $user = {};
+    $user->{"id"} = $uid;
+    $user->{"displayName"} = $userStruc->{$uid}->{$userDisplayName};
+    $user->{"status"} = $userStruc->{$uid}->{$userStatus};
+    $user->{"mail"} = $userStruc->{$uid}->{$userEmail};
+    $user->{"login"} = $userStruc->{$uid}->{$userLogin};
 
-        push @users, $user;
+    push @users, $user;
 }
 
 # PRINT USERS TO JSON
@@ -76,20 +76,20 @@ close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
 # PREPARE GROUPSDATA TO JSON
 my @groups;
 foreach my $gid (sort keys %$groupStruc) {
-        my $group = {};
-        $group->{"id"} = $gid;
-        $group->{"name"} = $data->getGroupAttributeValue(group => $gid, attrName => $A_GROUP_NAME);
-        $group->{"parentGroupId"} = $data->getGroupAttributeValue(group => $gid, attrName => $A_GROUP_PAR_ID);
+    my $group = {};
+    $group->{"id"} = $gid;
+	$group->{"name"} = $groupStruc->{$gid}->{$A_GROUP_NAME};
+	$group->{"parentGroupId"} = $groupStruc->{$gid}->{$A_GROUP_PAR_ID};
 
-        my @members;
-        foreach my $uid (sort keys %{$membershipStruc->{$gid}}){
-                my $struct = {};
-                $struct->{"userId"} = $uid;
-                push @members, $struct;
-        }
+    my @members;
+    foreach my $uid (sort keys %{$membershipStruc->{$gid}}){
+		my $struct = {};
+		$struct->{"userId"} = $uid;
+		push @members, $struct;
+    }
 
-        $group->{"members"} = \@members;
-        push @groups, $group;
+    $group->{"members"} = \@members;
+    push @groups, $group;
 }
 
 # PRINT GROUPS TO JSON
@@ -105,63 +105,63 @@ perunServicesInit::finalize;
 ##############################################################################
 ## creates structure for users.scim file
 sub processUsers {
-        my ($gid, $memberId) = @_;
+    my ($gid, $memberId) = @_;
 
-        my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
-        my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_USER_STATUS );
-        if ($data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_IS_SUSPENDED )) { $status = $STATUS_SUSPENDED; }
-        my $email = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EMAIL );
-        my $d_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_D_NAME );
-        my $login = $data->getUserFacilityAttributeValue( attrName => $A_USER_LOGIN, member => $memberId, facility => $data->getFacilityId );
+    my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
+    my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_USER_STATUS );
+    if ($data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_IS_SUSPENDED )) { $status = $STATUS_SUSPENDED; }
+    my $email = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EMAIL );
+    my $d_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_D_NAME );
+    my $login = $data->getUserFacilityAttributeValue( member => $memberId, facility => $data->getFacilityId, attrName => $A_USER_LOGIN );
 
-        if (exists $userStruc->{$uid}) {
-                my $memberStatus = $userStruc->{$uid}->{$userStatus};
+    if (exists $userStruc->{$uid}) {
+        my $memberStatus = $userStruc->{$uid}->{$userStatus};
 
-                if ($memberStatus eq $STATUS_EXPIRED && $status eq $STATUS_VALID){
-                        # change from EXPIRED to VALID
-                        $userStruc->{$uid}->{$userStatus} = $status;
-                } elsif ($memberStatus eq $STATUS_SUSPENDED && $status eq $STATUS_VALID){
-                        # change from SUSPENDED to VALID
-                        $userStruc->{$uid}->{$userStatus} = $status;
-                } elsif ($memberStatus eq $STATUS_SUSPENDED && $status eq $STATUS_EXPIRED){
-                        # change from SUSPENDED to EXPIRED
-                        $userStruc->{$uid}->{$userStatus} = $status;
-                }
-        } else {
-                $userStruc->{$uid}->{$userStatus} = $status;
-                $userStruc->{$uid}->{$userEmail} = $email;
-                $userStruc->{$uid}->{$userDisplayName} = $d_name;
-                $userStruc->{$uid}->{$userLogin} = $login;
-        }
+		if ($memberStatus eq $STATUS_EXPIRED && $status eq $STATUS_VALID){
+			# change from EXPIRED to VALID
+			$userStruc->{$uid}->{$userStatus} = $status;
+		} elsif ($memberStatus eq $STATUS_SUSPENDED && $status eq $STATUS_VALID){
+			# change from SUSPENDED to VALID
+			$userStruc->{$uid}->{$userStatus} = $status;
+		} elsif ($memberStatus eq $STATUS_SUSPENDED && $status eq $STATUS_EXPIRED){
+			# change from SUSPENDED to EXPIRED
+			$userStruc->{$uid}->{$userStatus} = $status;
+		}
+	} else {
+		$userStruc->{$uid}->{$userStatus} = $status;
+		$userStruc->{$uid}->{$userEmail} = $email;
+		$userStruc->{$uid}->{$userDisplayName} = $d_name;
+		$userStruc->{$uid}->{$userLogin} = $login;
+	}
 
-        processMemberships $gid, $uid;
+	processMemberships $gid, $uid;
 }
 
 ## creates structure for groups.scim file
 sub processGroups {
-        my $groupId = shift;
-		my $resourceId = shift;
+	my $groupId = shift;
+	my $resourceId = shift;
 
-        if ($data->getGroupAttributeValue(attrName => $A_GROUP_NAME, group => $groupId)) {
-                my $groupName = $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_NAME);
-                my $groupParId = $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_PAR_ID);
+    if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_GROUP_NAME)) {
+        my $groupName = $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_NAME);
+        my $groupParId = $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_PAR_ID);
 
-                unless(exists $groupStruc->{$groupId}) {
-                        $groupStruc->{$groupId}->{$A_GROUP_NAME} = $groupName;
-                        $groupStruc->{$groupId}->{$A_GROUP_PAR_ID} = $groupParId;
-                }
-
-				foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
-                        processUsers $groupId, $memberId;
-                }
+        unless(exists $groupStruc->{$groupId}) {
+            $groupStruc->{$groupId}->{$A_GROUP_NAME} = $groupName;
+            $groupStruc->{$groupId}->{$A_GROUP_PAR_ID} = $groupParId;
         }
+
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup( group => $groupId, resource => $resourceId )) {
+			processUsers $groupId, $memberId;
+		}
+	}
 }
 
 ## creates structure for memberships
 sub processMemberships {
-        my ($gid, $uid) = @_;
+	my ($gid, $uid) = @_;
 
-        unless(exists $membershipStruc->{$gid}->{$uid}) {
-                $membershipStruc->{$gid}->{$uid} = {};
-        }
+    unless(exists $membershipStruc->{$gid}->{$uid}) {
+        $membershipStruc->{$gid}->{$uid} = {};
+    }
 }

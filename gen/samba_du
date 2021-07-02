@@ -61,8 +61,8 @@ sub processMemberData {
 	my $gid = shift;
 	my $memberId = shift;
 
-	my $login = $data->getUserFacilityAttributeValue(attrName => $A_MEMBER_LOGIN, member => $memberId);
-	my $uid = $data->getUserFacilityAttributeValue(attrName => $A_MEMBER_ID, member => $memberId);
+	my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_MEMBER_LOGIN );
+	my $uid = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_MEMBER_ID );
 
 	unless(exists $memberStruc->{$login}) {
 		$memberStruc->{$login} = {};
@@ -87,8 +87,8 @@ sub processMemberData {
 sub processResourceData {
 	my $resourceId = shift;
 
-	my $resourceUnixGroupName = $data->getResourceAttributeValue(attrName => $A_RESOURCE_UNIX_GROUP_NAME, resource => $resourceId);
-	my $resourceUnixGID = $data->getResourceAttributeValue(attrName => $A_RESOURCE_UNIX_GID, resource => $resourceId);
+	my $resourceUnixGroupName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RESOURCE_UNIX_GROUP_NAME );
+	my $resourceUnixGID = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RESOURCE_UNIX_GID );
 
 	if (defined $resourceUnixGroupName) {
 		foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
@@ -103,11 +103,11 @@ sub processGroupData {
 	my $groupId = shift;
 	my $resourceId = shift;
 
-	my $unixGroupName = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_UNIX_GROUP_NAME, group => $groupId, resource => $resourceId);
+	my $unixGroupName = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_GROUP_UNIX_GROUP_NAME);
 	if(defined $unixGroupName) {
-		my $gid = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_UNIX_GID, group => $groupId, resource => $resourceId);
+		my $gid = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_GROUP_UNIX_GID );
 
-		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup( group => $groupId, resource => $resourceId )) {
 			processMemberData $unixGroupName, $gid, $memberId;
 		}
 	}
