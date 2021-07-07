@@ -9,16 +9,16 @@ use JSON::XS;
 
 our $SERVICE_NAME = "metacloud_export";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 #forward declaration
-sub processGroupData; 
-sub processMembersData; 
+sub processGroupData;
+sub processMembersData;
 sub processResourceData;
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_USER_MAIL;                  *A_USER_MAIL =                 \'urn:perun:user:attribute-def:def:preferredMail';
@@ -32,12 +32,18 @@ our $A_M_STATUS;                   *A_M_STATUS =                  \'urn:perun:me
 my $dataByUser = {};
 my %allCerts;
 
-foreach my $resourceData ($data->getChildElements) {
-	processResourceData $resourceData;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	my $groupName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RESOURCE_UNIX_GROUP_NAME );
+	my @memberIds = $data->getMemberIdsForResource( resource => $resourceId );
 
-	foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-		my $groupMembersLogins = processGroupData $groupData;
+	for my $memberId (@memberIds) {
+		processMembersData $memberId, $groupName, 1;
 	}
+}
+
+my @memberIds = $data->getMemberIdsForFacility();
+for my $memberId (@memberIds) {
+	processMembersData $memberId;
 }
 
 my @outStruc = values %$dataByUser;
@@ -47,7 +53,7 @@ $_->{"groups"} = [ sort { $_->{"groups"}->{$b} <=> $_->{"groups"}->{$a}} keys %{
 
 my $fileName = "$DIRECTORY/$SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
-print FILE JSON::XS->new->utf8->pretty->encode(\@outStruc);
+print FILE JSON::XS->new->utf8->pretty->canonical->encode(\@outStruc);
 close FILE;
 
 perunServicesInit::finalize;
@@ -56,63 +62,42 @@ perunServicesInit::finalize;
 #   Only subs definitions down there
 ##############################################################################
 
-# input: resource serviceAttributes
-# stores resource memers logins into $groupStruc structure
-sub processResourceData {
-	my $resourceData = shift;
-
-	my %resourceAttrs = attributesToHash $resourceData->getAttributes;
-	my $groupName = $resourceAttrs{$A_RESOURCE_UNIX_GROUP_NAME};
-
-	my $membersElement = ($resourceData->getChildElements)[1]; 
-	processMembersData $membersElement, $groupName, 1;
-}
-
-# input: groups serviceAttributes
-# stores groups memers logins into $groupStruc structure
-sub processGroupData {
-	my $groupData = shift;
-	my $membersElement = ($groupData->getChildElements)[1];
-	my %groupAttributes = attributesToHash $groupData->getAttributes;
-
-	processMembersData $membersElement;
-}
-
 # input: (members serviceAttributes, groupName)
 # stores memers logins into $groupStruc structure
 sub processMembersData {
-	my ($membersElement, $groupName, $fromResource) = @_;
-	for my $memberData ($membersElement->getChildElements) {
-		my %memberAttributes = attributesToHash $memberData->getAttributes;
+	my ($memberId, $groupName, $fromResource) = @_;
 
-		next if($memberAttributes{$A_M_STATUS} ne 'VALID');
-		my $login = $memberAttributes{$A_USER_LOGIN};
+	if($data->getMemberAttributeValue( member => $memberId, attrName => $A_M_STATUS ) ne 'VALID' ) {
+		exit processMembersData();
+	}
 
-		unless(exists $dataByUser->{$login}) {
-			my @certs =  (keys %{$memberAttributes{$A_U_CERT_DNS}}, '/C=CZ/O=CESNET/CN=' . $login . '@meta.cesnet.cz');
+	my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
 
-			#check for certificates duplicities between all users
-			my %allUsersCerts = ();
+	unless(exists $dataByUser->{$login}) {
+		my $certDNS = $data->getUserAttributeValue( member => $memberId, attrName => $A_U_CERT_DNS );
+		my @certs =  (keys %{$certDNS}, '/C=CZ/O=CESNET/CN=' . $login . '@meta.cesnet.cz');
 
-			my @certsDNsWithoutPrefixes;
-			for my $cert (@certs) {
-				my $certDNWithoutPrefix = $cert;
-				$certDNWithoutPrefix =~ s/^[0-9]+[:]//;
-				push @certsDNsWithoutPrefixes, $certDNWithoutPrefix;
-				if($allUsersCerts{$certDNWithoutPrefix} && $allUsersCerts{$certDNWithoutPrefix} ne $login) { die "Duplicate certificate found $cert for logins: $login and $allUsersCerts{$certDNWithoutPrefix}" ; }
-				else { $allUsersCerts{$certDNWithoutPrefix} = $login; }
-			}
+		#check for certificates duplicities between all users
+		my %allUsersCerts = ();
 
-			$dataByUser->{$login}->{"login"} = $login;
-			$dataByUser->{$login}->{"krb_principals"} = [ $login . '@META' ];
-			$dataByUser->{$login}->{"cert_dns"} = \@certsDNsWithoutPrefixes;
-			$dataByUser->{$login}->{"ssh_keys"} = $memberAttributes{$A_USER_SSH_KEY} || [];
-			$dataByUser->{$login}->{"mail"} = $memberAttributes{$A_USER_MAIL};
-			$dataByUser->{$login}->{"full_name"} = $memberAttributes{$A_USER_DISPLAY_NAME};
+		my @certsDNsWithoutPrefixes;
+		for my $cert (@certs) {
+			my $certDNWithoutPrefix = $cert;
+			$certDNWithoutPrefix =~ s/^[0-9]+[:]//;
+			push @certsDNsWithoutPrefixes, $certDNWithoutPrefix;
+			if($allUsersCerts{$certDNWithoutPrefix} && $allUsersCerts{$certDNWithoutPrefix} ne $login) { die "Duplicate certificate found $cert for logins: $login and $allUsersCerts{$certDNWithoutPrefix}" ; }
+			else { $allUsersCerts{$certDNWithoutPrefix} = $login; }
 		}
 
-		if($groupName) {
-			$dataByUser->{$login}->{"groups"}->{$groupName} = $fromResource ? 2 : 1;
-		}
+		$dataByUser->{$login}->{"login"} = $login;
+		$dataByUser->{$login}->{"krb_principals"} = [ $login . '@META' ];
+		$dataByUser->{$login}->{"cert_dns"} = \@certsDNsWithoutPrefixes;
+		$dataByUser->{$login}->{"ssh_keys"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_SSH_KEY ) || [];
+		$dataByUser->{$login}->{"mail"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_MAIL );
+		$dataByUser->{$login}->{"full_name"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_DISPLAY_NAME );
+	}
+
+	if($groupName) {
+		$dataByUser->{$login}->{"groups"}->{$groupName} = $fromResource ? 2 : 1;
 	}
 }
