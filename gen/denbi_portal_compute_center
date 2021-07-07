@@ -12,11 +12,11 @@ use utf8;
 
 local $::SERVICE_NAME = "denbi_portal_compute_center";
 local $::PROTOCOL_VERSION = "1.0.0";
-my $SCRIPT_VERSION = "1.0.0";
+my $SCRIPT_VERSION = "1.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getDataWithGroups;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #forward declaration
 sub processUsers;
@@ -77,10 +77,10 @@ my $fileGroups = $DIRECTORY . "/groups.scim";
 
 my $agent = perunServicesInit->getAgent;
 
-foreach my $resourceData ($data->getChildElements) {
-        foreach my $groupData (($resourceData->getChildElements)[0]->getChildElements) {
-                my $groupMembersLogins = processGroups $groupData;
-        }
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId )) {
+		processGroups($groupId, $resourceId);
+	}
 }
 
 # PREPARE USERSDATA TO JSON
@@ -99,7 +99,7 @@ my @users = values %$userStruc;
 # PRINT USERS TO JSON
 open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
 binmode(FILE_USERS);
-print FILE_USERS JSON::XS->new->utf8->pretty->encode(\@users);
+print FILE_USERS JSON::XS->new->utf8->pretty->canonical->encode(\@users);
 close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
 
 # PREPARE GROUPSDATA TO JSON
@@ -124,7 +124,7 @@ my @groups = values %$groupStruc;
 # PRINT GROUPS TO JSON
 open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
 binmode(FILE_GROUPS);
-print FILE_GROUPS JSON::XS->new->utf8->pretty->encode(\@groups);
+print FILE_GROUPS JSON::XS->new->utf8->pretty->canonical->encode(\@groups);
 close (FILE_GROUPS) or die "Cannot close $fileGroups: $! \n";
 
 perunServicesInit::finalize;
@@ -140,12 +140,22 @@ sub convertToFriendlyName($) {
 
 ## creates structure for users.scim file
 sub processUsers {
-        my ($gid, $memberData) = @_;
+	my ($gid, $memberId, $resourceId) = @_;
 
-        my %memberAttributes = attributesToHash $memberData->getAttributes;
-        my $uid = $memberAttributes{$A_USER_ID};
-        my $status = $memberAttributes{$A_USER_STATUS};
-	
+	my $userTypeAttributes = $data->getAllUserAttributes(member => $memberId);
+	my $memberTypeAttributes = $data->getAllMemberAttributes(member => $memberId);
+	my $memberResourceTypeAttributes = $data->getAllMemberResourceAttributes(member => $memberId, resource => $resourceId);
+	my $userFacilityTypeAttributes = $data->getAllUserFacilityAttributes(member => $memberId, facility => $data->getFacilityId());
+	my $memberGroupTypeAttributes = $data->getAllMemberGroupAttributes(member => $memberId, group => $gid);
+
+	my %memberAttributes = ($userTypeAttributes ? %{$userTypeAttributes} : (),
+							$memberTypeAttributes ? %{$memberTypeAttributes} : (),
+							$memberResourceTypeAttributes ? %{$memberResourceTypeAttributes} : (),
+							$userFacilityTypeAttributes ? %{$userFacilityTypeAttributes} : (),
+							$memberGroupTypeAttributes ? %{$memberGroupTypeAttributes} : ());
+	my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
+	my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_USER_STATUS );
+
 	if($status ne $STATUS_VALID) { return; }
 
 	unless($userStruc->{$uid}) {
@@ -153,14 +163,13 @@ sub processUsers {
 		$userStruc->{$uid} = \%memberAttributes;
 	}
 
-        processMemberships $gid, $uid;
+	processMemberships $gid, $uid;
 }
 
 ## creates structure for groups.scim file
 sub processGroups {
-        my $group = shift;
-        my %groupAttributes = attributesToHash $group->getAttributes;
-        my $membersElement = ($group->getChildElements)[1];
+	my ($groupId, $resourceId) = @_;
+	my %groupAttributes= %{$data->getAllGroupAttributes(group => $groupId)};
 
 	my $gid = $groupAttributes{$A_GROUP_ID};
 
@@ -172,16 +181,16 @@ sub processGroups {
 		$groupStruc->{$gid} = \%groupAttributes;
 	}
 
-	foreach my $memberData ($membersElement->getChildElements) {
-		processUsers $gid, $memberData;
+	foreach my $memberId ( $data->getMemberIdsForResourceAndGroup( group=> $groupId, resource => $resourceId ) ) {
+		processUsers $gid, $memberId, $resourceId;
 	}
 }
 
 ## creates structure for memberships
 sub processMemberships {
-        my ($gid, $uid) = @_;
+	my ($gid, $uid) = @_;
 
-        unless(exists $membershipStruc->{$gid}->{$uid}) {
-                $membershipStruc->{$gid}->{$uid} = {};
-        }
+	unless(exists $membershipStruc->{$gid}->{$uid}) {
+		$membershipStruc->{$gid}->{$uid} = {};
+	}
 }
