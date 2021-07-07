@@ -27,7 +27,7 @@ our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_CHIPNUMBERS; *A_CHIPNUMBERS = \'urn:perun:user:attribute-def:def:chipNumbers';
 our $A_MEMBER_STATUS; *A_MEMBER_STATUS = \'urn:perun:member:attribute-def:core:status';
-our $ALLOW_NOT_VALID_MEMBERS; *ALLOW_NOT_VALID_MEMBERS = \'urn:perun:resource:attribute-def:def:AllowNotValidMembers';
+our $A_ALLOW_INACTIVE; *A_ALLOW_INACTIVE = \'urn:perun:resource:attribute-def:def:allowInactiveMembers';
 
 our $A_R_NAME; *A_R_NAME = \'urn:perun:resource:attribute-def:core:name';
 
@@ -67,14 +67,14 @@ my $serviceAccountsDN = "OU=Services,OU=Perun,OU=MU,DC=ucn,DC=muni,DC=cz";
 # FOR EACH RESOURCE
 foreach my $resourceId ( $data->getResourceIds() ){
 
-	my $allowNotValidMembers = $data->getResourceAttributeValue( resource => $resourceId, attrName => $ALLOW_NOT_VALID_MEMBERS);
+	my $allowInactiveMembers = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_ALLOW_INACTIVE);
 	# EACH USER ON RESOURCE
 	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 
 		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 		my $memberStatus = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
 		#next unless ( $uAttributes{$A_MEMBER_STATUS} eq $STATUS_VALID || ( $uAttributes{$A_MEMBER_STATUS} eq $STATUS_EXPIRED && $rAttributes{$ALLOW_NOT_VALID_MEMBERS}));
-		next unless ( ($memberStatus eq $STATUS_VALID) || ( ($memberStatus eq $STATUS_EXPIRED) && $allowNotValidMembers));
+		next unless ( ($memberStatus eq $STATUS_VALID) || ( ($memberStatus eq $STATUS_EXPIRED) && $allowInactiveMembers));
 
 		unless ($login =~ /^s-/){
 			$users->{$login}->{"DN"} = "CN=" . $login . "," . $baseDN;
