@@ -11,11 +11,11 @@ use POSIX qw/strftime/;
 
 local $::SERVICE_NAME = "sympa_cesnet";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_NAME;                        *A_USER_NAME =                       \'urn:perun:user:attribute-def:core:displayName';
@@ -25,30 +25,23 @@ our $A_USER_STATUS;                      *A_USER_STATUS =                     \'
 our $A_RESOURCE_MAILING_LIST_NAME;       *A_RESOURCE_MAILING_LIST_NAME =      \'urn:perun:resource:attribute-def:def:mailingListName';
 
 
-my $mailinglistStruc = {};  # $mailinglistStruc->{"mailing list name"}->{"user's e-mail"}->{A_USER_*} 
-my $mailinglistAdminMailStruc = {};  # $mailinglistAdminMailStruc->{"mailing list name"}->{"admin's e-mail"} 
-
+my $mailinglistStruc = {};  # $mailinglistStruc->{"mailing list name"}->{"user's e-mail"}->{"user's name"}
 
 my $mailinglistsDirectory = "$DIRECTORY/mailinglists";
 mkdir $mailinglistsDirectory or die "Can't mkdir $mailinglistsDirectory: $!";
 
 
-my @membersAttributes;
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-    my %resourceAttributes  = attributesToHash $rData->getAttributes;
-    local *FILE;
+foreach my $resourceId ($data->getResourceIds()) {
+	my $listName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_NAME);
 
-    my @membersData = $rData->getChildElements;
+	for my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		next unless($data->getMemberAttributeValue(member => $memberId, attrName => $A_USER_STATUS) eq "VALID");
 
-    my $listName = "$resourceAttributes{$A_RESOURCE_MAILING_LIST_NAME}";
+		my $userMail = $data->getUserAttributeValue(attrName => $A_USER_MAIL, member => $memberId);
+		my $userName = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_NAME);
 
-    foreach my $memberAttributes (dataToAttributesHashes @membersData) {
-        #list only VALID members except if allowNonvalidUsers is true
-        next unless($memberAttributes->{$A_USER_STATUS} eq "VALID");
-
-        $mailinglistStruc->{$listName}->{$memberAttributes->{$A_USER_MAIL}}->{$A_USER_NAME} = $memberAttributes->{$A_USER_NAME};
-    }
+		$mailinglistStruc->{$listName}->{$userMail}->{$A_USER_NAME} = $userName;
+	}
 }
 
 
@@ -56,8 +49,8 @@ for my $listName (keys %$mailinglistStruc) {
     my $fileName = "$mailinglistsDirectory/$listName";
     open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 
-    for my $mail (keys %{$mailinglistStruc->{$listName}}) {
-      print FILE $mail, " ", unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME}), "\n";
+    for my $mail (sort keys %{$mailinglistStruc->{$listName}}) {
+		print FILE $mail, " ", unidecode($mailinglistStruc->{$listName}->{$mail}->{$A_USER_NAME}), "\n";
     }
 
     close FILE or die $!;
