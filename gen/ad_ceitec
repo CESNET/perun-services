@@ -5,9 +5,11 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 
+sub escapeDnValue;
+
 local $::SERVICE_NAME = "ad_ceitec";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -116,13 +118,13 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 		if (defined $serviceUser and ($serviceUser == 1)) {
 			# service users
-			$users->{$login}->{"DN"} = "cn=" . $cn . "," . $baseDNService;
-			$usersByResource->{$groupName}->{"CN=" . $cn . "," . $baseDNService} = 1
+			$users->{$login}->{"DN"} = "cn=" . escapeDnValue($cn) . "," . $baseDNService;
+			$usersByResource->{$groupName}->{"CN=" . escapeDnValue($cn) . "," . $baseDNService} = 1
 		}
 		else {
 			# normal users
-			$users->{$login}->{"DN"} = "cn=" . $cn . "," . $baseDNUsers;
-			$usersByResource->{$groupName}->{"CN=" . $cn . "," . $baseDNUsers} = 1
+			$users->{$login}->{"DN"} = "cn=" . escapeDnValue($cn) . "," . $baseDNUsers;
+			$usersByResource->{$groupName}->{"CN=" . escapeDnValue($cn) . "," . $baseDNUsers} = 1
 		}
 
 	}
@@ -228,3 +230,23 @@ for my $login (@logins) {
 close(FILE);
 
 perunServicesInit::finalize;
+
+
+# method looks for specific characters/symbols in the scalar $value
+# and escapes each of them using backslash
+sub escapeDnValue {
+	my $value = shift;
+
+	if (defined($value)){
+		# escape one of the characters inside the string: ",", "+", """, "\", "<", ">" or ";"
+		$value =~ s/[,+"\\><;]/\\${^MATCH}/pg;
+
+		# escape a whitespace or "#" character occurring at the beginning of the string
+		$value =~ s/^\s|^#/\\${^MATCH}/pg;
+
+		# escape a whitespace character occurring at the end of the string
+		$value =~ s/\s$/\\ /g;
+	}
+
+	return $value;
+}
