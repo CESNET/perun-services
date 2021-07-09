@@ -17,7 +17,7 @@ my $data = perunServicesInit::getHashedHierarchicalData;
 our $A_USER_LOGIN;      *A_USER_LOGIN =        \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_MAIL;       *A_USER_MAIL =         \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_MEMBER_STATUS;   *A_MEMBER_STATUS =     \'urn:perun:member:attribute-def:core:status';
-our $A_ALLOW_EXPIRED;   *A_ALLOW_EXPIRED =     \'urn:perun:resource:attribute-def:def:allowExpiredMembers';
+our $A_ALLOW_INACTIVE;  *A_ALLOW_INACTIVE =    \'urn:perun:resource:attribute-def:def:allowInactiveMembers';
 
 our $STATUS_VALID;      *STATUS_VALID =        \'VALID';
 our $STATUS_EXPIRED;    *STATUS_EXPIRED =      \'EXPIRED';
@@ -28,12 +28,12 @@ open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 my %mailByLogin;
 
 foreach my $resourceId ( $data->getResourceIds() ) {
-	my $allowExpiredMembers = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_ALLOW_EXPIRED );
+	my $allowInactiveMembers = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_ALLOW_INACTIVE );
 
 	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 		my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
 
-		if (($status eq $STATUS_VALID) || ($status eq $STATUS_EXPIRED && $allowExpiredMembers)) {
+		if (($status eq $STATUS_VALID) || ($status eq $STATUS_EXPIRED && $allowInactiveMembers)) {
 			my $login  = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_LOGIN);
 			my $mail  = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_MAIL);
 			$mailByLogin{$login} = $mail;
