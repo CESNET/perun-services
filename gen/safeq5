@@ -8,11 +8,11 @@ use open qw/:std :utf8/;
 
 local $::SERVICE_NAME = "safeq5";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_LOGIN;         *A_USER_LOGIN =        \'urn:perun:user:attribute-def:def:login-namespace:mu';
@@ -28,16 +28,17 @@ my $fileUsers = $DIRECTORY . "users.csv";
 my %workplaceById;
 my %usersByLogin;
 
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-	my @membersData = $rData->getChildElements;
-	for my $memberAttributes (dataToAttributesHashes @membersData) {
-		$usersByLogin{$memberAttributes->{$A_USER_LOGIN}} = $memberAttributes unless defined $usersByLogin{$memberAttributes->{$A_USER_LOGIN}};
-		$workplaceById{$memberAttributes->{$A_USER_WORKPLACE_ID}} = $memberAttributes->{$A_USER_WORKPLACE};
+foreach my $memberId ($data->getMemberIdsForFacility()) {
+	my $login = $data->getUserAttributeValue(attrName => $A_USER_LOGIN, member => $memberId);
+	unless (defined $usersByLogin{$login}) {
+		$usersByLogin{$login}->{$A_USER_FIRST_NAME} = $data->getUserAttributeValue(attrName => $A_USER_FIRST_NAME, member => $memberId);
+		$usersByLogin{$login}->{$A_USER_LAST_NAME} = $data->getUserAttributeValue(attrName => $A_USER_LAST_NAME, member => $memberId);
+		$usersByLogin{$login}->{$A_USER_MAIL} = $data->getUserAttributeValue(attrName => $A_USER_MAIL, member => $memberId);
+		$usersByLogin{$login}->{$A_USER_CHIP_NUM} = $data->getUserAttributeValue(attrName => $A_USER_CHIP_NUM, member => $memberId);
+		$usersByLogin{$login}->{$A_USER_WORKPLACE_ID} = $data->getUserAttributeValue(attrName => $A_USER_WORKPLACE_ID, member => $memberId);
 	}
+	$workplaceById{$data->getUserAttributeValue(attrName => $A_USER_WORKPLACE_ID, member => $memberId)} = $data->getUserAttributeValue(attrName => $A_USER_WORKPLACE, member => $memberId);
 }
-
-my $sortingFunction = getAttributeSorting $A_USER_LOGIN, 1;
 
 # centers.csv:  300;add;workplaceId;workplace;
 open FILE_CENTERS,">$fileCenters" or die "Cannot open $fileCenters: $! \n";
