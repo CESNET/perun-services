@@ -33,7 +33,6 @@ use Net::LDAP::Control::Paged;
 use Net::LDAP::Constant qw( LDAP_CONTROL_PAGED );
 use File::Copy;
 use Date::Calc qw/ Today Delta_Days Add_Delta_Days Date_to_Days Date_to_Text Decode_Date_EU /;
-use LockFile::Simple;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 
@@ -97,13 +96,7 @@ chomp($namespace);
 
 # create service lock
 my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespace);
-($lock->lock() == 1) or die "Unable to get lock, service propagation is already running or previous run failed.";
-
-# check for errors in last run - if there were an error this lock cannot be obtained
-my $lockManager = LockFile::Simple->make( -hold => 0, -delay => 30, -max => 2);
-my $errorLockFile = "/var/lock/" . $facility_name . "_" . $service_name . "_" . $namespace . ".errorLock";
-$lockManager->lock($errorLockFile) || die "There were an error in previous run. Resolve the error and delete following file to continue: $errorLockFile \n";
-
+($lock->lock() == 1) or die "Unable to get lock, service propagation is already running.";
 
 # init configuration
 my @conf = init_config($namespace);
@@ -246,7 +239,6 @@ print "Group updated with errors (members): " . $counter_group_members_updated_w
 print "Group failed to update (members): " . $counter_group_members_not_updated . " entries.\n";
 
 $lock->unlock();
-$lockManager->unlock($errorLockFile);
 
 if ($counter_fail or $counter_fail_password or $counter_fail_ous or
 	$counter_group_not_added or $counter_group_members_not_updated or
