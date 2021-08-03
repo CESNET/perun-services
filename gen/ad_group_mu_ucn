@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_group_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -23,6 +23,11 @@ our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseD
 our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
 our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName';
 our $A_MR_V_IS_BANNED;  *A_MR_V_IS_BANNED = \'urn:perun:member_resource:attribute-def:virt:isBanned';
+our $A_MEMBER_STATUS; *A_MEMBER_STATUS = \'urn:perun:member:attribute-def:core:status';
+our $A_ALLOW_INACTIVE;  *A_ALLOW_INACTIVE = \'urn:perun:resource:attribute-def:def:allowInactiveMembers';
+
+our $STATUS_VALID;      *STATUS_VALID =        \'VALID';
+our $STATUS_EXPIRED;    *STATUS_EXPIRED =      \'EXPIRED';
 
 # CHECK ON FACILITY ATTRIBUTES
 if (!defined($data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN ))) {
@@ -48,6 +53,7 @@ my $usersByResource = {};
 # FOR EACH RESOURCE
 foreach my $resourceId ($data->getResourceIds()) {
 
+	my $allowInactiveMembers = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_ALLOW_INACTIVE );
 	my $group = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_GROUP_NAME );
 	$groups->{$group} = 1;
 
@@ -56,9 +62,12 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 		my $isBanned = $data->getMemberResourceAttributeValue( member => $memberId, resource => $resourceId, attrName => $A_MR_V_IS_BANNED );
+		my $memberStatus = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
 
 		#skip banned members
 		next if $isBanned;
+
+		next unless ( ($memberStatus eq $STATUS_VALID) || (($memberStatus eq $STATUS_EXPIRED) && $allowInactiveMembers) );
 
 		# allow only UČO, 9UČO and s-[smth] logins
 
