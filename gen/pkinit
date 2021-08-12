@@ -8,11 +8,11 @@ use Text::Unidecode;
 
 local $::SERVICE_NAME = "pkinit";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_KERBEROS_LOGINS;     *A_USER_KERBEROS_LOGINS =       \'urn:perun:user:attribute-def:def:kerberosLogins';
@@ -20,24 +20,18 @@ our $A_USER_CERT_DNS;   *A_USER_CERT_DNS =     \'urn:perun:user:attribute-def:vi
 
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
 
-my @membersAttributes;
-my @resourcesData = $data->getChildElements;
-foreach my $rData (@resourcesData) {
-		my @membersData = $rData->getChildElements;
-		push @membersAttributes, dataToAttributesHashes @membersData;
-}
 
 # Create structure $realm->{$kerberosLogin, $userCertDN}
 my %realms;
 
 # realm
 # kerberosLogin:DN uzivatele
-foreach my $memberAttributes (@membersAttributes) {
-	foreach my $kerberosLogin (@{$memberAttributes->{$A_USER_KERBEROS_LOGINS}}) {
+foreach my $memberId ($data->getMemberIdsForFacility()) {
+	foreach my $kerberosLogin (@{$data->getUserAttributeValue(attrName => $A_USER_KERBEROS_LOGINS, member => $memberId)}) {
+		# Name of the realm on the first line
 		# Get realm from the kerberosLogins
 		my ($login, $realm) = split('@', $kerberosLogin);
-		foreach my $subjectDN (keys %{$memberAttributes->{$A_USER_CERT_DNS}}) {
-			chomp $memberAttributes->{$A_USER_CERT_DNS}{$subjectDN};
+		foreach my $subjectDN (keys %{$data->getUserAttributeValue(attrName => $A_USER_CERT_DNS, member => $memberId)}) {
 			#remove prefix from subject DN
 			my $subjectDNWithoutPrefix = $subjectDN;
 			$subjectDNWithoutPrefix =~ s/^[0-9]+[:]//;
