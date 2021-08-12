@@ -18,7 +18,7 @@ local $::PROTOCOL_VERSION = "3.0.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHierarchicalData;
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_F_BASE_DN;              *A_F_BASE_DN =             \'urn:perun:facility:attribute-def:def:adBaseDN';
@@ -35,8 +35,7 @@ our $A_RESOURCE_BILLING_CODE;  *A_RESOURCE_BILLING_CODE = \'urn:perun:resource:a
 our $A_R_PREPAID;              *A_R_PREPAID =             \'urn:perun:resource:attribute-def:def:safeq-prepaid';
 our $A_R_PRINT_FOR_FREE;       *A_R_PRINT_FOR_FREE =      \'urn:perun:resource:attribute-def:def:safeq-printForFree';
 
-my %facilityAttributes = attributesToHash $data->getAttributes;
-my $baseDNUsers = $facilityAttributes{$A_F_BASE_DN};
+my $baseDNUsers = $data->getFacilityAttributeValue(attrName => $A_F_BASE_DN);
 
 my $file = $DIRECTORY . "safeq";
 
@@ -47,14 +46,10 @@ my %costcentersById = ( 100 => "Uživatelé bez přiřazeného pracoviště");
 my $usersByLogin;
 my $resourceAttrsByUserLogin;
 
-my @resources = $data->getChildElements;
 
-foreach my $resourceData (@resources) {
-	my @membersData = $resourceData->getChildElements;
-	my %resourceAttributes = attributesToHash $resourceData->getAttributes;
-
-	for my $memberAttributes (dataToAttributesHashes @membersData) {
-		processUsers $memberAttributes, \%resourceAttributes;
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		processUsers $memberId, $resourceId;
 	}
 }
 
@@ -106,22 +101,24 @@ foreach my $login (sort keys %$usersByLogin) {
 	print FILE "lastname:", checkBase64($attributes->{$A_USER_LAST_NAME} || '(N/A)'), "\n";
 	print FILE "costcenter:", checkBase64("costcenterno=" . ($attributes->{$A_USER_WORKPLACE_ID} || 100) . ", ou=costcenters, o=ysoftsafeq"), "\n";
 	print FILE "email:", checkBase64($attributes->{$A_USER_MAIL}), "\n";
-	print FILE "homedir:: ", encode_base64('\\\\ha-ntc.ics.muni.cz\\profiles\\' . $attributes->{$A_USER_LOGIN});
+	print FILE "homedir:: ", encode_base64('\\\\ha-ntc.ics.muni.cz\\profiles\\' . $login);
 
-	foreach my $chipNumber (@{$attributes->{$A_USER_CHIP_NUM}}) {
-		if($allChipNumbers{$chipNumber}) {
-			warn "Same chip number shared by more users. Logins of users: " . $login . ", " . $allChipNumbers{$chipNumber} . "\n";
+	if (defined $attributes->{$A_USER_CHIP_NUM}) {
+		foreach my $chipNumber (sort @{$attributes->{$A_USER_CHIP_NUM}}) {
+			if ($allChipNumbers{$chipNumber}) {
+				warn "Same chip number shared by more users. Logins of users: " . $login . ", " . $allChipNumbers{$chipNumber} . "\n";
+			}
+			$allChipNumbers{$chipNumber} = $login;
+			print FILE "card:", checkBase64($chipNumber), "\n";
 		}
-		$allChipNumbers{$chipNumber} = $login;
-		print FILE "card:", checkBase64($chipNumber), "\n";
 	}
 
-	foreach my $role (keys %{$resourceAttrsByUserLogin->{$login}->{$STRUC_ROLES}}) {
+	foreach my $role (sort keys %{$resourceAttrsByUserLogin->{$login}->{$STRUC_ROLES}}) {
 		print FILE "role:", checkBase64($role), "\n";
 	}
 	print FILE "role: everyone", "\n";
 
-	foreach my $billingcode (keys %{$resourceAttrsByUserLogin->{$login}->{$STRUC_BILLINGCODES}}) {
+	foreach my $billingcode (sort keys %{$resourceAttrsByUserLogin->{$login}->{$STRUC_BILLINGCODES}}) {
 		print FILE "billingcode:",checkBase64("billingcode=" . $billingcode . ", ou=billingcodes, o=ysoftsafeq"), "\n";
 	}
 
@@ -141,25 +138,31 @@ perunServicesInit::finalize;
 ##############################################################################
 
 sub processUsers {
-	my $memberAttributes = shift;
-	my $resourceAttributes = shift;
-	my $login = $memberAttributes->{$A_USER_LOGIN};
+	my $memberId = shift;
+	my $resourceId = shift;
+	my $login = $data->getUserAttributeValue(attrName => $A_USER_LOGIN, member => $memberId);
 
-	unless(defined $usersByLogin->{$memberAttributes->{$A_USER_LOGIN}}) {
-	my %tmp =  ( %$memberAttributes, %$resourceAttributes );
-		$usersByLogin->{$memberAttributes->{$A_USER_LOGIN}} = $memberAttributes;
-		$usersByLogin->{$memberAttributes->{$A_USER_LOGIN}}->{$A_R_PREPAID} = $resourceAttributes->{$A_R_PREPAID};
-		$usersByLogin->{$memberAttributes->{$A_USER_LOGIN}}->{$A_R_PRINT_FOR_FREE} = ( $resourceAttributes->{$A_R_PRINT_FOR_FREE} || 0) ;
+	unless(defined $usersByLogin->{$login}) {
+		$usersByLogin->{$login}->{$A_USER_FIRST_NAME} = $data->getUserAttributeValue(attrName => $A_USER_FIRST_NAME, member => $memberId);
+		$usersByLogin->{$login}->{$A_USER_LAST_NAME} = $data->getUserAttributeValue(attrName => $A_USER_LAST_NAME, member => $memberId);
+		$usersByLogin->{$login}->{$A_USER_MAIL} = $data->getUserAttributeValue(attrName => $A_USER_MAIL, member => $memberId);
+		$usersByLogin->{$login}->{$A_USER_CHIP_NUM} = $data->getUserAttributeValue(attrName => $A_USER_CHIP_NUM, member => $memberId);
+		$usersByLogin->{$login}->{$A_USER_WORKPLACE_ID} = $data->getUserAttributeValue(attrName => $A_USER_WORKPLACE_ID, member => $memberId);
+		$usersByLogin->{$login}->{$A_R_PREPAID} = $data->getResourceAttributeValue(attrName => $A_R_PREPAID, resource => $resourceId);
+		$usersByLogin->{$login}->{$A_R_PRINT_FOR_FREE} = ( $data->getResourceAttributeValue(attrName => $A_R_PRINT_FOR_FREE, resource => $resourceId) || 0) ;
 	} else {
-		$usersByLogin->{$memberAttributes->{$A_USER_LOGIN}}->{$A_R_PREPAID} |= ($resourceAttributes->{$A_R_PREPAID} || 0);
-		$usersByLogin->{$memberAttributes->{$A_USER_LOGIN}}->{$A_R_PRINT_FOR_FREE} |= ( $resourceAttributes->{$A_R_PRINT_FOR_FREE} || 0) ;
+		$usersByLogin->{$login}->{$A_R_PREPAID} |= ($data->getResourceAttributeValue(attrName => $A_R_PREPAID, resource => $resourceId) || 0);
+		$usersByLogin->{$login}->{$A_R_PRINT_FOR_FREE} |= ( $data->getResourceAttributeValue(attrName => $A_R_PRINT_FOR_FREE, resource => $resourceId) || 0) ;
 	}
 
-	$resourceAttrsByUserLogin->{$login}->{$STRUC_ROLES}->{$resourceAttributes->{$A_RESOURCE_ROLE}} = 1 if defined $resourceAttributes->{$A_RESOURCE_ROLE};
-	$resourceAttrsByUserLogin->{$login}->{$STRUC_BILLINGCODES}->{$resourceAttributes->{$A_RESOURCE_BILLING_CODE}} = 1 if defined $resourceAttributes->{$A_RESOURCE_BILLING_CODE};
+	my $resourceRole = $data->getResourceAttributeValue(attrName => $A_RESOURCE_ROLE, resource => $resourceId);
+	my $resourceBillingCode = $data->getResourceAttributeValue(attrName => $A_RESOURCE_BILLING_CODE, resource => $resourceId);
+	$resourceAttrsByUserLogin->{$login}->{$STRUC_ROLES}->{$resourceRole} = 1 if defined $resourceRole;
+	$resourceAttrsByUserLogin->{$login}->{$STRUC_BILLINGCODES}->{$resourceBillingCode} = 1 if defined $resourceBillingCode;
 
-	if($memberAttributes->{$A_USER_WORKPLACE_ID}) {
-		processCostCenters $memberAttributes->{$A_USER_WORKPLACE_ID}, $memberAttributes->{$A_USER_WORKPLACE};
+	if($data->getUserAttributeValue(attrName => $A_USER_WORKPLACE_ID, member => $memberId)) {
+		processCostCenters $data->getUserAttributeValue(attrName => $A_USER_WORKPLACE_ID, member => $memberId),
+			$data->getUserAttributeValue(attrName => $A_USER_WORKPLACE, member => $memberId);
 	}
 }
 
