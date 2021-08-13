@@ -3,7 +3,6 @@ perun-slave-process-afs
 perun-slave-process-afs-group
 perun-slave-process-apache-basic-auth
 perun-slave-process-apache-ssl
-perun-slave-process-docdb
 perun-slave-process-eduroam-radius
 perun-slave-process-fs-home
 perun-slave-process-fs-project
@@ -26,7 +25,6 @@ perun-slave-process-passwd-scp
 perun-slave-process-pbsmon-json
 perun-slave-process-pbsmon-users
 perun-slave-process-pbs-publication-fairshare
-perun-slave-process-pkinit
 perun-slave-process-sshkeys
 perun-slave-process-sshkeys-root
 perun-slave-process-voms
