@@ -1,3 +1,9 @@
+perun-slave-full (3.1.13) stable; urgency=medium
+
+  * added new service kerberos-renewal-principals
+
+ -- Johana Supikova <xsupikov@fi.muni.cz>  Fri, 13 Aug 2021 10:37:00 +0200
+
 perun-slave-full (3.1.12) stable; urgency=medium
 
   * removed docdb, pkinit

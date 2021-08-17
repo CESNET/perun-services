@@ -1,0 +1,5 @@
+perun-slave-process-kerberos-renewal-principals (3.0.0) stable; urgency=low
+
+  * added new service kerberos-renewal-principals
+
+ -- Johana Supikova <xsupikov@fi.muni.cz>  Wed, 11 Aug 2021 10:37:00 +0200
