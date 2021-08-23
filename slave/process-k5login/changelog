@@ -1,3 +1,10 @@
+perun-slave-process-k5login (3.1.8) stable; urgency=medium
+
+  * Do not overwrite k5login files that have not changed.
+    It prevents unnecessary change in modification timestamps.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 23 Aug 2021 11:58:00 +0200
+
 perun-slave-process-k5login (3.1.7) stable; urgency=low
 
   * Skip creating k5login files in home directories that don't exist.
@@ -9,7 +16,7 @@ perun-slave-process-k5login (3.1.6) stable; urgency=low
   * Skip information about not changed k5login files. This information is
     not important for administrators of a service.
 
- -- Michal Stava <stavamichal@gmail.com> Wed, 03 Jun 2020 14:57:00 +0200
+ -- Michal Stava <stavamichal@gmail.com>  Wed, 03 Jun 2020 14:57:00 +0200
 
 perun-slave-process-k5login (3.1.5) stable; urgency=medium
 
