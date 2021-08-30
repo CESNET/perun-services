@@ -1,0 +1,11 @@
+#!/bin/bash
+
+SERVICE_NAME="myq_printsvc"
+
+FACILITY_NAME=$1
+DESTINATION=$2
+
+SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
+SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
+
+cp -f "$SERVICE_FILES_DIR/import_users-perun.csv" "$DESTINATION/import_users-perun.csv"
