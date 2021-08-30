@@ -1,0 +1,196 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+use Net::LDAPS;
+use Net::LDAP::Entry;
+use Net::LDAP::Message;
+use Net::LDAP::LDIF;
+use DBI;
+
+# Import shared AD library
+use ADConnector;
+use ScriptLock;
+
+sub process_disable;
+sub process_update;
+
+# log counters
+my $counter_remove = 0;
+my $counter_remove_fail = 0;
+my $counter_update = 0;
+my $counter_update_fail = 0;
+
+# define service
+my $service_name = "ad_admin_user_mu_ucn";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+
+my $base_dn = "OU=PrivilegedUsers,OU=MU,DC=ucn,DC=muni,DC=cz";
+
+# propagation destination
+my $namespace = $ARGV[1];
+chomp($namespace);
+
+my $filter = '(objectClass=person)';
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespace);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# init configuration
+my @conf = init_config($namespace);
+my @ldap_locations = resolve_domain_controlers($conf[0]);
+my $ldap = ldap_connect_multiple_options(\@ldap_locations);
+# connect
+ldap_bind($ldap, $conf[1], $conf[2]);
+
+# load all data
+my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
+my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn','displayName','sn','givenName','mail','userAccountControl','samAccountName']);
+
+my %ad_entries_map = ();
+my %perun_entries_map = ();
+
+foreach my $entry (@ad_entries) {
+	my $login = $entry->get_value('cn');
+	$ad_entries_map{ $login } = $entry;
+}
+
+foreach my $entry (@perun_entries) {
+	my $login = $entry->get_value('cn');
+	$perun_entries_map{ $login } = $entry;
+}
+
+# process data
+process_disable();
+process_update();
+
+# disconnect
+ldap_unbind($ldap);
+
+# log results
+ldap_log($service_name, "Disabled: " . $counter_remove . " entries.");
+ldap_log($service_name, "NOT Disabled: " . $counter_remove_fail . " entries.");
+ldap_log($service_name, "Updated: " . $counter_update. " entries.");
+ldap_log($service_name, "NOT Updated: " . $counter_update_fail . " entries.");
+
+# print results for TaskResults in GUI
+print "Disabled: " . $counter_remove . " entries.\n";
+print "NOT Disabled: " . $counter_remove_fail . " entries.\n";
+print "Updated: " . $counter_update. " entries.\n";
+print "NOT Updated: " . $counter_update_fail. " entries.\n";
+
+$lock->unlock();
+my $counter_fail = $counter_remove_fail + $counter_update_fail;
+if ($counter_fail > 0) { die "Failed to process: " . $counter_fail . " entries.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
+
+# END of main script
+
+###########################################
+#
+# Main processing functions
+#
+###########################################
+
+sub process_disable() {
+	foreach my $entry (@ad_entries) {
+
+		# We create only entries for normal UČO users
+		my $login = $entry->get_value('cn');
+		next if exists $perun_entries_map{$login};
+
+		my $entry_uac = $entry->get_value('userAccountControl');
+		if (is_uac_enabled($entry_uac) == 1){
+	                # Account enabled -> disable it
+			$entry->replace(
+                	        'userAccountControl' => disable_uac($entry_uac)
+                	);
+                	my $response = $entry->update($ldap);
+                	unless ($response->is_error()) {
+                    		# SUCCESS
+                    		ldap_log($service_name, "Disabled user: " . $entry->dn());
+                    		$counter_remove++;
+                	} else {
+                    		# FAIL
+				print STDERR "User NOT Disabled: " . $entry->dn() . " | " . $response->error() . "\n";
+                    		ldap_log($service_name, "NOT Disabled: " . $entry->dn() . " | " . $response->error());
+                    		ldap_log($service_name, $entry->ldif());
+                    		$counter_remove_fail++;
+                	}   
+            	}
+	}
+}
+
+#
+# Update existing user entries in AD
+#
+sub process_update() {
+
+	foreach my $perun_entry (@perun_entries) {
+
+		if (exists $ad_entries_map{$perun_entry->get_value('cn')}) {
+
+			my $ad_entry = $ad_entries_map{$perun_entry->get_value('cn')};
+
+			# attrs without cn since it's part of DN to be updated
+			my @attrs = ('displayName','sn','givenName','mail');
+
+			# stored log messages to check if entry should be updated
+			my @entry_changed = ();
+
+			# check each attribute
+			foreach my $attr (@attrs) {
+				if (compare_entry($ad_entry , $perun_entry , $attr) == 1) {
+					# store value for log
+					my @ad_val = $ad_entry->get_value($attr);
+					my @perun_val = $perun_entry->get_value($attr);
+					push(@entry_changed, "$attr | " . join(", ",sort(@ad_val)) .  " => " . join(", ",sort(@perun_val)));
+					# replace value
+					$ad_entry->replace(
+						$attr => \@perun_val
+					);
+				}
+			}
+
+			# check UAC
+			my $ad_entry_uac = $ad_entry->get_value('userAccountControl');
+
+			# if disabled -> enable it
+			unless (is_uac_enabled($ad_entry_uac) == 1) {
+
+				my $original_ad_entry_uac = $ad_entry_uac;
+				my $new_ad_entry_uac = enable_uac($ad_entry_uac);
+				push( @entry_changed, "userAccountControl | $original_ad_entry_uac => $new_ad_entry_uac" );
+				$ad_entry->replace(
+					'userAccountControl' => $new_ad_entry_uac
+				);
+
+			}
+
+			if (@entry_changed) {
+				# Update entry in AD
+				my $response = $ad_entry->update($ldap);
+				unless ($response->is_error()) {
+					# SUCCESS
+					foreach my $log_message (@entry_changed) {
+						#ldap_log($service_name, "Updated: " . $ad_entry->dn() . " | " . $log_message);
+					}
+					$counter_update++;
+				} else {
+					# FAIL
+					print STDERR "User NOT updated: " . $ad_entry->dn() . " | " . $response->error() . "\n";
+					ldap_log($service_name, "NOT updated: " . $ad_entry->dn() . " | " . $response->error());
+					ldap_log($service_name, $ad_entry->ldif());
+					$counter_update_fail++;
+				}
+			}
+
+		}
+
+	}
+}
