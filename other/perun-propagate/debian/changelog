@@ -1,3 +1,9 @@
+perun-propagate (3.0.8) stable; urgency=medium
+
+  * define missing lsb functions for rhel compatibility
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Thu, 19 Aug 2021 14:27:00 +0200
+
 perun-propagate (3.0.7) stable; urgency=medium
 
   * changed architecture from any to all
@@ -42,7 +48,7 @@ perun-propagate (3.0.2) stable; urgency=medium
   * Add better timeout and test all hosts for perun_propagate
   * timeout doesn't end propagation, propagation will continue in background,
     only perun_propagation ends with info about it
-  * script tries call remctl for every uniqe host in ktutils because of more 
+  * script tries call remctl for every uniqe host in ktutils because of more
     hosts for one physical address
 
  -- Michal Stava <stavamichal@gmail.com>  Tue, 18 Oct 2016 16:00:00 +0100

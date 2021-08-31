@@ -35,6 +35,9 @@ fi
 # Load lsb functions
 . /lib/lsb/init-functions
 
+type log_end_msg >/dev/null 2>&1 || log_end_msg() { return "$1"; }
+type log_daemon_msg >/dev/null 2>&1 || log_daemon_msg() { true; }
+
 #---------------------------- ADDITIONAL FUNCTIONS ----------
 # Return 0 if process with PID is still runing, 1 if not
 is_process_running() {
