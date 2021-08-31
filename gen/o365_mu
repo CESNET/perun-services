@@ -29,7 +29,7 @@ my $data      = perunServicesInit::getHashedDataWithGroups;
 
 our $A_G_AD_NAME;                            *A_G_AD_NAME =                            \'urn:perun:group:attribute-def:def:adName:o365mu';
 our $A_F_DOMAIN_NAME;                        *A_F_DOMAIN_NAME =                        \'urn:perun:facility:attribute-def:def:o365DomainName';
-our $A_MG_O365_SEND_AS;                      *A_MG_O365_SEND_AS =                      \'urn:perun:member_group:attribute-def:def:o365SendAs';
+our $A_MG_O365_SEND_AS;                      *A_MG_O365_SEND_AS =                      \'urn:perun:member_group:attribute-def:virt:o365SendAs';
 our $A_U_O365_MAIL_ADDRS;                    *A_U_O365_MAIL_ADDRS =                    \'urn:perun:user:attribute-def:def:o365EmailAddresses:mu';
 our $A_UF_DISABLE_MAIL_FORWARD;              *A_UF_DISABLE_MAIL_FORWARD =              \'urn:perun:user_facility:attribute-def:def:disableO365MailForward';
 our $A_UF_LOGIN;                             *A_UF_LOGIN =                             \'urn:perun:user_facility:attribute-def:virt:login';
