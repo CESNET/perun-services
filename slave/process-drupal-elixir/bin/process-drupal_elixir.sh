@@ -12,7 +12,7 @@ function process {
 	I_CHANGED=(0 '${FILE} updated')
 	I_NOT_CHANGED=(0 '${FILE} has not changed')
 	E_CHMOD=(51 'Cannot chmod on $WORK_DIR/$FILE')
-	E_DUPLICATES=(52 'Email duplicates: ${DUPLICATES}')
+	E_DUPLICATES=(0 'Email duplicates: ${DUPLICATES}')
 
 	create_lock
 
