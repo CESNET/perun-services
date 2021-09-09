@@ -34,12 +34,12 @@ function process {
 			if `echo $OUT | grep -q "pts: User or group doesn't exist so couldn't look up id for "`; then
 				pts createuser -name "$USER_LOGIN@$AFS_DEFAULT_USERS_REALM" -cell "$AFS_CELL"
 				if [ $? -ne 0 ]; then
-					echo "Command failed: pts createuser -name $AFS_DEFAULT_USERS_REALM -cell $AFS_CELL" >&2
+					echo "Command failed: pts createuser -name \"$USER_LOGIN@$AFS_DEFAULT_USERS_REALM\" -cell \"$AFS_CELL\"" >&2
 					ERROR=1
 				fi
 			else
 				echo $OUT >&2
-				echo "Command failed: pts examine -nameorid "$USER_LOGIN@$AFS_DEFAULT_USERS_REALM" -cell "$AFS_CELL"  >/dev/null" >&2
+				echo "Command failed: pts examine -nameorid \"$USER_LOGIN@$AFS_DEFAULT_USERS_REALM\" -cell \"$AFS_CELL\"  >/dev/null" >&2
 			fi
 		fi
 
@@ -66,7 +66,7 @@ function process {
 				if [ "$OUT" = "fs: File '$DIR' doesn't exist" ]; then
 					fs mkmount -dir "$DIR" -vol "$AFS_USERS_MOUNT_POINT.$USER_LOGIN" -cell "$AFS_CELL"
 					if [ $? -ne 0 ]; then
-						echo "Command failed: fs mkmount -dir $DIR -vol $AFS_USERS_MOUNT_POINT.$USER_LOGIN -cell $AFS_CELL" >&2
+						echo "Command failed: fs mkmount -dir \"$DIR\" -vol \"$AFS_USERS_MOUNT_POINT.$USER_LOGIN\" -cell \"$AFS_CELL\"" >&2
 						ERROR=1
 					else
 						#add volume:cell to VOLUMES_TO_RELEASE if it doesn't containt then yet
@@ -86,7 +86,7 @@ function process {
 					fi
 				else
 					echo $OUT >&2
-					echo "Command failed: fs lsmount -dir "$DIR" >/dev/null" >&2
+					echo "Command failed: fs lsmount -dir \"$DIR\" >/dev/null" >&2
 				fi
 			fi
 		fi
@@ -94,7 +94,7 @@ function process {
 
 		fs sq -path "/afs/.$AFS_CELL/$AFS_USERS_MOUNT_POINT/$USER_LOGIN" -max "$USER_QUOTA"
 		if [ $? -ne 0 ]; then
-			echo "Command failed: fs sq -path /afs/.$AFS_CELL/$AFS_USERS_MOUNT_POINT/$USER_LOGIN -max $USER_QUOTA" >&2
+			echo "Command failed: fs sq -path \"/afs/.$AFS_CELL/$AFS_USERS_MOUNT_POINT/$USER_LOGIN\" -max \"$USER_QUOTA\"" >&2
 			ERROR=1
 		fi
 
