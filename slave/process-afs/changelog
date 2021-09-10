@@ -1,3 +1,9 @@
+perun-slave-process-afs (3.1.8) stable; urgency=medium
+
+  * Fixed escaping in echo of failed commands
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Fri, 10 Sep 2021 10:30:00 +0200
+
 perun-slave-process-afs (3.1.7) stable; urgency=medium
 
   * Changed architecture to all
