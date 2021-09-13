@@ -1,0 +1,8 @@
+{
+  "name": "perun-services",
+  "version": "0.0.0-development",
+  "devDependencies": {
+    "@semantic-release/github": "^7.2.3",
+    "semantic-release": "^17.4.7"
+  }
+}

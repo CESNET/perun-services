@@ -313,7 +313,7 @@ foreach my $uco (sort keys %$dataByKey) {
 			# user don't have an address - remove any existing address
 			if($DEBUG == 1) { print "DELETE ADR: $uco\n"; }
 			$deleteAdr->execute($uco);
-			$deleteAdr++;
+			$deletedAdr++;
 			handleAkt($uco, 'ADR');
 		}
 	}

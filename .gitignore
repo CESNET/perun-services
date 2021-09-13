@@ -4,9 +4,14 @@
 *.war
 *.ear
 
+# Semantic releasing related
+node_modules
+
 # Ignore slave packages
 *.deb
 *.rpm
+*.buildinfo
+*.changes
 
 # Ignore Maven target #
 
@@ -58,6 +63,8 @@ nb-configuration.xml
 # LINUX ignore #
 
 .*
+!.github
+!.releaserc.json
 !.editorconfig
 !.gitignore
 !.gitattributes
