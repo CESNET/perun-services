@@ -201,7 +201,7 @@ for my $login (@logins) {
 	}
 
 	foreach my $val (@$exchangeMailAliases) {
-		print FILE "proxyAddresses: " . $val . "\n";
+		print FILE "proxyAddresses: smtp:" . $val . "\n";
 	}
 
 	# print classes
