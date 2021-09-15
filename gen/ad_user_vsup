@@ -10,7 +10,7 @@ sub calculateExpiration;
 
 local $::SERVICE_NAME = "ad_user_vsup";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.7";
+my $SCRIPT_VERSION = "3.0.8";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -42,6 +42,8 @@ our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:e
 our $A_EXPIRATION_MANUAL;  *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
 our $A_VSUP_PREF_MAIL;  *A_VSUP_PREF_MAIL = \'urn:perun:user:attribute-def:def:vsupPreferredMail';
 our $A_VSUP_SSH_KEYS;  *A_VSUP_SSH_KEYS = \'urn:perun:user:attribute-def:def:sshPublicKey';
+our $A_VSUP_EXCHANGE_MAIL_ALIASES;  *A_VSUP_EXCHANGE_MAIL_ALIASES = \'urn:perun:user:attribute-def:def:vsupExchangeMailAliases';
+our $A_VSUP_EXCHANGE_MAIL;  *A_VSUP_EXCHANGE_MAIL = \'urn:perun:user:attribute-def:def:vsupExchangeMail';
 
 # CHECK ON FACILITY ATTRIBUTES
 if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
@@ -115,6 +117,8 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 		$users->{$login}->{$A_EXPIRATION_MANUAL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_EXPIRATION_MANUAL );
 		$users->{$login}->{$A_VSUP_PREF_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_VSUP_PREF_MAIL );
 		$users->{$login}->{$A_VSUP_SSH_KEYS} = $data->getUserAttributeValue( member => $memberId, attrName => $A_VSUP_SSH_KEYS );
+		$users->{$login}->{$A_VSUP_EXCHANGE_MAIL_ALIASES} = $data->getUserAttributeValue( member => $memberId, attrName => $A_VSUP_EXCHANGE_MAIL_ALIASES );
+		$users->{$login}->{$A_VSUP_EXCHANGE_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_VSUP_EXCHANGE_MAIL );
 
 	}
 
@@ -135,7 +139,7 @@ for my $login (@logins) {
 
 	print FILE "cn: " . $login . "\n";
 	print FILE "samAccountName: " . $login . "\n";
-	print FILE "userPrincipalName: " . $login . "\@" . $domain . "\n";
+	print FILE "userPrincipalName: " . $login . "\@umprum.cz" . "\n";
 	# enable accounts (if not) using service propagation
 	print FILE "userAccountControl: " . $uac . "\n";
 
@@ -153,6 +157,8 @@ for my $login (@logins) {
 	my $chipNumbers = $users->{$login}->{$A_CARD_CHIP_NUMBERS};
 	my $vsupPrefMail = $users->{$login}->{$A_VSUP_PREF_MAIL};
 	my $sshKeys = $users->{$login}->{$A_VSUP_SSH_KEYS};
+	my $exchangeMailAliases = $users->{$login}->{$A_VSUP_EXCHANGE_MAIL_ALIASES};
+	my $exchangeMail = $users->{$login}->{$A_VSUP_EXCHANGE_MAIL};
 
 	# print display name from firstName/lastName only
 	my $printedDisplayName = undef;
@@ -177,8 +183,10 @@ for my $login (@logins) {
 
 	if (defined $vsupPrefMail and length $vsupPrefMail) {
 		print FILE "mail: " . $vsupPrefMail . "\n";
+	} elsif (defined $exchangeMail and length $exchangeMail) {
+		print FILE "mail: " . $exchangeMail . "\n";
 	} else {
-		print FILE "mail: " . $login . "\@" . $domain . "\n";
+		print FILE "mail: " . $login . "\@vsup.cz" . "\n";
 	}
 
 	if (defined $uco and length $uco) {
@@ -207,6 +215,10 @@ for my $login (@logins) {
 
 	foreach my $val (@$sshKeys) {
 		print FILE "altSecurityIdentities: " . $val . "\n";
+	}
+
+	foreach my $val (@$exchangeMailAliases) {
+		print FILE "proxyAddresses: " . $val . "\n";
 	}
 
 	# print classes
