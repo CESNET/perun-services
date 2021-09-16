@@ -1,3 +1,9 @@
+perun-slave-full (3.1.14) stable; urgency=medium
+
+  * removed unused service openvpn
+
+ -- Johana Supikova <xsupikov@fi.muni.cz>  Thu, 16 Sep 2021 10:00:00 +0200
+
 perun-slave-full (3.1.13) stable; urgency=medium
 
   * added new service kerberos-renewal-principals

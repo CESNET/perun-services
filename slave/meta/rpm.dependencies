@@ -19,7 +19,6 @@ perun-slave-process-mailaliases
 perun-slave-process-mailman
 perun-slave-process-mailman-meta
 perun-slave-process-mailman-owners
-perun-slave-process-openvpn
 perun-slave-process-passwd
 perun-slave-process-passwd-nfs4
 perun-slave-process-passwd-scp
