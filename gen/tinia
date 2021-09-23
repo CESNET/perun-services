@@ -9,7 +9,7 @@ use utf8;
 
 local $::SERVICE_NAME = "tinia";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -66,11 +66,6 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 				$dataByChip->{$chipNumber}->{$GOLD} = $resourceGold ? 1 : 0;
 				$dataByChip->{$chipNumber}->{$ARMING} = $resourceArming ? 1 : 0;
 				$dataByChip->{$chipNumber}->{$TYPE} = $type;
-				if($isBanned eq 1) {
-					$dataByChip->{$chipNumber}->{$ACC_GROUPS}->{$resourceAccGroup . "-BAN"} = 1;
-				} else {
-					$dataByChip->{$chipNumber}->{$ACC_GROUPS}->{$resourceAccGroup} = 1;
-				}
 				$dataByChip->{$chipNumber}->{$LOGIN} = $loginMU;
 			} else {
 				if($dataByChip->{$chipNumber}->{$LOGIN} ne $loginMU) {
@@ -79,6 +74,11 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 
 				if($resourceGold) { $dataByChip->{$chipNumber}->{$GOLD} = 1; }
 				if($resourceArming) { $dataByChip->{$chipNumber}->{$ARMING} = 1; };
+			}
+
+			if($isBanned eq 1) {
+				$dataByChip->{$chipNumber}->{$ACC_GROUPS}->{$resourceAccGroup . "-BAN"} = 1;
+			} else {
 				$dataByChip->{$chipNumber}->{$ACC_GROUPS}->{$resourceAccGroup} = 1;
 			}
 		}

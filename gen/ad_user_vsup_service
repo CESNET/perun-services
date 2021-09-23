@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_user_vsup_service";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.5";
+my $SCRIPT_VERSION = "3.0.6";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -36,6 +36,7 @@ our $A_CARD_BARCODES;  *A_CARD_BARCODES = \'urn:perun:user:attribute-def:def:car
 our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:cardCodes';
 our $A_VSUP_PREF_MAIL;  *A_VSUP_PREF_MAIL = \'urn:perun:user:attribute-def:def:vsupPreferredMail';
 our $A_VSUP_SSH_KEYS;  *A_VSUP_SSH_KEYS = \'urn:perun:user:attribute-def:def:sshPublicKey';
+our $A_VSUP_EXCHANGE_MAIL_ALIASES;  *A_VSUP_EXCHANGE_MAIL_ALIASES = \'urn:perun:user:attribute-def:def:vsupExchangeMailAliases';
 
 # CHECK ON FACILITY ATTRIBUTES
 if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
@@ -106,6 +107,7 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 		$users->{$login}->{$A_CARD_CHIP_NUMBERS} = $data->getUserAttributeValue( member => $memberId, attrName => $A_CARD_CHIP_NUMBERS );
 		$users->{$login}->{$A_VSUP_PREF_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_VSUP_PREF_MAIL );
 		$users->{$login}->{$A_VSUP_SSH_KEYS} = $data->getUserAttributeValue( member => $memberId, attrName => $A_VSUP_SSH_KEYS );
+		$users->{$login}->{$A_VSUP_EXCHANGE_MAIL_ALIASES} = $data->getUserAttributeValue( member => $memberId, attrName => $A_VSUP_EXCHANGE_MAIL_ALIASES );
 
 	}
 
@@ -126,7 +128,7 @@ for my $login (@logins) {
 
 	print FILE "cn: " . $login . "\n";
 	print FILE "samAccountName: " . $login . "\n";
-	print FILE "userPrincipalName: " . $login . "\@" . $domain . "\n";
+	print FILE "userPrincipalName: " . $login . "\@umprum.cz" . "\n";
 	# enable accounts (if not) using service propagation
 	print FILE "userAccountControl: " . $uac . "\n";
 
@@ -141,6 +143,7 @@ for my $login (@logins) {
 	my $chipNumbers = $users->{$login}->{$A_CARD_CHIP_NUMBERS};
 	my $vsupPrefMail = $users->{$login}->{$A_VSUP_PREF_MAIL};
 	my $sshKeys = $users->{$login}->{$A_VSUP_SSH_KEYS};
+	my $exchangeMailAliases = $users->{$login}->{$A_VSUP_EXCHANGE_MAIL_ALIASES};
 
 	# print display name from firstName/lastName only
 	my $printedDisplayName = undef;
@@ -195,6 +198,10 @@ for my $login (@logins) {
 
 	foreach my $val (@$sshKeys) {
 		print FILE "altSecurityIdentities: " . $val . "\n";
+	}
+
+	foreach my $val (@$exchangeMailAliases) {
+		print FILE "proxyAddresses: smtp:" . $val . "\n";
 	}
 
 	# print classes
