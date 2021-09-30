@@ -37,6 +37,7 @@ our $A_CARD_CHIP_NUMBERS;  *A_CARD_CHIP_NUMBERS = \'urn:perun:user:attribute-def
 our $A_VSUP_PREF_MAIL;  *A_VSUP_PREF_MAIL = \'urn:perun:user:attribute-def:def:vsupPreferredMail';
 our $A_VSUP_SSH_KEYS;  *A_VSUP_SSH_KEYS = \'urn:perun:user:attribute-def:def:sshPublicKey';
 our $A_VSUP_EXCHANGE_MAIL_ALIASES;  *A_VSUP_EXCHANGE_MAIL_ALIASES = \'urn:perun:user:attribute-def:def:vsupExchangeMailAliases';
+our $A_AD_DISPLAY_NAME;  *A_AD_DISPLAY_NAME = \'urn:perun:user:attribute-def:def:adDisplayName';
 
 # CHECK ON FACILITY ATTRIBUTES
 if (!defined($data->getFacilityAttributeValue( attrName => $A_F_BASE_DN ))) {
@@ -99,6 +100,7 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 		# store standard attrs
 		$users->{$login}->{$A_FIRST_NAME} = $artisticFirstName || $firstName;
 		$users->{$login}->{$A_LAST_NAME} = $artisticLastName || $lastName;
+		$users->{$login}->{$A_AD_DISPLAY_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_AD_DISPLAY_NAME );
 		$users->{$login}->{$A_UCO} = $data->getUserAttributeValue( member => $memberId, attrName => $A_UCO );
 		$users->{$login}->{$A_TITLE_BEFORE} = $data->getUserAttributeValue( member => $memberId, attrName => $A_TITLE_BEFORE );
 		$users->{$login}->{$A_TITLE_AFTER} = $data->getUserAttributeValue( member => $memberId, attrName => $A_TITLE_AFTER );
@@ -135,6 +137,7 @@ for my $login (@logins) {
 	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
 	my $sn = $users->{$login}->{$A_LAST_NAME};
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
+	my $adDisplayName = $users->{$login}->{$A_AD_DISPLAY_NAME};
 	my $uco = $users->{$login}->{$A_UCO};
 	my $titleBefore = $users->{$login}->{$A_TITLE_BEFORE};
 	my $titleAfter = $users->{$login}->{$A_TITLE_AFTER};
@@ -153,6 +156,10 @@ for my $login (@logins) {
 		$printedDisplayName = $givenName;
 	} elsif (!(defined $givenName and length $givenName) and defined $sn and length $sn) {
 		$printedDisplayName = $sn;
+	}
+	# prefer manually set display name for service accounts if present
+	if (defined $adDisplayName and length $adDisplayName) {
+		$printedDisplayName = $adDisplayName;
 	}
 	if (defined $printedDisplayName and length $printedDisplayName) {
 		print FILE "displayName: " . $printedDisplayName . "\n";
