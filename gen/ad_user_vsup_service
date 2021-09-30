@@ -200,6 +200,10 @@ for my $login (@logins) {
 		print FILE "altSecurityIdentities: " . $val . "\n";
 	}
 
+	# preferred mail must be in proxyAddresses as primary mail for service users
+	if (defined $vsupPrefMail and length $vsupPrefMail) {
+		print FILE "proxyAddresses: SMTP:" . $vsupPrefMail . "\n";
+	}
 	foreach my $val (@$exchangeMailAliases) {
 		print FILE "proxyAddresses: smtp:" . $val . "\n";
 	}
