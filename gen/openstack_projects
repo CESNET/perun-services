@@ -1,0 +1,129 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use JSON::XS;
+
+our $SERVICE_NAME = "openstack_projects";
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+our $A_FACILITY_PROJECT_NAMESPACE; *A_FACILITY_PROJECT_NAMESPACE = \'urn:perun:facility:attribute-def:def:projectNamespace';
+our $A_USER_MAIL;                  *A_USER_MAIL =                  \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_FACILITY_LOGIN;        *A_USER_FACILITY_LOGIN =        \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_USER_OPTIONAL_LOGIN;        *A_USER_OPTIONAL_LOGIN =        \'urn:perun:user:attribute-def:virt:optionalLogin-namespace:mu';
+our $A_RESOURCE_NAME;              *A_RESOURCE_NAME =              \'urn:perun:resource:attribute-def:core:name';
+our $A_MEMBER_EXPIRATION;          *A_MEMBER_EXPIRATION =          \'urn:perun:member:attribute-def:def:membershipExpiration';
+our $A_MEMBER_STATUS;              *A_MEMBER_STATUS =              \'urn:perun:member:attribute-def:core:status';
+
+our $STATUS_VALID;                 *STATUS_VALID =                 \'VALID';
+
+our $members = {};
+
+my $instance = $data->getFacilityAttributeValue(attrName => $A_FACILITY_PROJECT_NAMESPACE);
+my $projectPrefix = lc $instance . "_";
+
+foreach my $resourceId ($data->getResourceIds()) {
+
+	my $resourceName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_NAME);
+	my $projectName = $resourceName;
+
+	my $hasAccess = 0;
+	if ($resourceName =~ /-access$/) {
+		$hasAccess = 1;
+		$projectName = $projectPrefix . substr $resourceName, 0, length($resourceName) - 7;
+	}
+
+	my $isManager = 0;
+	if ($resourceName =~ /-managers$/) {
+		$isManager = 1;
+		$projectName = $projectPrefix . substr $resourceName, 0, length($resourceName) - 9;
+	}
+
+	my $isPersonalProject = 0;
+	if ($resourceName =~ /-personalProjects$/) {
+		$isPersonalProject = 1;
+	}
+
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		my $identifier = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_USER_FACILITY_LOGIN);
+		$identifier = $identifier . "\@muni.cz" if $projectPrefix eq "mu_";
+
+		if($members->{$identifier}) {
+			if ($hasAccess) {
+				push @{$members->{$identifier}->{'projects_access'}}, $projectName;
+			}
+			if ($isManager) {
+				push @{$members->{$identifier}->{'projects_managers'}}, $projectName;
+			}
+			if ($isPersonalProject) {
+				my $status = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_STATUS);
+				if($status eq $STATUS_VALID) {
+					$members->{$identifier}->{'personal_project'} = JSON::XS::true;
+					my $memberExpiration = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_EXPIRATION);
+					if (!$memberExpiration) {
+						$memberExpiration = "";
+					}
+					$members->{$identifier}->{'expiration'} = $memberExpiration;
+				}
+			}
+		} else {
+			my @additionalIdentifier = ();
+			my $muLogin = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_OPTIONAL_LOGIN);
+			if ($muLogin) {
+				push @additionalIdentifier, $muLogin . "\@muni.cz";
+			}
+
+			my $mail = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_MAIL);
+
+			my @projects_access = ();
+			if ($hasAccess) {
+				push @projects_access, $projectName;
+			}
+			my @projects_managers = ();
+			if ($isManager) {
+				push @projects_managers, $projectName;
+			}
+
+			my $member = {
+				identifier => $identifier,
+				additional_identifier => \@additionalIdentifier,
+				mail => $mail,
+				projects_access => \@projects_access,
+				projects_managers => \@projects_managers
+			};
+
+			my $status = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_STATUS);
+			if ($isPersonalProject && $status eq $STATUS_VALID) {
+				$member->{'personal_project'} = JSON::XS::true;
+				my $memberExpiration = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_EXPIRATION);
+				if(!$memberExpiration) {
+					$memberExpiration = "";
+				}
+				$member->{'expiration'} = $memberExpiration;
+			} else {
+				$member->{'personal_project'} = JSON::XS::false;
+			}
+
+			$members->{$identifier} = $member;
+		}
+	}
+}
+
+my @values = values(%$members);
+my $fileData = {
+	instance => $instance,
+	access   => \@values
+};
+my $file = $DIRECTORY . "access.json";
+open FILE_USERS, ">$file" or die "Cannot open $file: $! \n";
+print FILE_USERS JSON::XS->new->utf8->pretty->canonical->encode($fileData), "\n";
+close(FILE_USERS) or die "Cannot close $file: $! \n";
+
+perunServicesInit::finalize;

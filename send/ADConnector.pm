@@ -577,6 +577,7 @@ sub add_members_to_entry($$$$) {
 				ldap_log($service_name, "Group members added: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
 			} else {
 				ldap_log($service_name, "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
+				print STDERR "Group members NOT added: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_);
 				$return_code = $FAIL;
 			}
 		}
@@ -611,6 +612,7 @@ sub remove_members_from_entry($$$$) {
 				ldap_log($service_name, "Group members removed: " . $ad_entry->dn() . " | \n" . join(",\n", @$_));
 			} else {
 				ldap_log($service_name, "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_));
+				print STDERR "Group members NOT removed: " . $ad_entry->dn() . " | " . $response->error() . " | \n" . join(",\n", @$_);
 				$return_code = $FAIL;
 			}
 		}

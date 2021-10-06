@@ -217,6 +217,10 @@ for my $login (@logins) {
 		print FILE "altSecurityIdentities: " . $val . "\n";
 	}
 
+	# primary mail must be in proxyAddresses for normal users
+	if (defined $exchangeMail and length $exchangeMail) {
+		print FILE "proxyAddresses: SMTP:" . $exchangeMail . "\n";
+	}
 	foreach my $val (@$exchangeMailAliases) {
 		print FILE "proxyAddresses: smtp:" . $val . "\n";
 	}
