@@ -32,21 +32,24 @@ function process {
 		#set home dir of user as current working directory
 		catch_error E_DIR_NOT_EXISTS cd "${HOME_DIR}"
 
-		#is there anything new to be added?
-		ADDED_PRINCIPALS=""
-		for PRINCIPAL in ${PRINCIPALS}; do
-			grep "^${PRINCIPAL}\\s*\$" "${K5LOGIN}" > /dev/null
-			if [ "$?" -eq 1 ]; then
-				ADDED_PRINCIPALS="${PRINCIPAL}"
-				break
-			fi
-		done
+		# if k5login file exists
+		if [[ -f ${K5LOGIN} ]]; then
+			#is there anything new to be added?
+			ADDED_PRINCIPALS=""
+			for PRINCIPAL in ${PRINCIPALS}; do
+				grep "^${PRINCIPAL}\\s*\$" "${K5LOGIN}" > /dev/null
+				if [ "$?" -eq 1 ]; then
+					ADDED_PRINCIPALS="${PRINCIPAL}"
+					break
+				fi
+			done
 
-		#if nothing to add, can skip to another user
-		if [ -z "${ADDED_PRINCIPALS}" ]; then
-			#skip this log, not important information for administrators
-			#log_msg I_K5LOGIN_NOT_UPDATED
-			continue
+			#if nothing to add, can skip to another user
+			if [ -z "${ADDED_PRINCIPALS}" ]; then
+				#skip this log, not important information for administrators
+				#log_msg I_K5LOGIN_NOT_UPDATED
+				continue
+			fi
 		fi
 
 		#prepare empty temporary file
