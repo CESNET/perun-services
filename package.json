@@ -2,7 +2,7 @@
   "name": "perun-services",
   "version": "0.0.0-development",
   "devDependencies": {
-    "@semantic-release/github": "^7.2.3",
-    "semantic-release": "^17.4.7"
+    "@semantic-release/github": "^8.0.1",
+    "semantic-release": "^18.0.0"
   }
 }
