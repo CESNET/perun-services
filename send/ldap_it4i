@@ -1,0 +1,165 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+use Net::LDAPS;
+use Net::LDAP::Entry;
+use Net::LDAP::Message;
+use Net::LDAP::LDIF;
+use ScriptLock;
+use ADConnector;
+
+sub process_update;
+sub process_archive;
+
+# Constants and counters
+my $counter_add = 0;
+my $counter_update = 0;
+my $counter_archive = 0;
+my $counter_fail = 0;
+
+# Define service
+my $service_name = "ldap_it4i";
+
+# GEN folder location
+my $facility_name = $ARGV[0];
+chomp($facility_name);
+my $service_files_base_dir="../gen/spool";
+my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+my $service_file = "$service_files_dir/$service_name.ldif";
+
+# BASE DN
+open my $file, '<', "$service_files_dir/baseDN";
+my $base_dn = <$file>;
+chomp($base_dn);
+close $file;
+
+# propagation destination
+my $namespace = $ARGV[1];
+chomp($namespace);
+
+# create service lock
+my $lock = ScriptLock->new($facility_name . "_" . $service_name . "_" . $namespace);
+($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# init configuration
+my @conf = init_config($namespace);
+# we cannot use a function to resolve PDC from DNS since the LDAP instance is not an AD, therefore, we use the raw value
+my $ldap_location = $conf[0];
+my $ldap = Net::LDAPS->new( "$ldap_location" , onerror => 'warn' , timeout => 15, ciphers => 'AES256-GCM-SHA384' );
+my $filter = '(objectClass=person)';
+
+# connect
+ldap_bind($ldap, $conf[1], $conf[2]);
+
+# load all data
+my @users = load_perun($service_file);
+my @previousUsers = load_ad($ldap, $base_dn, $filter, ['uid','givenName','sn','cn','displayName','mail','status','sshPublicKey']);
+
+my %previousUsersMap = ();
+foreach my $previousUser (@previousUsers) {
+	my $login = $previousUser->get_value('uid');
+	$previousUsersMap{ $login } = $previousUser;
+}
+
+my %usersMap = ();
+foreach my $user (@users) {
+	my $login = $user->get_value('uid');
+	$usersMap{ $login } = $user;
+}
+
+# process data
+process_update();
+process_archive();
+
+# disconnect
+ldap_unbind($ldap);
+
+# log results
+ldap_log($service_name, "Added: " . $counter_add . " entries.");
+ldap_log($service_name, "Updated: " . $counter_update. " entries.");
+ldap_log($service_name, "Archived: " . $counter_archive. " entries.");
+ldap_log($service_name, "Failed: " . $counter_fail. " entries.");
+
+$lock->unlock();
+
+if ($counter_fail > 0) { die "Failed to process: " . $counter_fail . " entries.\nSee log at: ~/perun-engine/send/logs/$service_name.log";}
+
+# private methods
+sub process_update() {
+
+	foreach my $user (@users) {
+
+		if (exists $previousUsersMap{$user->get_value('uid')}) {
+
+			my $previousUser = $previousUsersMap{$user->get_value('uid')};
+
+			my @attrs = ('givenName','sn','cn','displayName','mail','status','sshPublicKey');
+
+			# stored log messages to check if entry should be updated
+			my @entry_changed = ();
+
+			# check each attribute
+			foreach my $attr (@attrs) {
+				if (compare_entry( $previousUser, $user, $attr ) == 1) {
+					my $entry = $previousUser->get_value($attr);
+					my $perun_entry = $user->get_value($attr);
+
+					push(@entry_changed,
+						"$attr | " . join(", ", $entry) . " => " . join(", ", $perun_entry));
+					# replace value
+					$previousUser->replace(
+						$attr => \$perun_entry
+					);
+				}
+			}
+
+			if (@entry_changed) {
+				# Update entry in AD
+				my $response = $previousUser->update($ldap);
+				unless ($response->is_error()) {
+					# SUCCESS
+					ldap_log($service_name, "Updated: " . $previousUser->dn());
+					$counter_update++;
+				} else {
+					# FAIL
+					ldap_log($service_name, "NOT updated: " . $previousUser->dn() . " | " . $response->error());
+					ldap_log($service_name, $previousUser->ldif());
+					$counter_fail++;
+				}
+			}
+		} else {
+			my $response = $user->update($ldap);
+			unless ($response->is_error()) {
+				# SUCCESS
+				ldap_log($service_name, "Added: " . $user->dn());
+				$counter_add++;
+			} else {
+				# FAIL
+				ldap_log($service_name, "NOT added: " . $user->dn() . " | " . $response->error());
+				ldap_log($service_name, $user->ldif());
+				$counter_fail++;
+			}
+		}
+	}
+}
+
+sub process_archive() {
+
+	foreach my $previousUser (@previousUsers) {
+		unless (exists $usersMap{$previousUser->get_value('uid')}) {
+			$previousUser->replace(
+				'status' => 'ARCHIVED'
+			);
+			my $response = $previousUser->update($ldap);
+			unless ($response->is_error()) {
+				ldap_log($service_name, "Archived: " . $previousUser->dn());
+				$counter_archive++;
+			} else {
+				ldap_log($service_name, "NOT archived: " . $previousUser->dn() . " | " . $response->error());
+				ldap_log($service_name, $previousUser->ldif());
+				$counter_fail++;
+			}
+		}
+	}
+}
