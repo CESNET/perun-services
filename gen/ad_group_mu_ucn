@@ -52,6 +52,9 @@ my $defaultDescription = "no-desc in Perun";
 # Default representation of resource in Active Directory
 my $defaultRepresentation = "group";
 
+# check uniquness of group names on the same level of tree structure
+our $uniqueNamesOfGroupsInTreeStructure = {};
+
 # CHECK ON FACILITY ATTRIBUTES
 if (!defined($data->getFacilityAttributeValue( attrName => $A_F_GROUP_BASE_DN ))) {
 	exit 1;
@@ -144,6 +147,13 @@ sub processTree {
 	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
 		writeDebug("Process Tree Group: $groupId", 1);
 		my $group = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_GROUP_NAME_COMPUTED);
+
+		#check if the name is unique through all resources
+		if ($uniqueNamesOfGroupsInTreeStructure->{$group}) {
+			die "Duplicity of group names in tree structure has been found for name '$group'!\n";
+		}
+		$uniqueNamesOfGroupsInTreeStructure->{$group} = 1;
+
 		my $description = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_DESCRIPTION );
 		my $adOuName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_ADOUNAME );
 
