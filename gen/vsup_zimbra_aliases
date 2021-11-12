@@ -1,0 +1,25 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use Perun::Agent;
+use perunServicesInit;
+use perunServicesUtils;
+
+local $::SERVICE_NAME = "vsup_zimbra_aliases";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+
+my $agent = Perun::Agent->new();
+my $servicesAgent = $agent->getServicesAgent;
+
+#
+# Zimbra ALIASES are now managed by "vsup_zimbra" service, hence on attribute change we just plan service propagation for it.
+# We expect it's on the same facility.
+
+my $service = $servicesAgent->getServiceByName(name => 'vsup_zimbra');
+$servicesAgent->planServicePropagation(service => $service->getId, facility => perunServicesInit->getFacility->getId);
+
+perunServicesInit::finalize;
