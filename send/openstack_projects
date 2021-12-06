@@ -1,4 +1,43 @@
 #!/bin/bash
 SERVICE_NAME="openstack_projects"
 
-. generic_send
+TIMEOUT="5400" #90s * 60 sec = 1.5h
+TIMEOUT_KILL="60" # 60 sec to kill after timeout
+
+FACILITY_NAME=$1
+DESTINATION=$2
+DESTINATION_TYPE=$3
+
+SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
+FILE_NAME="access.json"
+
+FILE="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME/$FILE_NAME"
+
+
+# Destination type has to be 'url'
+if [ "$DESTINATION_TYPE" != "url" ]; then
+	echo "Unknown destination type '$DESTINATION_TYPE' (url type required)." >&2
+	exit 1;
+fi
+
+# Read user name and password from configuration if it is present ( expect string "-u user:pass" )
+[ -r /etc/perun/services/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME
+
+# Specify command to transfer the data
+TRANSPORT_COMMAND="curl -Ss -i -H Content-Type:application/json -f -X POST -d @- $DESTINATION"
+
+# HTTP Request with timeout for USERS
+cat "$FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
+# Catch errors
+ERR_CODE=$?
+#Error code 124 means - timed out
+if [ $ERR_CODE -eq 124 ]; then
+	echo "Communication with the peer has timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
+else
+	if [ $ERR_CODE -ne 0 ]; then
+    echo "Communication with the peer ends with return code: $ERR_CODE" >&2
+  fi
+fi
+
+exit $ERR_CODE
+ 
