@@ -1,3 +1,9 @@
+perun-slave-process-ldap-vsb-vi (3.1.6) stable; urgency=low
+
+  * Fixed package priority from 'extra' to 'optional'.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Thu, 18 Aug 2022 09:00:00 +0200
+
 perun-slave-process-ldap-vsb-vi (3.1.5) stable; urgency=medium
 
   * Changed architecture to all

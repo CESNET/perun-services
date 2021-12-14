@@ -1,3 +1,9 @@
+perun-slave-base (3.1.18) stable; urgency=low
+
+  * Fixed package priority from 'extra' to 'optional'.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Thu, 19 Jan 2023 08:30:00 +0100
+
 perun-slave-base (3.1.17) stable; urgency=low
 
   * Added function log_warn_to_err_exit() that prints message to
