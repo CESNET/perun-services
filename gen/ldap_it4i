@@ -1,0 +1,124 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+
+our $SERVICE_NAME = "ldap_it4i";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
+my $baseDnFileName = "$DIRECTORY/baseDN";
+
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+# constants
+our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDN';
+our $A_USER_LOGIN_EINFRA; *A_USER_LOGIN_EINFRA = \'urn:perun:user:attribute-def:def:login-namespace:einfra';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
+our $A_USER_PREFERRED_MAIL;  *A_USER_PREFERRED_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_SSHKEYS;  *A_SSHKEYS = \'urn:perun:user:attribute-def:def:sshPublicKey';
+our $A_MEMBER_STATUS;  *A_MEMBER_STATUS =  \'urn:perun:member:attribute-def:core:status';
+
+our $STATUS_VALID;      *STATUS_VALID =        \'VALID';
+our $STATUS_EXPIRED;    *STATUS_EXPIRED =      \'EXPIRED';
+our $STATUS_DISABLED;   *STATUS_DISABLED =     \'DISABLED';
+
+# check facility attribute
+my $ldapBaseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+if (!defined($ldapBaseDN)) {
+	exit 1;
+}
+
+# gather user data
+my $users;
+
+foreach my $resourceId ( $data->getResourceIds() ) {
+	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId )) {
+
+		my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_EINFRA );
+		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
+		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
+		$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME );
+		$users->{$login}->{$A_USER_PREFERRED_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_PREFERRED_MAIL );
+		$users->{$login}->{$A_SSHKEYS} = $data->getUserAttributeValue( member => $memberId, attrName => $A_SSHKEYS );
+
+		my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+		if ($status eq $STATUS_VALID) {
+			$status = 'ACTIVE';
+		} elsif ($status eq $STATUS_EXPIRED) {
+			$status = 'INACTIVE';
+		} elsif ($status eq $STATUS_DISABLED) {
+			$status = 'ARCHIVED';
+		}
+		$users->{$login}->{$A_MEMBER_STATUS} = $status;
+	}
+}
+
+# print BASE_DN file
+open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
+print FILE $ldapBaseDN;
+close(FILE);
+
+# print user data LDIF
+open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
+
+for my $login (sort keys %$users) {
+
+	my $givenName = $users->{$login}->{$A_FIRST_NAME};
+	my $sn = $users->{$login}->{$A_LAST_NAME};
+
+	print FILE "dn: uid=" . $login . "," . $ldapBaseDN . "\n";
+	print FILE "uid: " . $login . "\n";
+
+	if (defined $givenName and length $givenName) {
+		print FILE "givenName: " . $givenName . "\n";
+	}
+
+	if (defined $sn and length $sn) {
+		print FILE "sn: " . $sn . "\n";
+	}
+
+	if (defined $sn and length $sn and defined $givenName and length $givenName) {
+		print FILE "cn: " . $givenName . " " . $sn . "\n";
+	} elsif (defined $sn and length $sn) {
+		print FILE "cn: " . $sn . "\n";
+	} elsif (defined $givenName and length $givenName) {
+		print FILE "cn: " . $givenName . "\n";
+	} else {
+		print FILE "cn: N/A\n";
+	}
+
+	print FILE "displayName: " . $users->{$login}->{$A_DISPLAY_NAME} . "\n";
+	print FILE "mail: " . $users->{$login}->{$A_USER_PREFERRED_MAIL} . "\n";
+	print FILE "userPassword: {SASL}" . $login . '@EINFRA' . "\n";
+	print FILE "status: " . $users->{$login}->{$A_MEMBER_STATUS} . "\n";
+
+	my $sshKeys = $users->{$login}->{$A_SSHKEYS};
+	if (defined $sshKeys and length $sshKeys) {
+		foreach my $sshKey (sort @$sshKeys) {
+			print FILE "sshPublicKey: " . $sshKey . "\n";
+		}
+	}
+
+	# print classes
+	print FILE "objectclass: top\n";
+	print FILE "objectclass: person\n";
+	print FILE "objectclass: einfraPerson\n";
+	print FILE "objectclass: inetOrgPerson\n";
+	print FILE "objectclass: ldapPublicKey\n";
+
+	# there must be empty line after each entry
+	print FILE "\n";
+
+}
+
+close FILE;
+
+perunServicesInit::finalize;
