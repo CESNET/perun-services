@@ -1,5 +1,5 @@
 perun-slave-process-vmware-ldap (1.0.0) stable; urgency=low
 
- * New service for provisioning of LDAP for VMware.
+  * New service for provisioning of LDAP for VMware.
 
  -- Pavel Zlamal <zlamal@cesnet.cz>  Tue, 14 Dec 2021 10:40:00 +0100
