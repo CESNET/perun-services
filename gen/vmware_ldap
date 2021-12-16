@@ -1,0 +1,203 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Text::Unidecode;
+
+local $::SERVICE_NAME = "vmware_ldap";
+local $::PROTOCOL_VERSION = "1.0.0";
+my $SCRIPT_VERSION = "1.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName_users = "$DIRECTORY/$::SERVICE_NAME"."_users".".ldif";
+my $fileName_groups = "$DIRECTORY/$::SERVICE_NAME"."_groups".".ldif";
+
+my $baseDnFileName = "$DIRECTORY/baseDN";
+
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDN';
+our $A_R_VO_SHORT_NAME;  *A_R_VO_SHORT_NAME = \'urn:perun:resource:attribute-def:virt:voShortName';
+our $A_R_NAME;  *A_R_NAME = \'urn:perun:resource:attribute-def:core:name';
+
+# User attributes
+our $A_USER_LOGIN; *A_USER_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:einfra';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+
+# CHECK ON FACILITY ATTRIBUTES
+my $ldapBaseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+if (!defined($ldapBaseDN)) {
+	exit 1;
+}
+
+# GATHER USERS
+my $users;  # $users->{$login}->{ATTR} = $attrValue;
+my $usersVos; # $users->{$login}->{$voShortName} = 1;
+# GATHER VOS and RESOURCES
+my $allVosAndResources; #  $allVosAndResources->{$voShortName}->{$resourceName} = 1;
+# GATHER USERS FROM RESOURCES
+my $usersByResource;  # $usersByResource->{$resourceName}->{$login}->{ATTR} = $attrValue;
+
+# FOR EACH RESOURCE
+foreach my $resourceId ( $data->getResourceIds() ) {
+
+	my $voShortName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_VO_SHORT_NAME );
+	my $resourceName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_NAME );
+
+	# Fill all VOs reference
+	$allVosAndResources->{$voShortName}->{$resourceName} = 1;
+
+	# FOR EACH MEMBER ON RESOURCE
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+
+		my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
+		my $firstName = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
+		my $lastName = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
+		my $mail = $data->getUserAttributeValue( member => $memberId, attrName => $A_MAIL );
+
+		# Store users in Resources structure
+		$usersByResource->{$resourceName}->{$login}->{$A_FIRST_NAME} = $firstName;
+		$usersByResource->{$resourceName}->{$login}->{$A_LAST_NAME} = $lastName;
+		if (defined $mail and length $mail) {
+			$usersByResource->{$resourceName}->{$login}->{$A_MAIL} = $mail;
+		}
+
+		# Store same user in flat structure
+		$users->{$login}->{$A_FIRST_NAME} = $firstName;
+		$users->{$login}->{$A_LAST_NAME} = $lastName;
+		$users->{$login}->{$A_MAIL} = $mail;
+
+		# Store VOS for member
+		$usersVos->{$login}->{$voShortName} = 1;
+
+	}
+
+}
+
+#
+# PRINT BASE_DN FILE
+#
+open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
+print FILE $ldapBaseDN;
+close(FILE);
+
+#
+# PRINT LDIF FILE
+#
+open FILE,">:encoding(UTF-8)","$fileName_users" or die "Cannot open $fileName_users: $! \n";
+
+# print base entry
+
+print FILE "dn: ou=perun,ou=users," . $ldapBaseDN . "\n";
+print FILE "ou: perun\n";
+print FILE "objectClass: top\n";
+print FILE "objectClass: organizationalUnit\n";
+print FILE "\n";
+
+# FLAT structure is stored in ou=perun,ou=users + base DN
+for my $login (sort keys %$users) {
+
+	print FILE "dn: cn=" . $login . ",ou=perun,ou=users," . $ldapBaseDN . "\n";
+	print FILE "cn: " . $login . "\n";
+	print FILE "uid: " . $login . "\n";
+
+	my $givenName = $users->{$login}->{$A_FIRST_NAME};
+	if (defined $givenName and length $givenName) {
+		print FILE "givenname: " . $givenName . "\n";
+	}
+	my $sn = $users->{$login}->{$A_LAST_NAME};
+	if (defined $givenName and length $givenName) {
+		print FILE "sn: " . $users->{$login}->{$A_LAST_NAME} . "\n";
+	}
+
+	my $mail = $users->{$login}->{$A_MAIL};
+	if (defined $mail and length $mail) {
+		print FILE "mail: " . $mail . "\n";
+	}
+
+	print FILE "userpassword: {SASL}" . $login . '@EINFRA' . "\n";
+
+	# print VO membership information
+	my @vos = keys %{$usersVos->{$login}};
+	for my $vo (@vos) {
+		print FILE "ou: " . $vo . "\n";
+	}
+
+	# print classes
+	print FILE "objectclass: top\n";
+	print FILE "objectclass: inetOrgPerson\n";
+
+	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
+	print FILE "\n";
+
+}
+
+close(FILE);
+
+#
+# PRINT LDIF FILE
+#
+open FILE,">:encoding(UTF-8)","$fileName_groups" or die "Cannot open $fileName_groups: $! \n";
+
+# print base entry
+
+print FILE "dn: ou=perun,ou=groups," . $ldapBaseDN . "\n";
+print FILE "ou: perun\n";
+print FILE "objectClass: top\n";
+print FILE "objectClass: organizationalUnit\n";
+print FILE "\n";
+
+# Print VOs entries like "ou=voShortName,ou=perun,ou=groups + baseDN"
+# Then Print also Resources inside VOs like: "cn=resourceName,ou=voShortName,ou=groups + baseDN" and their uniqueMembers
+
+# PRINT ALL VOS
+my @vos = sort keys %{$allVosAndResources};
+for my $vo (@vos) {
+
+	# PRINT VO
+	print FILE "dn: ou=" . $vo . ",ou=perun,ou=groups," . $ldapBaseDN . "\n";
+	print FILE "ou: " . $vo . "\n";
+	print FILE "objectclass: top\n";
+	print FILE "objectclass: organizationalUnit\n";
+
+	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
+	print FILE "\n";
+
+	# PRINT ALL RESOURCES
+	my @resources = sort keys %{$allVosAndResources->{$vo}};
+	for my $resource (@resources) {
+
+		my @usrs = sort keys %{$usersByResource->{$resource}};
+
+		# skip printing resource and it's users, if there are no users
+		unless (@usrs) {
+			next;
+		}
+
+		# PRINT RESOURCE
+		print FILE "dn: cn=" . $resource . ",ou=" . $vo . ",ou=perun,ou=groups," . $ldapBaseDN . "\n";
+		print FILE "cn: " . $resource . "\n";
+		print FILE "ou: " . $vo . "\n";
+		print FILE "objectclass: top\n";
+		print FILE "objectclass: groupOfUniqueNames\n";
+
+		# PRINT ALL USERS FROM RESOURCE
+		for my $u (@usrs) {
+			print FILE "uniquemember: cn=" . $u . ",ou=perun,ou=users," . $ldapBaseDN . "\n";
+		}
+
+		# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
+		print FILE "\n";
+
+	}
+
+}
+
+close(FILE);
+
+perunServicesInit::finalize;

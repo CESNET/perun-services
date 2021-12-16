@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="vmware_ldap"
+
+. generic_send
