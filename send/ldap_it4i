@@ -54,7 +54,7 @@ ldap_bind($ldap, $conf[1], $conf[2]);
 
 # load all data
 my @users = load_perun($service_file);
-my @previousUsers = load_ad($ldap, $base_dn, $filter, ['uid','givenName','sn','cn','displayName','mail','status','sshPublicKey']);
+my @previousUsers = load_ad($ldap, $base_dn, $filter, ['uid','givenName','sn','cn','displayName','mail','status','sshPublicKey','userPassword']);
 
 my %previousUsersMap = ();
 foreach my $previousUser (@previousUsers) {
@@ -94,7 +94,7 @@ sub process_update() {
 
 			my $previousUser = $previousUsersMap{$user->get_value('uid')};
 
-			my @attrs = ('givenName','sn','cn','displayName','mail','status','sshPublicKey');
+			my @attrs = ('givenName','sn','cn','displayName','mail','status','sshPublicKey','userPassword');
 
 			# stored log messages to check if entry should be updated
 			my @entry_changed = ();
@@ -102,14 +102,14 @@ sub process_update() {
 			# check each attribute
 			foreach my $attr (@attrs) {
 				if (compare_entry( $previousUser, $user, $attr ) == 1) {
-					my $entry = $previousUser->get_value($attr);
-					my $perun_entry = $user->get_value($attr);
+					my @entry = $previousUser->get_value($attr);
+					my @perun_entry = $user->get_value($attr);
 
 					push(@entry_changed,
-						"$attr | " . join(", ", $entry) . " => " . join(", ", $perun_entry));
+						"$attr | " . join(", ", @entry) . " => " . join(", ", @perun_entry));
 					# replace value
 					$previousUser->replace(
-						$attr => \$perun_entry
+						$attr => \@perun_entry
 					);
 				}
 			}
