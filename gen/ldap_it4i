@@ -27,6 +27,11 @@ our $A_MEMBER_STATUS;  *A_MEMBER_STATUS =  \'urn:perun:member:attribute-def:core
 our $A_USER_PREFERRED_MAIL;  *A_USER_PREFERRED_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_MEMBER_MAIL;  *A_MEMBER_MAIL =  \'urn:perun:member:attribute-def:def:mail';
 
+# IT4I specific logic
+our $A_BLOCK_COLLISION;  *A_BLOCK_COLLISION =  \'urn:perun:user:attribute-def:def:it4iBlockCollision';
+our $A_IMPORT_STATUS;    *A_IMPORT_STATUS =    \'urn:perun:user:attribute-def:def:it4iImportStatus';
+our $A_PWD_TIMESTAMP;    *A_PWD_TIMESTAMP =    \'urn:perun:user:attribute-def:def:lastPwdChangeTimestamp:einfra';
+
 our $STATUS_VALID;      *STATUS_VALID =        \'VALID';
 our $STATUS_EXPIRED;    *STATUS_EXPIRED =      \'EXPIRED';
 our $STATUS_DISABLED;   *STATUS_DISABLED =     \'DISABLED';
@@ -44,6 +49,32 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId )) {
 
 		my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_EINFRA );
+
+		my $collision = $data->getUserAttributeValue( member => $memberId, attrName => $A_BLOCK_COLLISION );
+		my $importStatus = $data->getUserAttributeValue( member => $memberId, attrName => $A_IMPORT_STATUS );
+		my $pwdTimestamp = $data->getUserAttributeValue( member => $memberId, attrName => $A_PWD_TIMESTAMP );
+
+		# Check if user is not prohibited in IT4I !!
+		if ($collision) {
+			die "Login '$login' has collision with old IT4I data. Propagations was stopped for safety."
+		}
+
+		unless (defined $importStatus) {
+			# User was not originally imported from IT4I -> must have login and valid password
+			$users->{$login}->{'PASSWORD'} = 1;
+		} else {
+			# user was imported from IT4I
+			if ($importStatus eq 'assignToSameLogin') {
+				# imported users merged to existing account have valid password
+				$users->{$login}->{'PASSWORD'} = 1;
+			} else {
+				if ($pwdTimestamp) {
+					# imported user with new login already set own password
+					$users->{$login}->{'PASSWORD'} = 1;
+				}
+			}
+		}
+
 		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
 		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
 		$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME );
@@ -98,7 +129,9 @@ for my $login (sort keys %$users) {
 
 	print FILE "displayName: " . $users->{$login}->{$A_DISPLAY_NAME} . "\n";
 	print FILE "mail: " . $users->{$login}->{$A_MEMBER_MAIL} . "\n";
-	print FILE "userPassword: {SASL}" . $login . '@EINFRA' . "\n";
+	if ($users->{$login}->{'PASSWORD'}) {
+		print FILE "userPassword: {SASL}" . $login . '@EINFRA' . "\n";
+	}
 	print FILE "status: " . $users->{$login}->{$A_MEMBER_STATUS} . "\n";
 
 	my $sshKeys = $users->{$login}->{$A_SSHKEYS};
