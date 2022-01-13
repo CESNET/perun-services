@@ -5,6 +5,8 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
+use MIME::Base64;
+use Encode;
 no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 local $::SERVICE_NAME = "ad_group_mu_ucn";
@@ -101,7 +103,7 @@ for my $group (sort keys %$groups) {
 	print FILE "dn: CN=" . $group . "," . $groups->{$group}->{$A_R_ADOUNAME} . "\n";
 	print FILE "cn: " . $group . "\n";
 	print FILE "samAccountName: " . $group . "\n";
-	print FILE "description: " . $groups->{$group}->{"description"} . "\n";
+	print FILE "description:: " . encode_base64($groups->{$group}->{"description"}) . "\n";
 	print FILE "info: perun\@muni.cz\n";
 	print FILE "objectClass: group\n";
 	print FILE "objectClass: top\n";
