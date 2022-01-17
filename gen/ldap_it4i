@@ -22,9 +22,10 @@ our $A_USER_LOGIN_EINFRA; *A_USER_LOGIN_EINFRA = \'urn:perun:user:attribute-def:
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
-our $A_USER_PREFERRED_MAIL;  *A_USER_PREFERRED_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_SSHKEYS;  *A_SSHKEYS = \'urn:perun:user:attribute-def:def:sshPublicKey';
 our $A_MEMBER_STATUS;  *A_MEMBER_STATUS =  \'urn:perun:member:attribute-def:core:status';
+our $A_USER_PREFERRED_MAIL;  *A_USER_PREFERRED_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_MEMBER_MAIL;  *A_MEMBER_MAIL =  \'urn:perun:member:attribute-def:def:mail';
 
 our $STATUS_VALID;      *STATUS_VALID =        \'VALID';
 our $STATUS_EXPIRED;    *STATUS_EXPIRED =      \'EXPIRED';
@@ -46,7 +47,7 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
 		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
 		$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME );
-		$users->{$login}->{$A_USER_PREFERRED_MAIL} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_PREFERRED_MAIL );
+		$users->{$login}->{$A_MEMBER_MAIL} = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_MAIL ) || $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_PREFERRED_MAIL );
 		$users->{$login}->{$A_SSHKEYS} = $data->getUserAttributeValue( member => $memberId, attrName => $A_SSHKEYS );
 
 		my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
@@ -96,7 +97,7 @@ for my $login (sort keys %$users) {
 	}
 
 	print FILE "displayName: " . $users->{$login}->{$A_DISPLAY_NAME} . "\n";
-	print FILE "mail: " . $users->{$login}->{$A_USER_PREFERRED_MAIL} . "\n";
+	print FILE "mail: " . $users->{$login}->{$A_MEMBER_MAIL} . "\n";
 	print FILE "userPassword: {SASL}" . $login . '@EINFRA' . "\n";
 	print FILE "status: " . $users->{$login}->{$A_MEMBER_STATUS} . "\n";
 
