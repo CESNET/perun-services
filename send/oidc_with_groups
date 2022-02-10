@@ -1,4 +1,0 @@
-#!/bin/bash
-SERVICE_NAME="oidc_with_groups"
-
-. generic_send
