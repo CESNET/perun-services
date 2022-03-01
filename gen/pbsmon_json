@@ -56,7 +56,7 @@ my $service = $servicesAgent->getServiceByName(name => $SERVICE_NAME);
 my $pbsmonServer = $agent->getAttributesAgent->getAttribute(attributeName => $A_FACILITY_PBSMON_SERVER, facility => perunServicesInit::getFacility->getId)->getValue;
 unless($pbsmonServer) { die "pbsmonServer not specified for facility ".(perunServicesInit::getFacility->getId()); }
 
-if($pbsmonServer eq 'metavo.metacentrum.cz') { $pbsmonServer = 'documents.metacentrum.cz'; }  #FIXME
+if($pbsmonServer eq 'metavo.metacentrum.cz') { $pbsmonServer = 'segin.vm.cesnet.cz'; }  #FIXME
 
 if($pbsmonServer ne perunServicesInit::getFacility->getName) {
 	my $pbsmonServerFacility;
