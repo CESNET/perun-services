@@ -7,7 +7,7 @@ use perunServicesUtils;
 use File::Basename;
 
 local $::SERVICE_NAME = basename($0);
-local $::PROTOCOL_VERSION = "3.0.0";
+local $::PROTOCOL_VERSION = "3.1.0";
 my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
