@@ -8,7 +8,7 @@ use JSON::XS;
 
 our $SERVICE_NAME = "openstack_projects";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -21,11 +21,13 @@ our $A_USER_OPTIONAL_LOGIN;        *A_USER_OPTIONAL_LOGIN =        \'urn:perun:u
 our $A_RESOURCE_NAME;              *A_RESOURCE_NAME =              \'urn:perun:resource:attribute-def:core:name';
 our $A_MEMBER_EXPIRATION;          *A_MEMBER_EXPIRATION =          \'urn:perun:member:attribute-def:def:membershipExpiration';
 our $A_MEMBER_STATUS;              *A_MEMBER_STATUS =              \'urn:perun:member:attribute-def:core:status';
+our $A_M_R_GROUP_STATUS; 		   *A_M_R_GROUP_STATUS = 		   \'urn:perun:member_resource:attribute-def:virt:groupStatus';
 
 our $STATUS_VALID;                 *STATUS_VALID =                 \'VALID';
 
 our $members = {};
 
+my $users; # $users->{$identifier}->{ATTR} = $attrValue
 my $instance = $data->getFacilityAttributeValue(attrName => $A_FACILITY_PROJECT_NAMESPACE);
 my $projectPrefix = lc $instance . "_";
 
@@ -46,6 +48,11 @@ foreach my $resourceId ($data->getResourceIds()) {
 		$projectName = $projectPrefix . substr $resourceName, 0, length($resourceName) - 9;
 	}
 
+	my $isPersonalProjectGracePeriod = 0;
+	if ($resourceName =~ /-personalProjectsGracePeriod$/) {
+		$isPersonalProjectGracePeriod = 1;
+	}
+
 	my $isPersonalProject = 0;
 	if ($resourceName =~ /-personalProjects$/) {
 		$isPersonalProject = 1;
@@ -55,7 +62,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 		my $identifier = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_USER_FACILITY_LOGIN);
 		$identifier = $identifier . "\@muni.cz" if $projectPrefix eq "mu_";
 
-		if($members->{$identifier}) {
+		if ($members->{$identifier}) {
 			if ($hasAccess) {
 				push @{$members->{$identifier}->{'projects_access'}}, $projectName;
 			}
@@ -64,7 +71,12 @@ foreach my $resourceId ($data->getResourceIds()) {
 			}
 			if ($isPersonalProject) {
 				my $status = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_STATUS);
-				if($status eq $STATUS_VALID) {
+				my $groupStatus = $data->getMemberResourceAttributeValue(member => $memberId, resource => $resourceId, attrName => $A_M_R_GROUP_STATUS);
+				$users->{$identifier}->{'pp_status'} = ($status eq $STATUS_VALID && $groupStatus eq $STATUS_VALID);
+				if ($users->{$identifier}->{'pp_status'} || $users->{$identifier}->{'gp_status'}) {
+					if ($users->{$identifier}->{'pp_status'}) {
+						$members->{$identifier}->{'valid'} = JSON::XS::true;
+					}
 					$members->{$identifier}->{'personal_project'} = JSON::XS::true;
 					my $memberExpiration = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_EXPIRATION);
 					if (!$memberExpiration) {
@@ -73,9 +85,28 @@ foreach my $resourceId ($data->getResourceIds()) {
 					$members->{$identifier}->{'expiration'} = $memberExpiration;
 				}
 			}
-		} else {
+			if ($isPersonalProjectGracePeriod) {
+				my $groupStatus = $data->getMemberResourceAttributeValue(member => $memberId, resource => $resourceId, attrName => $A_M_R_GROUP_STATUS);
+				$users->{$identifier}->{'gp_status'} = $groupStatus eq $STATUS_VALID;
+				if ($users->{$identifier}->{'gp_status'} && (!$users->{$identifier}->{'pp_status'})) {
+					$members->{$identifier}->{'valid'} = JSON::XS::false;
+					$members->{$identifier}->{'personal_project'} = JSON::XS::true;
+					my $memberExpiration = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_EXPIRATION);
+					if (!$memberExpiration) {
+						$memberExpiration = "";
+					}
+					$members->{$identifier}->{'expiration'} = $memberExpiration;
+				}
+			}
+
+		}
+		else {
 			my @additionalIdentifier = ();
 			my $muLogin = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_OPTIONAL_LOGIN);
+
+			$users->{$identifier}->{'pp_status'} = 0;
+			$users->{$identifier}->{'gp_status'} = 0;
+
 			if ($muLogin) {
 				push @additionalIdentifier, $muLogin . "\@muni.cz";
 			}
@@ -92,25 +123,40 @@ foreach my $resourceId ($data->getResourceIds()) {
 			}
 
 			my $member = {
-				identifier => $identifier,
+				identifier            => $identifier,
 				additional_identifier => \@additionalIdentifier,
-				mail => $mail,
-				projects_access => \@projects_access,
-				projects_managers => \@projects_managers
+				mail                  => $mail,
+				projects_access       => \@projects_access,
+				projects_managers     => \@projects_managers
 			};
 
 			my $status = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_STATUS);
-			if ($isPersonalProject && $status eq $STATUS_VALID) {
+			my $groupStatus = $data->getMemberResourceAttributeValue(member => $memberId, resource => $resourceId, attrName => $A_M_R_GROUP_STATUS);
+
+			if ($isPersonalProject && $status eq $STATUS_VALID && $groupStatus eq $STATUS_VALID) {
+				$users->{$identifier}->{'pp_status'} = ($status eq $STATUS_VALID && $groupStatus eq $STATUS_VALID);
+				$member->{'valid'} = JSON::XS::true;
 				$member->{'personal_project'} = JSON::XS::true;
 				my $memberExpiration = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_EXPIRATION);
-				if(!$memberExpiration) {
+				if (!$memberExpiration) {
 					$memberExpiration = "";
 				}
 				$member->{'expiration'} = $memberExpiration;
-			} else {
+			}
+			else {
 				$member->{'personal_project'} = JSON::XS::false;
 			}
 
+			if ($isPersonalProjectGracePeriod && $groupStatus eq $STATUS_VALID) {
+				$users->{$identifier}->{'gp_status'} = $groupStatus eq $STATUS_VALID;
+				$member->{'valid'} = JSON::XS::false;
+				$member->{'personal_project'} = JSON::XS::true;
+				my $memberExpiration = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_EXPIRATION);
+				if (!$memberExpiration) {
+					$memberExpiration = "";
+				}
+				$member->{'expiration'} = $memberExpiration;
+			}
 			$members->{$identifier} = $member;
 		}
 	}
@@ -118,8 +164,8 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 my @values = values(%$members);
 my $fileData = {
-	instance => $instance,
-	access   => \@values
+	instance  => $instance,
+	access    => \@values
 };
 my $file = $DIRECTORY . "access.json";
 open FILE_USERS, ">$file" or die "Cannot open $file: $! \n";
