@@ -1,0 +1,73 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Data::Dumper;
+use utf8;
+
+local $::SERVICE_NAME = "lawdb_export_mu";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedDataWithGroups;
+
+#Constants
+our $A_USER_LOGIN_MU;      *A_USER_LOGIN_MU =       \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_GROUP_ID;           *A_GROUP_ID =            \'urn:perun:group:attribute-def:core:id';
+our $A_GROUP_NAME;         *A_GROUP_NAME =          \'urn:perun:group:attribute-def:core:name';
+our $A_GROUP_DESCRIPTION;  *A_GROUP_DESCRIPTION =   \'urn:perun:group:attribute-def:core:description';
+
+
+our $GROUP_ID = 'GROUP_ID';
+our $GROUP_NAME = 'GROUP_NAME';
+our $GROUP_DESCRIPTION = 'GROUP_DESCRIPTION';
+our $GROUP_MEMBERS = 'GROUP_MEMBERS';
+
+my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+my $dataByGroupId = {};
+
+#Process resource by resource
+foreach my $resourceId ( $data->getResourceIds() ) {
+
+	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
+		
+		my $groupNameAttributeValue = $data->getGroupAttributeValue(attrName => $A_GROUP_NAME, group => $groupId);
+		my $groupDescAttributeValue = $data->getGroupAttributeValue(attrName => $A_GROUP_DESCRIPTION, group => $groupId);
+		#prevent description to contain '\t' and '\n' characters and replace them by empty spaces instead
+		unless($groupDescAttributeValue) {
+			$groupDescAttributeValue = '';
+		} else {
+			$groupDescAttributeValue =~ s/\n/ /g;
+			$groupDescAttributeValue =~ s/\t/ /g;
+		}
+
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
+			my $uco = $data->getUserFacilityAttributeValue(attrName => $A_USER_LOGIN_MU, member => $memberId);
+
+			#new record of this specific group
+			unless( $dataByGroupId->{$groupId} ) {
+				$dataByGroupId->{$groupId}->{$GROUP_ID} = $groupId;
+				$dataByGroupId->{$groupId}->{$GROUP_NAME} = $groupNameAttributeValue;
+				$dataByGroupId->{$groupId}->{$GROUP_DESCRIPTION} = $groupDescAttributeValue;
+			} 
+			$dataByGroupId->{$groupId}->{$GROUP_MEMBERS}->{$uco} = 1;
+		}
+	}
+}
+
+foreach my $groupId (sort keys %{$dataByGroupId}) {
+	print FILE $groupId . "\t";
+	print FILE $dataByGroupId->{$groupId}->{$GROUP_NAME} . "\t";
+	print FILE $dataByGroupId->{$groupId}->{$GROUP_DESCRIPTION} . "\t";
+	print FILE join(',',sort keys %{$dataByGroupId->{$groupId}->{$GROUP_MEMBERS}}) . "\n";
+}
+
+close (FILE);
+perunServicesInit::finalize;
