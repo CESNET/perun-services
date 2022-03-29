@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 our $SERVICE_NAME = "ldap_it4i";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -136,7 +136,8 @@ for my $login (sort keys %$users) {
 
 	my $sshKeys = $users->{$login}->{$A_SSHKEYS};
 	if (defined $sshKeys and length $sshKeys) {
-		foreach my $sshKey (sort @$sshKeys) {
+		# make sure SSH keys are unique
+		foreach my $sshKey (sort keys %{{ map { $_ => 1 } @$sshKeys }}) {
 			print FILE "sshPublicKey: " . $sshKey . "\n";
 		}
 	}
