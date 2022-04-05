@@ -164,10 +164,10 @@ sub diffCSV() {
 		exit 1;
 	}
 
-	if (@diff > 500) {
+	if (@diff > 800) {
 		copy("$sendSpoolPath/$service_name.last",$dest_fname_prev) or die "Move to /tmp backup failed: $!";
 		copy($gen_file_path,$dest_fname_new) or die "Move to /tmp backup failed: $!";
-		print "Updating more than 500 entries! Exiting for safety!\n";
+		print "Updating more than 800 entries! Exiting for safety!\n";
 		logCRM("--- Would update ---\n" . Dumper(\@diff));
 		$lock->unlock();
 		exit 1;

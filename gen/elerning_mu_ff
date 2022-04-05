@@ -1,0 +1,63 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+
+our $SERVICE_NAME = basename($0);
+our $PROTOCOL_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_USER_LOGIN;          		 *A_USER_LOGIN =            		 \'urn:perun:user:attribute-def:def:login-namespace:mu';
+our $A_USER_FIRST_NAME;              *A_USER_FIRST_NAME =                \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LAST_NAME;               *A_USER_LAST_NAME =                 \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_STATUS;                  *A_USER_STATUS =                    \'urn:perun:member:attribute-def:core:status';
+
+our $STATUS_VALID;                   *STATUS_VALID =                     \'VALID';
+
+
+my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+
+my $users;
+#####################################
+
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		my $memberStatus = $data->getMemberAttributeValue(member=> $memberId, attrName=>$A_USER_STATUS);
+		my $memberLogin = $data->getUserAttributeValue(member=> $memberId, attrName=>$A_USER_LOGIN);
+		my $memberAttributes->{$A_USER_FIRST_NAME} =  $data->getUserAttributeValue(member=> $memberId, attrName=>$A_USER_FIRST_NAME);
+		$memberAttributes->{$A_USER_LAST_NAME} =  $data->getUserAttributeValue(member=> $memberId, attrName=>$A_USER_LAST_NAME);
+
+		if($memberStatus eq $STATUS_VALID) {
+			$users->{$memberLogin} = $memberAttributes;
+		}
+
+	}
+}
+
+####### output ######################
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+for my $login (keys %$users) {
+
+	my $firstName = $users->{$login}->{$A_USER_FIRST_NAME};
+	$firstName =~ s/'/''/g;
+	my $lastName = $users->{$login}->{$A_USER_LAST_NAME};
+	$lastName =~ s/'/''/g;
+
+	print FILE 
+			qq/UPDATE [dbo].[tbl_User] SET [username]='$login', [FirstName]='$firstName', [LastName]='$lastName', [EmailAddress]='$login\@mail.muni.cz'  WHERE username='$login'/, "\n",
+			qq/IF \@\@ROWCOUNT = 0/, "\n",
+			qq/INSERT INTO [dbo].[tbl_User] ([Username],[Password],[FirstName],[LastName],[EmailAddress],[System],[MediaFormat],[LoginCount],[ProfilePicFilePath],[ProfilePicExtension],[ProfilePicReported],[PlaylistEnabled],[DefaultQuality],[Language],[status]) VALUES/, "\n",
+			qq/('$login', '', '$firstName', '$lastName', '$login\@mail.muni.cz', 0, 'F', 0, 'default', '.jpg', 0, 0, 'hi', 'en', 1);/, "\n\n";
+}
+close FILE or die "Cannot close $fileName: $! \n";
+#####################################################
+perunServicesInit::finalize;
