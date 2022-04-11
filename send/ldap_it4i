@@ -146,19 +146,22 @@ sub process_update() {
 
 sub process_archive() {
 
+	# Switch User to ARCHIVED if not present in perun data and doesn't have correct status in LDAP already.
 	foreach my $previousUser (@previousUsers) {
 		unless (exists $usersMap{$previousUser->get_value('uid')}) {
-			$previousUser->replace(
-				'status' => 'ARCHIVED'
-			);
-			my $response = $previousUser->update($ldap);
-			unless ($response->is_error()) {
-				ldap_log($service_name, "Archived: " . $previousUser->dn());
-				$counter_archive++;
-			} else {
-				ldap_log($service_name, "NOT archived: " . $previousUser->dn() . " | " . $response->error());
-				ldap_log($service_name, $previousUser->ldif());
-				$counter_fail++;
+			if ('ARCHIVED' ne $previousUser->get_value('status')) {
+				$previousUser->replace(
+					'status' => 'ARCHIVED'
+				);
+				my $response = $previousUser->update($ldap);
+				unless ($response->is_error()) {
+					ldap_log($service_name, "Archived: " . $previousUser->dn());
+					$counter_archive++;
+				} else {
+					ldap_log($service_name, "NOT archived: " . $previousUser->dn() . " | " . $response->error());
+					ldap_log($service_name, $previousUser->ldif());
+					$counter_fail++;
+				}
 			}
 		}
 	}
