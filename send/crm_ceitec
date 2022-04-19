@@ -5,13 +5,14 @@ use File::Copy;
 use ScriptLock;
 use Data::Dumper;
 use Time::Piece;
+use File::Path;
 
 sub diffCSV;
 sub logCRM;
 
 my $service_name = "crm_ceitec";
 my $protocol_version = "3.1.0";
-my $script_version = "3.0.5";
+my $script_version = "3.0.6";
 
 my $facility_name = $ARGV[0];
 chomp($facility_name);
@@ -19,6 +20,10 @@ chomp($facility_name);
 # create service lock
 my $lock = ScriptLock->new($facility_name . "_" . $service_name);
 ($lock->lock() == 1) or die "Unable to get lock, service propagation was already running.";
+
+# create send spool unless it exists
+my $sendSpoolPath = "./spool/$facility_name/$service_name";
+mkpath($sendSpoolPath) or die "Error creating $sendSpoolPath\n" unless -d $sendSpoolPath;
 
 my @diff = diffCSV();
 
@@ -97,9 +102,9 @@ if ($error == 1) {
 
 	# backup previous state by timestamp
 	my $currentTimestamp = localtime->ymd . "-" . localtime->hms;
-	copy("./$service_name.last","./logs/$service_name.previous.".$currentTimestamp) or die "Move to backup failed: $!";
+	copy("$sendSpoolPath/$service_name.last","./logs/$service_name.previous.".$currentTimestamp) or die "Move to backup failed: $!";
 	# make new state as LAST
-	copy("../gen/spool/$facility_name/$service_name/$service_name","./$service_name.last") or die "Move failed: $!";
+	copy("../gen/spool/$facility_name/$service_name/$service_name","$sendSpoolPath/$service_name.last") or die "Move new state failed: $!";
 	$lock->unlock();
 }
 #
@@ -108,7 +113,7 @@ if ($error == 1) {
 sub diffCSV() {
 
 	# Open last state file
-	my $storage_file_path = "./$service_name.last";
+	my $storage_file_path = "$sendSpoolPath/$service_name.last";
 	open my $storage_file, $storage_file_path or die "Could not open $storage_file_path: $!";
 
 	# Open new gen file
@@ -144,7 +149,7 @@ sub diffCSV() {
 	my $keynumber = keys %previous_state;
 	if ($keynumber < 1) {
 		print "Previous state was empty! Exiting! See:\n$dest_fname_new\n$dest_fname_prev";
-		copy("./$service_name.last",$dest_fname_prev) or die "Move to /tmp backup failed: $!";
+		copy("$sendSpoolPath/$service_name.last",$dest_fname_prev) or die "Move to /tmp backup failed: $!";
 		copy($gen_file_path,$dest_fname_new) or die "Move to /tmp backup failed: $!";
 		$lock->unlock();
 		exit 1;
@@ -153,14 +158,14 @@ sub diffCSV() {
 	my $keynumber_new = keys %current_state;
 	if ($keynumber_new < 1) {
 		print "Current state is empty! Exiting! See:\n $dest_fname_new \n $dest_fname_prev";
-        copy("./$service_name.last",$dest_fname_prev) or die "Move to /tmp backup failed: $!";
+        copy("$sendSpoolPath/$service_name.last",$dest_fname_prev) or die "Move to /tmp backup failed: $!";
 		copy($gen_file_path,$dest_fname_new) or die "Move to /tmp backup failed: $!";
 		$lock->unlock();
 		exit 1;
 	}
 
 	if (@diff > 500) {
-		copy("./$service_name.last",$dest_fname_prev) or die "Move to /tmp backup failed: $!";
+		copy("$sendSpoolPath/$service_name.last",$dest_fname_prev) or die "Move to /tmp backup failed: $!";
 		copy($gen_file_path,$dest_fname_new) or die "Move to /tmp backup failed: $!";
 		print "Updating more than 500 entries! Exiting for safety!\n";
 		logCRM("--- Would update ---\n" . Dumper(\@diff));
