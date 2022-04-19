@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="rt_data_vocesnet"
+
+. generic_send

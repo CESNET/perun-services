@@ -1,0 +1,92 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+use utf8;
+
+binmode STDOUT, ":utf8";
+
+our $SERVICE_NAME = basename($0);
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_USER_ID;                 *A_USER_ID =                   \'urn:perun:user:attribute-def:core:id';
+our $A_USER_EPPN;               *A_USER_EPPN =                 \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
+our $A_MEMBER_STATUS;           *A_MEMBER_STATUS =             \'urn:perun:member:attribute-def:core:status';
+our $A_MEMBER_MAIL;             *A_MEMBER_MAIL =               \'urn:perun:member:attribute-def:def:mail';
+our $A_RES_VO_NAME;    			*A_RES_VO_NAME =     		   \'urn:perun:resource:attribute-def:virt:voShortName';
+
+our $STATUS_VALID;              *STATUS_VALID =                \'VALID';
+
+#Other constants
+our $EINFRA_DOMAIN = '@einfra.cesnet.cz';
+our $META_DOMAIN   = '@meta.cesnet.cz';
+
+my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
+
+my $usersStructureByUserId = {};
+
+#####################################
+
+foreach my $resourceId ($data->getResourceIds()) {
+
+	my $voName = $data->getResourceAttributeValue(attrName => $A_RES_VO_NAME, resource => $resourceId);
+
+	if ($voName ne 'cesnet') {
+		# allow only single VO "cesnet" -> data from all resources will be the same, including member mail
+		next;
+	}
+
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+
+		#skip non-valid members
+		next if $data->getMemberAttributeValue(attrName => $A_MEMBER_STATUS, member => $memberId) ne $STATUS_VALID;
+
+		my $userId = $data->getUserAttributeValue(attrName => $A_USER_ID, member => $memberId);
+
+		unless(defined $usersStructureByUserId->{$userId}) {
+
+			my $mail = $data->getMemberAttributeValue(attrName => $A_MEMBER_MAIL, member => $memberId);
+			$usersStructureByUserId->{$userId}->{$A_MEMBER_MAIL} = $mail;
+
+			#if user has meta eppn, he should have also einfra eppn
+			my %userEPPNs = map { $_ => 1 } @{$data->getUserAttributeValue(attrName => $A_USER_EPPN, member => $memberId)};
+			foreach my $eppn (keys %userEPPNs) {
+				if($eppn =~ m/$META_DOMAIN/) {
+					my $neweppn = $eppn;
+					$neweppn =~ s/$META_DOMAIN/$EINFRA_DOMAIN/ge;
+					$userEPPNs{$neweppn} = 1;
+				}
+			}
+			#list of eppns must be unique
+			$usersStructureByUserId->{$userId}->{$A_USER_EPPN} = \%userEPPNs;
+
+		}
+
+	}
+}
+
+####### FILE WITH DATA FOR OUTPUT FILE ######
+open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
+binmode SERVICE_FILE, ":utf8";
+
+#print header to the file
+print SERVICE_FILE "user_id\tmail\teppns\n";
+
+foreach my $userId (sort { $a <=> $b } keys %$usersStructureByUserId) {
+	print SERVICE_FILE $userId . "\t";
+	print SERVICE_FILE $usersStructureByUserId->{$userId}->{$A_MEMBER_MAIL} . "\t";
+	print SERVICE_FILE join(',', sort keys %{$usersStructureByUserId->{$userId}->{$A_USER_EPPN}});
+	print SERVICE_FILE "\n";
+}
+
+close(SERVICE_FILE);
+
+perunServicesInit::finalize;

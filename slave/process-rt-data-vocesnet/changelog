@@ -1,0 +1,5 @@
+perun-slave-process-rt-data-vocesnet (3.0.0) stable; urgency=low
+
+  * New package for processing service rt_data_vocesnet
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Wed, 16 Mar 2022 13:20:00 +0100
