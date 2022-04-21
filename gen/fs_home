@@ -189,7 +189,7 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 					$dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_QUOTA_HEADER} = 0;
 				}
 				unless ($dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_LIMIT_HEADER}) {
-					$dataForUserQuotasByUID->{$uid}->{$volume}->{$FILE_LIMIT_HEADER} = 0;
+					$dataForUserQuotasByUID->{$uid}->{$volume}->{$DATA_LIMIT_HEADER} = 0;
 				}
 			}
 		}
