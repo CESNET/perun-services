@@ -51,7 +51,7 @@ ldap_bind($ldap, $conf[1], $conf[2]);
 
 # load all data
 my @perun_entries = load_perun($service_files_dir . "/" . $service_name . ".ldif");
-my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn','displayName','sn','givenName','mail','userAccountControl','samAccountName']);
+my @ad_entries = load_ad($ldap, $base_dn, $filter, ['cn','displayName','sn','givenName','mail','userPrincipalName','userAccountControl','samAccountName']);
 
 my %ad_entries_map = ();
 my %perun_entries_map = ();
@@ -138,7 +138,7 @@ sub process_update() {
 			my $ad_entry = $ad_entries_map{$perun_entry->get_value('cn')};
 
 			# attrs without cn since it's part of DN to be updated
-			my @attrs = ('displayName','sn','givenName','mail');
+			my @attrs = ('displayName','sn','givenName','mail','userPrincipalName');
 
 			# stored log messages to check if entry should be updated
 			my @entry_changed = ();
