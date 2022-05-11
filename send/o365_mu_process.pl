@@ -57,9 +57,6 @@ my $OPERATION_USER_NOT_CHANGED = $OPERATION_USER . "-NOT_CHANGED";
 my $OPERATION_GROUP = "group";
 my $OPERATION_GROUP_CHANGED = $OPERATION_GROUP . "-CHANGED";
 my $OPERATION_GROUP_NOT_CHANGED = $OPERATION_GROUP . "-NOT_CHANGED";
-my $OPERATION_RESOURCE_MAIL = "resourceMail";
-my $OPERATION_RESOURCE_MAIL_REMOVED = $OPERATION_RESOURCE_MAIL . "-REMOVED";
-my $OPERATION_RESOURCE_MAIL_CHANGED = $OPERATION_RESOURCE_MAIL . "-CHANGED";
 my $OPERATION_END = "end"; #signal end of the operation
 my $OPERATION_SYNC = "synchronize"; #signal to synchronize with other threads
 my $ARGUMENT = "argument";
@@ -73,6 +70,12 @@ my $EMAIL_ADDRESSES_TEXT = "emailAddresses";
 my $PLAIN_TEXT_OBJECT_TEXT = "plainTextObject";
 my $AD_GROUP_NAME_TEXT = "adGroupName";
 my $SEND_AS_TEXT = "sendAs";
+
+### RESOURCE MAILBOXES CONFIGURATION
+### We are not using these variables, we just want to preserve them for further use
+my $OPERATION_RESOURCE_MAIL = "resourceMail";
+my $OPERATION_RESOURCE_MAIL_REMOVED = $OPERATION_RESOURCE_MAIL . "-REMOVED";
+my $OPERATION_RESOURCE_MAIL_CHANGED = $OPERATION_RESOURCE_MAIL . "-CHANGED";
 my $RES_NAME_TEXT = "RES_NAME";
 my $RES_ALIAS_TEXT = "RES_ALIAS";
 my $RES_EMAIL_ADDRESES_TEXT = "RES_EMAIL_ADDRESES";
@@ -100,6 +103,7 @@ my $RES_DELEGATES_TEXT = "RES_DELEGATES";
 my $RES_BOOK_IN_POLICY_TEXT = "RES_BOOK_IN_POLICY";
 my $RES_REQUEST_IN_POLICY_TEXT = "RES_REQUEST_IN_POLICY";
 my $RES_REQUEST_OUT_OF_POLICY_TEXT = "RES_REQUEST_OUT_OF_POLICY";
+### END OF RESOURCE MAILBOXES CONFIGURATION
 
 #needed global variables and constants for this script
 my $instanceName;
@@ -146,12 +150,13 @@ if(! -f $groupsDataFilename) {
 	exit 14;
 }
 
+### Don't check Resource mialboxes file existence
 #resource-mails data filename from perun need to exists (even if it is empty)
-my $resourceMailsDataFilename = "$pathToServiceFile/$serviceName-resource-mails";
-if(! -f $resourceMailsDataFilename) {
-	print "ERROR - Missing service file with data about resource mails.\n";
-	exit 14;
-}
+#my $resourceMailsDataFilename = "$pathToServiceFile/$serviceName-resource-mails";
+#if(! -f $resourceMailsDataFilename) {
+#	print "ERROR - Missing service file with data about resource mails.\n";
+#	exit 14;
+#}
 
 #file with facility id from gen (can't be empty)
 my $facilityIdFilename = "$pathToServiceFile/$serviceName-facilityId";
@@ -181,8 +186,9 @@ my $newUsersStruc = readDataAboutUsers $usersDataFilename;
 #read new data about groups from PERUN
 my $newGroupsStruc = readDataAboutGroups $groupsDataFilename;
 
+### don't read data about resource mailboxes
 #read new data about resource mails from PERUN
-my $newResourceMailsStruc = readDataAboutResourceMails $resourceMailsDataFilename;
+#my $newResourceMailsStruc = readDataAboutResourceMails $resourceMailsDataFilename;
 
 #Read data (cache) about last state of users
 my $lastUsersStruc = {};
@@ -196,9 +202,10 @@ if( -f $lastStateOfGroupsFilename) {
 	$lastGroupsStruc = readDataAboutGroups $lastStateOfGroupsFilename;
 }
 
+### don't read data about resources mailboxes in o365
 #read data about existing resources from o365 proxy
-my $lastResourceMailsStruc = readDataAboutResourceMailsFromO365Proxy;
-unless($lastResourceMailsStruc) { $lastResourceMailsStruc = {}; }
+#my $lastResourceMailsStruc = readDataAboutResourceMailsFromO365Proxy;
+#unless($lastResourceMailsStruc) { $lastResourceMailsStruc = {}; }
 
 #prepare new cache files
 my $newUsersCache = new File::Temp( UNLINK => 1 );
@@ -257,30 +264,32 @@ foreach my $key (keys %$newGroupsStruc) {
 	$jobQueue->enqueue($job);
 }
 
-waitForSynchronize;
-
+### don't process jobs for working with resource mailboxes
+#
+#waitForSynchronize;
+#
 #create and submit jobs for working with resource-mail's objects
-foreach my $key (keys %$newResourceMailsStruc) {
-	my $newResourceMail = $newResourceMailsStruc->{$key};
-
-	my $job = { $OPERATION => $OPERATION_RESOURCE_MAIL_CHANGED, $ARGUMENT => $newResourceMail };
-	
-	#add job to the queue to process it by threads
-	$jobQueue->enqueue($job);
-}
-
-waitForSynchronize;
-
+#foreach my $key (keys %$newResourceMailsStruc) {
+#	my $newResourceMail = $newResourceMailsStruc->{$key};
+#
+#	my $job = { $OPERATION => $OPERATION_RESOURCE_MAIL_CHANGED, $ARGUMENT => $newResourceMail };
+#	
+#	#add job to the queue to process it by threads
+#	$jobQueue->enqueue($job);
+#}
+#
+#waitForSynchronize;
+#
 #we need to also remove not existing resource from o365 proxy
-foreach my $key (keys %$lastResourceMailsStruc) {
-	my $newResourceMail = $newResourceMailsStruc->{$key};
-	unless($newResourceMail) {
-		#resource mail no longer exists, we should remove it
-		my $job = { $OPERATION => $OPERATION_RESOURCE_MAIL_REMOVED, $ARGUMENT => $lastResourceMailsStruc->{$key} };
-		#add job to the queue to process it by threads
-		$jobQueue->enqueue($job);
-	}
-}
+#foreach my $key (keys %$lastResourceMailsStruc) {
+#	my $newResourceMail = $newResourceMailsStruc->{$key};
+#	unless($newResourceMail) {
+#		#resource mail no longer exists, we should remove it
+#		my $job = { $OPERATION => $OPERATION_RESOURCE_MAIL_REMOVED, $ARGUMENT => $lastResourceMailsStruc->{$key} };
+#		#add job to the queue to process it by threads
+#		$jobQueue->enqueue($job);
+#	}
+#}
 
 #wait for all threads to finish
 waitForThreads;
@@ -329,8 +338,9 @@ sub processTasks {
 				$sucess = processGroup( $job->{$ARGUMENT} , $job->{$OPERATION} );
 			} elsif ($job->{$OPERATION} =~ $OPERATION_USER) {
 				$sucess = processUser( $job->{$ARGUMENT} , $job->{$OPERATION} );
-			} elsif ($job->{$OPERATION} =~ $OPERATION_RESOURCE_MAIL) {
-				$sucess = processResourceMail( $job->{$ARGUMENT}, $job->{$OPERATION} );
+			### don't process resource mailboxes jobs there
+			#} elsif ($job->{$OPERATION} =~ $OPERATION_RESOURCE_MAIL) {
+			#	$sucess = processResourceMail( $job->{$ARGUMENT}, $job->{$OPERATION} );
 			} else {
 				print "ERROR - UNKNOWN OPERATION: " . $job->{$OPERATION} . " was skipped!\n";
 				$sucess = 0;

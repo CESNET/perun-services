@@ -97,13 +97,17 @@ our $COMMAND_GET_GROUP = "Get-MuniGroup";
 our $COMMAND_GET_O365_GROUP = "Get-MuniO365Group";
 our $COMMAND_GET_MAILBOX = "Get-MuniMailbox";
 our $COMMAND_GET_SHAREBOX = "Get-MuniSharebox";
-our $COMMAND_GET_RESOURCE = "Get-MuniResource";
-our $COMMAND_GET_RESOURCES = "Get-MuniResources";
 our $COMMAND_SET_GROUP = "Set-MuniGroup";
 our $COMMAND_SET_MAILBOX = "Set-MuniMailBox";
+our $COMMAND_TEST_MUNI_ERROR = "Test-MuniError";
+
+### RESOURCE MAILBOXES commands - not used, only preserved
+our $COMMAND_GET_RESOURCE = "Get-MuniResource";
+our $COMMAND_GET_RESOURCES = "Get-MuniResources";
 our $COMMAND_SET_RESOURCE = "Set-MuniResource";
 our $COMMAND_REMOVE_RESOURCE = "Remove-MuniResource";
-our $COMMAND_TEST_MUNI_ERROR = "Test-MuniError";
+### End of RESOURCE MAILBOXES commands
+
 #Basic content of every call
 our %content = ();
 	#"WaitMsec" => $MAX_WAIT_MSEC
@@ -206,32 +210,33 @@ GetOptions("help|h"	=> sub {
 	"forwarding|f=s"             => \$argForw,
 	"emails|e=s"                 => \$argEmailAddresses,
 	'contacts|t=s@{1,}'          => \@argContacts,
-	"alias|A=s"                  => \$argResAlias,
-	'resEmails|B=s@{1,}'         => \@argResEmails,
-	"displayName|C=s"            => \$argResDisplayName,
-	"type|D=s"                   => \$argResType,
-	"capacity|E=i"               => \$argResCapacity,
-	"additionalResponse|F=s"     => \$argResAdditionalResponse,
-	"extMeetingMsg|G=i"          => \$argResExtMeetingMsg,
-	"allowConflicts|H=i"         => \$argResAllowConflicts,
-	"bookingWindow|I=i"          => \$argResBookingWindow,
-	"percentageAllowed|J=i"      => \$argResPercentageAllowed,
-	"enforceSchedHorizon|K=i"    => \$argResEnforceSchedHorizon,
-	"maxConflictInstances|L=i"   => \$argResMaxConflictInstances,
-	"maxDuration|M=i"            => \$argResMaxDuration,
-	"schedDuringWorkHours|N=i"   => \$argResSchedDuringWorkHours,
-	"allBookInPolicy|O=i"        => \$argResAllBookInPolicy,
-	"allReqInPolicy|P=i"         => \$argResAllRequestInPolicy,
-	"allReqOutOfPolicy|Q=i"      => \$argResAllReqOutOfPolicy,
-	'workingDays|R=s@{1,}'       => \@argResWorkingDays,
-	"workingHoursStart|T=s"      => \$argResWorkingHoursStart,
-	"workingHoursEnd|U=s"        => \$argResWorkingHoursEnd,
-	"allowRecurMeetings|V=i"     => \$argResAllowRecurMeetings,
-	"addAdditionalResp|X=i"      => \$argResAddAdditionalResp,
-	'delegates|Y=s{1,}'          => \@argResDelegates,
-	'bookInPolicy|Z=s{1,}'       => \@argResBookInPolicy,
-	'requestInPolicy|x=s{1,}'    => \@argResRequestInPolicy,
-	'requestOutOfPolicy|y=s{1,}' => \@argResRequestOutOfPolicy
+	"alias|A=s"                  => \$argResAlias
+	### Resource mailboxes parameters are not used, only preserved
+	#'resEmails|B=s@{1,}'         => \@argResEmails,
+	#"displayName|C=s"            => \$argResDisplayName,
+	#"type|D=s"                   => \$argResType,
+	#"capacity|E=i"               => \$argResCapacity,
+	#"additionalResponse|F=s"     => \$argResAdditionalResponse,
+	#"extMeetingMsg|G=i"          => \$argResExtMeetingMsg,
+	#"allowConflicts|H=i"         => \$argResAllowConflicts,
+	#"bookingWindow|I=i"          => \$argResBookingWindow,
+	#"percentageAllowed|J=i"      => \$argResPercentageAllowed,
+	#"enforceSchedHorizon|K=i"    => \$argResEnforceSchedHorizon,
+	#"maxConflictInstances|L=i"   => \$argResMaxConflictInstances,
+	#"maxDuration|M=i"            => \$argResMaxDuration,
+	#"schedDuringWorkHours|N=i"   => \$argResSchedDuringWorkHours,
+	#"allBookInPolicy|O=i"        => \$argResAllBookInPolicy,
+	#"allReqInPolicy|P=i"         => \$argResAllRequestInPolicy,
+	#"allReqOutOfPolicy|Q=i"      => \$argResAllReqOutOfPolicy,
+	#'workingDays|R=s@{1,}'       => \@argResWorkingDays,
+	#"workingHoursStart|T=s"      => \$argResWorkingHoursStart,
+	#"workingHoursEnd|U=s"        => \$argResWorkingHoursEnd,
+	#"allowRecurMeetings|V=i"     => \$argResAllowRecurMeetings,
+	#"addAdditionalResp|X=i"      => \$argResAddAdditionalResp,
+	#'delegates|Y=s{1,}'          => \@argResDelegates,
+	#'bookInPolicy|Z=s{1,}'       => \@argResBookInPolicy,
+	#'requestInPolicy|x=s{1,}'    => \@argResRequestInPolicy,
+	#'requestOutOfPolicy|y=s{1,}' => \@argResRequestOutOfPolicy
 ) || die help;
 
 #Check existence of mandatory parameters
@@ -265,13 +270,20 @@ if($argCommand eq $COMMAND_SET_MAILBOX) {
 	setMailbox ( $COMMAND_STATUS_SET, undef, $argIdent, $argDeliv, $argArch, $argForw, $argEmailAddresses );
 } elsif ($argCommand eq $COMMAND_SET_GROUP) {
 	setGroup ( $COMMAND_STATUS_SET, undef, $argIdent, \@argContacts);
-} elsif ($argCommand eq $COMMAND_SET_RESOURCE) {
-	setResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent, $argResAlias, \@argResEmails, $argResDisplayName, $argResType,
-	 $argResCapacity, $argResAdditionalResponse, $argResExtMeetingMsg, $argResAllowConflicts, $argResBookingWindow,
-	 $argResPercentageAllowed, $argResEnforceSchedHorizon, $argResMaxConflictInstances, $argResMaxDuration, $argResSchedDuringWorkHours,
-	 $argResAllBookInPolicy, $argResAllRequestInPolicy, $argResAllReqOutOfPolicy, \@argResWorkingDays, $argResWorkingHoursStart,
-	 $argResWorkingHoursEnd, $argResAllowRecurMeetings, $argResAddAdditionalResp, \@argResDelegates, \@argResBookInPolicy,
-	 \@argResRequestInPolicy, \@argResRequestOutOfPolicy);
+### Resource mailboxes commands are not allowed, only preserved
+#} elsif ($argCommand eq $COMMAND_SET_RESOURCE) {
+#	setResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent, $argResAlias, \@argResEmails, $argResDisplayName, $argResType,
+#	 $argResCapacity, $argResAdditionalResponse, $argResExtMeetingMsg, $argResAllowConflicts, $argResBookingWindow,
+#	 $argResPercentageAllowed, $argResEnforceSchedHorizon, $argResMaxConflictInstances, $argResMaxDuration, $argResSchedDuringWorkHours,
+#	 $argResAllBookInPolicy, $argResAllRequestInPolicy, $argResAllReqOutOfPolicy, \@argResWorkingDays, $argResWorkingHoursStart,
+#	 $argResWorkingHoursEnd, $argResAllowRecurMeetings, $argResAddAdditionalResp, \@argResDelegates, \@argResBookInPolicy,
+#	 \@argResRequestInPolicy, \@argResRequestOutOfPolicy);
+#} elsif ($argCommand eq $COMMAND_GET_RESOURCE) {
+#	getResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent);
+#} elsif ($argCommand eq $COMMAND_GET_RESOURCES) {
+#	getResourceMails ( $COMMAND_STATUS_SET, undef);
+#} elsif ($argCommand eq $COMMAND_REMOVE_RESOURCE) {
+#	removeResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_PING_EMAIL) {
 	pingEmail ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_GET_CONTACT) {
@@ -284,12 +296,6 @@ if($argCommand eq $COMMAND_SET_MAILBOX) {
 	getO365Group ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_GET_SHAREBOX) {
 	getSharebox ( $COMMAND_STATUS_SET, undef, $argIdent);
-} elsif ($argCommand eq $COMMAND_GET_RESOURCE) {
-	getResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent);
-} elsif ($argCommand eq $COMMAND_GET_RESOURCES) {
-	getResourceMails ( $COMMAND_STATUS_SET, undef);
-} elsif ($argCommand eq $COMMAND_REMOVE_RESOURCE) {
-	removeResourceMail ( $COMMAND_STATUS_SET, undef, $argIdent);
 } elsif ($argCommand eq $COMMAND_TEST_MUNI_ERROR) {
 	testMuniError ( $COMMAND_STATUS_SET, undef, $argIdent);
 } else {
@@ -1222,18 +1228,19 @@ sub resolveOutputByCommandName {
 		return getSharebox ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_GET_MAILBOX) {
 		return getMailbox ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
-	} elsif ($actualCommand eq $COMMAND_GET_RESOURCE) {
-		return getResourceMail ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
-	} elsif ($actualCommand eq $COMMAND_GET_RESOURCES) {
-		return getResourceMails ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
+	### Resource mailboxes commands are not supported any more, only preserved
+	#} elsif ($actualCommand eq $COMMAND_GET_RESOURCE) {
+	#	return getResourceMail ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
+	#} elsif ($actualCommand eq $COMMAND_GET_RESOURCES) {
+	#	return getResourceMails ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
+	#} elsif ($actualCommand eq $COMMAND_SET_RESOURCE) {
+	#	return setResourceMail ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
+	#} elsif ($actualCommand eq $COMMAND_REMOVE_RESOURCE) {
+	#	return removeResourceMail ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_SET_GROUP) {
 		return setGroup ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_SET_MAILBOX) {
 		return setMailbox ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
-	} elsif ($actualCommand eq $COMMAND_SET_RESOURCE) {
-		return setResourceMail ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
-	} elsif ($actualCommand eq $COMMAND_REMOVE_RESOURCE) {
-		return removeResourceMail ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} elsif ($actualCommand eq $COMMAND_TEST_MUNI_ERROR) {
 		return testMuniError ( $COMMAND_STATUS_RESOLVE, $jsonOutput );
 	} else {
