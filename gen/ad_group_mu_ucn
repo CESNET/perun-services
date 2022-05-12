@@ -11,7 +11,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 local $::SERVICE_NAME = "ad_group_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.3";
+my $SCRIPT_VERSION = "3.0.4";
 
 sub addMemberToGroup;
 sub processWorkplaces;
@@ -103,7 +103,7 @@ for my $group (sort keys %$groups) {
 	print FILE "dn: CN=" . $group . "," . $groups->{$group}->{$A_R_ADOUNAME} . "\n";
 	print FILE "cn: " . $group . "\n";
 	print FILE "samAccountName: " . $group . "\n";
-	print FILE "description:: " . encode_base64($groups->{$group}->{"description"}) . "\n";
+	print FILE "description:" . checkBase64($groups->{$group}->{"description"}) . "\n";
 	print FILE "info: perun\@muni.cz\n";
 	print FILE "objectClass: group\n";
 	print FILE "objectClass: top\n";
@@ -252,4 +252,15 @@ sub writeDebug {
 
 	print "\t" x $indentation;
 	print $message . "\n";
+}
+
+# method checks if value starts with SAFE-INIT-CHAR and then continue with SAFE-CHAR
+# if not then it encode to Base64 with ":: " prefix
+sub checkBase64 {
+	my $value = shift;
+
+	if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
+		return " " . $value;
+	}
+	return ": " . encode_base64(Encode::encode_utf8($value), '');
 }

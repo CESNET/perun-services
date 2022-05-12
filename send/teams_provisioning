@@ -1,0 +1,4 @@
+#!/bin/bash
+SERVICE_NAME="teams_provisioning"
+
+. generic_send

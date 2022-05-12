@@ -40,6 +40,9 @@ END { if($DIE_AT_END) { die "Died because of warning(s) occur during processing.
 
 my ($agent, $service, $facility, $servicesAgent, $directory, $tmp_directory, $tmp_directory_destination, $getData_directory, $local_data);
 
+# Parameter that enforces consent evaluation
+our $CONSENT_EVAL = 0;
+
 # Prepare directory for file which will be generated
 # Create VERSION file in this directory. This file contains protocol version
 #
@@ -50,7 +53,7 @@ my ($agent, $service, $facility, $servicesAgent, $directory, $tmp_directory, $tm
 sub init {
 
 	my ($facilityId, $facilityName, $local_data_file, $serviceName, $getDataType);
-	GetOptions ("facilityId|f=i" => \$facilityId, "facilityName|F=s" => \$facilityName, "data|d=s" => \$local_data_file, "serviceName|s=s" => \$serviceName, "getDataType|t=s" => \$getDataType) or die;
+	GetOptions ("consentEval|c"=>\$CONSENT_EVAL,"facilityId|f=i" => \$facilityId, "facilityName|F=s" => \$facilityName, "data|d=s" => \$local_data_file, "serviceName|s=s" => \$serviceName, "getDataType|t=s" => \$getDataType) or die;
 	# serviceName is way how to specify service from argument, use it instead local SERVICE_NAME if set
 	if(defined $serviceName) { $::SERVICE_NAME = $serviceName; }
 
@@ -143,7 +146,7 @@ sub getHashedHierarchicalData {
 	if(defined $local_data) { return $local_data; }
   my $filterExpiredMembers = shift;
   unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
-  my $data = $servicesAgent->getHashedHierarchicalData(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
+  my $data = $servicesAgent->getHashedHierarchicalData(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers, consentEval => $CONSENT_EVAL);
   logData $data, 'hashedHierarchicalData';
   return $data;
 }
@@ -170,7 +173,7 @@ sub getHashedDataWithGroups {
 	if(defined $local_data) { return $local_data; }
 	my $filterExpiredMembers = shift;
 	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
-	my $data = $servicesAgent->getHashedDataWithGroups(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
+	my $data = $servicesAgent->getHashedDataWithGroups(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers, consentEval => $CONSENT_EVAL);
 	logData $data, 'hashedDataWithGroups';
 	return $data;
 }
