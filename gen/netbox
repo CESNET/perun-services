@@ -9,14 +9,14 @@ use Data::Dumper;
 
 our $SERVICE_NAME     = "netbox";
 our $PROTOCOL_VERSION = "3.0.0";
-my  $SCRIPT_VERSION   = "3.0.0";
+my  $SCRIPT_VERSION   = "3.0.1";
 
 my $file_name_users = "netbox_users";
 my $file_name_groups = "netbox_groups";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data =      perunServicesInit::getHashedHierarchicalData(1);
+my $data =      perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_RESOURCE_GROUP_NAME;       *A_RESOURCE_GROUP_NAME =   \'urn:perun:resource:attribute-def:def:netboxGroupName';

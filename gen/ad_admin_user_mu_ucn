@@ -10,13 +10,13 @@ use Encode;
 
 local $::SERVICE_NAME = "ad_admin_user_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 
-my $data = perunServicesInit::getHashedHierarchicalData(1);
+my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_F_DOMAIN;  *A_F_DOMAIN = \'urn:perun:facility:attribute-def:def:adDomain';
