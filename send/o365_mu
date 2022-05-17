@@ -101,7 +101,8 @@ trap 'rm -r -f "${LOCK_FILE}" "${TMP_HOSTNAME_DIR}"' EXIT
 #copy all needed files to the temporary directory
 cp $SERVICE_FILES_DIR/$SERVICE_NAME-users $TMP_HOSTNAME_DIR
 cp $SERVICE_FILES_DIR/$SERVICE_NAME-groups $TMP_HOSTNAME_DIR
-cp $SERVICE_FILES_DIR/$SERVICE_NAME-resource-mails $TMP_HOSTNAME_DIR;
+### We are not using resource mailboxes any more, this code will be preserved for further use
+#cp $SERVICE_FILES_DIR/$SERVICE_NAME-resource-mails $TMP_HOSTNAME_DIR;
 cp $SERVICE_FILES_DIR/$SERVICE_NAME-facilityId $TMP_HOSTNAME_DIR
 if [ $? -ne 0 ]; then
 	echo "Can't copy service file to temporary dir" >&2
