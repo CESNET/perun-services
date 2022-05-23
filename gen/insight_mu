@@ -9,12 +9,12 @@ use POSIX qw(strftime);
 
 our $SERVICE_NAME = "insight_mu";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 # get only valid members
-my $data = perunServicesInit::getHashedDataWithGroups(1);
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 # CONSTANTS
 our $A_USER_ID;                  *A_USER_ID =                  \'urn:perun:user:attribute-def:core:id';

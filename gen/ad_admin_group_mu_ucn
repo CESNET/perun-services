@@ -9,7 +9,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 local $::SERVICE_NAME = "ad_admin_group_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 sub addMemberToGroup;
 sub processWorkplaces;
@@ -23,7 +23,7 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
 
 #Get hierarchical data without expired members
-my $data = perunServicesInit::getHashedDataWithGroups(1);
+my $data = perunServicesInit::getHashedDataWithGroups;
 my $DEBUG = 0;
 
 #Constants

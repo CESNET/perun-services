@@ -8,11 +8,11 @@ use JSON::XS;
 use utf8;
 
 our $SERVICE_NAME     = "arcgis_licenses_mu";
-our $PROTOCOL_VERSION = "3.0.0";
+our $PROTOCOL_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data      = perunServicesInit::getHashedDataWithGroups(1);
+my $data      = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 our $A_USER_FIRST_NAME;             *A_USER_FIRST_NAME =             \'urn:perun:user:attribute-def:core:firstName';
