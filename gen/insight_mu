@@ -9,7 +9,7 @@ use POSIX qw(strftime);
 
 our $SERVICE_NAME = "insight_mu";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -80,7 +80,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 			};
 			$memberDataById->{$uco} = $person;
 		}
-		my @membersList = keys %members;
+		my @membersList = sort { $a <=> $b } keys %members;
 		# decide whether group or workplace depending on defined VAZPR attribute
 		unless ( defined $groupVAZPR ) {
 			my $group = {
@@ -116,6 +116,14 @@ foreach my $resourceId ($data->getResourceIds()) {
 my @groupValues = values(%$groupDataById);
 my @workplaceValues = values(%$workplaceDataById);
 my @personValues = values(%$memberDataById);
+
+# sort persons by UCO
+@personValues = sort { $a->{'UCO'} <=> $b->{'UCO'} } @personValues;
+# sort groups by externalObjectId = Group ID
+@groupValues = sort { $a->{'ExternalObjectID'} <=> $b->{'ExternalObjectID'} } @groupValues;
+# sort workplaces by externalObjectId = Group ID
+@workplaceValues = sort { $a->{'ExternalObjectID'} <=> $b->{'ExternalObjectID'} } @workplaceValues;
+
 
 # get data in desired format
 my $groupData = {
