@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Data::Dumper;
+use utf8;
+
+local $::SERVICE_NAME = "o365_mu_users_export";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_UF_LOGIN;                     *A_UF_LOGIN =                     \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UF_O365_STATE;                *A_UF_O365_STATE =                \'urn:perun:user_facility:attribute-def:def:o365InternalUserState';
+our $A_UF_DISABLE_O365_MAIL_FORWARD; *A_UF_DISABLE_O365_MAIL_FORWARD = \'urn:perun:user_facility:attribute-def:def:disableO365MailForward';
+our $A_UF_O365_STORE_AND_FORWARD;    *A_UF_O365_STORE_AND_FORWARD =    \'urn:perun:user_facility:attribute-def:def:o365MailStoreAndForward';
+
+my $validLogins = {};
+
+#RULES:
+#1] any user who has UCO
+#2] status of user in o365 is not 0
+#3] disableMailForward == true
+#OR
+#3] disableMailForward == false AND mailStoreAndForward == true
+foreach my $memberId ( $data->getMemberIdsForFacility() ) {
+	my $uco = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
+	#skip all users without UCO
+	next unless $uco;
+	my $o365Status = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_O365_STATE );
+	#skip all users with 0 or empty value in status attribute (everything except 0 is OK here)
+	next unless $o365Status;
+	my $disableMailForward = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_DISABLE_O365_MAIL_FORWARD );
+	my $storeAndForward = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_O365_STORE_AND_FORWARD );
+	unless( $disableMailForward ) {
+		#skip users with set forward without storing a copy
+		next unless $storeAndForward;
+	}
+	#if all rules are met, add uco to the list
+	$validLogins->{$uco} = $uco;
+}
+
+my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+foreach my $uco (sort keys %{$validLogins}) {
+	print FILE $uco . "\n";
+}
+
+close (FILE);
+perunServicesInit::finalize;

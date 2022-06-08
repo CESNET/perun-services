@@ -144,54 +144,42 @@ sub getFacility {
 
 sub getHashedHierarchicalData {
 	if(defined $local_data) { return $local_data; }
-  my $filterExpiredMembers = shift;
-  unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
-  my $data = $servicesAgent->getHashedHierarchicalData(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers, consentEval => $CONSENT_EVAL);
+  my $data = $servicesAgent->getHashedHierarchicalData(service => $service->getId, facility => $facility->getId, consentEval => $CONSENT_EVAL);
   logData $data, 'hashedHierarchicalData';
   return $data;
 }
 
 sub getHierarchicalData {
 	if(defined $local_data) { return $local_data; }
-	my $filterExpiredMembers = shift;
-	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
-	my $data = $servicesAgent->getHierarchicalData(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
+	my $data = $servicesAgent->getHierarchicalData(service => $service->getId, facility => $facility->getId);
 	logData $data, 'hierarchicalData';
 	return $data;
 }
 
 sub getFlatData {
 	if(defined $local_data) { return $local_data; }
-	my $filterExpiredMembers = shift;
-	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
-	my $data = $servicesAgent->getFlatData(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
+	my $data = $servicesAgent->getFlatData(service => $service->getId, facility => $facility->getId);
 	logData $data, 'flatData';
 	return $data;
 }
 
 sub getHashedDataWithGroups {
 	if(defined $local_data) { return $local_data; }
-	my $filterExpiredMembers = shift;
-	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
-	my $data = $servicesAgent->getHashedDataWithGroups(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers, consentEval => $CONSENT_EVAL);
+	my $data = $servicesAgent->getHashedDataWithGroups(service => $service->getId, facility => $facility->getId, consentEval => $CONSENT_EVAL);
 	logData $data, 'hashedDataWithGroups';
 	return $data;
 }
 
 sub getDataWithGroups {
 	if(defined $local_data) { return $local_data; }
-	my $filterExpiredMembers = shift;
-	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
-	my $data = $servicesAgent->getDataWithGroups(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
+	my $data = $servicesAgent->getDataWithGroups(service => $service->getId, facility => $facility->getId);
 	logData $data, 'dataWithGroups';
 	return $data;
 }
 
 sub getDataWithVos {
 	if(defined $local_data) { return $local_data; }
-	my $filterExpiredMembers = shift;
-	unless($filterExpiredMembers) { $filterExpiredMembers = 0; }
-	my $data = $servicesAgent->getDataWithVos(service => $service->getId, facility => $facility->getId, filterExpiredMembers => $filterExpiredMembers);
+	my $data = $servicesAgent->getDataWithVos(service => $service->getId, facility => $facility->getId);
 	logData $data, 'dataWithVos';
 	return $data;
 }

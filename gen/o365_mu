@@ -16,8 +16,8 @@ sub saveUsersToFile;
 sub saveGroupsToFile;
 
 our $SERVICE_NAME     = "o365_mu";
-our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+our $PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.1.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -39,6 +39,19 @@ our $A_UF_O365_STORE_AND_FORWARD;            *A_UF_O365_STORE_AND_FORWARD =     
 our $A_UF_O365_LICENCE;                      *A_UF_O365_LICENCE =                      \'urn:perun:user_facility:attribute-def:def:o365Licence';
 our $A_R_IS_FOR_O365_GROUP;                  *A_R_IS_FOR_O365_GROUP =                  \'urn:perun:resource:attribute-def:def:isForO365Group';
 our $A_F_ID;                                 *A_F_ID =                                 \'urn:perun:facility:attribute-def:core:id';
+
+our $UPN_TEXT = "UPN";
+our $MAIL_FORWARD_TEXT = "mailForward";
+our $ARCHIVE_TEXT = "archive";
+our $STORE_AND_FORWARD_TEXT = "storeAndForward";
+our $EMAIL_ADDRESSES = "emailAddresses";
+
+###------------------------------------------------------------------------------
+### RESOURCE MAILBOXES CONFIGURATION
+### WARNING: These variables are for purpose of resource mail boxes configuration
+###          and we are not using them at this moment! We still want to preserve
+###          this for continuing a work on service in the future.
+###------------------------------------------------------------------------------
 our $A_R_O365_RES_NAME;                      *A_R_O365_RES_NAME =                      \'urn:perun:resource:attribute-def:def:o365ResourceName';
 our $A_R_O365_RES_ALIAS;                     *A_R_O365_RES_ALIAS =                     \'urn:perun:resource:attribute-def:def:o365ResourceAlias';
 our $A_R_O365_RES_EMAIL_ADDRESES;            *A_R_O365_RES_EMAIL_ADDRESES =            \'urn:perun:resource:attribute-def:def:o365ResourceEmailAddresses';
@@ -66,7 +79,6 @@ our $A_GR_O365_RES_BOOK_IN_POLICY;           *A_GR_O365_RES_BOOK_IN_POLICY =    
 our $A_GR_O365_RES_REQUEST_IN_POLICY;        *A_GR_O365_RES_REQUEST_IN_POLICY =        \'urn:perun:group_resource:attribute-def:def:o365ResourceRequestInPolicy';
 our $A_GR_O365_RES_REQUEST_OUT_OF_POLICY;    *A_GR_O365_RES_REQUEST_OUT_OF_POLICY =    \'urn:perun:group_resource:attribute-def:def:o365ResourceRequestOutOfPolicy';
 our $A_GR_O365_RES_DELEGATES;                *A_GR_O365_RES_DELEGATES =                \'urn:perun:group_resource:attribute-def:def:o365ResourceDelegates';
-
 our $RES_NAME_TEXT = "RES_NAME";
 our $RES_ALIAS_TEXT = "RES_ALIAS";
 our $RES_EMAIL_ADDRESES_TEXT = "RES_EMAIL_ADDRESES";
@@ -94,11 +106,12 @@ our $RES_DELEGATES_TEXT = "RES_DELEGATES";
 our $RES_BOOK_IN_POLICY_TEXT = "RES_BOOK_IN_POLICY";
 our $RES_REQUEST_IN_POLICY_TEXT = "RES_REQUEST_IN_POLICY";
 our $RES_REQUEST_OUT_OF_POLICY_TEXT = "RES_REQUEST_OUT_OF_POLICY";
-our $UPN_TEXT = "UPN";
-our $MAIL_FORWARD_TEXT = "mailForward";
-our $ARCHIVE_TEXT = "archive";
-our $STORE_AND_FORWARD_TEXT = "storeAndForward";
-our $EMAIL_ADDRESSES = "emailAddresses";
+
+our $resourceMails = {};
+my $resourceMailsFileName = "$DIRECTORY/$::SERVICE_NAME-resource-mails";
+###------------------------------------------------------------------------------
+### END of RESOURCE MAILBOXES CONFIGURATION
+###------------------------------------------------------------------------------
 
 #Default forwarding domain for MU
 our $DEFAULT_FORWARDING_DOMAIN = '@mo.muni.cz';
@@ -109,7 +122,6 @@ our $DEFAULT_FORWARDING_DOMAIN = '@mo.muni.cz';
 
 our $users = {};
 our $groups = {};
-our $resourceMails = {};
 
 #-------------------------------------------------------------------------
 # PROCESSING FACILITY
@@ -135,12 +147,12 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 
 my $usersFileName = "$DIRECTORY/$::SERVICE_NAME-users";
 my $groupsFileName = "$DIRECTORY/$::SERVICE_NAME-groups";
-my $resourceMailsFileName = "$DIRECTORY/$::SERVICE_NAME-resource-mails";
 my $facilityIdFileName = "$DIRECTORY/$::SERVICE_NAME-facilityId";
 
 saveUsersToFile $usersFileName, $users;
 saveGroupsToFile $groupsFileName, $groups;
-saveResourceMailsToFile $resourceMailsFileName, $resourceMails;
+###we don't want to process resource mailboxes until further change
+#saveResourceMailsToFile $resourceMailsFileName, $resourceMails;
 saveFacilityIdToFile $facilityIdFileName, $facilityId;
 
 #-------------------------------------------------------------------------
@@ -164,20 +176,21 @@ sub processResource {
 
 	#define attributes for processing o365 groups and o365 resource maling lists
 	my $isForO365Group = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_IS_FOR_O365_GROUP );
-	my $resName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_NAME );
+	#my $resName = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_O365_RES_NAME );
 
 	#process all members from resource (users data)
 	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 		processResourceMember $memberId;
 	}
 
+	### Skip of processing resource mails
 	#if resource mail name exists, process it as resource mail (resource-mails data)
-	if($resName) {
-		#prevent duplicity in resource name
-		if($resourceMails->{$resName}) { die "There is a duplicity of two Resources with the same resourceMailName: $resName\n"; }
-
-		processResourceMail $resourceId;
-	}
+	#if($resName) {
+	#	#prevent duplicity in resource name
+	#	if($resourceMails->{$resName}) { die "There is a duplicity of two Resources with the same resourceMailName: $resName\n"; }
+	#
+	#	processResourceMail $resourceId;
+	#}
 
 	#if resource is set as o365 resource, process it with all it's groups (groups data)
 	if($isForO365Group) {
@@ -301,7 +314,9 @@ sub processResourceMember {
 		} else {
 			warn "Can't find emails for user with UCO: $UCO \n";
 		}
-		my $emailsString = join(',', sort @emailsArray);
+		#do not use sorting because of cache in send script (cache does not have sorted emails and such records would need to be updated even if there is no really change)
+		#my $emailsString = join(',', sort @emailsArray);
+		my $emailsString = join(',', @emailsArray);
 
 		unless($users->{$UCO}) {
 			$users->{$UCO}->{$UPN_TEXT} = $UCO . "@" . $domainName;

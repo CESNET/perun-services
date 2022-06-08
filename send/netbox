@@ -35,8 +35,8 @@ my $users_file_name = "$service_files_dir/netbox_users";
 my $groups_file_name = "$service_files_dir/netbox_groups";
 
 # Authorization TOKEN
-open(my $file, '<', "/etc/perun/perun-services/$service_name/$service_name")
-	or die("Can't open /etc/perun/perun-services/$service_name/$service_name: $!\n");
+open(my $file, '<', "/etc/perun/services/$service_name/$service_name")
+	or die("Can't open /etc/perun/services/$service_name/$service_name: $!\n");
 my $TOKEN = <$file>;
 chomp($TOKEN);
 close $file;
