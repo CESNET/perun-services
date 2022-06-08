@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import requests
+import json
+import re
+from json.decoder import JSONDecodeError
+
+urlPattern = re.compile("^(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;()*$']*[-a-zA-Z0-9+&@#/%=~_|()*$']")
+
+if __name__ == "__main__":
+
+    # check input
+    if len(sys.argv) != 4 and len(sys.argv) != 3:
+        print("Error: Expected number of arguments is 2 or 3 (FACILITY_NAME, DESTINATION and optional DESTINATION_TYPE)", file=sys.stderr)
+        exit(1)
+
+    facility_name = sys.argv[1]
+    destination = sys.argv[2]
+    if len(sys.argv) == 3:
+        # if there is no destination type, use default 'url'
+        destination_type = "url"
+    else:
+        destination_type = sys.argv[3]
+
+    if destination_type != "url":
+        print("Only 'url' type of destination is supported.", file=sys.stderr)
+        exit(1)
+
+    if not (re.fullmatch(urlPattern, destination)):
+        print("Destination '" + destination + "' is not in valid URL format!", file=sys.stderr)
+        exit(1)
+
+    # Import client config (file must have .py -> "scs_it4i.py")
+    try:
+        sys.path.insert(1, '/etc/perun/services/scs_it4i/')
+        CLIENT_ID = __import__("scs_it4i").CLIENT_ID
+        CLIENT_SECRET = __import__("scs_it4i").CLIENT_SECRET
+        TOKEN_API = __import__("scs_it4i").TOKEN_API
+    except ImportError as ie:
+        # this means that config file does not exist
+        print("Failed to import config! - " + ie.msg, file=sys.stderr)
+        exit(1)
+
+    if not CLIENT_ID:
+        print("CLIENT_ID configuration is empty!", file=sys.stderr)
+        exit(1)
+
+    if not CLIENT_SECRET:
+        print("CLIENT_SECRET configuration is empty!", file=sys.stderr)
+        exit(1)
+
+    if not TOKEN_API:
+        print("TOKEN_API configuration is empty!", file=sys.stderr)
+        exit(1)
+
+    # Request authorization token via client_id/client_secret
+    token_req = requests.post(
+        TOKEN_API,
+        data = {
+            "client_id": CLIENT_ID,
+            "client_secret": CLIENT_SECRET,
+            "grant_type": "client_credentials"
+        }
+    )
+
+    if token_req.status_code != 200:
+        print("Unable to acquire token!", file=sys.stderr)
+        exit(1)
+
+    try:
+        token_st = json.loads(token_req.text)
+    except JSONDecodeError:
+        print("Invalid token!", file=sys.stderr)
+        exit(1)
+
+    # read all lines at once
+    service_files_base_dir = os.getcwd() + "/../gen/spool"
+    service_files_dir = service_files_base_dir + "/" + facility_name + "/scs_it4i"
+
+    file = open(service_files_dir + "/scs_it4i", mode='r')
+    all_of_it = file.read()
+    file.close()
+
+    try:
+        all_of_it_json = json.loads(all_of_it)
+    except JSONDecodeError:
+        print("Invalid JSON in generated data!", file=sys.stderr)
+        exit(1)
+
+    # Call einfra-user-attr with auth token
+    user_attr_req = requests.post(
+        destination,
+        headers = { "Authorization": "Bearer " + token_st["access_token"] },
+        json = all_of_it
+    )
+
+    response = user_attr_req.text.strip()
+
+    if user_attr_req.status_code != 200:
+        print(f"Failed to import data ({response})", file=sys.stderr)
+
+    else:
+        print(f"Import succeeded ({response})")
