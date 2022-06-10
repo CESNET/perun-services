@@ -8,7 +8,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "crm_ceitec";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.6";
+my $SCRIPT_VERSION = "3.0.7";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -25,7 +25,6 @@ our $A_O; *A_O = \'urn:perun:member:attribute-def:def:organization';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user:attribute-def:def:login-namespace:ceitec';
 our $A_U_ALT_LOGINS; *A_U_ALT_LOGINS = \'urn:perun:user:attribute-def:virt:alternativeLoginNames';
 our $A_G_NAME; *A_G_NAME = \'urn:perun:group:attribute-def:core:name';
-our $A_M_G_GROUP_STATUS; *A_M_G_GROUP_STATUS = \'urn:perun:member_group:attribute-def:virt:groupStatus';
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
@@ -38,16 +37,7 @@ my $userGroups; # $userGroups->{$login}->{$groupName} = 1;
 # FOR EACH RESOURCE
 foreach my $resourceId ( $data->getResourceIds() ) {
 	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
-
 		for my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
-
-			my $memberGroupStatus = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_M_G_GROUP_STATUS );
-
-			# skip EXPIRED members by group membership
-			if (defined $memberGroupStatus and ($memberGroupStatus eq "EXPIRED")) {
-				next;
-			}
-
 			my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_LOGIN );
 			my $groupName = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_NAME );
 
