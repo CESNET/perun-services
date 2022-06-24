@@ -23,7 +23,7 @@ if [ "$DESTINATION_TYPE" != "url" ]; then
 fi
 
 # Read user name and password from configuration if it is present ( expect string "-u user:pass" )
-[ -r /etc/perun/services/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME
+[ -r /etc/perun/services/$SERVICE_NAME/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME/$SERVICE_NAME
 
 # Specify command to tranfer the data
 #TRANSPORT_COMMAND="curl --cacert /etc/ssl/chain_TERENA_SSL_CA_3.pem -i -H Content-Type:application/json -f -X POST"
