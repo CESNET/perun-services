@@ -1,0 +1,54 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+use JSON::XS;
+
+local $::SERVICE_NAME = basename($0);
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+our $A_USER_LOGIN;                  *A_USER_LOGIN =                  \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_RESOURCE_UMBRACO_GROUP_NAME; *A_RESOURCE_UMBRACO_GROUP_NAME = \'urn:perun:resource:attribute-def:def:umbracoGroupName';
+
+my $siteStruc = {};
+
+foreach my $resourceId ($data->getResourceIds()) {
+	my $groupName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_UMBRACO_GROUP_NAME );
+	next unless $groupName;
+
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
+		$siteStruc->{$groupName}->{$login} = 1;
+	}
+}
+
+###Prepare struc for printing to JSON
+my @printingStruc = ();
+foreach my $groupName (sort keys %$siteStruc) {
+	my $record = {};
+	$record->{'groupName'} = $groupName;
+	my @members = ();
+	foreach my $login (sort keys %{$siteStruc->{$groupName}}) {
+		push @members, $login;
+	}
+	$record->{'members'} = \@members;
+	push @printingStruc, $record;
+}
+#sort the struc to get comparable otuput
+@printingStruc = sort { $a->{'groupName'} cmp $b->{'groupName'} } @printingStruc;
+
+my $file_name = "$DIRECTORY/$::SERVICE_NAME";
+####### output file ######################
+open FILE,">$file_name" or die "Cannot open $file_name: $! \n";
+print FILE JSON::XS->new->utf8->pretty->canonical->encode(\@printingStruc);
+close(FILE);
+
+perunServicesInit::finalize;
