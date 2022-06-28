@@ -1,0 +1,44 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+use utf8;
+
+binmode STDOUT, ":utf8";
+
+our $SERVICE_NAME = basename($0);
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_MEMBER_MAILS;            *A_MEMBER_MAILS =              \'urn:perun:member:attribute-def:virt:mails';
+
+my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
+
+my $emailsStruc = {};
+
+#####################################
+foreach my $memberId ($data->getMemberIdsForFacility()) {
+	my $emails = $data->getMemberAttributeValue(attrName => $A_MEMBER_MAILS, member => $memberId);
+	foreach my $email (@$emails) {
+		$emailsStruc->{$email} = 1;
+	}
+}
+
+####### FILE WITH EMAILS ######
+open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
+binmode SERVICE_FILE, ":utf8";
+
+foreach my $email (sort keys %$emailsStruc) {
+	print SERVICE_FILE $email . "\n";
+}
+
+close(SERVICE_FILE);
+
+perunServicesInit::finalize;
