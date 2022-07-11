@@ -23,7 +23,7 @@ if [ "$DESTINATION_TYPE" != "url" ]; then
 fi
 
 # Read user name and password from configuration if it is present ( expect string "-u user:pass" )
-[ -r /etc/perun/services/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME
+[ -r /etc/perun/services/$SERVICE_NAME/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME/$SERVICE_NAME
 
 # Specify command to transfer the data
 TRANSPORT_COMMAND="curl -Ss -i -H Content-Type:application/json -f -X POST"
