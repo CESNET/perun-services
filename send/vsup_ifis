@@ -12,6 +12,7 @@ binmode STDOUT, ":utf8";
 
 sub handleContact;
 sub handleAkt;
+sub appendParam;
 
 my $username;
 my $password;
@@ -168,54 +169,14 @@ foreach my $uco (sort keys %$dataByKey) {
 		my $select = "SELECT 1 from $tableName where OSB_ID=? and OS_CISLO=?";
 		my @params = ($uco, $OS_CISLO);
 
-		if ($JMENO) {
-			$select = $select . " and JMENO=?";
-			push(@params, $JMENO);
-		} else {
-			$select = $select . " and JMENO is NULL";
-		}
-		if ($PRIJMENI) {
-			$select = $select . " and PRIJMENI=?";
-			push(@params, $PRIJMENI);
-		} else {
-			$select = $select . " and PRIJMENI is NULL";
-		}
-		if ($TITUL) {
-			$select = $select . " and TITUL=?";
-			push(@params, $TITUL);
-		} else {
-			$select = $select . " and TITUL is NULL";
-		}
-		if ($TITUL2) {
-			$select = $select . " and TITUL2=?";
-			push(@params, $TITUL2);
-		} else {
-			$select = $select . " and TITUL2 is NULL";
-		}
-		if ($RODCISLO) {
-			$select = $select . " and ROD_CISLO=?";
-			push(@params, $RODCISLO);
-		} else {
-			$select = $select . " and ROD_CISLO is NULL";
-		}
-		if ($FUNKCE) {
-			$select = $select . " and FUNKCE=?";
-			push(@params, $FUNKCE);
-		} else {
-			$select = $select . " and FUNKCE is NULL";
-		}
-		if ($POHLAVI) {
-			$select = $select . " and POHLAVI=?";
-			push(@params, $POHLAVI);
-		} else {
-			$select = $select . " and POHLAVI is NULL";
-		}
-		if ($TYP_VZTAHU) {
-			$select = $select . " and TYP_VZTAHU=?";
-			push(@params, $TYP_VZTAHU);
-		} else {
-			$select = $select . " and TYP_VZTAHU is NULL";
-		}
+		$select = appendParam(select => $select, params => \@params, paramName => 'JMENO', paramValue => $JMENO);
+		$select = appendParam(select => $select, params => \@params, paramName => 'PRIJMENI', paramValue => $PRIJMENI);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TITUL', paramValue => $TITUL);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TITUL2', paramValue => $TITUL2);
+		$select = appendParam(select => $select, params => \@params, paramName => 'ROD_CISLO', paramValue => $RODCISLO);
+		$select = appendParam(select => $select, params => \@params, paramName => 'FUNKCE', paramValue => $FUNKCE);
+		$select = appendParam(select => $select, params => \@params, paramName => 'POHLAVI', paramValue => $POHLAVI);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TYP_VZTAHU', paramValue => $TYP_VZTAHU);
 
 		my $recordAreEquals = $dbh->prepare($select);
 		$recordAreEquals->execute(@params);
@@ -494,43 +455,14 @@ foreach my $key (sort keys %$dc2_data) {
 	if($personExists->fetch) {
 		if($DEBUG == 1) { print "FIND: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
 
-		#Generate proper select on NULLs
-		my $select = "SELECT 1 from $tableNameVzt where OSB_ID=? and VZTAH_CISLO=? and EXT_ID=? and TYP_VZTAHU=? and NS";
+		my $select = "SELECT 1 from $tableNameVzt where OSB_ID=? and VZTAH_CISLO=? and EXT_ID=? and TYP_VZTAHU=?";
 		my @params = ($OSB_ID, $VZTAH_CISLO, $EXT_ID, $TYP_VZTAHU);
-		if (defined($NS)) {
-			$select = $select . "=?";
-			push(@params, $NS);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and DRUH_VZTAHU";
-		if (defined($DRUH_VZTAHU)) {
-			$select = $select . "=?";
-			push(@params, $DRUH_VZTAHU);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and OD";
-		if (defined($VZTAH_OD)) {
-			$select = $select . "=?";
-			push(@params, $VZTAH_OD);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and DO_";
-		if (defined($VZTAH_DO)) {
-			$select = $select . "=?";
-			push(@params, $VZTAH_DO);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and KARTA_IDENT";
-		if (defined($KARTA_IDENT)) {
-			$select = $select . "=?";
-			push(@params, $KARTA_IDENT);
-		} else {
-			$select = $select . " is NULL";
-		}
+
+		$select = appendParam(select => $select, params => \@params, paramName => 'NS', paramValue => $NS);
+		$select = appendParam(select => $select, params => \@params, paramName => 'DRUH_VZTAHU', paramValue => $DRUH_VZTAHU);
+		$select = appendParam(select => $select, params => \@params, paramName => 'OD', paramValue => $VZTAH_OD);
+		$select = appendParam(select => $select, params => \@params, paramName => 'DO_', paramValue => $VZTAH_DO);
+		$select = appendParam(select => $select, params => \@params, paramName => 'KARTA_IDENT', paramValue => $KARTA_IDENT);
 
 		# We need to know if these two records are without changes, if yes, skip them
 		my $recordAreEquals = $dbh->prepare($select);
@@ -586,24 +518,24 @@ while(my $row = $existingVztah_dc2->fetchrow_hashref()) {
 $existingVztah_dc2->finish();
 
 #
-# PROCESS RELATIONS FROM KOS
+# PROCESS RELATIONS FROM IS
 #
 
-my $kos_data = load_kos();
+my $is_data = load_is();
 
-foreach my $key (sort keys %$kos_data) {
+foreach my $key (sort keys %$is_data) {
 
-	my $OSB_ID = $kos_data->{$key}->{'OSB_ID'};
-	my $NS = $kos_data->{$key}->{'NS'};
-	my $TYP_VZTAHU = $kos_data->{$key}->{'TYP_VZTAHU'};
-	my $DRUH_VZTAHU = $kos_data->{$key}->{'DRUH_VZTAHU'};
-	my $STU_FORMA = $kos_data->{$key}->{'STU_FORMA'};
-	my $STUD_STAV = $kos_data->{$key}->{'STUD_STAV'};
-	my $STU_PROGR = $kos_data->{$key}->{'STU_PROGR'};
+	my $OSB_ID = $is_data->{$key}->{'OSB_ID'};
+	my $NS = $is_data->{$key}->{'NS'};
+	my $TYP_VZTAHU = $is_data->{$key}->{'TYP_VZTAHU'};
+	my $DRUH_VZTAHU = $is_data->{$key}->{'DRUH_VZTAHU'};
+	my $STU_FORMA = $is_data->{$key}->{'STU_FORMA'};
+	my $STUD_STAV = $is_data->{$key}->{'STUD_STAV'};
+	my $STU_PROGR = $is_data->{$key}->{'STU_PROGR'};
 	my $VZTAH_CISLO = $key;
-	my $VZTAH_OD = $kos_data->{$key}->{'VZTAH_OD'};
-	my $VZTAH_DO = $kos_data->{$key}->{'VZTAH_DO'};
-	my $KARTA_IDENT = $kos_data->{$key}->{'KARTA_IDENT'};
+	my $VZTAH_OD = $is_data->{$key}->{'VZTAH_OD'};
+	my $VZTAH_DO = $is_data->{$key}->{'VZTAH_DO'};
+	my $KARTA_IDENT = $is_data->{$key}->{'KARTA_IDENT'};
 	my $EXT_ID = $key; # same as VZTAH_CISLO
 
 	#If osb_id or typ_vztahu are undef, skip this record
@@ -623,64 +555,17 @@ foreach my $key (sort keys %$kos_data) {
 	if($personExists->fetch) {
 		if($DEBUG == 1) { print "FIND: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
 
-		#Generate proper select on NULLs
-		my $select = "SELECT 1 from $tableNameVzt where OSB_ID=? and VZTAH_CISLO=? and EXT_ID=? and TYP_VZTAHU=? and NS";
+		my $select = "SELECT 1 from $tableNameVzt where OSB_ID=? and VZTAH_CISLO=? and EXT_ID=? and TYP_VZTAHU=?";
 		my @params = ($OSB_ID, $VZTAH_CISLO, $EXT_ID, $TYP_VZTAHU);
-		if (defined($NS)) {
-			$select = $select . "=?";
-			push(@params, $NS);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and DRUH_VZTAHU";
-		if (defined($DRUH_VZTAHU)) {
-			$select = $select . "=?";
-			push(@params, $DRUH_VZTAHU);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and STU_FORMA";
-		if (defined($STU_FORMA)) {
-			$select = $select . "=?";
-			push(@params, $STU_FORMA);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and STUD_STAV";
-		if (defined($STUD_STAV)) {
-			$select = $select . "=?";
-			push(@params, $STUD_STAV);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and STU_PROGR";
-		if (defined($STU_PROGR)) {
-			$select = $select . "=?";
-			push(@params, $STU_PROGR);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and OD";
-		if (defined($VZTAH_OD)) {
-			$select = $select . "=?";
-			push(@params, $VZTAH_OD);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and DO_";
-		if (defined($VZTAH_DO)) {
-			$select = $select . "=?";
-			push(@params, $VZTAH_DO);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and KARTA_IDENT";
-		if (defined($KARTA_IDENT)) {
-			$select = $select . "=?";
-			push(@params, $KARTA_IDENT);
-		} else {
-			$select = $select . " is NULL";
-		}
+
+		$select = appendParam(select => $select, params => \@params, paramName => 'NS', paramValue => $NS);
+		$select = appendParam(select => $select, params => \@params, paramName => 'DRUH_VZTAHU', paramValue => $DRUH_VZTAHU);
+		$select = appendParam(select => $select, params => \@params, paramName => 'STU_FORMA', paramValue => $STU_FORMA);
+		$select = appendParam(select => $select, params => \@params, paramName => 'STUD_STAV', paramValue => $STUD_STAV);
+		$select = appendParam(select => $select, params => \@params, paramName => 'STU_PROGR', paramValue => $STU_PROGR);
+		$select = appendParam(select => $select, params => \@params, paramName => 'OD', paramValue => $VZTAH_OD);
+		$select = appendParam(select => $select, params => \@params, paramName => 'DO_', paramValue => $VZTAH_DO);
+		$select = appendParam(select => $select, params => \@params, paramName => 'KARTA_IDENT', paramValue => $KARTA_IDENT);
 
 		# We need to know if these two records are without changes, if yes, skip them
 		my $recordAreEquals = $dbh->prepare($select);
@@ -722,8 +607,8 @@ $existingVztah_kos->execute();
 while(my $row = $existingVztah_kos->fetchrow_hashref()) {
 	my $VZTAH_CISLO = $row->{VZTAH_CISLO};
 	my $UCO = $row->{OSB_ID};
-	unless (exists $kos_data->{$VZTAH_CISLO}) {
-		# STU vztah is not in KOS source, remove from IFIS.
+	unless (exists $is_data->{$VZTAH_CISLO}) {
+		# STU vztah is not in IS source, remove from IFIS.
 		if ($DEBUG == 1) { print "DELETE VZTAH RECORD CISLO_VZTAHU: $VZTAH_CISLO /STU \n"; }
 		$deleteVztah_kos->execute($VZTAH_CISLO);
 		$kos_deleted++;
@@ -1041,5 +926,27 @@ sub handleAkt() {
 	} else {
 		print "Wrong usage of handleAkt()."
 	}
+
+}
+
+#
+# Appends PARAM with respecting to possible NULL to select
+#
+sub appendParam() {
+
+	my %args = @_;
+	my $select = $args{select};
+	my $paramsRef = $args{params};
+	my $paramName = $args{paramName};
+	my $paramValue = $args{paramValue};
+
+	if (defined($paramValue)) {
+		$select = $select . " and $paramName=?";
+		push(@$paramsRef, $paramValue);
+	} else {
+		$select = $select . " and $paramName is NULL";
+	}
+
+	return $select;
 
 }
