@@ -123,14 +123,16 @@ if __name__ == "__main__":
 		# send a gziped tar archive via HTTP(s)
 		tar_mode = tar_mode + "z"
 
-	temp_dir = tempfile.TemporaryDirectory()
-	temp_file = tempfile.TemporaryFile(mode="w+", dir=temp_dir.name)
+	temp_dir = tempfile.TemporaryDirectory(prefix="perun-send.")
+	temp_file = tempfile.NamedTemporaryFile(mode="w+", prefix="hostname_", dir=temp_dir.name)
 	temp_file.write(hostname)
+	temp_file.flush()
+	temp_file_name = os.path.basename(temp_file.name)
 
 	if os.path.isdir(service_files_for_destination):
-		tar_command = "tar " + tar_mode + " -C " + service_files_for_destination + " . -C " + service_files_dir + "  --exclude=\"_destination\" .  -C " + temp_dir.name + " ."
+		tar_command = "tar " + tar_mode + " -C " + service_files_for_destination + " . -C " + service_files_dir + " --exclude=\"_destination\" . -C " + temp_dir.name + " . --transform='flags=r;s|" + temp_file_name + "|HOSTNAME|'"
 	else:
-		tar_command = "tar " + tar_mode + " -C " + service_files_dir + "  --exclude=\"_destination\" .  -C " + temp_dir.name + " ."
+		tar_command = "tar " + tar_mode + " -C " + service_files_dir + " --exclude=\"_destination\" . -C " + temp_dir.name + " . --transform='flags=r;s|" + temp_file_name + "|HOSTNAME|'"
 
 	process_tar = subprocess.Popen(shlex.split(tar_command), stdout=subprocess.PIPE)
 
@@ -150,11 +152,15 @@ if __name__ == "__main__":
 	timeout_command = "timeout -k " + timeout_kill + " " + timeout + " " + transport_command
 	process = subprocess.Popen(shlex.split(timeout_command), stdin=transformation_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	transformation_process.stdout.close()
-	stdout = process.communicate()[0]
+	(stdout, stderr) = process.communicate()
+
+	# close temp file with HOSTNAME will delete the file
+	temp_file.close()
 
 	if process.returncode == 124:
 		# special situation when error code 124 has been thrown. That means - timeout and terminated from our side
 		print(stdout.decode("utf-8"))
+		print(stderr.decode("utf-8"), file=sys.stderr)
 		print("Communication with slave script was timed out with return code: " + str(process.returncode) + " (Warning: this error can mask original error 124 from peer!)", file=sys.stderr)
 	else:
 		# in all other cases we need to resolve if 'ssh' or 'curl' was used
@@ -178,6 +184,7 @@ if __name__ == "__main__":
 			print(stdout.decode("utf-8"))
 		# for all situations different from time-out by our side we can return value from ERR_CODE as the result
 		if process.returncode != 0:
+			print(stderr.decode("utf-8"), file=sys.stderr)
 			print("Communication with slave script ends with return code: " + str(process.returncode), file=sys.stderr)
 
 	exit(process.returncode)
