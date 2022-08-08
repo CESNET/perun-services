@@ -15,7 +15,7 @@ my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_LOGIN_MU;                          *A_USER_LOGIN_MU =                         \'urn:perun:user:attribute-def:def:login-namespace:mu';
-our $A_MEMBER_O365_EMAIL_ADDRESSES;            *A_MEMBER_O365_EMAIL_ADDRESSES =           \'urn:perun:member:attribute-def:def:o365EmailAddresses:mu';
+our $A_USER_O365_EMAIL_ADDRESSES;              *A_USER_O365_EMAIL_ADDRESSES =             \'urn:perun:user:attribute-def:def:o365EmailAddresses:mu';
 our $A_FACILITY_O365_ALLOWED_DOMAINS;          *A_FACILITY_O365_ALLOWED_DOMAINS =         \'urn:perun:facility:attribute-def:def:o365ContactExportAllowedDomains';
 
 #open file
@@ -27,7 +27,7 @@ my %allowedDomains = map { $_ => 1 } @{$data->getFacilityAttributeValue( attrNam
 my $memberDataByLogin;
 foreach my $memberId ($data->getMemberIdsForFacility()) {
 	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_MU );
-	my @emailAddresses = @{$data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_O365_EMAIL_ADDRESSES )};
+	my @emailAddresses = @{$data->getUserAttributeValue( member => $memberId, attrName => $A_USER_O365_EMAIL_ADDRESSES )};
 
 	my @allowedEmails = ();
 	foreach my $email (@emailAddresses) {
