@@ -1,3 +1,9 @@
+perun-slave-base (3.1.16) stable; urgency=low
+
+  * Fixed print of E_LOCK_DIR_NOT_WRITABLE error message
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 01 Aug 2022 13:30:00 +0200
+
 perun-slave-base (3.1.15) stable; urgency=low
 
   * Suppress unnecessary TAR warnings about timestamps in the future.

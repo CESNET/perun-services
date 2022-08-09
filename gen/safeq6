@@ -1,0 +1,206 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use MIME::Base64;
+use utf8;
+use Encode;
+
+#Forward Declaration
+sub processUsers;
+sub processCostCenters;
+sub checkAttributeValue;
+
+local $::SERVICE_NAME = "safeq6";
+local $::PROTOCOL_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_F_BASE_DN;              *A_F_BASE_DN =             \'urn:perun:facility:attribute-def:def:adBaseDN';
+
+our $A_USER_LOGIN;             *A_USER_LOGIN =            \'urn:perun:user:attribute-def:def:login-namespace:mu';
+our $A_USER_FIRST_NAME;        *A_USER_FIRST_NAME =       \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_LAST_NAME;         *A_USER_LAST_NAME =        \'urn:perun:user:attribute-def:core:lastName';
+our $A_USER_MAIL;              *A_USER_MAIL =             \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_CHIP_NUM;          *A_USER_CHIP_NUM =         \'urn:perun:user:attribute-def:def:chipNumbers';
+our $A_USER_WORKPLACE;         *A_USER_WORKPLACE =        \'urn:perun:user:attribute-def:def:workplace';
+our $A_USER_WORKPLACE_ID;      *A_USER_WORKPLACE_ID =     \'urn:perun:user:attribute-def:def:workplaceId';
+our $A_RESOURCE_ROLE;          *A_RESOURCE_ROLE =         \'urn:perun:resource:attribute-def:def:safeq-role';
+our $A_RESOURCE_BILLING_CODE;  *A_RESOURCE_BILLING_CODE = \'urn:perun:resource:attribute-def:def:safeq-billingcode';
+our $A_R_PREPAID;              *A_R_PREPAID =             \'urn:perun:resource:attribute-def:def:safeq-prepaid';
+our $A_R_PRINT_FOR_FREE;       *A_R_PRINT_FOR_FREE =      \'urn:perun:resource:attribute-def:def:safeq-printForFree';
+
+my $baseDNUsers = $data->getFacilityAttributeValue(attrName => $A_F_BASE_DN);
+
+my $file = $DIRECTORY . "safeq";
+
+my $STRUC_ROLES = \0;
+my $STRUC_BILLINGCODES = \1;
+
+my %costcentersById = ( 100 => "Uživatelé bez přiřazeného pracoviště");
+my $usersByLogin;
+my $resourceAttrsByUserLogin;
+
+
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+		processUsers $memberId, $resourceId;
+	}
+}
+
+
+open FILE,">$file" or die "Cannot open $file: $! \n";
+binmode FILE,":utf8";
+
+# safeq_costcenters
+## dn: costcenterno=1000001, ou=costcenters, o=ysoftsafeq
+## objectclass: ysqcostcenter
+## costcenterno: 1000001
+## costcentername: Human Resources
+foreach my $id (sort keys %costcentersById) {
+	print FILE "dn: ", "costcenterno=" . escapeDnValue($id) . ",ou=costcenters,o=ysoftsafeq", "\n";
+	print FILE "objectclass: ysqcostcenter", "\n";
+	print FILE "costcenterno:", checkBase64($id), "\n";
+	print FILE "costcentername:", checkBase64($costcentersById{$id}), "\n";
+	print FILE "\n";
+}
+
+
+
+
+# safeq_users
+## dn: username=johndoe,ou=users,o=ysoftsafeq
+## objectclass: ysquser
+## username: johndoe
+## ldapauthdn: cn=johndoe,ou=users,ou=mu,dc=ucn,dc=muni,dc=cz
+## firstname: John
+## lastname: Doe
+## costcenter: costcenterno=1000001, ou=costcenters, o=ysoftsafeq
+## email: johndoe@muni.cz
+## card: CARD87654321
+## card: CARD98765432
+## role: rolename=student,ou=roles,o=ysoftsafeq
+## billingcode: billincode=bc1,ou=billingcodes,o=ysoftsafeq
+## prepaid: FALSE
+
+my %allChipNumbers;  #used for consistency check - each chip number should belong to only one user
+
+foreach my $login (sort keys %$usersByLogin) {
+	my $attributes = $usersByLogin->{$login};
+
+	print FILE "dn: ", "username=" . escapeDnValue($login) . ",ou=users,o=ysoftsafeq", "\n";
+	print FILE "objectclass: ysquser", "\n";
+	print FILE "username:", checkBase64($login), "\n";
+	print FILE "ldapauthdn:", checkBase64("cn=" . $login . "," . $baseDNUsers), "\n";
+	print FILE "firstname:", checkBase64($attributes->{$A_USER_FIRST_NAME} || '(N/A)'), "\n";
+	print FILE "lastname:", checkBase64($attributes->{$A_USER_LAST_NAME} || '(N/A)'), "\n";
+	print FILE "costcenter:", checkBase64("costcenterno=" . ($attributes->{$A_USER_WORKPLACE_ID} || 100) . ",ou=costcenters,o=ysoftsafeq"), "\n";
+	print FILE "email:", checkBase64($attributes->{$A_USER_MAIL}), "\n";
+	print FILE "homedir:: ", encode_base64('\\\\ha-ntc.ics.muni.cz\\profiles\\' . $login);
+
+	if (defined $attributes->{$A_USER_CHIP_NUM}) {
+		foreach my $chipNumber (sort @{$attributes->{$A_USER_CHIP_NUM}}) {
+			if ($allChipNumbers{$chipNumber}) {
+				warn "Same chip number shared by more users. Logins of users: " . $login . ", " . $allChipNumbers{$chipNumber} . "\n";
+			}
+			$allChipNumbers{$chipNumber} = $login;
+			print FILE "card:", checkBase64($chipNumber), "\n";
+		}
+	}
+
+	foreach my $role (sort keys %{$resourceAttrsByUserLogin->{$login}->{$STRUC_ROLES}}) {
+		print FILE "role:", checkBase64($role), "\n";
+	}
+	print FILE "role: everyone", "\n";
+
+	foreach my $billingcode (sort keys %{$resourceAttrsByUserLogin->{$login}->{$STRUC_BILLINGCODES}}) {
+		print FILE "billingcode:",checkBase64("billingcode=" . $billingcode . ",ou=billingcodes,o=ysoftsafeq"), "\n";
+	}
+
+	if($attributes->{$A_R_PRINT_FOR_FREE}) {
+		print FILE "pricelistname: bezplatny tisk - zamestnanci", "\n";
+	}
+
+	#print FILE "prepaid: ", $attributes->{$A_R_PREPAID} ? "TRUE" : "FALSE", "\n";
+	print FILE "prepaid: FALSE", "\n";
+	print FILE "\n";
+}
+
+close (FILE) or die "Cannot close $file: $! \n";
+perunServicesInit::finalize;
+
+##############################################################################
+#   Only subs definitions down there
+##############################################################################
+
+sub processUsers {
+	my $memberId = shift;
+	my $resourceId = shift;
+	my $login = $data->getUserAttributeValue(attrName => $A_USER_LOGIN, member => $memberId);
+
+	unless(defined $usersByLogin->{$login}) {
+		$usersByLogin->{$login}->{$A_USER_FIRST_NAME} = $data->getUserAttributeValue(attrName => $A_USER_FIRST_NAME, member => $memberId);
+		$usersByLogin->{$login}->{$A_USER_LAST_NAME} = $data->getUserAttributeValue(attrName => $A_USER_LAST_NAME, member => $memberId);
+		$usersByLogin->{$login}->{$A_USER_MAIL} = $data->getUserAttributeValue(attrName => $A_USER_MAIL, member => $memberId);
+		$usersByLogin->{$login}->{$A_USER_CHIP_NUM} = $data->getUserAttributeValue(attrName => $A_USER_CHIP_NUM, member => $memberId);
+		$usersByLogin->{$login}->{$A_USER_WORKPLACE_ID} = $data->getUserAttributeValue(attrName => $A_USER_WORKPLACE_ID, member => $memberId);
+		$usersByLogin->{$login}->{$A_R_PREPAID} = $data->getResourceAttributeValue(attrName => $A_R_PREPAID, resource => $resourceId);
+		$usersByLogin->{$login}->{$A_R_PRINT_FOR_FREE} = ( $data->getResourceAttributeValue(attrName => $A_R_PRINT_FOR_FREE, resource => $resourceId) || 0) ;
+	} else {
+		$usersByLogin->{$login}->{$A_R_PREPAID} |= ($data->getResourceAttributeValue(attrName => $A_R_PREPAID, resource => $resourceId) || 0);
+		$usersByLogin->{$login}->{$A_R_PRINT_FOR_FREE} |= ( $data->getResourceAttributeValue(attrName => $A_R_PRINT_FOR_FREE, resource => $resourceId) || 0) ;
+	}
+
+	my $resourceRole = $data->getResourceAttributeValue(attrName => $A_RESOURCE_ROLE, resource => $resourceId);
+	my $resourceBillingCode = $data->getResourceAttributeValue(attrName => $A_RESOURCE_BILLING_CODE, resource => $resourceId);
+	$resourceAttrsByUserLogin->{$login}->{$STRUC_ROLES}->{$resourceRole} = 1 if defined $resourceRole;
+	$resourceAttrsByUserLogin->{$login}->{$STRUC_BILLINGCODES}->{$resourceBillingCode} = 1 if defined $resourceBillingCode;
+
+	if($data->getUserAttributeValue(attrName => $A_USER_WORKPLACE_ID, member => $memberId)) {
+		processCostCenters $data->getUserAttributeValue(attrName => $A_USER_WORKPLACE_ID, member => $memberId),
+			$data->getUserAttributeValue(attrName => $A_USER_WORKPLACE, member => $memberId);
+	}
+}
+
+sub processCostCenters {
+	my $costCenterId = shift;
+	my $costCenterName = shift;
+
+	$costcentersById{$costCenterId} = $costCenterName unless defined $costcentersById{$costCenterId};
+}
+
+# method looks for specific characters/symbols in the scalar $value
+# and escapes each of them using backslash
+sub escapeDnValue {
+	my $value = shift;
+
+	if (defined($value)){
+		# escape one of the characters inside the string: ",", "+", """, "\", "<", ">" or ";"
+		$value =~ s/[,+"\\><;]/\\${^MATCH}/pg;
+
+		# escape a whitespace or "#" character occurring at the beginning of the string
+		$value =~ s/^\s|^#/\\${^MATCH}/pg;
+
+		# escape a whitespace character occurring at the end of the string
+		$value =~ s/\s$/\\ /g;
+	}
+
+	return $value;
+}
+
+# method checks if value starts with SAFE-INIT-CHAR and then continue with SAFE-CHAR
+# if not then it encode to Base64 with ":: " prefix
+sub checkBase64 {
+	my $value = shift;
+
+	if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
+		return " ", $value;
+	}
+	return ": ", encode_base64(Encode::encode_utf8($value), '');
+}
+

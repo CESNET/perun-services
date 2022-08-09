@@ -1,0 +1,127 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use open qw/:std :utf8/;
+use JSON::XS;
+use utf8;
+
+local $::SERVICE_NAME = "atlassian_mu";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#forward declaration
+sub processUsers;
+sub processResource;
+sub processMemberships;
+
+#Constants
+our $A_USER_ID;                        *A_USER_ID =                        \'urn:perun:user:attribute-def:core:id';
+our $A_USER_LOGIN;                     *A_USER_LOGIN =                     \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_USER_GIVEN_NAME;                *A_USER_GIVEN_NAME =                \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_FAMILY_NAME;               *A_USER_FAMILY_NAME =               \'urn:perun:user:attribute-def:core:lastName';
+our $A_RESOURCE_ATLASSIAN_GROUP_NAME;  *A_RESOURCE_ATLASSIAN_GROUP_NAME =  \'urn:perun:resource:attribute-def:def:atlassianGroupName';
+
+my $domain = "\@muni.cz";
+
+my $userStruc = {};
+my $resourceStruc = {};
+my $membershipStruc = {};
+
+my $emailHeader = "email";
+my $givenNameHeader = "givenName";
+my $familyNameHeader = "familyName";
+
+my $fileUsers = $DIRECTORY . "/users.scim";
+my $fileGroups = $DIRECTORY . "/groups.scim";
+foreach my $resourceId ($data->getResourceIds()) {
+	processResource $resourceId;
+}
+
+# PREPARE USERSDATA TO JSON
+my %users = ();
+foreach my $uid (sort keys %$userStruc) {
+	my $userInfo = {};
+	$userInfo->{$emailHeader} = $userStruc->{$uid}->{$emailHeader};
+	$userInfo->{$givenNameHeader} = $userStruc->{$uid}->{$givenNameHeader};
+	$userInfo->{$familyNameHeader} = $userStruc->{$uid}->{$familyNameHeader};
+	$users{$userStruc->{$uid}->{$emailHeader}} = $userInfo;
+}
+
+# PRINT USERS TO JSON
+open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
+binmode(FILE_USERS);
+print FILE_USERS JSON::XS->new->utf8->pretty->canonical->encode(\%users);
+close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
+
+# PREPARE GROUPSDATA TO JSON
+my %groups;
+foreach my $resourceId (sort keys %$resourceStruc) {
+	my @members;
+	foreach my $uid (sort keys %{$membershipStruc->{$resourceId}}){
+		push @members, $userStruc->{$uid}->{$emailHeader};
+	}
+
+	$groups{$resourceStruc->{$resourceId}->{$A_RESOURCE_ATLASSIAN_GROUP_NAME}} = \@members;
+}
+
+# PRINT GROUPS TO JSON
+open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
+binmode(FILE_GROUPS);
+print FILE_GROUPS JSON::XS->new->utf8->pretty->canonical->encode(\%groups);
+close (FILE_GROUPS) or die "Cannot close $fileGroups: $! \n";
+
+perunServicesInit::finalize;
+
+##############################################################################
+#   Only subs definitions down there
+##############################################################################
+## creates structure for users.scim file
+sub processUsers {
+	my ($resourceId, $memberId) = @_;
+
+	my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
+	my $userFamilyName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_FAMILY_NAME );
+	my $userGivenName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_GIVEN_NAME );
+	my $login = $data->getUserFacilityAttributeValue( member => $memberId, facility => $data->getFacilityId, attrName => $A_USER_LOGIN );
+
+	unless (exists $userStruc->{$uid}) {
+		$userStruc->{$uid}->{$emailHeader} = $login . $domain;
+		$userStruc->{$uid}->{$familyNameHeader} = $userFamilyName;
+		$userStruc->{$uid}->{$givenNameHeader} = $userGivenName;
+	}
+
+	processMemberships $resourceId, $uid;
+}
+
+## creates structure for groups.scim file
+sub processResource {
+	my ($resourceId) = @_;
+
+	if ($data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_ATLASSIAN_GROUP_NAME)) {
+		my $groupName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_ATLASSIAN_GROUP_NAME);
+
+		unless(exists $resourceStruc->{$resourceId}) {
+			$resourceStruc->{$resourceId}->{$A_RESOURCE_ATLASSIAN_GROUP_NAME} = $groupName;
+		}
+
+		foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+			processUsers $resourceId, $memberId;
+		}
+	}
+}
+
+## creates structure for memberships
+sub processMemberships {
+	my ($resourceId, $uid) = @_;
+
+	unless(exists $membershipStruc->{$resourceId}->{$uid}) {
+		$membershipStruc->{$resourceId}->{$uid} = {};
+	}
+}
