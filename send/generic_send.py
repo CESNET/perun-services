@@ -182,9 +182,9 @@ if __name__ == "__main__":
 		else:
 			# in this situation 'ssh' was used, STDOUT has to be printed
 			print(stdout.decode("utf-8"))
+			print(stderr.decode("utf-8"), file=sys.stderr)
 		# for all situations different from time-out by our side we can return value from ERR_CODE as the result
 		if process.returncode != 0:
-			print(stderr.decode("utf-8"), file=sys.stderr)
 			print("Communication with slave script ends with return code: " + str(process.returncode), file=sys.stderr)
 
 	exit(process.returncode)
