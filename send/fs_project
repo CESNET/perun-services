@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="fs_project"
+export SERVICE_NAME="fs_project"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

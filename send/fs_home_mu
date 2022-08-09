@@ -1,5 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
+export SERVICE_NAME="fs_home_mu"
 
-SERVICE_NAME="fs_home_mu"
-
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

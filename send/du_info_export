@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="du_info_export"
+export SERVICE_NAME="du_info_export"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="ldap"
+export SERVICE_NAME="ldap"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

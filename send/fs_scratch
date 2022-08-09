@@ -1,4 +1,4 @@
-#!/bin/bash 
-SERVICE_NAME="fs_scratch"
+#!/bin/bash
+export SERVICE_NAME="fs_scratch"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"
