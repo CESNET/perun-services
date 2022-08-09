@@ -130,9 +130,9 @@ if __name__ == "__main__":
 	temp_file_name = os.path.basename(temp_file.name)
 
 	if os.path.isdir(service_files_for_destination):
-		tar_command = "tar " + tar_mode + " -C " + service_files_for_destination + " . -C " + service_files_dir + " --exclude=\"_destination\" . -C " + temp_dir.name + " . --transform='flags=r;s|" + temp_file_name + "|HOSTNAME|'"
+		tar_command = "tar " + tar_mode + " -C \"" + service_files_for_destination + "\" . -C \"" + service_files_dir + "\" --exclude=\"_destination\" . -C \"" + temp_dir.name + "\" . --transform='flags=r;s|" + temp_file_name + "|HOSTNAME|'"
 	else:
-		tar_command = "tar " + tar_mode + " -C " + service_files_dir + " --exclude=\"_destination\" . -C " + temp_dir.name + " . --transform='flags=r;s|" + temp_file_name + "|HOSTNAME|'"
+		tar_command = "tar " + tar_mode + " -C \"" + service_files_dir + "\" --exclude=\"_destination\" . -C \"" + temp_dir.name + "\" . --transform='flags=r;s|" + temp_file_name + "|HOSTNAME|'"
 
 	process_tar = subprocess.Popen(shlex.split(tar_command), stdout=subprocess.PIPE)
 
