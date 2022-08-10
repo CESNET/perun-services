@@ -159,9 +159,9 @@ if __name__ == "__main__":
 
 	if process.returncode == 124:
 		# special situation when error code 124 has been thrown. That means - timeout and terminated from our side
-		print(stdout.decode("utf-8"))
-		print(stderr.decode("utf-8"), file=sys.stderr)
-		print("Communication with slave script was timed out with return code: " + str(process.returncode) + " (Warning: this error can mask original error 124 from peer!)", file=sys.stderr)
+		print(stdout.decode("utf-8"), end='')
+		print(stderr.decode("utf-8"), file=sys.stderr, end='')
+		print("Communication with slave script was timed out with return code: " + str(process.returncode) + " (Warning: this error can mask original error 124 from peer!)", file=sys.stderr, end='')
 	else:
 		# in all other cases we need to resolve if 'ssh' or 'curl' was used
 		if destination_type == destination_type_url:
@@ -181,10 +181,10 @@ if __name__ == "__main__":
 					exit(0)
 		else:
 			# in this situation 'ssh' was used, STDOUT has to be printed
-			print(stdout.decode("utf-8"))
-			print(stderr.decode("utf-8"), file=sys.stderr)
+			print(stdout.decode("utf-8"), end='')
+			print(stderr.decode("utf-8"), file=sys.stderr, end='')
 		# for all situations different from time-out by our side we can return value from ERR_CODE as the result
 		if process.returncode != 0:
-			print("Communication with slave script ends with return code: " + str(process.returncode), file=sys.stderr)
+			print("Communication with slave script ends with return code: " + str(process.returncode), file=sys.stderr, end='')
 
 	exit(process.returncode)
