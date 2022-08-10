@@ -88,7 +88,7 @@ if __name__ == "__main__":
 		host = destination.split(":")[0]
 		hostname = host.split("@")[1]
 		port = destination.split(":")[1]
-		transport_command = transport_command + "-p " + port
+		transport_command = transport_command + " -p " + port
 	elif destination_type == destination_type_url:
 		host = destination
 		hostname = destination
