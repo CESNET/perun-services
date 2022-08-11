@@ -78,6 +78,10 @@ if __name__ == "__main__":
 		print("$SERVICE_FILES_DIR: " + service_files_dir + " is not a directory", file=sys.stderr)
 		exit(1)
 
+	# if there is no specific data for destination, use "all" destination
+	if not os.path.isdir(service_files_for_destination):
+		service_files_for_destination = service_files_dir + "/_destination/all"
+
 	if destination_type == destination_type_host:
 		hostname = destination
 		host = "root@" + destination
