@@ -23,7 +23,7 @@ function process {
 
 	create_lock
 
-	UMASK=0755   #default pemissions
+	UMASK=0755   #default permissions
 	[ -f "$UMASK_FILE" ] && UMASK=`head -n 1 "$UMASK_FILE"`
 
 	#if QUOTA_ENABLED is not set in prescript, try to get info from quota_enabled file
@@ -107,9 +107,13 @@ function process {
 			catch_error E_CANNOT_SET_OWNERSHIP chown -R "${U_UID}":"${U_GID}" "${TMP_HOME_DIR}"
 			catch_error E_CANNOT_SET_PERMISSIONS chmod "$UMASK" "${TMP_HOME_DIR}"
 
-			catch_error E_CANNOT_MOVE_TEMP mv "${TMP_HOME_DIR}" "${HOME_DIR}"
+      if [ ! -d "${HOME_DIR}" ]; then
+			  catch_error E_CANNOT_MOVE_TEMP mv "${TMP_HOME_DIR}" "${HOME_DIR}"
+			  log_msg I_DIR_CREATED
+			else
+			  catch_error E_BAD_HOME_OWNER [ `stat -L -c "%u" ${HOME_DIR}` -eq ${U_UID} ]
+			fi
 
-			log_msg I_DIR_CREATED
 		else
 			catch_error E_BAD_HOME_OWNER [ `stat -L -c "%u" ${HOME_DIR}` -eq ${U_UID} ]
 		fi
