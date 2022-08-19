@@ -6,13 +6,13 @@ use perunServicesInit;
 use perunServicesUtils;
 
 #forward declaration
-sub processGroupData; 
-sub processMembersData; 
+sub processGroupData;
+sub processMembersData;
 sub processResourceData;
 
 our $SERVICE_NAME = "afs_group";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -23,6 +23,9 @@ our $A_GR_AFS_GROUP_NAME;         *A_GR_AFS_GROUP_NAME =      \'urn:perun:group_
 our $A_USER_KERBEROS_LOGINS;      *A_USER_KERBEROS_LOGINS =   \'urn:perun:user:attribute-def:virt:kerberosLogins';
 our $A_USER_FACILITY_LOGIN;       *A_USER_FACILITY_LOGIN =    \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_R_DEFAULT_USERS_REALM;     *A_R_DEFAULT_USERS_REALM =  \'urn:perun:resource:attribute-def:def:afsDefaultUsersRealm';
+our $A_MEMBER_STATUS;             *A_MEMBER_STATUS =          \'urn:perun:member:attribute-def:core:status';
+
+our $STATUS_VALID;                *STATUS_VALID =             \'VALID';
 
 #Global data structure
 our $groupStruc = {};     #$groupStruc->{$groupName}->{$login} = 1;
@@ -39,7 +42,7 @@ mkdir $groupsDirName or die "Cannot mkdir $groupsDirName: $!";
 foreach my $groupName (keys %$groupStruc) {
 	my $fileName = $groupsDirName . "/" . $groupName;
 	open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
-	my @groupMembers = keys %{$groupStruc->{$groupName}};
+	my @groupMembers = sort keys %{$groupStruc->{$groupName}};
 	print FILE join "\n", @groupMembers;
 	close FILE or die "Cannot close file: $!";
 }
@@ -65,7 +68,12 @@ sub processGroupData {
 sub processMembersData {
 	my ($memberIdsRef, $groupName, $defaultUserRealm) = @_;
 	for my $memberId (@$memberIdsRef) {
+
+		# skip members expired in VO
+		next unless ($STATUS_VALID eq $data->getMemberAttributeValue(attrName => $A_MEMBER_STATUS, member => $memberId));
+
 		my $login = $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_LOGIN, member => $memberId) . '@' . $defaultUserRealm;
 		$groupStruc->{$groupName}->{$login} = 1;
+
 	}
 }
