@@ -16,8 +16,8 @@ sub saveUsersToFile;
 sub saveGroupsToFile;
 
 our $SERVICE_NAME     = "o365_mu";
-our $PROTOCOL_VERSION = "3.2.0";
-my $SCRIPT_VERSION = "3.2.0";
+our $PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.1.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;

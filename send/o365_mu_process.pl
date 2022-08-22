@@ -2,7 +2,6 @@
 
 use strict;
 use warnings;
-use DBI;
 use Getopt::Long qw(:config no_ignore_case);
 use File::Temp qw/ tempfile tempdir /;
 use File::Copy;
@@ -58,13 +57,15 @@ our $DRY_RUN=0;
 
 #text predefined constants to use
 my $UPN_TEXT = "upn";
-my $DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT = "deliverToMailBoxAndForward";
-my $FORWARDING_SMTP_ADDRESS_TEXT = "forwardingSmtpAdress";
+my $DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT = "deliverToMailboxAndForward";
+my $FORWARDING_SMTP_ADDRESS_TEXT = "forwardingSmtpAddress";
 my $ARCHIVE_TEXT = "archive";
-my $EMAIL_ADDRESSES_TEXT = "emailAddresses";
+my $EMAIL_ADDRESSES_TEXT = "emailaddresses";
 my $PLAIN_TEXT_OBJECT_TEXT = "plainTextObject";
-my $AD_GROUP_NAME_TEXT = "adGroupName";
+my $AD_GROUP_NAME_TEXT = "groupName";
 my $SEND_AS_TEXT = "sendAs";
+my $COMMAND_TEXT = "command";
+my $PARAMETERS_TEXT = "parameters";
 
 #needed global variables and constants for this script
 my $instanceName;
@@ -86,7 +87,6 @@ our $MAX_WAIT_MSEC = $MAX_WAIT_SEC * 1000;
 our $MAX_USERS_CHUNK_SIZE = 500;
 our $MAX_GROUPS_CHUNK_SIZE = 50;
 our $BASIC_URL;
-our $URL;
 our $CHECK_URL;
 our $USERNAME;
 our $PASSWORD;
@@ -113,7 +113,7 @@ checkFileExists($usersDataFilename, 'Missing service file with data about users.
 my $groupsDataFilename = "$pathToServiceFile/$serviceName-groups";
 checkFileExists($groupsDataFilename, 'Missing service file with data about groups.');
 my $facilityIdFilename = "$pathToServiceFile/$serviceName-facilityId";
-checkFileExists($facilityIdFilename, 'Missing file with facilit id.');
+checkFileExists($facilityIdFilename, 'Missing file with facility id.');
 
 #get and check configuration for communication with o365 server
 getConfiguration();
@@ -126,7 +126,7 @@ getConfiguration();
 my $facilityId = readFacilityId $facilityIdFilename;
 
 #prepare paths to files with cache (users and groups cache)
-my $basicCacheDir = "/var/cache/perun/services/$facilityId/$serviceName/";
+my $basicCacheDir = "/var/cache/perun/services/$facilityId/$serviceName";
 my $cacheDir = $basicCacheDir . "/" . $instanceName . "/";
 make_path($cacheDir, { chmod => 0755, error => \my $err });
 die "ERROR - Can't create the cache directory $cacheDir.\n" if @$err;
@@ -267,7 +267,6 @@ if($countOfUsersToProcess > 0 && $DRY_RUN == 0) {
 				$returnCode = 1;
 			}
 		}
-		#save only if this is hard run (not the DRY run)
 		saveCacheFile( $newUsersCache, $lastStateOfUsersFilename );
 	}
 }
@@ -314,7 +313,6 @@ if($countOfGroupsToProcess > 0 && $DRY_RUN == 0) {
 				$returnCode = 1;
 			}
 		}
-		#save only if this is hard run (not the DRY run)
 		saveCacheFile( $newGroupsCache, $lastStateOfGroupsFilename );
 	}
 }
@@ -441,13 +439,13 @@ sub readFacilityId {
 	my $pathToFile = shift;
 
 	my $facId;
-	open FILE, $pathToFile or die "ERROR - Could not open file with groups data from perun $pathToFile: $!\n";
+	open FILE, $pathToFile or die "ERROR - Could not open file with facility id from perun $pathToFile: $!\n";
 	while(my $line = <FILE>) {
 		chomp( $line );
 		unless($facId) {
 			$facId = $line;
 		} else {
-			die "ERROR - There is more than one line in file with facility ids $pathToFile!\n";
+			die "ERROR - There is more than one line in file with facility id $pathToFile!\n";
 		}
 	}
 
@@ -528,7 +526,7 @@ sub readDataAboutGroups {
 ##########################################################################
 sub getConfiguration {
 	my $configPath = "/etc/perun/services/$serviceName/$instanceName";
-	open FILE, $configPath or die "Could not open config file $configPath: $!";
+	open FILE, $configPath or die "ERROR - Could not open config file $configPath: $!";
 	while(my $line = <FILE>) {
 		chomp( $line );
 		if($line =~ /^username: .*/) {
@@ -553,31 +551,31 @@ sub getUsersContent {
 	my $command = "Set-MuniMailbox";
 
 	my $content = {};
-	$content->{'command'} = $command;
+	$content->{$COMMAND_TEXT} = $command;
 
 	my @parameters = ();
 	#prepare users as parameters of the content one by one
 	foreach my $key (sort keys %$usersToProcess) {
 		my $userToProcess = $usersToProcess->{$key};
 		my $user = {};
-		$user->{'upn'} = $key;
+		$user->{$UPN_TEXT} = $key;
 		my $forwardSmtpAddress = $userToProcess->{$FORWARDING_SMTP_ADDRESS_TEXT};
-		$user->{'forwardingSmtpAddress'} = $forwardSmtpAddress ? $forwardSmtpAddress : JSON::null;
+		$user->{$FORWARDING_SMTP_ADDRESS_TEXT} = $forwardSmtpAddress ? $forwardSmtpAddress : JSON::null;
 		my $deliverToMailboxAndForward = $userToProcess->{$DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT};
-		$user->{'deliverToMailboxAndForward'} = $deliverToMailboxAndForward ? JSON::true : JSON::false;
+		$user->{$DELIVERED_TO_MAILBOX_AND_FORWARD_TEXT} = $deliverToMailboxAndForward ? JSON::true : JSON::false;
 		my $archive = $userToProcess->{$ARCHIVE_TEXT};
-		$user->{'archive'} = $archive ? JSON::true : JSON::false;
+		$user->{$ARCHIVE_TEXT} = $archive ? JSON::true : JSON::false;
 		my $emailsString = $userToProcess->{$EMAIL_ADDRESSES_TEXT};
 		my @emails = ();
 		if ($emailsString) {
 			@emails = split(",", $emailsString);
 		}
-		$user->{'emailaddresses'} = \@emails;
+		$user->{$EMAIL_ADDRESSES_TEXT} = \@emails;
 		push @parameters, $user;
 	}
 	
 	#add parameters (users) to the content
-	$content->{'parameters'} = \@parameters;
+	$content->{$PARAMETERS_TEXT} = \@parameters;
 
 	return $content;
 }
@@ -590,19 +588,19 @@ sub getGroupsContent {
 	my $command = "Set-MuniGroup";
 	
 	my $content = {};
-	$content->{'command'} = $command;
+	$content->{$COMMAND_TEXT} = $command;
 
 	my @parameters = ();
 	foreach my $key (sort keys %$groupsToProcess) {
 		my $groupToProcess = $groupsToProcess->{$key};
 		my $group = {};
-		$group->{'groupName'} = $key;
-		$group->{'sendAs'} = $groupToProcess->{$SEND_AS_TEXT};
+		$group->{$AD_GROUP_NAME_TEXT} = $key;
+		$group->{$SEND_AS_TEXT} = $groupToProcess->{$SEND_AS_TEXT};
 		push @parameters, $group;
 	}
 
 	#add parameters (groups) to the content
-	$content->{'parameters'} = \@parameters;
+	$content->{$PARAMETERS_TEXT} = \@parameters;
 	return $content;
 }
 
@@ -647,8 +645,8 @@ sub callServerForUpdate {
 	my $content = shift;
 	my $result = {};
 
-	my $parametersCount = @{$content->{'parameters'}};
-	my $command = $content->{'command'};
+	my $parametersCount = @{$content->{$PARAMETERS_TEXT}};
+	my $command = $content->{$COMMAND_TEXT};
 
 	#make first call with data
 	my $serverResponse = makeRequestToServer($BASIC_URL . "Set-MuniRequestBatch", $TYPE_POST, $MAX_WAIT_MSEC, $content);
@@ -661,7 +659,7 @@ sub callServerForUpdate {
 	my $counter = $MAX_WAIT_BATCH;
 	my $processedParametersCount = 0;
 	while($counter != 0) {
-		#wait 2 seconds, then ask for the result
+		#wait a few seconds, then ask for the result
 		sleep 5;
 		
 		$serverResponse = makeRequestToServer($urlToCheckCount, $TYPE_GET, 100, {});
