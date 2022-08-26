@@ -17,7 +17,6 @@ my $data = perunServicesInit::getHashedHierarchicalData;
 #Constants
 our $A_FACILITY_MIN_UID;                       *A_FACILITY_MIN_UID =                      \'urn:perun:facility:attribute-def:virt:minUID';
 our $A_FACILITY_MAX_UID;                       *A_FACILITY_MAX_UID =                      \'urn:perun:facility:attribute-def:virt:maxUID';
-our $A_FACILITY_HOME_MOUNT_POINT;              *A_FACILITY_HOME_MOUNT_POINT =             \'urn:perun:facility:attribute-def:def:homeMountPoint_passwd-scp';
 our $A_FACILITY_DESTINATION_FILE;              *A_FACILITY_DESTINATION_FILE =             \'urn:perun:facility:attribute-def:def:passwdScpDestinationFile';
 our $A_USER_FACILITY_LOGIN;                    *A_USER_FACILITY_LOGIN =                   \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_FACILITY_UID;                      *A_USER_FACILITY_UID =                     \'urn:perun:user_facility:attribute-def:virt:UID';

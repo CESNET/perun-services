@@ -1,8 +1,8 @@
 import os
-import shlex
 import subprocess
 import sys
 import tempfile
+import re
 
 timeout = "5400"  # 90s * 60 sec = 1.5h
 timeout_kill = "60"  # 60 sec to kill after timeout
@@ -20,6 +20,11 @@ destination_type_user_host_port = "user@host:port"
 destination_type_user_host_windows = "user@host-windows"
 destination_type_user_host_windows_proxy = "host-windows-proxy"
 
+# regex checks
+hostPattern = re.compile("^(?!:\/\/)(?=.{1,255}$)((.{1,63}\.){1,127}(?![0-9]*$)[a-z0-9-]+\.?)$|^(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}$")
+userAtHostPattern = re.compile("^[a-z_]([a-z0-9_-]{0,31}|[a-z0-9_-]{0,30}\$)@(?:(?!:\/\/)(?=.{1,255}$)((.{1,63}\.){1,127}(?![0-9]*$)[a-z0-9-]+\.?)$|(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}$)")
+userAtHostPortPattern = re.compile("^[a-z_]([a-z0-9_-]{0,31}|[a-z0-9_-]{0,30}\$)@(?:(?!:\/\/)(?=.{1,255}$)((.{1,63}\.){1,127}(?![0-9]*$)[a-z0-9-]+\.?)|(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}):[0-9]+")
+urlPattern = re.compile("^(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;()*$']*[-a-zA-Z0-9+&@#/%=~_|()*$']")
 
 if __name__ == "__main__":
 	if len(sys.argv) != 4 and len(sys.argv) != 3:
@@ -41,15 +46,18 @@ if __name__ == "__main__":
 
 	# choose transport command, only url type has different transport command at this moment
 	if destination_type == destination_type_url:
+		# FIXME - test this use-case
+		transport_command = ["curl"]
 		# add certificate to the curl if cert file and key file exists and they are readable
 		if os.access(perun_cert, os.R_OK) and os.access(perun_key, os.R_OK) and os.access(perun_chain, os.R_OK):
-			perun_cert_setting = "--cert " + perun_cert + " --key " + perun_key + " --cacert " + perun_chain
-		else:
-			perun_cert_setting = ""
+			transport_command.extend(["--cert", perun_cert, "--key", perun_key, "--cacert", perun_chain])
+		# add standard CURL params
 		temp = tempfile.NamedTemporaryFile(mode="w+")
-		transport_command = "curl " + perun_cert_setting + " -i -H Content-Type:application/x-tar -w %{http_code} --show-error --silent -o " + temp.name + " -X PUT --data-binary @- "
+		transport_command.extend(["-i", "-H", "Content-Type:application/x-tar", "-w", "%{http_code}", "--show-error",
+								  "--silent", "-o", temp.name, "-X", "PUT", "--data-binary", "@-"])
 	else:
-		transport_command = "ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o GSSAPIAuthentication=no -o GSSAPIKeyExchange=no -o ConnectTimeout=5"
+		transport_command = ["ssh", "-o", "PasswordAuthentication=no", "-o", "StrictHostKeyChecking=no", "-o",
+							 "GSSAPIAuthentication=no", "-o", "GSSAPIKeyExchange=no", "-o", "ConnectTimeout=5"]
 
 	# override existing variable transport_command
 	try:
@@ -70,8 +78,6 @@ if __name__ == "__main__":
 	slave_command = "/opt/perun/bin/perun"
 	service_files_base_dir = os.getcwd() + "/../gen/spool"
 	service_files_dir = service_files_base_dir + "/" + facility_name + "/" + service_name
-	# dir which contains special configuration for this destination (this dir may not exist)  ==IT MUST BE ABSOLUTE PATH (because of double -C in tar command)==
-	service_files_for_destination = service_files_dir + "/_destination/" + destination
 
 	# just safety check, this it should be a directory
 	if not os.path.isdir(service_files_dir):
@@ -79,21 +85,36 @@ if __name__ == "__main__":
 		exit(1)
 
 	if destination_type == destination_type_host:
+		if not (re.fullmatch(hostPattern, destination)):
+			print("Destination '" + destination + "' is not in a valid format for hostname", file=sys.stderr)
+			exit(1)
 		hostname = destination
 		host = "root@" + destination
 	elif destination_type == destination_type_user_host:
+		if not (re.fullmatch(userAtHostPattern, destination)):
+			print("Destination '" + destination + "' is not in valid format user@host", file=sys.stderr)
+			exit(1)
 		hostname = destination.split("@")[1]
 		host = destination
 	elif destination_type == destination_type_user_host_port:
+		if not (re.fullmatch(userAtHostPortPattern, destination)):
+			print("Destination '" + destination + "' is not in valid format user@host:port", file=sys.stderr)
+			exit(1)
 		host = destination.split(":")[0]
 		hostname = host.split("@")[1]
 		port = destination.split(":")[1]
-		transport_command = transport_command + " -p " + port
+		transport_command.extend(["-p", port])
 	elif destination_type == destination_type_url:
+		if not (re.fullmatch(urlPattern, destination)):
+			print("Destination '" + destination + "' is not in valid URL format", file=sys.stderr)
+			exit(1)
 		host = destination
 		hostname = destination
 	elif destination_type == destination_type_user_host_windows:
-		host = destination.split(":")[0]
+		if not (re.fullmatch(userAtHostPattern, destination)):
+			print("Destination '" + destination + "' is not in valid format user@host", file=sys.stderr)
+			exit(1)
+		host = destination
 		hostname = host.split("@")[1]
 	elif destination_type == destination_type_user_host_windows_proxy:
 		if locals().get("windows_proxy") is None:
@@ -101,7 +122,14 @@ if __name__ == "__main__":
 			if windows_proxy is None:
 				print('Variable WINDOWS_PROXY is not defined. It is usually defined in /etc/perun/services/generic_send/generic_send.conf.', file=sys.stderr)
 				exit(1)
-		host = destination.split("@")[1]
+		if not (re.fullmatch(userAtHostPattern, destination)):
+			print("Destination '" + destination + "' is not in valid format user@host", file=sys.stderr)
+			exit(1)
+		if not (re.fullmatch(userAtHostPattern, windows_proxy)):
+			print("Value of WINDOWS_PROXY '" + windows_proxy + "' is not in valid format user@host", file=sys.stderr)
+			exit(1)
+		host = windows_proxy                  # propagate on proxy instead of destination
+		hostname = destination.split("@")[1]  # hostname file content from original destination
 	elif destination_type == destination_type_email:
 		print("Destination type " + destination_type + " is not supported yet.", file=sys.stderr)
 		exit(1)
@@ -110,10 +138,10 @@ if __name__ == "__main__":
 		exit(1)
 
 	# add host to the transport command for all types of destination
-	transport_command = transport_command + " " + host
+	transport_command.append(host)
 	# add also slave command if this is not url type of destination
 	if destination_type != destination_type_url:
-		transport_command = transport_command + " " + slave_command
+		transport_command.append(slave_command)
 
 	# default tar mode - create an archive
 	tar_mode = "-c"
@@ -129,17 +157,26 @@ if __name__ == "__main__":
 	temp_file.flush()
 	temp_file_name = os.path.basename(temp_file.name)
 
-	if os.path.isdir(service_files_for_destination):
-		tar_command = "tar " + tar_mode + " -C \"" + service_files_for_destination + "\" . -C \"" + service_files_dir + "\" --exclude=\"_destination\" . -C \"" + temp_dir.name + "\" . --transform='flags=r;s|" + temp_file_name + "|HOSTNAME|'"
-	else:
-		tar_command = "tar " + tar_mode + " -C \"" + service_files_dir + "\" --exclude=\"_destination\" . -C \"" + temp_dir.name + "\" . --transform='flags=r;s|" + temp_file_name + "|HOSTNAME|'"
+	tar_command = ["tar", tar_mode, "-C", service_files_dir, "--exclude=_destination", ".", "-C", temp_dir.name, ".",
+				   "--transform=flags=r;s|" + temp_file_name + "|HOSTNAME|"]
 
-	process_tar = subprocess.Popen(shlex.split(tar_command), stdout=subprocess.PIPE)
+	# FIXME - works only for destinations type "host" or do we generate folders like "user@host" for that type?
+	# determine DIR with special configuration for destination (this dir may not exist) ==IT MUST BE ABSOLUTE PATH (because of double -C in tar command)==
+	service_files_for_destination = service_files_dir + "/_destination/" + destination
+	# if there is no specific data for destination, use "all" destination
+	if not os.path.isdir(service_files_for_destination):
+		service_files_for_destination = service_files_dir + "/_destination/all"
+
+	if os.path.isdir(service_files_for_destination):
+		tar_command.extend(["-C", service_files_for_destination, "."])
+
+	process_tar = subprocess.Popen(tar_command, stdout=subprocess.PIPE)
 
 	if destination_type == destination_type_user_host_windows_proxy:
 		# converts stdin to base64 and append single space and "$DESTINATION" at the end of it
 		transformation_process_1 = subprocess.Popen("base64", stdin=process_tar.stdout, stdout=subprocess.PIPE)
-		transformation_process = subprocess.Popen("sed -e \"\$s/\$/ $DESTINATION/g\"", stdin=transformation_process_1.stdout, stdout=subprocess.PIPE)
+		sed_command = ["sed", "-e", "$s/$/ "+destination+"/g"]
+		transformation_process = subprocess.Popen(sed_command, stdin=transformation_process_1.stdout, stdout=subprocess.PIPE)
 		transformation_process_1.stdout.close()
 	elif destination_type == destination_type_user_host_windows:
 		# converts stdin to base64
@@ -149,8 +186,9 @@ if __name__ == "__main__":
 		transformation_process = subprocess.Popen("cat", stdin=process_tar.stdout, stdout=subprocess.PIPE)
 	process_tar.stdout.close()
 
-	timeout_command = "timeout -k " + timeout_kill + " " + timeout + " " + transport_command
-	process = subprocess.Popen(shlex.split(timeout_command), stdin=transformation_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	timeout_command = ["timeout",  "-k", timeout_kill, timeout]
+	timeout_command.extend(transport_command)
+	process = subprocess.Popen(timeout_command, stdin=transformation_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	transformation_process.stdout.close()
 	(stdout, stderr) = process.communicate()
 
