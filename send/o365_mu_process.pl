@@ -130,8 +130,8 @@ my $basicCacheDir = "/var/cache/perun/services/$facilityId/$serviceName";
 my $cacheDir = $basicCacheDir . "/" . $instanceName . "/";
 make_path($cacheDir, { chmod => 0755, error => \my $err });
 die "ERROR - Can't create the cache directory $cacheDir.\n" if @$err;
-my $lastStateOfUsersFilename = $cacheDir . "o365_mu_bulk-users";
-my $lastStateOfGroupsFilename = $cacheDir . "o365_mu_bulk-groups";
+my $lastStateOfUsersFilename = $cacheDir . "o365_mu-users";
+my $lastStateOfGroupsFilename = $cacheDir . "o365_mu-groups";
 
 #read data from files and convert them to the hash structure in perl
 #read new data about users from PERUN
@@ -161,7 +161,7 @@ my $usersToProcessStruc = {};
 foreach my $key (keys %$newUsersStruc) {
 	my $newUser = $newUsersStruc->{$key};
 	my $oldUser = $lastUsersStruc->{$key};
-	
+
 	unless($oldUser) {
 		#this is a new user (no record before this one)
 		#process him first, add to the cache only if processed sucessfully
@@ -199,7 +199,7 @@ foreach my $key (keys %$newGroupsStruc) {
 		#this is an existing group (record exists) and it is different
 		#process it first, add to the cache only if processed sucessfully
 		$groupsToProcessStruc->{$key} = $newGroup;
-	}       
+	}
 }
 
 #print all prepared informations if DEBUG is in action
@@ -215,7 +215,7 @@ if($DEBUG > 1) {
 	print "-------------------------------------\n";
 	print "ALL DATA ABOUT CACHE USERS TO PROCESS\n";
 	print "-------------------------------------\n";
-	print Dumper($newUsersCache);	
+	print Dumper($newUsersCache);
 	print "--------------------------------------\n";
 	print "ALL DATA ABOUT CACHE GROUPS TO PROCESS\n";
 	print "--------------------------------------\n";
@@ -230,7 +230,7 @@ my $countOfUsersToProcess = keys %$usersToProcessStruc;
 #check all processed users and add them to the cache if they were updated ok
 if($countOfUsersToProcess > 0 && $DRY_RUN == 0) {
 	#we need to do this in chunks to prevent big queues on the server site
-	my @chunksOfUsersStruc = createChunksForStruc( $usersToProcessStruc, $MAX_USERS_CHUNK_SIZE ); 
+	my @chunksOfUsersStruc = createChunksForStruc( $usersToProcessStruc, $MAX_USERS_CHUNK_SIZE );
 	my $chunkCounter = 0;
 	foreach my $chunk (@chunksOfUsersStruc) {
 		$chunkCounter++;
@@ -345,7 +345,7 @@ exit $returnCode;
 sub createChunksForStruc {
 	my $originalStruc = shift;
 	my $chunkSize = shift;
-	
+
 	my @arrayOfStrucs = ();
 	my $counter = 0;
 	my $struc = {};
@@ -363,7 +363,7 @@ sub createChunksForStruc {
 	if($counter > 0 && $counter < $chunkSize) {
 		push @arrayOfStrucs, $struc;
 	}
-	
+
 	return @arrayOfStrucs;
 }
 
@@ -388,7 +388,7 @@ sub saveCacheFile {
 	my $newCacheFile = new File::Temp( UNLINK => 1 );
 	open FILE_CACHE, ">$newCacheFile" or die "ERROR - Could not open file with new cache of users data $newUsersCache: $!\n";
 
-	#save all record to the temp file	
+	#save all record to the temp file
 	foreach my $key (sort keys %$cacheToSave) {
 		print FILE_CACHE $cacheToSave->{$key}->{$PLAIN_TEXT_OBJECT_TEXT} . "\n";
 	}
@@ -573,7 +573,7 @@ sub getUsersContent {
 		$user->{$EMAIL_ADDRESSES_TEXT} = \@emails;
 		push @parameters, $user;
 	}
-	
+
 	#add parameters (users) to the content
 	$content->{$PARAMETERS_TEXT} = \@parameters;
 
@@ -586,7 +586,7 @@ sub getUsersContent {
 sub getGroupsContent {
 	my $groupsToProcess = shift;
 	my $command = "Set-MuniGroup";
-	
+
 	my $content = {};
 	$content->{$COMMAND_TEXT} = $command;
 
@@ -661,15 +661,15 @@ sub callServerForUpdate {
 	while($counter != 0) {
 		#wait a few seconds, then ask for the result
 		sleep 5;
-		
+
 		$serverResponse = makeRequestToServer($urlToCheckCount, $TYPE_GET, 100, {});
 		checkServerResponseStatus($serverResponse);
 		$processedParametersCount = $serverResponse->content();
 		print "DEBUG: max:" . $parametersCount . ' vs processed:' . $processedParametersCount . "\n" if $DEBUG>0;
-		
+
 		#if we have all of them, break out of the while and process the result
 		last if $parametersCount == $processedParametersCount;
-		
+
 		#if this is not the last one, decrease a counter and try again
 		$counter--;
 	}
@@ -677,7 +677,7 @@ sub callServerForUpdate {
 	#0 in $counter means timeout
 	unless($counter) {
 		print "WARNING - Batch operation for command '" . $command . "' timeouted. Only '" . $processedParametersCount . "' from '" . $parametersCount . "' were processed before the timeout from Perun site.\n";
-		$returnCode = 1;	
+		$returnCode = 1;
 	}
 
 	#check results, set cache, prepare script output and return code
@@ -691,7 +691,7 @@ sub callServerForUpdate {
 	#if callStatus is different from Completed,
 	$returnCode = 1 if $callStatus ne 'Completed';
 	#return all processed objects with info about processing
-	return \@psOutput; 
+	return \@psOutput;
 }
 
 ##########################################################################
@@ -699,7 +699,7 @@ sub callServerForUpdate {
 ##########################################################################
 sub checkServerResponseStatus {
 	my $serverResponse = shift;
-	
+
 	unless($serverResponse->is_success) {
 		die "ERROR - Communication with PSWS server ended with ERROR:\n" . "STATUS: " . $serverResponse->status_line . "\nCONTENT: " . $serverResponse->decoded_content . "\n";
 	}
@@ -710,13 +710,13 @@ sub checkServerResponseStatus {
 ##########################################################################
 sub getResponoseContentJSON {
 	my $serverResponse = shift;
-	
+
 	my $responseContent = $serverResponse->content();
 	$responseContent =~ s/^"//;
 	$responseContent =~ s/"$//;
-	
+
 	my  $responseJSON = JSON->new->utf8->decode( $responseContent );
-	
+
 	return $responseJSON;
 }
 
