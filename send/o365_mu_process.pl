@@ -251,7 +251,7 @@ if($countOfUsersToProcess > 0 && $DRY_RUN == 0) {
 				#exception means a problem, return an error, do not add to the cache
 				if($exception) {
 					my $exceptionType = $resultUser->{'ExceptionType'};
-					print "WARNING - User with ID $key was not processed properly due to: " . $exceptionType . " -- " . $exception . "\n";
+					print STDERR "WARNING - User with ID $key was not processed properly due to: " . $exceptionType . " -- " . $exception . "\n";
 					$failedUsers++;
 					$returnCode = 1;
 				} else {
@@ -262,7 +262,7 @@ if($countOfUsersToProcess > 0 && $DRY_RUN == 0) {
 				}
 			} else {
 				#if user was not processed at all, it is also an error, do not add to the cache
-				print "WARNING - User with ID $key was timeouted (not processed).\n";
+				print STDERR "WARNING - User with ID $key was timeouted (not processed).\n";
 				$failedUsers++;
 				$returnCode = 1;
 			}
@@ -297,7 +297,7 @@ if($countOfGroupsToProcess > 0 && $DRY_RUN == 0) {
 				#exception means a problem, return an error, do not add to the cache
 				if($exception) {
 					my $exceptionType = $resultGroup->{'ExceptionType'};
-					print "WARNING - Group with ID $key was not processed properly due to: " . $exceptionType . " -- " . $exception . "\n";
+					print STDERR "WARNING - Group with ID $key was not processed properly due to: " . $exceptionType . " -- " . $exception . "\n";
 					$failedGroups++;
 					$returnCode = 1;
 				} else {
@@ -308,7 +308,7 @@ if($countOfGroupsToProcess > 0 && $DRY_RUN == 0) {
 				}
 			} else {
 				#if user was not processed at all, it is also an error, do not add to the cache
-				print "WARNING - Group with ID $key was timeouted (not processed).\n";
+				print STDERR "WARNING - Group with ID $key was timeouted (not processed).\n";
 				$failedGroups++;
 				$returnCode = 1;
 			}
@@ -474,7 +474,7 @@ sub readDataAboutUsers {
 
 		#If UPN is from any reason empty, set global return code to 1 and skip this user
 		unless($UPN) {
-			print "WARNING - Can't find UPN for user in $pathToFile for line '$line'\n";
+			print STDERR "WARNING - Can't find UPN for user in $pathToFile for line '$line'\n";
 			$returnCode = 1;
 			next;
 		}
@@ -507,7 +507,7 @@ sub readDataAboutGroups {
 
 		#If groupADName is from any reason empty, set global return code to 1 and skip this group
 		unless($line) {
-			print "WARNING - Can't find AD name of group in $pathToFile for line '$line'\n";
+			print STDERR "WARNING - Can't find AD name of group in $pathToFile for line '$line'\n";
 			$returnCode = 1;
 			next;
 		}
@@ -676,7 +676,7 @@ sub callServerForUpdate {
 
 	#0 in $counter means timeout
 	unless($counter) {
-		print "WARNING - Batch operation for command '" . $command . "' timeouted. Only '" . $processedParametersCount . "' from '" . $parametersCount . "' were processed before the timeout from Perun site.\n";
+		print STDERR "WARNING - Batch operation for command '" . $command . "' timeouted. Only '" . $processedParametersCount . "' from '" . $parametersCount . "' were processed before the timeout from Perun site.\n";
 		$returnCode = 1;
 	}
 
