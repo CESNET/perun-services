@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="k5login_root"
+export SERVICE_NAME="k5login_root"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

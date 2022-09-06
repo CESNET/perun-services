@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="vmware_ldap"
+export SERVICE_NAME="vmware_ldap"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

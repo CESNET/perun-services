@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="passwd_nfs4"
+export SERVICE_NAME="passwd_nfs4"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"
