@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="ceitec_proteomics"
+export SERVICE_NAME="ceitec_proteomics"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

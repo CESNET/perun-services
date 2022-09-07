@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="affiliation_mapping_mu"
+export SERVICE_NAME="affiliation_mapping_mu"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

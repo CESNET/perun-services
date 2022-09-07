@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="teams_provisioning"
+export SERVICE_NAME="teams_provisioning"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"
