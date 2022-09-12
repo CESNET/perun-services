@@ -116,7 +116,7 @@ foreach my $key (sort keys %$dataByKeys) {
 
 	# Construct BIRTH_DATE from BIRTH_NUMBER
 	my $BIRTH_DATE = undef;
-	if (defined $BIRTH_NUMBER and length( $BIRTH_NUMBER > 0)) {
+	if (defined $BIRTH_NUMBER and length($BIRTH_NUMBER) > 0) {
 
 		my $YY = substr($BIRTH_NUMBER, 0, 2);
 		my $MM = substr($BIRTH_NUMBER, 2, 2);
