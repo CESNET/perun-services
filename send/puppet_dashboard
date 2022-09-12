@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="puppet_dashboard"
+export SERVICE_NAME="puppet_dashboard"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

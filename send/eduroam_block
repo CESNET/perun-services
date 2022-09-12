@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="eduroam_block"
+export SERVICE_NAME="eduroam_block"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

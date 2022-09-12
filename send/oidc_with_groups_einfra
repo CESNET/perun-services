@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="oidc_with_groups_einfra"
+export SERVICE_NAME="oidc_with_groups_einfra"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

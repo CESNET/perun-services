@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="sympa"
+export SERVICE_NAME="sympa"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"

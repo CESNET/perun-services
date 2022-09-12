@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="pbs_publication_fairshare"
+export SERVICE_NAME="pbs_publication_fairshare"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"
