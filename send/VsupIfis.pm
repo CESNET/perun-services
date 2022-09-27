@@ -103,7 +103,7 @@ sub load_dc2() {
 
 	# Select query for input database (DC2) - internal/external teachers with valid relation
 	my $sth = $dbh->prepare(qq{SELECT UCO, VZTAH_CISLO, NS, VZTAH_STATUS_NAZEV, VZTAH_STATUS_CISLO, OD, DO,
-        CASE WHEN (VZTAH_STATUS_CISLO in (1,2,4,5,6,7,8,9,10,16,17,21) AND VZTAH_FUNKCE_CISLO in (1,2,3,4,5,52))
+        CASE WHEN (VZTAH_STATUS_CISLO in (1,2,4,5,6,7,8,9,10,16,17,18,21) AND VZTAH_FUNKCE_CISLO in (1,2,3,4,5,52))
                 THEN 'ITIC'
         ELSE null
         END as KARTA_IDENT
