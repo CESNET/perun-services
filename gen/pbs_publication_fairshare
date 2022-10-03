@@ -21,7 +21,7 @@ our $HOW_OLD_PUBLICATIONS;         *HOW_OLD_PUBLICATIONS       =   \3;   #in yea
 our $A_USER_LOGIN;                 *A_USER_LOGIN               =   \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_ID;                    *A_USER_ID                  =   \'urn:perun:user:attribute-def:core:id';
 our $A_RESOURCE_FAIRSHARE_GNAME;   *A_RESOURCE_FAIRSHARE_GNAME =   \'urn:perun:resource:attribute-def:def:fairshareGroupName';
-our $A_RESOURCE_ID;                *A_RESOURCE_ID              =   \'urn:perun:resource:attribute-def:core:id';
+our $A_MEMBER_STATUS;              *A_MEMBER_STATUS            =   \'urn:perun:member:attribute-def:core:status';
 
 my $nowYear = (localtime)[5] + 1900;
 
@@ -59,6 +59,10 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 		foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 
+			# process only VALID members
+			my $status = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_STATUS);
+			next unless ($status eq "VALID");
+
 			my $userId = $data->getUserIdForMember(member => $memberId);
 			my $userLogin = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_USER_LOGIN);
 
@@ -70,7 +74,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 			$users->{$userId}->{"weight"} = 1.0;
 			$users->{$userId}->{"group"} = "G:" . $fairShareGroupName;
 
-			# skip users without any publication
+			# skip processing publications for users without any publication
 			next unless defined $authorsByID->{$userId};
 
 			# gather all users publications for later processing
@@ -101,6 +105,10 @@ foreach my $resourceId ($data->getResourceIds()) {
 			#if user is already there, we can skip him (take the one from the fairshare group instead)
 			my $userId = $data->getUserIdForMember(member => $memberId);
 			next if($users->{$userId});
+
+			# process only VALID members
+			my $status = $data->getMemberAttributeValue(member => $memberId, attrName => $A_MEMBER_STATUS);
+			next unless ($status eq "VALID");
 
 			$users->{$userId}->{"login"} = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_USER_LOGIN);
 			$users->{$userId}->{"weight"} = 1.0;
