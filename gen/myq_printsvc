@@ -85,7 +85,7 @@ for my $login (@logins) {
     # SCANSTORAGE
     print FILE '"' . "\\\\copy.ics.muni.cz\\$login\\Scan" . '";';
     # PIN
-    print FILE $login . ";";
+    print FILE ";";
     # MANAGED_GROUPS
     print FILE ";";
     # AUTH_SERVER
@@ -93,7 +93,7 @@ for my $login (@logins) {
     # PHONE
     print FILE ";";
     # LANG
-    print FILE "en;";
+    print FILE "cs;";
     # PWD
     print FILE ";";
     # EXTID
