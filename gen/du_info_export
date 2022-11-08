@@ -9,7 +9,7 @@ use Tie::IxHash;
 
 our $SERVICE_NAME = "du_info_export";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -22,7 +22,7 @@ my $attributesAgent = $agent->getAttributesAgent;
 
 #Constants
 our $A_USER_MAIL;                *A_USER_MAIL =                \'urn:perun:user:attribute-def:def:preferredMail';
-our $A_USER_LOGIN_EINFRA;        *A_USER_LOGIN_EINFRA =        \'urn:perun:user:attribute-def:def:login-namespace:einfra';
+our $A_USER_LOGIN_EINFRA;        *A_USER_LOGIN_EINFRA =        \'urn:perun:user:attribute-def:virt:optional-login-namespace:einfra';
 our $A_RESOURCE_NAME;            *A_RESOURCE_NAME =            \'urn:perun:resource:attribute-def:core:name';
 our $A_R_VO_NAME;                *A_R_VO_NAME =                \'urn:perun:resource:attribute-def:virt:voShortName';
 our $A_F_NAME;                   *A_F_NAME =                   \'urn:perun:facility:attribute-def:core:name';
@@ -77,6 +77,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 		my $uuid = $data->getUserAttributeValue(attrName => $A_U_UUID, member => $memberId);
 		my $einfraLogin = $data->getUserAttributeValue(attrName => $A_USER_LOGIN_EINFRA, member => $memberId);
+		$einfraLogin = defined $einfraLogin ? $einfraLogin : "";
 
 		unless(defined $attributesByUUID{$uuid}) {
 
