@@ -1,0 +1,45 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Perun::Agent;
+use JSON::XS;
+
+our $SERVICE_NAME = "banned_facility_users";
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+my $agent = Perun::Agent->new();
+my $bansAgent = $agent->getBanOnFacilityAgent;
+
+#Constants
+our $A_U_F_IS_BANNED;		*A_U_F_IS_BANNED = \'urn:perun:user_facility:attribute-def:virt:isBanned';
+
+my %bansStruc;
+my $facilityId = perunServicesInit::getFacility->getId;
+my @bans = $bansAgent->getBansForFacility(facilityId => $facilityId);
+
+foreach my $memberId ($data->getMemberIdsForFacility) {
+	my $isBanned = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_U_F_IS_BANNED );
+	if ($isBanned) {
+		my $uid = $data->getUserIdForMember(member => $memberId);
+		foreach my $ban (@bans) {
+			if ($ban->getUserId() eq $uid) {
+				$bansStruc{$uid} = $ban;
+			}
+		}
+	}
+}
+
+my $fileName = "$DIRECTORY/$SERVICE_NAME";
+open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
+print FILE JSON::XS->new->utf8->pretty->canonical->convert_blessed->encode(\%bansStruc);
+close FILE or die "Cannot close $fileName: $! \n";
+
+
+perunServicesInit::finalize;
