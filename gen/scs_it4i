@@ -1,0 +1,53 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+
+our $SERVICE_NAME = basename($0);
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_USER_LOGIN_EINFRA;         *A_USER_LOGIN_EINFRA =     \'urn:perun:user:attribute-def:def:login-namespace:einfra';
+our $A_ORGANIZATION;              *A_ORGANIZATION =          \'urn:perun:user:attribute-def:def:organization';
+our $A_BLOCK_COLLISION;           *A_BLOCK_COLLISION =       \'urn:perun:user:attribute-def:def:it4iBlockCollision';
+
+my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
+
+my $users;
+
+foreach my $memberId ($data->getMemberIdsForFacility()) {
+
+	my $collision = $data->getUserAttributeValue( member => $memberId, attrName => $A_BLOCK_COLLISION );
+	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_EINFRA );
+	my $org = $data->getUserAttributeValue( member => $memberId, attrName => $A_ORGANIZATION ) || "";
+
+	# Check if user is not prohibited in IT4I !!
+	if (defined $collision) {
+		die "Login '$login' has collision with old IT4I data. Propagations was stopped for safety."
+	}
+
+	$users->{$login}->{"login"} = $login;
+	$users->{$login}->{"organization"} = $org;
+	$users->{$login}->{"citizenship"} = "";  # TODO
+
+}
+
+# convert structure to the result json
+my @result;
+foreach my $login (sort keys %{$users}) {
+	push(@result, $users->{$login})
+}
+
+####### output file ######################
+open SERVICE_FILE, ">:encoding(UTF-8)", "$service_file_name" or die "Cannot open $service_file_name: $! \n";
+print SERVICE_FILE JSON::XS->new->utf8->pretty->canonical->encode(\@result);
+close(SERVICE_FILE);
+#####################################################
+perunServicesInit::finalize;
