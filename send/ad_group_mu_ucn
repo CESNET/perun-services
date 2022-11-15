@@ -14,6 +14,7 @@ use ScriptLock;
 sub process_add;
 sub process_remove;
 sub process_update;
+sub process_skipped;
 
 # log counters
 my $counter_group_added = 0;
@@ -24,6 +25,7 @@ my $counter_group_not_removed = 0;
 my $counter_group_members_updated = 0;
 my $counter_group_members_updated_with_errors = 0;
 my $counter_group_members_not_updated = 0;
+my $counter_group_skipped = 0;
 
 # define service
 my $service_name = "ad_group_mu_ucn";
@@ -40,6 +42,7 @@ my $facility_name = $ARGV[0];
 chomp($facility_name);
 my $service_files_base_dir="../gen/spool";
 my $service_files_dir="$service_files_base_dir/$facility_name/$service_name";
+my $skippedGroupsFilename = "$service_files_dir/skipped";
 
 # BASE DN
 open my $file, '<', "$service_files_dir/baseDN";
@@ -90,6 +93,7 @@ foreach my $perun_entry (@perun_entries) {
 process_add();
 process_remove();
 process_update();
+process_skipped();
 
 # disconnect
 ldap_unbind($ldap);
@@ -97,6 +101,7 @@ ldap_unbind($ldap);
 # log results
 ldap_log($service_name, "Group added (without members): " . $counter_group_added . " entries.");
 ldap_log($service_name, "Group failed to add: " . $counter_group_not_added. " entries.");
+ldap_log($service_name, "Group skipped: " . $counter_group_skipped. " entries.");
 ldap_log($service_name, "-------------------------------------------------------------------------------------------------------");
 ldap_log($service_name, "Group updated (members): " . $counter_group_members_updated . " entries.");
 ldap_log($service_name, "Group updated with errors (members): " . $counter_group_members_updated_with_errors . " entries.");
@@ -109,6 +114,7 @@ ldap_log($service_name, "Group failed to remove: " . $counter_group_not_removed.
 # print results for TaskResults in GUI
 print "Group added (without members): " . $counter_group_added . " entries.\n";
 print "Group failed to add: " . $counter_group_not_added. " entries.\n";
+print "Group skipped: " . $counter_group_skipped. " entries.\n";
 print "-------------------------------------------------------------------------------------------------------\n";
 print "Group updated (members): " . $counter_group_members_updated . " entries.\n";
 print "Group updated with errors (members): " . $counter_group_members_updated_with_errors . " entries.\n";
@@ -264,6 +270,20 @@ sub process_update() {
 
 	}
 
+}
+
+#
+# Count invalid skipped groups
+#
+sub process_skipped {
+
+	if(-e $skippedGroupsFilename) {
+		open FILE, '<', $skippedGroupsFilename;
+		while (<FILE>) {
+			$counter_group_skipped++;
+		}
+		close FILE;
+	}
 }
 
 sub update_info {

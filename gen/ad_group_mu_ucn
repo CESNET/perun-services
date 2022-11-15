@@ -11,7 +11,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 local $::SERVICE_NAME = "ad_group_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.5";
+my $SCRIPT_VERSION = "3.0.6";
 
 sub addMemberToGroup;
 sub processWorkplaces;
@@ -23,6 +23,7 @@ sub writeDebug;
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
 my $fileName = "$DIRECTORY/$::SERVICE_NAME".".ldif";
+my $skippedGroupsFileName = "$DIRECTORY/skipped";
 my $baseDnFileName = "$DIRECTORY/baseDN";
 
 # Get hierarchical data without expired members
@@ -46,6 +47,7 @@ our $STATUS_EXPIRED;    *STATUS_EXPIRED =      \'EXPIRED';
 
 our $A_R_ADOUNAME; *A_R_ADOUNAME = \'urn:perun:resource:attribute-def:def:adOuName';
 our $A_G_INETCISPR; *A_G_INETCISPR = \'urn:perun:group:attribute-def:def:inetCispr';
+our $A_G_GROUP_NAME; *A_G_GROUP_NAME = \'urn:perun:group:attribute-def:core:name';
 our $A_G_DESCRIPTION; *A_G_DESCRIPTION = \'urn:perun:group:attribute-def:core:description';
 our $A_R_DESCRIPTION; *A_R_DESCRIPTION = \'urn:perun:resource:attribute-def:core:description';
 
@@ -77,6 +79,7 @@ close(FILE);
 
 our $groups = {};
 our $usersByGroups = {};
+our $skippedGroups = {};
 
 # FOR EACH RESOURCE
 foreach my $resourceId ($data->getResourceIds()) {
@@ -120,6 +123,15 @@ for my $group (sort keys %$groups) {
 
 close FILE;
 
+#
+# Print skipped data
+#
+open FILE,">:encoding(UTF-8)","$skippedGroupsFileName" or die "Cannot open $skippedGroupsFileName: $! \n";
+for my $group (keys %$skippedGroups) {
+	print FILE "gid=" . $skippedGroups->{$group}->{"id"} . "," . "name=" . $skippedGroups->{$group}->{"name"} . "\n";
+}
+close FILE;
+
 perunServicesInit::finalize;
 
 ####################
@@ -149,6 +161,15 @@ sub processTree {
 	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
 		writeDebug("Process Tree Group: $groupId", 1);
 		my $group = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_GROUP_NAME_COMPUTED);
+
+		#check if group has computed name (otherwise it does not belong to correct hierarchy)
+		unless (defined $group) {
+			my $groupName = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_GROUP_NAME);
+			$skippedGroups->{$groupId}->{"name"} = $groupName;
+			$skippedGroups->{$groupId}->{"id"} = $groupId;
+			writeDebug("Skipping group with missing computed name $groupId '$groupName'.", 2);
+			next;
+		}
 
 		#check if the name is unique through all resources
 		if ($uniqueNamesOfGroupsInTreeStructure->{$group}) {
