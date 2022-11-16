@@ -53,6 +53,10 @@ my $usersByResource = {};
 foreach my $resourceId ($data->getResourceIds()) {
 
 	my $group = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_GROUP_NAME );
+	unless (defined $group) {
+		print STDERR "Resource with ID: $resourceId has no AD group name!";
+		exit 1;
+	}
 	$groups->{$group} = 1;
 
 	# FOR EACH MEMBER ON RESOURCE
