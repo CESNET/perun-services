@@ -75,7 +75,8 @@ for my $login (@logins) {
     print FILE '"' . $users->{$login}->{$A_MAIL} . '";';
     # CARDS
     my @cards = grep {!($_ =~ s/^\s+|\s+$//g)} map {checkBase64($_)} @{$users->{$login}->{$A_CHIPNUMBERS}};
-    my $cards_str = join ",",@cards;
+    @cards = map {reverseCardBits($_)} @cards;
+	my $cards_str = join ",",@cards;
     print FILE '"' . $cards_str . '";';
     # GROUPS
     my $groups_str = join ",",@{$users->{$login}->{"groups"}};
@@ -114,6 +115,14 @@ sub checkBase64 {
 		return " ", $value;
 	}
 	return ": ", encode_base64(Encode::encode_utf8($value), '');
+}
+
+# Reverse bits of each hex digit in the hexstring such as: "1" = (binary)0001 -> (binary)1000 = "8"
+# E.g. card number "8D00" = (binary)1000 1101 0000 0000 -> (binary)0001 1011 0000 0000 = "1B00"
+sub reverseCardBits {
+	my $card = shift;
+
+	return uc unpack('h*', pack("b*", unpack("B*", pack('H*', $card))));
 }
 
 perunServicesInit::finalize;
