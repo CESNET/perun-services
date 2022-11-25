@@ -116,10 +116,10 @@ my $dc2_inserted = 0;
 my $dc2_foundAndUpdated = 0;
 my $dc2_foundAndSkipped = 0;
 my $dc2_deleted = 0;
-my $kos_inserted = 0;
-my $kos_foundAndUpdated = 0;
-my $kos_foundAndSkipped = 0;
-my $kos_deleted = 0;
+my $is_inserted = 0;
+my $is_foundAndUpdated = 0;
+my $is_foundAndSkipped = 0;
+my $is_deleted = 0;
 
 # Allow storing change info (AKT)
 my $insertAkt = $dbh->prepare(qq{INSERT INTO $tableNameAkt (OSB_ID, KDYZAP, OBJ, PRIO) VALUES (?,sysdate,?,?)});
@@ -435,7 +435,7 @@ foreach my $uco (sort keys %$dataByKey) {
 
 }
 
-# delete vztah of unwanted persons (for simplicity of other scripts (KOS/DC2 to IFIS) we delete vztah of any type !!
+# delete vztah of unwanted persons (for simplicity of other scripts (IS/DC2 to IFIS) we delete vztah of any type !!
 my $ary_ref_vzt = $dbh->selectcol_arrayref(qq{select distinct OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null});
 my @ucos_vzt = @$ary_ref_vzt;
 foreach my $uco (@ucos_vzt) {
@@ -558,24 +558,24 @@ while(my $row = $existingVztah_dc2->fetchrow_hashref()) {
 $existingVztah_dc2->finish();
 
 #
-# PROCESS RELATIONS FROM KOS
+# PROCESS RELATIONS FROM IS
 #
 
-my $kos_data = load_kos();
+my $is_data = load_is();
 
-foreach my $key (sort keys %$kos_data) {
+foreach my $key (sort keys %$is_data) {
 
-	my $OSB_ID = $kos_data->{$key}->{'OSB_ID'};
-	my $NS = $kos_data->{$key}->{'NS'};
-	my $TYP_VZTAHU = $kos_data->{$key}->{'TYP_VZTAHU'};
-	my $DRUH_VZTAHU = $kos_data->{$key}->{'DRUH_VZTAHU'};
-	my $STU_FORMA = $kos_data->{$key}->{'STU_FORMA'};
-	my $STUD_STAV = $kos_data->{$key}->{'STUD_STAV'};
-	my $STU_PROGR = $kos_data->{$key}->{'STU_PROGR'};
+	my $OSB_ID = $is_data->{$key}->{'OSB_ID'};
+	my $NS = $is_data->{$key}->{'NS'};
+	my $TYP_VZTAHU = $is_data->{$key}->{'TYP_VZTAHU'};
+	my $DRUH_VZTAHU = $is_data->{$key}->{'DRUH_VZTAHU'};
+	my $STU_FORMA = $is_data->{$key}->{'STU_FORMA'};
+	my $STUD_STAV = $is_data->{$key}->{'STUD_STAV'};
+	my $STU_PROGR = $is_data->{$key}->{'STU_PROGR'};
 	my $VZTAH_CISLO = $key;
-	my $VZTAH_OD = $kos_data->{$key}->{'VZTAH_OD'};
-	my $VZTAH_DO = $kos_data->{$key}->{'VZTAH_DO'};
-	my $KARTA_IDENT = $kos_data->{$key}->{'KARTA_IDENT'};
+	my $VZTAH_OD = $is_data->{$key}->{'VZTAH_OD'};
+	my $VZTAH_DO = $is_data->{$key}->{'VZTAH_DO'};
+	my $KARTA_IDENT = $is_data->{$key}->{'KARTA_IDENT'};
 	my $EXT_ID = $key; # same as VZTAH_CISLO
 
 	#If osb_id or typ_vztahu are undef, skip this record
@@ -617,19 +617,19 @@ foreach my $key (sort keys %$kos_data) {
 			$updatePerson->execute($NS, $DRUH_VZTAHU, $STU_FORMA, $STUD_STAV, $STU_PROGR, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID, $OSB_ID, $VZTAH_CISLO, $TYP_VZTAHU);
 			handleAkt($OSB_ID, 'VZTAHY');
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
-			$kos_foundAndUpdated++;
+			$is_foundAndUpdated++;
 
 		} else {
 
 			if($DEBUG == 1) { print "SKIP RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
-			$kos_foundAndSkipped++;
+			$is_foundAndSkipped++;
 
 		}
 
 	} else {
 
 		if($DEBUG == 1) { print "INSERT NEW RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
-		$kos_inserted++;
+		$is_inserted++;
 		#We will insert new record to output database (IFIS)
 		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, NS, TYP_VZTAHU, DRUH_VZTAHU, STU_FORMA, STUD_STAV, STU_PROGR, VZTAH_CISLO, OD, DO_, KARTA_IDENT, EXT_ID) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)});
 		$insertPerson->execute($OSB_ID, $NS, $TYP_VZTAHU, $DRUH_VZTAHU, $STU_FORMA, $STUD_STAV, $STU_PROGR, $VZTAH_CISLO, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID);
@@ -641,22 +641,22 @@ foreach my $key (sort keys %$kos_data) {
 
 # Delete unwanted relations of STU type
 
-my $deleteVztah_kos = $dbh->prepare(qq{DELETE FROM $tableNameVzt where VZTAH_CISLO=? and TYP_VZTAHU='STU'});
-my $existingVztah_kos = $dbh->prepare(qq{select VZTAH_CISLO, OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null and TYP_VZTAHU='STU'});
-$existingVztah_kos->execute();
-while(my $row = $existingVztah_kos->fetchrow_hashref()) {
+my $deleteVztah_is = $dbh->prepare(qq{DELETE FROM $tableNameVzt where VZTAH_CISLO=? and TYP_VZTAHU='STU'});
+my $existingVztah_is = $dbh->prepare(qq{select VZTAH_CISLO, OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null and TYP_VZTAHU='STU'});
+$existingVztah_is->execute();
+while(my $row = $existingVztah_is->fetchrow_hashref()) {
 	my $VZTAH_CISLO = $row->{VZTAH_CISLO};
 	my $UCO = $row->{OSB_ID};
-	unless (exists $kos_data->{$VZTAH_CISLO}) {
-		# STU vztah is not in KOS source, remove from IFIS.
+	unless (exists $is_data->{$VZTAH_CISLO}) {
+		# STU vztah is not in IS source, remove from IFIS.
 		if ($DEBUG == 1) { print "DELETE VZTAH RECORD CISLO_VZTAHU: $VZTAH_CISLO /STU \n"; }
-		$deleteVztah_kos->execute($VZTAH_CISLO);
-		$kos_deleted++;
+		$deleteVztah_is->execute($VZTAH_CISLO);
+		$is_deleted++;
 		handleAkt($UCO, 'VZTAHY');
 	}
 }
 
-$existingVztah_kos->finish();
+$existingVztah_is->finish();
 
 #
 # SET WHICH RELATIONS ARE 'HLAVNI'
@@ -883,10 +883,10 @@ print "Vztah (zam) skipped:  \t$dc2_foundAndSkipped\n";
 print "Vztah (zam) updated:  \t$dc2_foundAndUpdated\n";
 print "Vztah (zam) deleted:  \t$dc2_deleted\n";
 print "---------------------------------------\n";
-print "Vztah (stu) inserted: \t$kos_inserted\n";
-print "Vztah (stu) skipped:  \t$kos_foundAndSkipped\n";
-print "Vztah (stu) updated:  \t$kos_foundAndUpdated\n";
-print "Vztah (stu) deleted:  \t$kos_deleted\n";
+print "Vztah (stu) inserted: \t$is_inserted\n";
+print "Vztah (stu) skipped:  \t$is_foundAndSkipped\n";
+print "Vztah (stu) updated:  \t$is_foundAndUpdated\n";
+print "Vztah (stu) deleted:  \t$is_deleted\n";
 print "=======================================\n";
 
 #
