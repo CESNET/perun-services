@@ -9,7 +9,7 @@ use Tie::IxHash;
 
 our $SERVICE_NAME = "du_info_export";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -77,7 +77,6 @@ foreach my $resourceId ($data->getResourceIds()) {
 	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 		my $uuid = $data->getUserAttributeValue(attrName => $A_U_UUID, member => $memberId);
 		my $einfraLogin = $data->getUserAttributeValue(attrName => $A_USER_LOGIN_EINFRA, member => $memberId);
-		$einfraLogin = defined $einfraLogin ? $einfraLogin : "";
 
 		unless(defined $attributesByUUID{$uuid}) {
 
