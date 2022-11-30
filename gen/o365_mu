@@ -16,8 +16,8 @@ sub saveUsersToFile;
 sub saveGroupsToFile;
 
 our $SERVICE_NAME     = "o365_mu";
-our $PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.1.1";
+our $PROTOCOL_VERSION = "3.2.0";
+my $SCRIPT_VERSION = "3.2.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -28,6 +28,7 @@ my $data      = perunServicesInit::getHashedDataWithGroups;
 #-------------------------------------------------------------------------
 
 our $A_G_AD_NAME;                            *A_G_AD_NAME =                            \'urn:perun:group:attribute-def:def:adName:o365mu';
+our $A_G_O365_MAILS;                         *A_G_O365_MAILS =                         \'urn:perun:group:attribute-def:def:o365EmailAddresses:o365mu';
 our $A_F_DOMAIN_NAME;                        *A_F_DOMAIN_NAME =                        \'urn:perun:facility:attribute-def:def:o365DomainName';
 our $A_MG_O365_SEND_AS;                      *A_MG_O365_SEND_AS =                      \'urn:perun:member_group:attribute-def:virt:o365SendAs';
 our $A_U_O365_MAIL_ADDRS;                    *A_U_O365_MAIL_ADDRS =                    \'urn:perun:user:attribute-def:def:o365EmailAddresses:mu';
@@ -45,6 +46,8 @@ our $MAIL_FORWARD_TEXT = "mailForward";
 our $ARCHIVE_TEXT = "archive";
 our $STORE_AND_FORWARD_TEXT = "storeAndForward";
 our $EMAIL_ADDRESSES = "emailAddresses";
+our $GROUP_MAIL_TEXT = "groupMail";
+our $GROUP_CONTACTS_TEXT = "groupContacts";
 
 ###------------------------------------------------------------------------------
 ### RESOURCE MAILBOXES CONFIGURATION
@@ -338,7 +341,18 @@ sub processGroup {
 	if($groupADName) {
 		#all groups for mu should have specific part of name
 		$groupADName = $groupADName . '_group.muni.cz';
-		$groups->{$groupADName} = undef;
+		#get group mail
+		my $groupMails = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_O365_MAILS );
+		#take the first email if there is none with right domain
+		my $groupMail = $groupMails->[0];
+		foreach my $mail(sort @$groupMails) {
+			if($mail =~ m/\@group[.]muni[.]cz/) {
+				$groupMail = $mail;
+				last;
+			}
+		}
+
+		$groups->{$groupADName}->{$GROUP_MAIL_TEXT} = $groupMail;
 
 		foreach my $memberId($data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
 			processGroupMember $memberId, $groupId, $resourceId, $groupADName;
@@ -361,7 +375,7 @@ sub processGroupMember {
 	my $UPN = $users->{$UCO}->{$UPN_TEXT};
 	my $sendAsGroup = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_MG_O365_SEND_AS );
 
-	if($sendAsGroup) { $groups->{$groupADName}->{$UPN} = 1; }
+	if($sendAsGroup) { $groups->{$groupADName}->{$GROUP_CONTACTS_TEXT}->{$UPN} = 1; }
 }
 
 # input: file name for users data, usersData structure
@@ -394,9 +408,10 @@ sub saveGroupsToFile {
 	binmode FILE, ":utf8";
 
 	foreach my $adName (sort keys %$groupsData) {
-		my $contacts = join " ", sort keys %{$groupsData->{$adName}};
+		my $groupMail = $groupsData->{$adName}->{$GROUP_MAIL_TEXT};
+		my $contacts = join " ", sort keys %{$groupsData->{$adName}->{$GROUP_CONTACTS_TEXT}};
 		unless($contacts) { $contacts = ""; }
-		print FILE $adName . "\t" . $contacts . "\n";
+		print FILE $adName . "\t" . $contacts . "\t" . $groupMail . "\n";
 	}
 
 	close(FILE) or die "Cannot close $fileName: $! \n";

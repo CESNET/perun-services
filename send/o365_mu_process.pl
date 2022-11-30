@@ -64,6 +64,7 @@ my $EMAIL_ADDRESSES_TEXT = "emailaddresses";
 my $PLAIN_TEXT_OBJECT_TEXT = "plainTextObject";
 my $AD_GROUP_NAME_TEXT = "groupName";
 my $SEND_AS_TEXT = "sendAs";
+my $GROUP_MAIL_TEXT = "groupMail";
 my $COMMAND_TEXT = "command";
 my $PARAMETERS_TEXT = "parameters";
 
@@ -504,6 +505,8 @@ sub readDataAboutGroups {
 		my $groupADName = $parts[0];
 		my @emails = ();
 		if($parts[1]) { @emails = split / /, $parts[1]; }
+		my $groupMail = "";
+		if($parts[2]) { $groupMail = $parts[2]; }
 
 		#If groupADName is from any reason empty, set global return code to 1 and skip this group
 		unless($line) {
@@ -514,6 +517,7 @@ sub readDataAboutGroups {
 
 		$groupsStruc->{$groupADName}->{$AD_GROUP_NAME_TEXT} = $groupADName;
 		$groupsStruc->{$groupADName}->{$SEND_AS_TEXT} = \@emails;
+		$groupsStruc->{$groupADName}->{$GROUP_MAIL_TEXT} = $groupMail;
 		$groupsStruc->{$groupADName}->{$PLAIN_TEXT_OBJECT_TEXT} = $line;
 	}
 	close FILE or die "ERROR - Could not close file $pathToFile: $!\n";
@@ -596,6 +600,7 @@ sub getGroupsContent {
 		my $group = {};
 		$group->{$AD_GROUP_NAME_TEXT} = $key;
 		$group->{$SEND_AS_TEXT} = $groupToProcess->{$SEND_AS_TEXT};
+		$group->{$GROUP_MAIL_TEXT} = $groupToProcess->{$GROUP_MAIL_TEXT};
 		push @parameters, $group;
 	}
 
