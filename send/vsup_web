@@ -133,6 +133,7 @@ foreach my $uco (sort keys %$dataByUco) {
 
 			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName SET LOGIN=? , EMAIL_SKOLNI=? , TITUL_PRED=? , JMENO=? , PRIJMENI=? , TITUL_ZA=? , TEL_PRAC_LINKA=? , TEL_PRAC_MOB=? , EMAIL_SOUKR=? , TEL_SOUKR=? , FOTO=? , ZMENENO_KDY=NOW() WHERE UCO=?});
 			$updatePerson->execute($LOGIN, $EMAIL, $TITLE_BEFORE, $FIRST_NAME, $LAST_NAME, $TITLE_AFTER, $PHONE, $MOBILE, $EMAIL_PRIV, $PHONE_PRIV, $FOTO, $uco);
+			$updatePerson->finish();
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $uco\n"; }
 			$foundAndUpdated++;
 
@@ -142,6 +143,7 @@ foreach my $uco (sort keys %$dataByUco) {
 			$foundAndSkipped++;
 
 		}
+		$recordAreEquals->finish();
 
 	} else {
 
@@ -150,8 +152,11 @@ foreach my $uco (sort keys %$dataByUco) {
 		# we will do insert
 		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName (UCO, LOGIN, EMAIL_SKOLNI, TITUL_PRED, JMENO, PRIJMENI, TITUL_ZA, TEL_PRAC_LINKA, TEL_PRAC_MOB, EMAIL_SOUKR, TEL_SOUKR, FOTO, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,NOW())});
 		$insertPerson->execute($uco, $LOGIN, $EMAIL, $TITLE_BEFORE, $FIRST_NAME, $LAST_NAME, $TITLE_AFTER, $PHONE, $MOBILE, $EMAIL_PRIV, $PHONE_PRIV, $FOTO);
+		$insertPerson->finish();
 
 	}
+	$personExists->finish();
+
 }
 
 ##########################
@@ -198,8 +203,10 @@ while(my $line = <FILE>) {
 		# we will do insert
 		my $insertCao = $dbh->prepare(qq{INSERT INTO $tableName_cao (UCO, VZTAH_TYP, CAO_ORGAN, CAO_FUNKCE_NAZEV, CAO_FUNKCE_ID, ZMENENO_KDY) VALUES (?,?,?,?,?,NOW())});
 		$insertCao->execute($UCO, 'CAO', $CAO_ORGAN, $CAO_FUNKCE, $CAO_FUNKCE_ID);
+		$insertCao->finish();
 
 	}
+	$caoExist->finish();
 
 }
 close FILE;
@@ -281,6 +288,7 @@ while(my $line = <FILE>) {
 
 			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName_ext SET VZTAH_TYP=? , ZAM_FUNKCE_NAZEV=? , ZAM_FUNKCE_CISLO=? , NS=? , ZMENENO_KDY=NOW() WHERE UCO=? and VZTAH_ID=?});
 			$updatePerson->execute($VZTAH_TYP, $ZAM_FCE_NAZ, $ZAM_FCE_CIS, $NS, $UCO, $VZTAH_ID);
+			$updatePerson->finish();
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $UCO\n"; }
 			$foundAndUpdatedExt++;
 
@@ -290,6 +298,7 @@ while(my $line = <FILE>) {
 			$foundAndSkippedExt++;
 
 		}
+		$recordAreEquals->finish();
 
 	} else {
 
@@ -298,8 +307,10 @@ while(my $line = <FILE>) {
 		# we will do insert
 		my $insertExt = $dbh->prepare(qq{INSERT INTO $tableName_ext (UCO, VZTAH_ID, VZTAH_TYP, ZAM_FUNKCE_CISLO, ZAM_FUNKCE_NAZEV, NS, ZMENENO_KDY) VALUES (?,?,?,?,?,?,NOW())});
 		$insertExt->execute($UCO, $VZTAH_ID, $VZTAH_TYP, $ZAM_FCE_CIS, $ZAM_FCE_NAZ, $NS);
+		$insertExt->finish();
 
 	}
+	$extExist->finish();
 
 }
 close FILE;
@@ -384,6 +395,7 @@ while(my $line = <FILE>) {
 
 			my $updatePerson = $dbh->prepare(qq{UPDATE $tableName_pass SET STUDIUM_ID=? , STUDIUM_OD=STR_TO_DATE(?,'%Y-%m-%d') , PRIHLASKA_KOD=? , DR=? , ROCNIK=? , ZMENENO_KDY=NOW() WHERE UCO=?});
 			$updatePerson->execute($STUDY_ID, $STUDY_SINCE, $STUDY_PRIHLASKA, $DR, $STUDY_ROCNIK, $UCO);
+			$updatePerson->finish();
 			if($DEBUG == 1) { print "UPDATING EXISTING PASS RECORD: $UCO\n"; }
 			$foundAndUpdatedPass++;
 
@@ -393,6 +405,7 @@ while(my $line = <FILE>) {
 			$foundAndSkippedPass++;
 
 		}
+		$recordAreEquals->finish();
 
 	} else {
 
@@ -404,6 +417,8 @@ while(my $line = <FILE>) {
 	}
 
 }
+$passExist->finish();
+$insertExt->finish();
 close FILE;
 
 #####
@@ -458,6 +473,7 @@ foreach my $NS_KOD (sort keys %$dataByNs) {
 		# we will do insert
 		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableName_ns (NS_KOD, NS_NAZEV, UCO) VALUES (?,?,?)});
 		$insertPerson->execute($NS_KOD, $NS_NAZEV, $UCO);
+		$insertPerson->finish();
 
 	}
 
@@ -495,6 +511,14 @@ foreach my $uco (@web_ucos) {
 
 	}
 }
+
+$deleteUser->finish();
+$deleteCao->finish();
+$deletePass->finish();
+$deleteExt->finish();
+$deleteNs->finish();
+$deleteDC2->finish();
+$deleteKOS->finish();
 
 commit $dbh;
 $dbh->disconnect();
