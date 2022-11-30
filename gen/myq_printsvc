@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "myq_printsvc";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -84,7 +84,7 @@ for my $login (@logins) {
     # CODE
     print FILE $login . ";";
     # SCANSTORAGE
-    print FILE '"' . "\\\\copy.ics.muni.cz\\$login\\Scan" . '";';
+    print FILE '"' . "\\\\ha-bay.ics.muni.cz\\sciscan\\$login\\Scan" . '";';
     # PIN
     print FILE ";";
     # MANAGED_GROUPS
