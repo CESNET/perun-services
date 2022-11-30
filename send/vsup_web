@@ -8,6 +8,8 @@ use Encode qw(encode);
 use ScriptLock;
 binmode STDOUT, ":utf8";
 
+sub appendParam;
+
 my $username;
 my $password;
 my $tableName = 'IDM2WEB_OSOBY';
@@ -110,71 +112,18 @@ foreach my $uco (sort keys %$dataByUco) {
 		if($DEBUG == 1) { print "FIND: $uco\n"; }
 
 		# generate proper select on NULLs
-		my $select = "SELECT 1 from $tableName where UCO=? and LOGIN=? and EMAIL_SKOLNI=? and TITUL_PRED";
+		my $select = "SELECT 1 from $tableName where UCO=? and LOGIN=? and EMAIL_SKOLNI=?";
 		my @params = ($uco, $LOGIN, $EMAIL);
-		if ($TITLE_BEFORE) {
-			$select = $select . "=?";
-			push(@params, $TITLE_BEFORE);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and JMENO";
-		if ($FIRST_NAME) {
-			$select = $select . "=?";
-			push(@params, $FIRST_NAME);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and PRIJMENI";
-		if ($LAST_NAME) {
-			$select = $select . "=?";
-			push(@params, $LAST_NAME);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and TITUL_ZA";
-		if ($TITLE_AFTER) {
-			$select = $select . "=?";
-			push(@params, $TITLE_AFTER);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and TEL_PRAC_LINKA";
-		if ($PHONE) {
-			$select = $select . "=?";
-			push(@params, $PHONE);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and TEL_PRAC_MOB";
-		if ($MOBILE) {
-			$select = $select . "=?";
-			push(@params, $MOBILE);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and EMAIL_SOUKR";
-		if ($EMAIL_PRIV) {
-			$select = $select . "=?";
-			push(@params, $EMAIL_PRIV);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and TEL_SOUKR";
-		if ($PHONE_PRIV) {
-			$select = $select . "=?";
-			push(@params, $PHONE_PRIV);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and FOTO";
-		if ($FOTO) {
-			$select = $select . "=?";
-			push(@params, $FOTO);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . ";";
+
+		$select = appendParam(select => $select, params => \@params, paramName => 'TITUL_PRED', paramValue => $TITLE_BEFORE);
+		$select = appendParam(select => $select, params => \@params, paramName => 'JMENO', paramValue => $FIRST_NAME);
+		$select = appendParam(select => $select, params => \@params, paramName => 'PRIJMENI', paramValue => $LAST_NAME);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TITUL_ZA', paramValue => $TITLE_AFTER);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_LINKA', paramValue => $PHONE);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TEL_PRAC_MOB', paramValue => $MOBILE);
+		$select = appendParam(select => $select, params => \@params, paramName => 'EMAIL_SOUKR', paramValue => $EMAIL_PRIV);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TEL_SOUKR', paramValue => $PHONE_PRIV);
+		$select = appendParam(select => $select, params => \@params, paramName => 'FOTO', paramValue => $FOTO);
 
 		#we need to know if these two records are without changes, if yes, skip them
 		my $recordAreEquals = $dbh->prepare($select);
@@ -222,6 +171,7 @@ open FILE, $service_file_cao or die "Could not open $service_file_cao: $!";
 while(my $line = <FILE>) {
 
 	my @parts = split /\t/, $line;
+	chomp(@parts);
 
 	my $UCO = (($parts[0] ne '') ? $parts[0] : undef);
 	my $CAO_ORGAN = (($parts[1] ne '') ? $parts[1] : undef);
@@ -258,7 +208,7 @@ close FILE;
 # Delete removed CAOs
 #####
 
-# delete completly removed people from CAO
+# delete completely removed people from CAO
 my @keptUcos = sort keys %{$cao};
 my $elements = join(',',@keptUcos);
 if($DEBUG == 1) { print "DELETED NOT IN ($elements)\n"; }
@@ -299,6 +249,7 @@ open FILE, $service_file_ext or die "Could not open $service_file_ext: $!";
 while(my $line = <FILE>) {
 
 	my @parts = split /\t/, $line;
+	chomp(@parts);
 
 	my $UCO = (($parts[0] ne '') ? $parts[0] : undef);
 	my $VZTAH_ID = (($parts[1] ne '') ? $parts[1] : undef);
@@ -317,28 +268,11 @@ while(my $line = <FILE>) {
 	if($extExist->fetch) {
 		if($DEBUG == 1) { print "FIND: $UCO\n"; }
 
-		my $select = "SELECT 1 from $tableName_ext where UCO=? and VZTAH_ID=? and VZTAH_TYP=? and ZAM_FUNKCE_NAZEV";
+		my $select = "SELECT 1 from $tableName_ext where UCO=? and VZTAH_ID=? and VZTAH_TYP=?";
 		my @params = ($UCO, $VZTAH_ID, $VZTAH_TYP);
-		if ($ZAM_FCE_NAZ) {
-			$select = $select . "=?";
-			push(@params, $ZAM_FCE_NAZ);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and ZAM_FUNKCE_CISLO";
-		if ($ZAM_FCE_CIS) {
-			$select = $select . "=?";
-			push(@params, $ZAM_FCE_CIS);
-		} else {
-			$select = $select . " is NULL";
-		}
-		$select = $select . " and NS";
-		if ($NS) {
-			$select = $select . "=?";
-			push(@params, $NS);
-		} else {
-			$select = $select . " is NULL";
-		}
+		$select = appendParam(select => $select, params => \@params, paramName => 'ZAM_FUNKCE_NAZEV', paramValue => $ZAM_FCE_NAZ);
+		$select = appendParam(select => $select, params => \@params, paramName => 'ZAM_FUNKCE_CISLO', paramValue => $ZAM_FCE_CIS);
+		$select = appendParam(select => $select, params => \@params, paramName => 'NS', paramValue => $NS);
 
 		my $recordAreEquals = $dbh->prepare($select);
 		$recordAreEquals->execute(@params);
@@ -593,3 +527,25 @@ print "Deleted users:\t$deletedUsers\n";
 print "=======================================\n";
 
 $lock->unlock();
+
+#
+# Appends PARAM with respecting to possible NULL to select
+#
+sub appendParam() {
+
+	my %args = @_;
+	my $select = $args{select};
+	my $paramsRef = $args{params};
+	my $paramName = $args{paramName};
+	my $paramValue = $args{paramValue};
+
+	if (defined($paramValue)) {
+		$select = $select . " and $paramName=?";
+		push(@$paramsRef, $paramValue);
+	} else {
+		$select = $select . " and $paramName is NULL";
+	}
+
+	return $select;
+
+}
