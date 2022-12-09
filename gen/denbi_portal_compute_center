@@ -22,12 +22,15 @@ my $data = perunServicesInit::getHashedDataWithGroups;
 sub processUsers;
 sub processGroups;
 sub processMemberships;
+sub getDenbiMembersForGroup;
 
 #Constants
 our $A_USER_ID;                   *A_USER_ID =               \'urn:perun:user:attribute-def:core:id';
 our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:attribute-def:core:status';
 our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
-our $A_USER_LOGIN;                *A_USER_LOGIN =            \'urn:perun:user:attribute-def:virt:login-namespace:elixir-persistent';
+our $A_USER_LOGIN_PERSISTENT;     *A_USER_LOGIN_PERSISTENT = \'urn:perun:user:attribute-def:virt:login-namespace:elixir-persistent';
+our $A_USER_LOGIN;                *A_USER_LOGIN =            \'urn:perun:user:attribute-def:def:login-namespace:elixir';
+our $A_USER_MAIL;                 *A_USER_MAIL =             \'urn:perun:user:attribute-def:def:preferredMail';
 
 our $A_GROUP_ID;                  *A_GROUP_ID =              \'urn:perun:group:attribute-def:core:id';
 our $A_GROUP_NAME;                *A_GROUP_NAME =            \'urn:perun:group:attribute-def:core:name';
@@ -57,8 +60,11 @@ our $STATUS_SUSPENDED;            *STATUS_SUSPENDED =        \'SUSPENDED';
 #urn:perun:user:attribute-def:virt:login-namespace:elixir-persistent  | string  | ELIXIR login                | Login to ELIXIR. It is set automatically with first call.    |
 #urn:perun:user_facility:attribute-def:opt:denbiVmsRunning            | hash    | Machines Running            | Collection of user-generated running VMs                     |
 
-
-
+#attr friendly names
+our $idFriendlyName = "id";
+our $mailFriendlyName = "preferredMail";
+our $loginFriendlyName = "login-namespace:elixir";
+our $persLoginFriendlyName = "login-namespace:elixir-persistent";
 
 my $userStruc = {};
 my $groupStruc = {};
@@ -174,7 +180,9 @@ sub processGroups {
 	my $gid = $groupAttributes{$A_GROUP_ID};
 
 	#convert attributes data
-	$groupAttributes{$A_GROUP_DENBI_PROJECT_MEMBERS} = decode_json $groupAttributes{$A_GROUP_DENBI_PROJECT_MEMBERS};
+	#$groupAttributes{$A_GROUP_DENBI_PROJECT_MEMBERS} = decode_json $groupAttributes{$A_GROUP_DENBI_PROJECT_MEMBERS};
+
+	$groupAttributes{$A_GROUP_DENBI_PROJECT_MEMBERS} = getDenbiMembersForGroup( $groupId, $resourceId );
 
 	unless(exists $groupStruc->{$gid}) {
 		%groupAttributes = map { convertToFriendlyName($_) => $groupAttributes{$_} } keys %groupAttributes;
@@ -184,6 +192,27 @@ sub processGroups {
 	foreach my $memberId ( $data->getMemberIdsForResourceAndGroup( group=> $groupId, resource => $resourceId ) ) {
 		processUsers $gid, $memberId, $resourceId;
 	}
+}
+
+sub getDenbiMembersForGroup {
+	my ($groupId, $resourceId) = @_;
+
+	my @denbiMembers = ();
+
+	foreach my $memberId ( $data->getMemberIdsForResourceAndGroup( group=> $groupId, resource => $resourceId ) ) {
+		my $userId = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
+		my $email = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_MAIL );
+		my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
+		my $persistentLogin = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_PERSISTENT );
+		my $member = {};
+		$member->{$idFriendlyName} = $userId;
+		$member->{$mailFriendlyName} = $email;
+		$member->{$loginFriendlyName} = $login;
+		$member->{$persLoginFriendlyName} = $persistentLogin;
+		push @denbiMembers, $member;
+	}
+
+	return \@denbiMembers;
 }
 
 ## creates structure for memberships
