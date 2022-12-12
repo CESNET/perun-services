@@ -363,7 +363,7 @@ while(my $line = <FILE>) {
 		next;
 	}
 
-	# fill existing CAO relations for UCO
+	# fill existing Pass relations for UCO
 	$pass->{$UCO} = 1;
 
 	# There is a PASS
@@ -425,7 +425,7 @@ close FILE;
 # Delete removed PASS
 #####
 
-# delete completly removed people from PASS
+# delete completely removed people from PASS
 my @keptPassUcos = sort keys %{$pass};
 my $elementsPass = join(',',@keptPassUcos);
 if($DEBUG == 1) { print "DELETED PASS NOT IN ($elementsPass)\n"; }
