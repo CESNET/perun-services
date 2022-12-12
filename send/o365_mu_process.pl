@@ -283,7 +283,7 @@ if($countOfGroupsToProcess > 0 && $DRY_RUN == 0) {
 		if($DEBUG>0) { print "INFO: Groups chunk number - $chunkCounter\n"; }
 
 		#groups to be updated as content for call
-		my $groupsContent = getGroupsContent($groupsToProcessStruc);
+		my $groupsContent = getGroupsContent($chunk);
 		my $groupsResult = callServerForUpdate($groupsContent);
 		my $groupsResultMap = transformResultToMap($groupsResult);
 		#check all processed groups and add them to the cache if they were updated ok
