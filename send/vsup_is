@@ -139,8 +139,12 @@ foreach my $key (sort keys %$dataByKeys) {
 			$BIRTH_DATE = "19" . $YY . "-" . $MM . "-" . $DD;
 		}
 
-	}
+		# skip wrong values
+		if ($DD > 31) {
+			$BIRTH_DATE = undef;
+		}
 
+	}
 
 	# There is
 	my $personExists = $dbh->prepare(qq{select 1 from $table_osoby where UCO_PERUN=? and TYP_ZAZN=?});
