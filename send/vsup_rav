@@ -7,6 +7,8 @@ use Data::Dumper;
 use Encode qw(encode);
 use ScriptLock;
 
+sub appendParam;
+
 my $username;
 my $password;
 my $tableName = 'idm2rav_osoby';
@@ -104,60 +106,15 @@ foreach my $uco (sort keys %$dataByUco) {
 		my $select = "SELECT 1 from $tableName where UCO=? and LOGIN=?";
 		my @params = ($uco, $LOGIN);
 
-		if ($JMENO) {
-			$select = $select . " and JMENO=?";
-			push(@params, $JMENO);
-		} else {
-			$select = $select . " and JMENO is NULL";
-		}
-		if ($PRIJMENI) {
-			$select = $select . " and PRIJMENI=?";
-			push(@params, $PRIJMENI);
-		} else {
-			$select = $select . " and PRIJMENI is NULL";
-		}
-		if ($TITUL_PRED) {
-			$select = $select . " and TITUL_PRED=?";
-			push(@params, $TITUL_PRED);
-		} else {
-			$select = $select . " and TITUL_PRED is NULL";
-		}
-		if ($TITUL_ZA) {
-			$select = $select . " and TITUL_ZA=?";
-			push(@params, $TITUL_ZA);
-		} else {
-			$select = $select . " and TITUL_ZA is NULL";
-		}
-		if ($EMAIL) {
-			$select = $select . " and EMAIL=?";
-			push(@params, $EMAIL);
-		} else {
-			$select = $select . " and EMAIL is NULL";
-		}
-		if ($TELEFON) {
-			$select = $select . " and TELEFON=?";
-			push(@params, $TELEFON);
-		} else {
-			$select = $select . " and TELEFON is NULL";
-		}
-		if ($IDCARD_CHIP) {
-			$select = $select . " and IDCARD_CHIP=?";
-			push(@params, $IDCARD_CHIP);
-		} else {
-			$select = $select . " and IDCARD_CHIP is NULL";
-		}
-		if ($IDCARD_BARCODE) {
-			$select = $select . " and IDCARD_BARCODE=?";
-			push(@params, $IDCARD_BARCODE);
-		} else {
-			$select = $select . " and IDCARD_BARCODE is NULL";
-		}
-		if ($PLATNOST_DO) {
-			$select = $select . " and PLATNOST_DO=?";
-			push(@params, $PLATNOST_DO);
-		} else {
-			$select = $select . " and PLATNOST_DO is NULL";
-		}
+		$select = appendParam(select => $select, params => \@params, paramName => 'JMENO', paramValue => $JMENO);
+		$select = appendParam(select => $select, params => \@params, paramName => 'PRIJMENI', paramValue => $PRIJMENI);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TITUL_PRED', paramValue => $TITUL_PRED);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TITUL_ZA', paramValue => $TITUL_ZA);
+		$select = appendParam(select => $select, params => \@params, paramName => 'EMAIL', paramValue => $EMAIL);
+		$select = appendParam(select => $select, params => \@params, paramName => 'TELEFON', paramValue => $TELEFON);
+		$select = appendParam(select => $select, params => \@params, paramName => 'IDCARD_CHIP', paramValue => $IDCARD_CHIP);
+		$select = appendParam(select => $select, params => \@params, paramName => 'IDCARD_BARCODE', paramValue => $IDCARD_BARCODE);
+		$select = appendParam(select => $select, params => \@params, paramName => 'PLATNOST_DO', paramValue => $PLATNOST_DO);
 
 		my $recordAreEquals = $dbh->prepare($select);
 		$recordAreEquals->execute(@params);
@@ -199,3 +156,25 @@ print "Skipped:\t$foundAndSkipped\n";
 print "=======================================\n";
 
 $lock->unlock();
+
+#
+# Appends PARAM with respecting to possible NULL to select
+#
+sub appendParam() {
+
+	my %args = @_;
+	my $select = $args{select};
+	my $paramsRef = $args{params};
+	my $paramName = $args{paramName};
+	my $paramValue = $args{paramValue};
+
+	if (defined($paramValue)) {
+		$select = $select . " and $paramName=?";
+		push(@$paramsRef, $paramValue);
+	} else {
+		$select = $select . " and $paramName is NULL";
+	}
+
+	return $select;
+
+}
