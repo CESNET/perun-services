@@ -28,7 +28,7 @@ our $A_USER_LAST_NAME;                         *A_USER_LAST_NAME =              
 our $A_MEMBER_STATUS;                          *A_MEMBER_STATUS =                         \'urn:perun:member:attribute-def:core:status';
 our $A_MEMBER_IS_SUSPENDED;                    *A_MEMBER_IS_SUSPENDED =                   \'urn:perun:member:attribute-def:virt:isSuspended';
 our $A_MEMBER_EXPIRATION;                      *A_MEMBER_EXPIRATION =                     \'urn:perun:member:attribute-def:def:membershipExpiration';
-our $A_USER_OPTIONAL_LOGIN;                    *A_USER_OPTIONAL_LOGIN =                   \'urn:perun:user:attribute-def:virt:optionalLogin-namespace:mu';
+our $A_USER_OPTIONAL_LOGIN;                    *A_USER_OPTIONAL_LOGIN =                   \'urn:perun:user:attribute-def:virt:optional-login-namespace:mu';
 
 our $A_R_VO_SHORT_NAME;                        *A_R_VO_SHORT_NAME =                       \'urn:perun:resource:attribute-def:virt:voShortName';
 

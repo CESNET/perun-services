@@ -21,7 +21,7 @@ our $A_USER_KERBEROS_LOGINS;            *A_USER_KERBEROS_LOGINS =               
 our $A_USER_FACILITY_UID;               *A_USER_FACILITY_UID =                     \'urn:perun:user_facility:attribute-def:virt:UID';
 our $A_USER_FACILITY_GID;               *A_USER_FACILITY_GID =                     \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
 our $A_MEMBER_STATUS;                   *A_MEMBER_STATUS =                         \'urn:perun:member:attribute-def:core:status';
-our $A_USER_OPTIONAL_LOGIN;             *A_USER_OPTIONAL_LOGIN =                   \'urn:perun:user:attribute-def:virt:optionalLogin-namespace:mu';
+our $A_USER_OPTIONAL_LOGIN;             *A_USER_OPTIONAL_LOGIN =                   \'urn:perun:user:attribute-def:virt:optional-login-namespace:mu';
 
 our $STATUS_VALID;                      *STATUS_VALID =                            \'VALID';
 

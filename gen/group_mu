@@ -31,7 +31,7 @@ our $A_GROUP_RESOURCE_UNIX_GROUP_NAME;        *A_GROUP_RESOURCE_UNIX_GROUP_NAME 
 our $A_GROUP_RESOURCE_UNIX_GID;               *A_GROUP_RESOURCE_UNIX_GID =               \'urn:perun:group_resource:attribute-def:virt:unixGID';
 our $A_USER_FACILITY_LOGIN;                   *A_USER_FACILITY_LOGIN =                   \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_MEMBER_STATUS;                         *A_MEMBER_STATUS =                         \'urn:perun:member:attribute-def:core:status';
-our $A_USER_OPTIONAL_LOGIN;                   *A_USER_OPTIONAL_LOGIN =                   \'urn:perun:user:attribute-def:virt:optionalLogin-namespace:mu';
+our $A_USER_OPTIONAL_LOGIN;                   *A_USER_OPTIONAL_LOGIN =                   \'urn:perun:user:attribute-def:virt:optional-login-namespace:mu';
 our $A_GROUP_RESOURCE_IS_SYSTEM_UNIX_GROUP;   *A_GROUP_RESOURCE_IS_SYSTEM_UNIX_GROUP =   \'urn:perun:group_resource:attribute-def:def:isSystemUnixGroup';
 our $A_GROUP_RESOURCE_SYSTEM_UNIX_GID;        *A_GROUP_RESOURCE_SYSTEM_UNIX_GID =        \'urn:perun:group_resource:attribute-def:def:systemUnixGID';
 our $A_GROUP_RESOURCE_SYSTEM_UNIX_GROUP_NAME; *A_GROUP_RESOURCE_SYSTEM_UNIX_GROUP_NAME = \'urn:perun:group_resource:attribute-def:def:systemUnixGroupName';
