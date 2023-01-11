@@ -12,7 +12,6 @@ function process {
 	I_CHANGED=(0 '${FILE} updated')
 	I_NOT_CHANGED=(0 '${FILE} has not changed')
 	E_CHMOD=(51 'Cannot chmod on $WORK_DIR/$FILE')
-	E_DUPLICATES=(52 'Email duplicates: ${DUPLICATES}')
 
 	create_lock
 
@@ -41,6 +40,6 @@ function process {
 	#there are some duplicates between emails, need to end with error
 	if [ -s "${FILE_USER_DUPLICATES}" ]; then
 		DUPLICATES=`cat $FILE_USER_DUPLICATES`
-		log_msg E_DUPLICATES
+		log_warn_to_err_exit "Email duplicates: ${DUPLICATES}"
 	fi
 }
