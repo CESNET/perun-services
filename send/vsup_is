@@ -9,6 +9,7 @@ use ScriptLock;
 binmode STDOUT, ":utf8";
 
 sub solveClob;
+sub appendParam;
 
 my $username;
 my $password;
@@ -138,8 +139,12 @@ foreach my $key (sort keys %$dataByKeys) {
 			$BIRTH_DATE = "19" . $YY . "-" . $MM . "-" . $DD;
 		}
 
-	}
+		# skip wrong values
+		if ($DD > 31) {
+			$BIRTH_DATE = undef;
+		}
 
+	}
 
 	# There is
 	my $personExists = $dbh->prepare(qq{select 1 from $table_osoby where UCO_PERUN=? and TYP_ZAZN=?});
@@ -175,90 +180,20 @@ foreach my $key (sort keys %$dataByKeys) {
 			my $select = "SELECT 1 from $table_osoby where UCO_PERUN=? and USERNAME=? and EMAIL_SKOLNI=? and TYP_ZAZN=?";
 			my @params = ($UCO_PERUN, $LOGIN, $EMAIL, $TYP_ZAZN);
 
-			if ($UCO_IS) {
-				$select = $select . " and UCO_IS=?";
-				push(@params, $UCO_IS);
-			} else {
-				$select = $select . " and UCO_IS is NULL";
-			}
-			if ($FIRST_NAME) {
-				$select = $select . " and JMENO=?";
-				push(@params, $FIRST_NAME);
-			} else {
-				$select = $select . " and JMENO is NULL";
-			}
-			if ($LAST_NAME) {
-				$select = $select . " and PRIJMENI=?";
-				push(@params, $LAST_NAME);
-			} else {
-				$select = $select . " and PRIJMENI is NULL";
-			}
-			if ($BIRTH_LAST_NAME) {
-				$select = $select . " and ROD_PRIJMENI=?";
-				push(@params, $BIRTH_LAST_NAME);
-			} else {
-				$select = $select . " and ROD_PRIJMENI is NULL";
-			}
-			if ($BIRTH_NUMBER) {
-				$select = $select . " and ROD_CISLO=?";
-				push(@params, $BIRTH_NUMBER);
-			} else {
-				$select = $select . " and ROD_CISLO is NULL";
-			}
-			if ($BIRTH_DATE) {
-				$select = $select . " and DATUM_NAR=?";
-				push(@params, $BIRTH_DATE);
-			} else {
-				$select = $select . " and DATUM_NAR is NULL";
-			}
-			if ($GENDER) {
-				$select = $select . " and POHLAVI=?";
-				push(@params, $GENDER);
-			} else {
-				$select = $select . " and POHLAVI is NULL";
-			}
-			if ($TITLE_BEFORE) {
-				$select = $select . " and TITUL_PRED=?";
-				push(@params, $TITLE_BEFORE);
-			} else {
-				$select = $select . " and TITUL_PRED is NULL";
-			}
-			if ($TITLE_AFTER) {
-				$select = $select . " and TITUL_ZA=?";
-				push(@params, $TITLE_AFTER);
-			} else {
-				$select = $select . " and TITUL_ZA is NULL";
-			}
-			if ($PHONE) {
-				$select = $select . " and TEL_SKOLNI=?";
-				push(@params, $PHONE);
-			} else {
-				$select = $select . " and TEL_SKOLNI is NULL";
-			}
-			if ($EMAIL_PRIV) {
-				$select = $select . " and EMAIL_SOUKR=?";
-				push(@params, $EMAIL_PRIV);
-			} else {
-				$select = $select . " and EMAIL_SOUKR is NULL";
-			}
-			if ($PHONE_PRIV) {
-				$select = $select . " and TEL_SOUKR=?";
-				push(@params, $PHONE_PRIV);
-			} else {
-				$select = $select . " and TEL_SOUKR is NULL";
-			}
-			if ($JOB) {
-				$select = $select . " and FUNKCE=?";
-				push(@params, $JOB);
-			} else {
-				$select = $select . " and FUNKCE is NULL";
-			}
-			if ($VZTAH_DO) {
-				$select = $select . " and VZTAH_DO=?";
-				push(@params, $VZTAH_DO);
-			} else {
-				$select = $select . " and VZTAH_DO is NULL";
-			}
+			$select = appendParam(select => $select, params => \@params, paramName => 'UCO_IS', paramValue => $UCO_IS);
+			$select = appendParam(select => $select, params => \@params, paramName => 'JMENO', paramValue => $FIRST_NAME);
+			$select = appendParam(select => $select, params => \@params, paramName => 'PRIJMENI', paramValue => $LAST_NAME);
+			$select = appendParam(select => $select, params => \@params, paramName => 'ROD_PRIJMENI', paramValue => $BIRTH_LAST_NAME);
+			$select = appendParam(select => $select, params => \@params, paramName => 'ROD_CISLO', paramValue => $BIRTH_NUMBER);
+			$select = appendParam(select => $select, params => \@params, paramName => 'DATUM_NAR', paramValue => $BIRTH_DATE);
+			$select = appendParam(select => $select, params => \@params, paramName => 'POHLAVI', paramValue => $GENDER);
+			$select = appendParam(select => $select, params => \@params, paramName => 'TITUL_PRED', paramValue => $TITLE_BEFORE);
+			$select = appendParam(select => $select, params => \@params, paramName => 'TITUL_ZA', paramValue => $TITLE_AFTER);
+			$select = appendParam(select => $select, params => \@params, paramName => 'TEL_SKOLNI', paramValue => $PHONE);
+			$select = appendParam(select => $select, params => \@params, paramName => 'EMAIL_SOUKR', paramValue => $EMAIL_PRIV);
+			$select = appendParam(select => $select, params => \@params, paramName => 'TEL_SOUKR', paramValue => $PHONE_PRIV);
+			$select = appendParam(select => $select, params => \@params, paramName => 'FUNKCE', paramValue => $JOB);
+			$select = appendParam(select => $select, params => \@params, paramName => 'VZTAH_DO', paramValue => $VZTAH_DO);
 
 			$recordAreEquals = $dbh->prepare($select);
 			$recordAreEquals->execute(@params);
@@ -432,5 +367,27 @@ sub solveClob() {
 	}
 
 	return 0;
+
+}
+
+#
+# Appends PARAM with respecting to possible NULL to select
+#
+sub appendParam() {
+
+	my %args = @_;
+	my $select = $args{select};
+	my $paramsRef = $args{params};
+	my $paramName = $args{paramName};
+	my $paramValue = $args{paramValue};
+
+	if (defined($paramValue)) {
+		$select = $select . " and $paramName=?";
+		push(@$paramsRef, $paramValue);
+	} else {
+		$select = $select . " and $paramName is NULL";
+	}
+
+	return $select;
 
 }

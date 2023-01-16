@@ -1,3 +1,9 @@
+perun-slave-process-drupal-elixir (3.1.7) stable; urgency=low
+  * upon finding duplicates the script now exits with an ok error code
+    to prevent rerun of propagation with the same data
+
+ -- David Flor <davidflor@seznam.cz>  Tue, 3 Jan 2023 14:50:00 +0100
+
 perun-slave-process-drupal-elixir (3.1.6) stable; urgency=high
   * catching of duplicates on slave side were not working correctly, because
     there was wrong path to file with duplicates
