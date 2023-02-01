@@ -20,7 +20,7 @@ use Array::Utils qw(:all);
 my $DEBUG=0;
 
 # Required setting for connection
-my $RESULTS_COUNT = 200; # This many objects will be fetched with one GET request on server
+my $RESULTS_COUNT = 200; # This many objects will be fetched with one GET request on server. Limited by Atlassian ANYWAY!
 my $directoryUrl;
 my $key;
 
@@ -37,6 +37,7 @@ my $TYPE_DELETE = 'DELETE';
 my @ATLASSIAN_ERROR_CODES = (500, 503); # Internal Atlassian error codes
 my $WAITING_ERROR_TIME = 20 * 1000; # Wait this long (ms) if above error occurs
 my $REPEAT_ERROR_COUNT = 3; # Retry this many times if above error occurs
+my $GROUP_OPERATIONS_LIMIT = 9999; # Limit of group operations in a chunk on Atlassian side
 
 my $USERS_FILENAME = 'users.scim';
 my $GROUPS_FILENAME = 'groups.scim';
@@ -192,7 +193,7 @@ sub fetchTheirUsers {
 	my %theirUsersHash = ();
 
 	while ($startIndex <= $totalResults) {
-		my $url = $directoryUrl . 'Users?startIndex=' . $startIndex . '&count=' . $RESULTS_COUNT;
+		my $url = $directoryUrl . '/Users?startIndex=' . $startIndex . '&count=' . $RESULTS_COUNT;
 		my $response = callServer($url, $TYPE_GET);
 		$totalResults = $response->{'totalResults'};
 		$itemsPerPage = $response->{'itemsPerPage'};
@@ -217,7 +218,7 @@ sub fetchTheirGroups {
 	my %theirGroupsHash = ();
 
 	while ($startIndex <= $totalResults) {
-		my $url = $directoryUrl . 'Groups?startIndex=' . $startIndex . '&count=' . $RESULTS_COUNT;
+		my $url = $directoryUrl . '/Groups?startIndex=' . $startIndex . '&count=' . $RESULTS_COUNT;
 		my $response = callServer($url, $TYPE_GET);
 		$totalResults = $response->{'totalResults'};
 		$itemsPerPage = $response->{'itemsPerPage'};
@@ -290,26 +291,26 @@ sub fetchOurGroups {
 # Compares Atlassian users with Perun users.
 # Sends request to create missing users, update outdated user data and deactivate users missing in Perun.
 sub evaluateUsers {
-	my $ourUserName;
-	my $ourUserInfo;
-	while (($ourUserName, $ourUserInfo) = each(%{$ourUsers})) {
-		my $theirUserInfo = $theirUsers->{$ourUserName};
-		if ($theirUserInfo) {
-			# check if attributes changed or our user got active again
-			if (checkUserAttributesDiffer($ourUserInfo, $theirUserInfo) || !$theirUserInfo->{"active"}) {
-				updateUser($ourUserName, $ourUserInfo, $theirUserInfo->{'id'}, 1);
-			}
-		} else {
-			createUser($ourUserName, $ourUserInfo);
-		}
-	}
-
 	my $theirUserName;
 	my $theirUserInfo;
 	while (($theirUserName, $theirUserInfo) = each(%{$theirUsers})) {
 		my $ourUserInfo = $ourUsers->{$theirUserName};
 		if (!$ourUserInfo && $theirUserInfo->{'active'}) {
 			updateUser($theirUserName, $theirUserInfo, $theirUserInfo->{'id'}, 0);
+		}
+	}
+
+	my $ourUserName;
+	my $ourUserInfo;
+	while (($ourUserName, $ourUserInfo) = each(%{$ourUsers})) {
+		$theirUserInfo = $theirUsers->{$ourUserName};
+		if (defined $theirUserInfo) {
+			# check if attributes changed or our user got active again
+			if (checkUserAttributesDiffer($ourUserInfo, $theirUserInfo) || !$theirUserInfo->{"active"}) {
+				updateUser($ourUserName, $ourUserInfo, $theirUserInfo->{'id'}, 1);
+			}
+		} else {
+			createUser($ourUserName, $ourUserInfo);
 		}
 	}
 }
@@ -357,7 +358,7 @@ sub createGroup {
 
 	my $data = { "displayName" => $displayName };
 	$groupsCreated++;
-	return callServer($directoryUrl . 'Groups', $TYPE_POST, JSON::XS->new->utf8->encode($data));
+	return callServer($directoryUrl . '/Groups', $TYPE_POST, JSON::XS->new->utf8->encode($data));
 }
 
 # Sends request to remove a group from Atlassian.
@@ -365,7 +366,7 @@ sub removeGroup {
 	my $groupId = shift;
 	if ($DEBUG) {print "Removing group $groupId.\n";}
 
-	callServer($directoryUrl . 'Groups/' . $groupId, $TYPE_DELETE);
+	callServer($directoryUrl . '/Groups/' . $groupId, $TYPE_DELETE);
 	$groupsRemoved++;
 }
 
@@ -395,19 +396,37 @@ sub updateGroupMembership {
 		push @membersToRemove, {"value" => $theirUsers->{$outdatedMember}->{"id"}, "display" => $outdatedMember};
 	}
 
-	my $updateContent = {
-		"schemas"    => [ "urn:ietf:params:scim:api:messages:2.0:PatchOp" ],
-		"Operations" => [
-			{"op" => "add",
-			"path" => "members",
-			"value" => \@membersToAdd},
-			{"op" => "remove",
-			"path" => "members",
-			"value" => \@membersToRemove}
-		]
-	};
+	# Chunks need to be used for membership operations because of operations limit in Atlassian
+	my @chunks_to_remove = ();
+	push @chunks_to_remove, [ splice @membersToRemove, 0, $GROUP_OPERATIONS_LIMIT ] while @membersToRemove;
+	foreach (@chunks_to_remove) {
+		my $updateContent = {
+			"schemas"    => [ "urn:ietf:params:scim:api:messages:2.0:PatchOp" ],
+			"Operations" => [
+				{ "op"      => "remove",
+					"path"  => "members",
+					"value" => \@$_}
+			]
+		};
 
-	callServer($directoryUrl . 'Groups/' . $groupId, $TYPE_PATCH, JSON::XS->new->utf8->encode($updateContent));
+		callServer($directoryUrl . '/Groups/' . $groupId, $TYPE_PATCH, JSON::XS->new->utf8->encode($updateContent));
+	}
+
+	my @chunks_to_add = ();
+	push @chunks_to_add, [ splice @membersToAdd, 0, $GROUP_OPERATIONS_LIMIT ] while @membersToAdd;
+	foreach (@chunks_to_add) {
+		my $updateContent = {
+			"schemas"    => [ "urn:ietf:params:scim:api:messages:2.0:PatchOp" ],
+			"Operations" => [
+				{"op" => "add",
+					"path" => "members",
+					"value" => \@$_}
+			]
+		};
+
+		callServer($directoryUrl . '/Groups/' . $groupId, $TYPE_PATCH, JSON::XS->new->utf8->encode($updateContent));
+	}
+
 	$membershipUpdated++;
 }
 
@@ -430,7 +449,7 @@ sub updateUser {
 		"active"   => $statusActive ? JSON::XS::true : JSON::XS::false
 	};
 
-	callServer($directoryUrl . 'Users/' . $userId, $TYPE_PUT, JSON::XS->new->utf8->encode($updateContent));
+	callServer($directoryUrl . '/Users/' . $userId, $TYPE_PUT, JSON::XS->new->utf8->encode($updateContent));
 	if ($statusActive) { $usersUpdated++ } else { $usersDeactivated++ };
 }
 
