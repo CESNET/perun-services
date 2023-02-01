@@ -102,6 +102,27 @@ foreach my $uco (sort keys %$dataByUco) {
 	my $TOWN = $dataByUco->{$uco}->{'TOWN'};
 	my $POSTAL_CODE = $dataByUco->{$uco}->{'POSTAL_CODE'};
 
+	if (defined $PHONE and length $PHONE > 20) {
+		print $uco . " | long telefon: " . $PHONE . "\n";
+		next;
+	}
+	if (defined $CARD_CHIP_NUMBER and length $CARD_CHIP_NUMBER > 20) {
+		print $uco . " | long kod cipu: " . $CARD_CHIP_NUMBER . "\n";
+		next;
+	}
+	if (defined $CARD_BARCODE and length $CARD_BARCODE > 20) {
+		print $uco . " | long kod karty: " . $CARD_BARCODE . "\n";
+		next;
+	}
+	if (defined $HOUSE_NUMBER and length $HOUSE_NUMBER > 20) {
+		print $uco . " | long adr_cp_co: " . $HOUSE_NUMBER . "\n";
+		next;
+	}
+	if (defined $POSTAL_CODE and length $POSTAL_CODE > 20) {
+		print $uco . " | long psc: " . $POSTAL_CODE . "\n";
+		next;
+	}
+
 	if($DEBUG == 1) { print "INSERT NEW RECORD: $uco\n"; }
 	$inserted++;
 	# we will do insert
