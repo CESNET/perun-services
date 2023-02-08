@@ -1,4 +1,0 @@
-#!/bin/bash
-export SERVICE_NAME="fbmi_doors"
-
-python3 generic_send.py "$1" "$2" "$3"
