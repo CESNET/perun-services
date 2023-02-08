@@ -1,8 +1,8 @@
 Source: ${PACKAGE_NAME}
 Section: utils
-Priority: extra
+Priority: optional
 Maintainer: Michal Stava <stavamichal@gmail.com>
-Standards-Version: 3.9.2
+Standards-Version: 3.9.5
 
 Package: ${PACKAGE_NAME}
 Architecture: all

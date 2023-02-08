@@ -1,3 +1,9 @@
+perun-slave-process-group (3.1.7) stable; urgency=low
+
+  * Fixed package priority from 'extra' to 'optional'.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Thu, 18 Aug 2022 09:00:00 +0200
+
 perun-slave-process-group (3.1.6) stable; urgency=medium
 
   * Changed architecture to all
@@ -13,7 +19,7 @@ perun-slave-process-group (3.1.5) stable; urgency=low
 perun-slave-process-group (3.1.4) stable; urgency=high
 
   * Use more gidRanges instead of one limited by min and max gid.
-  * Major protocol version was increased (this change will not work with 
+  * Major protocol version was increased (this change will not work with
     older protocol versions)
 
  -- Michal Stava <stavamichal@gmail.com>  Wed, 17 Jan 2018 15:31:00 +0100

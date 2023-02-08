@@ -1,3 +1,9 @@
+perun-slave-process-voms (3.1.14) stable; urgency=low
+
+  * Fixed package priority from 'extra' to 'optional'.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Thu, 18 Aug 2022 09:00:00 +0200
+
 perun-slave-process-voms (3.1.13) stable; urgency=medium
 
   * Sort user records by CA, so that matching DNs issued by different
@@ -23,9 +29,9 @@ perun-slave-process-voms (3.1.10) stable; urgency=high
   * change path for exec script to be manually set on "voms", because the value
     in the variable $SERVICE can be set to different value if "voms_dirac"
     service has been called and executing script then can't be found.
-  * set correct protocol version (was forgotten to increase it) in voms slave 
-    script to 3.1.1. This is just a minor difference in protocol version is 
-    it has no impact on script behavior. 
+  * set correct protocol version (was forgotten to increase it) in voms slave
+    script to 3.1.1. This is just a minor difference in protocol version is
+    it has no impact on script behavior.
 
  -- Michal Stava <stavamichal@gmail.com>  Tue, 30 Jan 2018 17:12:00 +0100
 

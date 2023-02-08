@@ -1,3 +1,9 @@
+perun-slave-process-operations-portal-egi (3.1.6) stable; urgency=low
+
+  * Fixed package priority from 'extra' to 'optional'.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Thu, 18 Aug 2022 09:00:00 +0200
+
 perun-slave-process-operations-portal-egi (3.1.5) stable; urgency=medium
 
   * Changed architecture to all
@@ -21,7 +27,7 @@ perun-slave-process-operations-portal-egi (3.1.3) stable; urgency=low
 
 perun-slave-process-operations-portal-egi (3.1.2) stable; urgency=medium
 
-  * Fix detection whether DST_FILE variable is set. 
+  * Fix detection whether DST_FILE variable is set.
 
  -- Slavek Licehammer <slavek@ics.muni.cz>  Mon, 21 Mar 2016 11:05:17 +0100
 
