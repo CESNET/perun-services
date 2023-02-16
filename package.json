@@ -3,6 +3,7 @@
   "version": "0.0.0-development",
   "devDependencies": {
     "@semantic-release/github": "^8.0.2",
+    "conventional-changelog-conventionalcommits": "^5.0.0",
     "semantic-release": "^19.0.3"
   }
 }
