@@ -1,3 +1,9 @@
+perun-slave-process-drupal-elixir (3.1.8) stable; urgency=low
+
+  * Fixed package priority from 'extra' to 'optional'.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Thu, 19 Jan 2023 08:30:00 +0100
+
 perun-slave-process-drupal-elixir (3.1.7) stable; urgency=low
   * upon finding duplicates the script now exits with an ok error code
     to prevent rerun of propagation with the same data

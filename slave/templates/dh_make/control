@@ -1,6 +1,6 @@
 Source: #PACKAGE#
 Section: utils
-Priority: extra
+Priority: optional
 Maintainer: #USERNAME# <#EMAIL#>
 Build-Depends: #BUILD_DEPS#
 Standards-Version: #POLICY#

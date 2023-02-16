@@ -1,8 +1,8 @@
 Source: perun-propagate
 Section: utils
-Priority: extra
+Priority: optional
 Maintainer: Pavel Zlamal <zlamal@cesnet.cz>
-Build-Depends: debhelper (>= 7)
+Build-Depends: debhelper (>= 8.0.0)
 Standards-Version: 3.9.5
 
 Package: perun-propagate

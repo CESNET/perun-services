@@ -14,7 +14,7 @@ use DBI;
 sub init_config($) {
 
 	my $filename = shift;
-	my $configPath = "/home/perun/perun-sync/$filename";
+	my $configPath = "/etc/perun/ifis/$filename";
 	my $result = {};
 
 	open FILE, $configPath or die "Could not open config file $configPath: $!";

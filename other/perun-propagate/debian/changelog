@@ -1,3 +1,9 @@
+perun-propagate (3.0.9) stable; urgency=low
+
+  * Fixed package priority from 'extra' to 'optional'.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Thu, 18 Aug 2022 09:00:00 +0200
+
 perun-propagate (3.0.8) stable; urgency=medium
 
   * define missing lsb functions for rhel compatibility
