@@ -2,7 +2,7 @@
 package perunServicesUtils;
 use Exporter;
 @ISA = ('Exporter');
-@EXPORT = qw(attributesToHash dataToAttributesHashes getAttributeSorting quotaToKb uniqList convertNonAsciiToEscapedUtf8Form);
+@EXPORT = qw(getAttributeSorting quotaToKb uniqList convertNonAsciiToEscapedUtf8Form);
 
 use strict;
 use warnings;
@@ -11,37 +11,6 @@ use feature qw(switch);
 no if $] >= 5.018, warnings => "experimental"; #supress warnings on experimetal features like "switch"
 
 #use Perun::Agent;
-
-# Get attributes from getData function and convert them into hash
-#
-# Usage:
-# my $data = perunServicesInit::getHierarchicalData;
-# my %facilityAttributes = attributesToHash $data->getAttributes
-# print $facilityAttributes{"urn:perun:facility:attribute-def:core:name"}, "\n";
-#
-sub attributesToHash {
-	my %attributesHash;
-	foreach my $attr (@_) {
-		$attributesHash{$attr->getName}=$attr->getValue;
-	}
-	return %attributesHash;
-}
-
-# Get "data" from getData function and convert them into array of attributes. Attributes is represented by REFERENCE to hash.
-#
-# Usage:
-# my $data = perunServicesInit::getHierarchicalData;
-# foreach my $resourceAttributes (dataToAttributesHashes $data->getChildElements) {
-#   print $resourceAttributes->{"urn:perun:resource:attribute-def:core:name"}, "\n";
-# }
-#
-sub dataToAttributesHashes {
-	my @arrayOfHashes = ();
-	foreach my $entity (@_) {
-		push @arrayOfHashes, { attributesToHash $entity->getAttributes } ;
-	}
-	return @arrayOfHashes;
-}
 
 # Return sorting function which can be used as parameter for sort
 # This function can sort hashREF.

@@ -3,7 +3,7 @@ package perunServicesInit;
 
 use Exporter 'import';
 @EXPORT_OK = qw(init);
-@EXPORT= qw(getDirectory getDestinationDirectory getHierarchicalData getDataWithGroups getDataWithVos getHashedDataWithGroups getHashedHierarchicalData);
+@EXPORT= qw(getDirectory getDestinationDirectory getHashedDataWithGroups getHashedHierarchicalData);
 
 use strict;
 use warnings;
@@ -18,19 +18,11 @@ use IO::Compress::Gzip qw(gzip $GzipError) ;
 use Storable;
 
 # variables define possible getData methods what can be execute
-our $DATA_TYPE_HIERARCHICAL="hierarchical";
 our $DATA_TYPE_HASHED_HIERARCHICAL="hashedhierarchical";
-our $DATA_TYPE_FLAT="flat";
 our $DATA_TYPE_HASHED_WITH_GROUPS="hashedwithgroups";
-our $DATA_TYPE_WITH_GROUPS="withgroups";
-our $DATA_TYPE_WITH_VOS="withvos";
 our $DATA_TYPE = {
 	$DATA_TYPE_HASHED_HIERARCHICAL => sub {getHashedHierarchicalData(@_)},
-	$DATA_TYPE_HIERARCHICAL => sub {getHierarchicalData(@_)},
-	$DATA_TYPE_FLAT => sub {getFlatData(@_)},
 	$DATA_TYPE_HASHED_WITH_GROUPS => sub {getHashedDataWithGroups(@_)},
-	$DATA_TYPE_WITH_GROUPS => sub {getDataWithGroups(@_)},
-	$DATA_TYPE_WITH_VOS => sub {getDataWithVos(@_)},
 };
 
 #die at the very end of script when any warning occur during executing
@@ -62,11 +54,11 @@ sub init {
 
 	# some services support variable getData method type, default is hierarchical
 	# if service does not support this variable behavior, then it does not care about this setting
-	if(!defined($getDataType)) { $getDataType = "hierarchical"; }
+	if(!defined($getDataType)) { $getDataType = $DATA_TYPE_HASHED_HIERARCHICAL; }
 	if(defined($DATA_TYPE->{$getDataType})) {
 		$::GET_DATA_METHOD = $DATA_TYPE->{$getDataType};
 	} else {
-		die "Not supported getData type $getDataType! Use one of these: '$DATA_TYPE_HIERARCHICAL', '$DATA_TYPE_HASHED_HIERARCHICAL', '$DATA_TYPE_FLAT', '$DATA_TYPE_WITH_GROUPS', '$DATA_TYPE_HASHED_WITH_GROUPS' or '$DATA_TYPE_WITH_VOS'.";
+		die "Not supported getData type $getDataType! Use one of these: '$DATA_TYPE_HASHED_HIERARCHICAL' or '$DATA_TYPE_HASHED_WITH_GROUPS'.";
 	}
 
 	if(defined $local_data_file) {
@@ -149,38 +141,10 @@ sub getHashedHierarchicalData {
   return $data;
 }
 
-sub getHierarchicalData {
-	if(defined $local_data) { return $local_data; }
-	my $data = $servicesAgent->getHierarchicalData(service => $service->getId, facility => $facility->getId);
-	logData $data, 'hierarchicalData';
-	return $data;
-}
-
-sub getFlatData {
-	if(defined $local_data) { return $local_data; }
-	my $data = $servicesAgent->getFlatData(service => $service->getId, facility => $facility->getId);
-	logData $data, 'flatData';
-	return $data;
-}
-
 sub getHashedDataWithGroups {
 	if(defined $local_data) { return $local_data; }
 	my $data = $servicesAgent->getHashedDataWithGroups(service => $service->getId, facility => $facility->getId, consentEval => $CONSENT_EVAL);
 	logData $data, 'hashedDataWithGroups';
-	return $data;
-}
-
-sub getDataWithGroups {
-	if(defined $local_data) { return $local_data; }
-	my $data = $servicesAgent->getDataWithGroups(service => $service->getId, facility => $facility->getId);
-	logData $data, 'dataWithGroups';
-	return $data;
-}
-
-sub getDataWithVos {
-	if(defined $local_data) { return $local_data; }
-	my $data = $servicesAgent->getDataWithVos(service => $service->getId, facility => $facility->getId);
-	logData $data, 'dataWithVos';
 	return $data;
 }
 
