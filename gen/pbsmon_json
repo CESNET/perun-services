@@ -43,6 +43,21 @@ $struc->{'reserved_machines'} = [];
 $struc->{'frontends'} = [];
 
 
+# Get attribute values from obtained attributes (input).
+#
+# Usage:
+# my $data = $attributesAgent->getRequiredAttributes(service => $service->getId, host => $host->getId);
+# my %facilityAttributes = attributesToHash $data
+# print $facilityAttributes{"urn:perun:facility:attribute-def:core:name"}, "\n";
+#
+sub attributesToHash {
+	my %attributesHash;
+	foreach my $attr (@_) {
+		$attributesHash{$attr->getName}=$attr->getValue;
+	}
+	return %attributesHash;
+}
+
 my $physicalMachinesStruc = {};
 
 my $agent = perunServicesInit->getAgent;
@@ -134,9 +149,9 @@ for my $item (sort { $b->{"facilityListingPriority"} <=> $a->{"facilityListingPr
 			}
 		);
 		$physicalMachinesStruc->{$mergedOwner} = \%ownerStruc;
-}
+	}
 
-push @{$physicalMachinesStruc->{$mergedOwner}->{'resources'}}, $facilityStruc;
+	push @{$physicalMachinesStruc->{$mergedOwner}->{'resources'}}, $facilityStruc;
 
 
 	my @hosts = $facilitiesAgent->getHosts(facility => $facility->getId);
@@ -153,7 +168,7 @@ push @{$physicalMachinesStruc->{$mergedOwner}->{'resources'}}, $facilityStruc;
 		$facilityStruc->{'cpu'} = $hostsStruc[0]->{'cpu'};
 	} else {
 		$facilityStruc->{'machines'} = \@hostsStruc;
-}
+	}
 }
 
 for my $key (sort keys %$physicalMachinesStruc) {

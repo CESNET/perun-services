@@ -11,7 +11,7 @@ no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 local $::SERVICE_NAME = "ad_group_mu_ucn";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.6";
+my $SCRIPT_VERSION = "3.0.7";
 
 sub addMemberToGroup;
 sub processWorkplaces;
@@ -127,7 +127,7 @@ close FILE;
 # Print skipped data
 #
 open FILE,">:encoding(UTF-8)","$skippedGroupsFileName" or die "Cannot open $skippedGroupsFileName: $! \n";
-for my $group (keys %$skippedGroups) {
+for my $group (sort keys %$skippedGroups) {
 	print FILE "gid=" . $skippedGroups->{$group}->{"id"} . "," . "name=" . $skippedGroups->{$group}->{"name"} . "\n";
 }
 close FILE;
