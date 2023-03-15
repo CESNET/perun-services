@@ -1,0 +1,4 @@
+#!/bin/bash
+export SERVICE_NAME="zabbix_mu"
+
+python3 generic_send.py "$1" "$2" "$3"
