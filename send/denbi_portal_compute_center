@@ -1,4 +1,4 @@
 #!/bin/bash
-SERVICE_NAME="denbi_portal_compute_center"
+export SERVICE_NAME="denbi_portal_compute_center"
 
-. generic_send
+python3 generic_send.py "$1" "$2" "$3"
