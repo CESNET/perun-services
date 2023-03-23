@@ -1,42 +1,42 @@
-#!/bin/bash
-SERVICE_NAME="openstack_projects"
+#!/usr/bin/env python3
+import send_lib
+import sys
+import os
+import requests
 
-TIMEOUT="5400" #90s * 60 sec = 1.5h
-TIMEOUT_KILL="60" # 60 sec to kill after timeout
+service_name = "openstack_projects"
+timeout = 5400  # 90s * 60 sec = 1.5h
 
-FACILITY_NAME=$1
-DESTINATION=$2
-DESTINATION_TYPE=$3
+send_lib.check_input_fields(sys.argv, True)
 
-SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
-FILE_NAME="access.json"
+facility = sys.argv[1]
+destination = sys.argv[2]
+destination_type = sys.argv[3]
 
-FILE="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME/$FILE_NAME"
+gen_folder = send_lib.get_gen_folder(facility, service_name)
+file_name = "access.json"
 
+send_lib.check_destination_type_allowed(destination_type, send_lib.DESTINATION_TYPE_URL)
+send_lib.check_destination_format(destination, destination_type)
+filepath = os.path.join(gen_folder, file_name)
 
-# Destination type has to be 'url'
-if [ "$DESTINATION_TYPE" != "url" ]; then
-	echo "Unknown destination type '$DESTINATION_TYPE' (url type required)." >&2
-	exit 1;
-fi
+# Read username and password from configuration if it is present
+auth = None
+try:
+	sys.path.insert(1, '/etc/perun/services/' + service_name + '/')
+	username = __import__(service_name).username
+	password = __import__(service_name).password
+	auth = (username, password)
+except ImportError:
+	# this means that config file does not exist
+	pass
 
-# Read user name and password from configuration if it is present ( expect string "-u user:pass" )
-[ -r /etc/perun/services/$SERVICE_NAME/$SERVICE_NAME ] && . /etc/perun/services/$SERVICE_NAME/$SERVICE_NAME
-
-# Specify command to transfer the data
-TRANSPORT_COMMAND="curl -Ss -i -H Content-Type:application/json -f -X POST -d @- $DESTINATION"
-
-# HTTP Request with timeout for USERS
-cat "$FILE" | timeout -k $TIMEOUT_KILL $TIMEOUT $TRANSPORT_COMMAND
-# Catch errors
-ERR_CODE=$?
-#Error code 124 means - timed out
-if [ $ERR_CODE -eq 124 ]; then
-	echo "Communication with the peer has timed out with return code: $ERR_CODE (Warning: this error can mask original error 124 from peer!)" >&2
-else
-	if [ $ERR_CODE -ne 0 ]; then
-    echo "Communication with the peer ends with return code: $ERR_CODE" >&2
-  fi
-fi
-
-exit $ERR_CODE
+with open(filepath, 'rb') as f:
+	headers = {'Content-Type': 'application/json'}
+	files = {file_name: f}
+	response = requests.post(destination, headers=headers, auth=auth, timeout=timeout, files=files)
+	if response.status_code == 124:
+		send_lib.die_with_error("Communication with the peer has timed out with return code: 124 "
+								"(Warning: this error can mask original error 124 from peer!)")
+	if not response.ok:
+		send_lib.die_with_error("Communication with the peer ends with return code: " + str(response.status_code))
