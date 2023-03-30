@@ -1,0 +1,45 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use JSON::XS;
+use utf8;
+
+local $::SERVICE_NAME = "pithia_portal";
+local $::PROTOCOL_VERSION = "1.0.0";
+my $SCRIPT_VERSION = "1.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedDataWithGroups;
+
+#Constants
+our $A_GROUP_NAME;               *A_GROUP_NAME =        \'urn:perun:group:attribute-def:core:name';
+
+my @groupNames = ();
+
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
+		my $groupName = $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_NAME);
+
+		# skip top-level hierarchy group assigned to their single facility
+		# skip all sub-groups of each organization since registrations are only for the organizations.
+		if ($groupName eq "organizations" || $groupName =~ m/^organizations:[^:]+:(.)+/ ) {
+			next;
+		}
+		push(@groupNames, $groupName);
+	}
+}
+
+@groupNames = sort(@groupNames);
+
+# PRINT DATA TO JSON FILE
+my $file = "$DIRECTORY/$::SERVICE_NAME.json";
+open FILE,">$file" or die "Cannot open $file: $! \n";
+binmode(FILE);
+print FILE JSON::XS->new->utf8->pretty->canonical->encode(\@groupNames);
+close (FILE) or die "Cannot close $file: $! \n";
+
+perunServicesInit::finalize;
