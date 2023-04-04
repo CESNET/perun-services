@@ -5,6 +5,7 @@ import re
 import os
 import tempfile
 import shutil
+from typing import Optional
 
 PERUN_CERT = "/etc/perun/ssl/perun-send.pem"
 PERUN_KEY = "/etc/perun/ssl/perun-send.key"
@@ -291,7 +292,7 @@ def get_windows_proxy() -> str:
 	return windows_proxy
 
 
-def load_custom_transport_command(service_name: str) -> list[str] | None:
+def load_custom_transport_command(service_name: str) -> Optional[list[str]]:
 	"""
 	Retrieves custom transport command from config file located in service directory.
 	Config file must end with .py -> "/etc/perun/services/service_name/service_name.py")
