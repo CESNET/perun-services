@@ -173,13 +173,13 @@ if __name__ == "__main__":
 					# in this situation 'curl' was used
 					if return_code == 0:
 						# check if curl ended without an error (ERR_CODE = 0) (if not, we can continue as usual, because there is an error on STDERR)
-						if int(stdout) != 200:
-							# check if HTTP_CODE is different from OK (200)
+						if int(stdout) not in send_lib.http_ok_codes:
+							# check if HTTP_CODE is different from OK
 							# if yes, then we will use HTTP_CODE as ERROR_CODE which is always non-zero
 							temp.seek(0, 0)
 							print(temp.read(), file=sys.stderr)
 						else:
-							# if HTTP_CODE is 200, then call was successful and result call can be printed with info
+							# if HTTP_CODE is OK, then call was successful and result call can be printed with info
 							# result call is saved in temp file
 							temp.seek(0, 0)
 							print(temp.read())
