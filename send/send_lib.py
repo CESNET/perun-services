@@ -27,6 +27,8 @@ DESTINATION_TYPE_SERVICE_SPECIFIC = "service-specific"
 TIMEOUT = 7200  # 120 * 60 sec = 2h
 TIMEOUT_KILL = 60  # 60 sec to kill after timeout
 
+http_ok_codes = [200, 201, 202, 203, 204]
+
 # regex checks
 HOST_PATTERN = re.compile(
 	"^(?!:\/\/)(?=.{1,255}$)((.{1,63}\.){1,127}(?![0-9]*$)[a-z0-9-]+\.?)$|^(25[0-5]|2[0-4]\d|[0-1]?\d?\d)(\.(25[0-5]|2[0-4]\d|[0-1]?\d?\d)){3}$")
