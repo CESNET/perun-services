@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# set handling script
+#DST_SCRIPT=/tmp/dhus.py
+
+# set configuration path - specific config will be retrieved by facility name (e.g. /etc/dhus/facility.yml)
+#DST_CONF=/etc/dhus/
