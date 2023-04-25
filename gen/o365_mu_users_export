@@ -9,7 +9,7 @@ use utf8;
 
 local $::SERVICE_NAME = "o365_mu_users_export";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -17,13 +17,17 @@ my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_UF_LOGIN;                     *A_UF_LOGIN =                     \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UF_MFA_STATUS;                *A_UF_MFA_STATUS =                \'urn:perun:user:attribute-def:virt:mfaStatus:mu';
 our $A_UF_O365_STATE;                *A_UF_O365_STATE =                \'urn:perun:user_facility:attribute-def:def:o365InternalUserState';
 our $A_UF_DISABLE_O365_MAIL_FORWARD; *A_UF_DISABLE_O365_MAIL_FORWARD = \'urn:perun:user_facility:attribute-def:def:disableO365MailForward';
 our $A_UF_O365_STORE_AND_FORWARD;    *A_UF_O365_STORE_AND_FORWARD =    \'urn:perun:user_facility:attribute-def:def:o365MailStoreAndForward';
 
-my $validLogins = {};
+my $validLoginsO365 = {};
+my $validLoginsMFA = {};
 
 #RULES:
+# add any user with mfaStatus attribute value filled to the mfa structure
+# for the O365 structure:
 #1] any user who has UCO
 #2] status of user in o365 is not 0
 #3] disableMailForward == true
@@ -31,8 +35,14 @@ my $validLogins = {};
 #3] disableMailForward == false AND mailStoreAndForward == true
 foreach my $memberId ( $data->getMemberIdsForFacility() ) {
 	my $uco = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
-	#skip all users without UCO
+	# skip all users without UCO
 	next unless $uco;
+	# check whether user has mfa configured and add to mfa structure if so
+	my $mfaStatus = $data->getUserAttributeValue( member => $memberId, attrName => $A_UF_MFA_STATUS );
+	if ($mfaStatus && $mfaStatus ne "") {
+		$validLoginsMFA->{$uco} = $mfaStatus;
+	}
+	# now check for O365 rules
 	my $o365Status = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_O365_STATE );
 	#skip all users with 0 or empty value in status attribute (everything except 0 is OK here)
 	next unless $o365Status;
@@ -43,16 +53,22 @@ foreach my $memberId ( $data->getMemberIdsForFacility() ) {
 		next unless $storeAndForward;
 	}
 	#if all rules are met, add uco to the list
-	$validLogins->{$uco} = $uco;
+	$validLoginsO365->{$uco} = $uco;
 }
 
 my $fileName = "$DIRECTORY/$::SERVICE_NAME";
-open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
-binmode FILE, ":utf8";
-
-foreach my $uco (sort keys %{$validLogins}) {
+open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
+foreach my $uco (sort keys %{$validLoginsO365}) {
 	print FILE $uco . "\n";
 }
-
 close (FILE);
+
+my $mfaFileName = $fileName."_mfa";
+open FILE,">:encoding(UTF-8)","$mfaFileName" or die "Cannot open $mfaFileName: $! \n";
+foreach my $uco (sort keys %{$validLoginsMFA}) {
+	print FILE $uco . "\t";
+	print FILE $validLoginsMFA->{$uco} . "\n"
+}
+close (FILE);
+
 perunServicesInit::finalize;

@@ -20,13 +20,21 @@ send_lib.check_destination_type_allowed(destination_type, send_lib.DESTINATION_T
 send_lib.check_destination_format(destination, destination_type)
 filepath = os.path.join(gen_folder, file_name)
 
-# Read username and password from configuration if it is present
+# Read username and password from configuration if it is present - else auth is not added to the request
 auth = None
 try:
+	# expected format of the auth file /etc/perun/services/openstack_projects/openstack_projects.py
+	# supplement $ variables with destination url, username and password
+	# credentials = {
+	#   '$url1': { 'username': '$user1', 'password': '$pwd1' },
+	#   '$url2': { 'username': '$user2', 'password': '$pwd2' }
+	# }
 	sys.path.insert(1, '/etc/perun/services/' + service_name + '/')
-	username = __import__(service_name).username
-	password = __import__(service_name).password
-	auth = (username, password)
+	credentials = __import__(service_name).credentials
+	if destination in credentials.keys():
+		username = credentials.get(destination).get('username')
+		password = credentials.get(destination).get('password')
+		auth = (username, password)
 except ImportError:
 	# this means that config file does not exist
 	pass
