@@ -1,0 +1,12 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use File::Basename;
+use perunDataGenerator;
+
+local $::SERVICE_NAME = basename($0);
+local $::PROTOCOL_VERSION = "3.0.0";
+local $::SKIP_NON_VALID_MEMBERS = 1;
+
+perunDataGenerator::generateUsersDataInJSON;

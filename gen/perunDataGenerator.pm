@@ -9,11 +9,15 @@ use Exporter 'import';
 our $JSON_FORMAT = "json";
 our @EXPORT = qw($JSON_FORMAT);
 
+our $A_MEMBER_STATUS;                 *A_MEMBER_STATUS =                  \'urn:perun:member:attribute-def:core:status';
+
 # Generate user and user_facility required attributes for each user into JSON file.
 # Subroutine uses perunServicesInit which REQUIRE access to $::SERVICE_NAME and $::PROTOCOL_VERSION.
 # This can be achieved by following lines in your main script: (for example)
 # local $::SERVICE_NAME = "passwd";
 # local $::PROTOCOL_VERSION = "3.0.0";
+# If not valid VO members should be skipped, member status attribute needs to be set on service and set
+# local $::SKIP_NON_VALID_MEMBERS = 1;
 sub generateUsersDataInJSON {
 	perunServicesInit::init;
 
@@ -45,6 +49,11 @@ sub generateUsersDataInJSON {
 	####### prepare data ######################
 	my %usersIds = ();
 	foreach my $memberId ($data->getMemberIdsForFacility()) {
+
+		if ($::SKIP_NON_VALID_MEMBERS) {
+			next if $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS ) ne 'VALID';
+		}
+
 		my $userId = $data->getUserIdForMember(member => $memberId);
 		if (exists($usersIds{$userId})) {
 			next;

@@ -1,0 +1,5 @@
+perun-slave-process-dhus (3.0.0) stable; urgency=low
+
+  * New service dhus
+
+ -- Johana Supikova <supikova@ics.muni.cz>  Wed, 12 Apr 2023 14:32:00 +0200
