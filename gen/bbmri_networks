@@ -27,7 +27,7 @@ sub processMemberships;
 
 #Constants
 our $A_USER_ID;                   *A_USER_ID =               \'urn:perun:user:attribute-def:core:id';
-our $A_BBMRI_USER_ID;             *A_BBMRI_USER_ID =         \'urn:perun:user:attribute-def:virt:bbmriUserId';
+our $A_BBMRI_USER_ID;             *A_BBMRI_USER_ID =         \'urn:perun:user:attribute-def:virt:login-namespace:bbmriid-persistent';
 our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:attribute-def:core:status';
 our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_EPPNS;                *A_USER_EPPNS =            \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
