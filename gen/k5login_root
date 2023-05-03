@@ -8,47 +8,36 @@ use File::Basename;
 
 local $::SERVICE_NAME = basename($0);
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.1.2";
+my $SCRIPT_VERSION = "3.2.0";
 
 perunServicesInit::init;
+my $directory = perunServicesInit::getDirectory;
 my $data = perunServicesInit::getHashedDataWithGroups;
-
 
 our $A_PRINCIPAL;            *A_PRINCIPAL =           \'urn:perun:user:attribute-def:def:kerberosAdminPrincipal';
 our $A_USER_STATUS;          *A_USER_STATUS =         \'urn:perun:member:attribute-def:core:status';
-our $A_GROUP_DESTINATIONS;   *A_GROUP_DESTINATIONS =  \'urn:perun:group:attribute-def:def:listOfDestinations';
 
-my %outputByDestination = ('all' => undef);
+my $kerberosLogins = (); # $kerberosLogins->{principal} = 1
 
 foreach my $resourceId ($data->getResourceIds()) {
 
-	foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId )) {
-		my @generatedDataDestination = ('all');
-		if(defined $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_DESTINATIONS )) {
-			@generatedDataDestination = @{$data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_DESTINATIONS )};
-		}
+	foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
 
-		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId )) {
-			next if $data->getMemberAttributeValue( member => $memberId, attrName => $A_USER_STATUS ) ne 'VALID';
-			push @{$outputByDestination{$_}}, $data->getUserAttributeValue( member => $memberId, attrName => $A_PRINCIPAL ) foreach @generatedDataDestination;
-		}
+		next if $data->getMemberAttributeValue( member => $memberId, attrName => $A_USER_STATUS ) ne 'VALID';
+
+		my $principal = $data->getUserAttributeValue( member => $memberId, attrName => $A_PRINCIPAL );
+		$kerberosLogins->{$principal} = 1;
 
 	}
+
 }
 
-
-####### output ######################
-{
-	local $, = "\n";
-	local $\ = "\n";
-
-	for my $destination (keys %outputByDestination) {
-		my $destinationDirectory = getDestinationDirectory $destination; 
-		my $service_file_name = "$destinationDirectory/$::SERVICE_NAME";
-		open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
-		print SERVICE_FILE sort &uniqList(@{$outputByDestination{$destination}}, @{$outputByDestination{"all"}});
-		close(SERVICE_FILE);
-	}
+####### output file ######################
+my $service_file_name = "$directory/$::SERVICE_NAME";
+open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
+foreach my $principal (sort keys %$kerberosLogins) {
+	print SERVICE_FILE $principal . "\n";
 }
+close(SERVICE_FILE);
 
 perunServicesInit::finalize;
