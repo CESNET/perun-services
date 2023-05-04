@@ -24,7 +24,7 @@ function process {
 
 	FROM_PERUN="${WORK_DIR}/zabbix_mu.json"
 
-	java -jar ${DST_SCRIPT} $FROM_PERUN
+	${DST_SCRIPT} $FROM_PERUN
 
 	exit $?
 }
