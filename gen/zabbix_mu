@@ -40,9 +40,6 @@ foreach my $resourceId ($data->getResourceIds()) {
 		unless ($userData->{$uco} || (!defined $groupName && !defined $role)) {
 			my $firstName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_FIRSTNAME );
 			my $lastName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LASTNAME );
-			if (!defined $role) {
-				$role = [];
-			}
 			my $user = {
 				identifier => $uco,
 				firstName  => $firstName,
