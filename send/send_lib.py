@@ -150,7 +150,7 @@ def prepare_temporary_directory() -> tempfile.TemporaryDirectory:
 	so it is removed afterwards with all its content.
 	:return: created temporary directory
 	"""
-	return tempfile.TemporaryDirectory(prefix="perun-send.", dir=TEMPORARY_DIR, ignore_cleanup_errors=True)
+	return tempfile.TemporaryDirectory(prefix="perun-send.", dir=TEMPORARY_DIR)
 
 
 def copy_files_to_directory(path_from: str, path_to: str, name_pattern: re.Pattern = None) -> None:
