@@ -49,7 +49,6 @@ class FileLock(object):
 	"""
 
 	def __init__(self, lockfile):
-		print("init")
 		self.lockfile = lockfile
 		self.dir_fd = os.open(self.lockfile, os.O_CREAT | os.O_RDWR)
 		try:
@@ -330,4 +329,4 @@ def exec_script(script_path: str, arguments: list[str]):
 	check_script_file(script_path)
 	command = [script_path]
 	command.extend(arguments)
-	return subprocess.Popen(command, stdout=subprocess.PIPE)
+	return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
