@@ -32,6 +32,8 @@ DBNAME=$DESTINATION
 
 SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
 SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
+SERVICE_FILE="$SERVICE_FILES_DIR/$SERVICE_NAME"
+SERVICE_FILE_MFA=$SERVICE_FILE"_mfa"
 
 #Just safety check. This should not happen.
 if [ ! -d "$SERVICE_FILES_DIR" ]; then echo '$SERVICE_FILES_DIR: '$SERVICE_FILES_DIR' is not a directory' >&2 ; exit 1; fi
@@ -89,10 +91,19 @@ fi
 #prepare removing of temporary files and dirs after exit of script
 trap 'rm -r -f "${LOCK_FILE}" "${TMP_HOSTNAME_DIR}"' EXIT
 
-cp $SERVICE_FILES_DIR/$SERVICE_NAME $TMP_HOSTNAME_DIR
+cp $SERVICE_FILE $TMP_HOSTNAME_DIR
 if [ $? -ne 0 ]; then
 	echo "Can't copy service file to temporary dir" >&2
 	exit 254
+fi
+
+# copy also MFA status file
+if [[ -f "$SERVICE_FILE_MFA" ]]; then
+    cp $SERVICE_FILE_MFA $TMP_HOSTNAME_DIR
+    if [ $? -ne 0 ]; then
+    	echo "Can't copy service mfa file to temporary dir" >&2
+    	exit 252
+    fi
 fi
 
 EXECSCRIPT="./o365_mu_users_export_process.pl"
