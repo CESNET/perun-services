@@ -28,6 +28,7 @@ with send_lib.prepare_temporary_directory() as tmp_dir:
 	process = send_lib.exec_script(scriptpath, ["-d", dbname, "-p", tmp_dir, "-s", service_name])
 	process.wait()
 	stdout, stderr = process.communicate()
-	print(stdout.decode())
+	print(stdout.decode("utf-8"), end='')
+	print(stderr.decode("utf-8"), file=sys.stderr, end='')
 	if process.returncode != 0:
 		send_lib.die_with_error("Slave script ends with return code: " + str(process.returncode))
