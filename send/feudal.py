@@ -35,7 +35,7 @@ auth = (credentials.split(':')[0], credentials.split(':')[1])
 
 service_files_dir = send_lib.get_gen_folder(facility, SERVICE_NAME)
 
-send_lib.create_lock(SERVICE_NAME, destination)
+send_lib.create_lock(SERVICE_NAME, re.sub(r'^https?://', '', destination))
 
 # Get users
 response = requests.get(f"{destination}/upstream/users/", auth=auth)
