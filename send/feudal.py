@@ -31,7 +31,7 @@ with open(f'/etc/perun/services/feudal/{credentials_filename}', 'r') as f:
 if not credentials:
 	send_lib.die_with_error('No credentials available in configuration')
 # TODO verify credentials file format
-auth = (credentials.split(' ')[0], credentials.split(' ')[1])
+auth = (credentials.split(':')[0], credentials.split(':')[1])
 
 service_files_dir = send_lib.get_gen_folder(facility, SERVICE_NAME)
 
