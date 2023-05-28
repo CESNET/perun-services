@@ -1,41 +1,22 @@
-#!/bin/bash
+#!/usr/bin/env python3
+import sys
+import send_lib
+from datetime import datetime
+import re
 
-SERVICE_NAME="crocs_user_export"
+SERVICE_NAME = "crocs_user_export"
 
-TIMEOUT="5400" #90s * 60 sec = 1.5h
-TIMEOUT_KILL="60" # 60 sec to kill after timeout
+send_lib.check_input_fields(sys.argv)
 
-FACILITY_NAME=$1
-DESTINATION=$2
-DESTINATION_TYPE=$3
+facility = sys.argv[1]
+destination = sys.argv[2]
+destination_type = send_lib.DESTINATION_TYPE_SERVICE_SPECIFIC if len(sys.argv) < 4 else sys.argv[3]
 
-SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
-SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
+send_lib.check_destination_type_allowed(destination_type, send_lib.DESTINATION_TYPE_SERVICE_SPECIFIC)
+send_lib.check_destination_format(destination, destination_type)
 
+service_files_dir = send_lib.get_gen_folder(facility, SERVICE_NAME)
 
-#Just safety check. This should not happen.
-if [ ! -d "$SERVICE_FILES_DIR" ]; then echo '$SERVICE_FILES_DIR: "'$SERVICE_FILES_DIR'" is not a directory' >&2 ; exit 1; fi
+timestamp = datetime.now().strftime("%Y-%m-%d_%H.%M.%S")
 
-#unless specific configuration for destination exists use common configuration for all destination
-[ -d "$SERVICE_FILES_FOR_DESTINATION" ] || SERVICE_FILES_FOR_DESTINATION="$SERVICE_FILES_DIR/_destination/all"
-
-
-#if there is no destination type, use default 'host'
-if [ -z "$DESTINATION_TYPE" ]; then
-	DESTINATION_TYPE="service-specific"
-fi
-
-case $DESTINATION_TYPE in
-	service-specific)
-		DESTINATION_DIR="$DESTINATION"
-		;;
-	*)
-		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
-		exit 1;
-		;;
-esac
-
-
-	TIMESTAMP=`date "+%F_%H.%M.%S"`
-
-	cp "$SERVICE_FILES_DIR/$SERVICE_NAME" "$DESTINATION_DIR/crocs-user-export-$TIMESTAMP"
+send_lib.copy_files_to_directory(service_files_dir, destination + "/crocs-user-export-" + timestamp, re.compile(SERVICE_NAME))
