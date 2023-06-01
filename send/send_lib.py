@@ -265,7 +265,7 @@ def create_lock(service_name: str, destination: str, custom_lock_dir: str = None
 			lock_dir = TEMPORARY_DIR
 
 	if destination is not None:
-		lockfile = "perun-{}-{}.lock".format(service_name, destination)
+		lockfile = "perun-{}-{}.lock".format(service_name, escape_filename(destination))
 	else:
 		lockfile = "perun-{}.lock".format(service_name)
 	lockfile = os.path.join(lock_dir, lockfile)
@@ -330,3 +330,13 @@ def exec_script(script_path: str, arguments: list[str]):
 	command = [script_path]
 	command.extend(arguments)
 	return subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def escape_filename(filename: str) -> str:
+	"""
+	Checks if provided filename contains any forbidden characters and escapes them.
+
+	:param filename: filename to escape
+	:return: escaped filename
+	"""
+	return filename.replace('/', '⧸')  # replace classic slash with U+29F8
