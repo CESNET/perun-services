@@ -30,7 +30,7 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 
 ####### output ######################
 for my $login (keys %sshKeys) {
-	open SERVICE_FILE,">$sshkeysDirectory/$login" or die "Cannot open $sshkeysDirectory/$login: $! \n";
+	open (SERVICE_FILE,">:encoding(UTF-8)","$sshkeysDirectory/$login") or die "Cannot open $sshkeysDirectory/$login: $! \n";
 	print SERVICE_FILE join "\n", @{$sshKeys{$login}}, "\n" if defined $sshKeys{$login};
 	close SERVICE_FILE;
 }
