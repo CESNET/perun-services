@@ -123,7 +123,7 @@ perunServicesInit::finalize;
 #
 # Calculate if user is expired or not.
 #
-# 1. param - expiration in KOS (studies)
+# 1. param - expiration in KOS (studies) (we will add 28 days grace period to the calculation)
 # 2. param - expiration in DC2 (employees)
 # 3. param - manually set expiration
 #
@@ -140,8 +140,9 @@ sub isExpired() {
 	my $expirationDc2Time = ($expirationDc2) ? Time::Piece->strptime($expirationDc2,"%Y-%m-%d") : undef;
 	my $expirationManTime = ($expirationMan) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
 
+	# Extend KOS studies expiration with 28 days if there is a defined value
 	my @expirations = ();
-	if (defined $expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
+	if (defined $expirationKosTime) { push(@expirations, ($expirationKosTime->epoch + (28*24*60*60))); }
 	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
 	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
 
