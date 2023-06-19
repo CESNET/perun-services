@@ -340,3 +340,33 @@ def escape_filename(filename: str) -> str:
 	:return: escaped filename
 	"""
 	return filename.replace('/', '⧸')  # replace classic slash with U+29F8
+
+
+def get_auth_credentials(service_name: str, destination: str):
+	"""
+	Retrieves credentials from a file located in the /etc/perun/services/service_name/service_name.py file.
+	The file is a python file containing map of {destination: {'username': username, 'password': password}} mapping.
+
+	Example of such file - supplement $ variables with destination url, username and password
+	credentials = {
+		"$url1": { 'username': "$user1", 'password': "$pwd1" },
+		"$url2": { 'username': "$user2", 'password': "$pwd2" }
+	}
+
+	:param service_name: name of the destination (used both as the folder name and the credentials python file name)
+	:param destination: key used to search in the credentials map
+	:return: (username, password) if credentials retrieved, None otherwise
+	"""
+	auth = None
+
+	try:
+		sys.path.insert(1, f'{SERVICES_DIR}/{service_name}/')
+		credentials = __import__(service_name).credentials
+		if destination in credentials.keys():
+			username = credentials.get(destination).get('username')
+			password = credentials.get(destination).get('password')
+			auth = (username, password)
+	except Exception:
+		# this means that config file does not exist or properties are not set
+		pass
+	return auth
