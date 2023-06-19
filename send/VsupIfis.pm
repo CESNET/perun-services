@@ -58,7 +58,7 @@ sub load_is() {
 	my $dbh = DBI->connect("dbi:Pg:dbname=$db_name;host=$hostname;port=$port", $db_user, $db_password,{ RaiseError=>1, AutoCommit=>0 }) or die "Connect to database $db_name Error!\n";
 
 	# Select query for input database (IS) - all students with UCO_PERUN not null and STUD_DO >= now or null
-	my $sth = $dbh->prepare(qq{select distinct ex_is2idm_studia.UCO_PERUN as UCO, NS, 'STU' as TYP_VZTAHU, STUD_FORMA as DRUH_VZTAHU, ex_is2idm_studia.ID_STUDIA as VZTAH_CISLO, STUD_FORMA as STU_FORMA, STUD_STAV as STUD_STAV, STUD_TYP as STU_PROGR, STUD_OD, STUD_DO, KARTA_LIC as KARTA_IDENT from ex_is2idm_studia left join ex_is2idm_adresy on ex_is2idm_studia.ID_STUDIA=ex_is2idm_adresy.ID_STUDIA where ex_is2idm_studia.UCO_PERUN is not null and (STUD_DO >= CURRENT_DATE OR STUD_DO is NULL)});
+	my $sth = $dbh->prepare(qq{select distinct ex_is2idm_studia.UCO_PERUN as UCO, NS, 'STU' as TYP_VZTAHU, STUD_FORMA as DRUH_VZTAHU, ex_is2idm_studia.ID_STUDIA as VZTAH_CISLO, STUD_FORMA as STU_FORMA, STUD_STAV as STUD_STAV, STUD_TYP as STU_PROGR, STUD_OD, case when STUD_DO is not null then STUD_DO+28 ELSE STUD_DO END as STUD_DO, KARTA_LIC as KARTA_IDENT from ex_is2idm_studia left join ex_is2idm_adresy on ex_is2idm_studia.ID_STUDIA=ex_is2idm_adresy.ID_STUDIA where ex_is2idm_studia.UCO_PERUN is not null and (STUD_DO >= CURRENT_DATE-28 OR STUD_DO is NULL)});
 	$sth->execute();
 
 	# Structure to store data from input database (IS)
