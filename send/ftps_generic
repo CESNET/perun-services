@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+import os
+import sys
+import re
+from ftplib import FTP_TLS
+from urllib.parse import urlparse
+
+import send_lib
+import tarfile
+
+service_name = "ftps_generic"
+port = 21
+
+file_path_pattern = re.compile("[a-zA-Z0-9\+\-~_\./]*")
+
+if __name__ == "__main__":
+	# Parse command line arguments
+	send_lib.check_input_fields(sys.argv)
+	facility_name = sys.argv[1]
+	destination = sys.argv[2]
+
+	# Parse destination
+	# expected destination type url, example: 'ftp://example.org:2121/path-to/folder/'
+	parsed_destination = urlparse(destination, scheme='ftp')
+	if parsed_destination.scheme not in ['ftp', 'ftps', 'ftpes']:
+		print("only FTPS is supported by this service")
+		exit(1)
+	hostname = parsed_destination.hostname
+	port = parsed_destination.port or port
+	remote_folder_path = parsed_destination.path.rstrip('/')
+
+	local_file_path = os.getcwd() + "/../gen/spool/" + facility_name + "/" + service_name + "/" + service_name
+	remote_file_path = f'{remote_folder_path}/{service_name}'
+	if not (re.fullmatch(file_path_pattern, remote_file_path)):
+		send_lib.die_with_error("Path to the remote file " + remote_file_path + "  is not in a valid format")
+
+	# Connect via explicit FTPS (FTPES)
+	auth = send_lib.get_auth_credentials(service_name, destination)
+	ftps = FTP_TLS()
+	ftps.connect(hostname, port)
+	ftps.login(auth[0], auth[1])
+	ftps.prot_p()
+
+	# Send file to FTP server
+	with open(local_file_path, 'rb') as file:
+		ftps.storbinary(f'STOR {remote_file_path}', file)
+
+	# End connection
+	print("File has been successfully sent")
+	ftps.quit()
