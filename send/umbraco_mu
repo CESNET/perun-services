@@ -1,4 +1,34 @@
-#!/bin/bash
-export SERVICE_NAME="umbraco_mu"
+#!/usr/bin/env python3
+import sys
+import requests
+import send_lib
+import tarfile
 
-python3 generic_send.py "$1" "$2" "$3"
+SERVICE_NAME = "umbraco_mu"
+TIMEOUT = 1800  # 30 * 60 sec = 30 min
+
+send_lib.check_input_fields(sys.argv, True)
+
+facility = sys.argv[1]
+destination = sys.argv[2]
+destination_type = sys.argv[3]
+
+send_lib.check_destination_type_allowed(destination_type, send_lib.DESTINATION_TYPE_URL)
+send_lib.check_destination_format(destination, destination_type)
+
+auth = send_lib.get_auth_credentials(SERVICE_NAME, destination)
+
+gen_folder = send_lib.get_gen_folder(facility, SERVICE_NAME)
+with send_lib.prepare_temporary_directory() as temp_dir:
+	send_lib.copy_files_to_directory(gen_folder, temp_dir)
+
+	with tarfile.open(temp_dir + '/perun_data.tar.gz', 'w:gz', format=tarfile.GNU_FORMAT) as archive:
+		archive.add(temp_dir, arcname='.')
+
+	with open(temp_dir + '/perun_data.tar.gz', 'rb') as compressed:
+		headers = {'Content-type': 'application/tar+gzip'}
+		response = requests.put(destination, headers=headers, data=compressed, auth=auth, timeout=TIMEOUT)
+		if not response.ok:
+			send_lib.die_with_error(
+				"Request ended with error code: " + str(response.status_code))
+

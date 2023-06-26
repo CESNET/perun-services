@@ -304,8 +304,8 @@ def load_custom_transport_command(service_name: str) -> Optional[list[str]]:
 	try:
 		sys.path.insert(1, os.path.join(SERVICES_DIR, service_name))
 		return __import__(service_name).transport_command
-	except ImportError:
-		# this means that config file does not exist
+	except Exception:
+		# this means that config file does not exist or property is not set
 		return None
 
 
