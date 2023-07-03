@@ -9,7 +9,7 @@ use utf8;
 
 local $::SERVICE_NAME = "tinia";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -20,6 +20,7 @@ our $A_USER_FIRSTNAME;     *A_USER_FIRSTNAME =      \'urn:perun:user:attribute-d
 our $A_USER_LASTNAME;      *A_USER_LASTNAME =       \'urn:perun:user:attribute-def:core:lastName';
 our $A_USER_LOGIN_MU;      *A_USER_LOGIN_MU =       \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_USER_CHIP_NUMBERS;  *A_USER_CHIP_NUMBERS =   \'urn:perun:user:attribute-def:def:chipNumbers';
+our $A_USER_GOTEX_CHIP_NUMBERS;  *A_USER_GOTEX_CHIP_NUMBERS = \'urn:perun:user:attribute-def:def:gotexChipNumbers';
 
 our $A_RESOURCE_ACC_GROUP; *A_RESOURCE_ACC_GROUP =   \'urn:perun:resource:attribute-def:def:tiniaAccessGroup';
 our $A_RESOURCE_GOLD;      *A_RESOURCE_GOLD =        \'urn:perun:resource:attribute-def:def:tiniaWinpakGold';
@@ -47,21 +48,28 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 	my $resourceArming = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RESOURCE_ARMING );
 	my $resourceAccGroup = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RESOURCE_ACC_GROUP );
 
+	#skip resource with COVID-APPROVAL (for now)
+	if( $resourceAccGroup eq 'COVID-APPROVAL' ) { next; }
+	if( $resourceAccGroup eq 'COVID-STUDENTS' ) { next; }
+
 	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
 
 		my $possibleFirstName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_FIRSTNAME );
 		my $firstName = (defined $possibleFirstName and length $possibleFirstName) ? $possibleFirstName : '-';
+		my $external = $firstName eq "'External'" ? 1 : 0;
 		my $possibleLastName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LASTNAME );
 		my $lastName = (defined $possibleLastName and length $possibleLastName) ? $possibleLastName : '-';
 		my $loginMU = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_MU );
 		my $chipNumbers = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_CHIP_NUMBERS );
+		my $gotexChipNumbers = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_GOTEX_CHIP_NUMBERS );
 		my $isBanned = $data->getMemberResourceAttributeValue(resource => $resourceId, member => $memberId, attrName => $A_V_RM_IS_BANNED );
 		#1 Person, 2 Externist
-		my $type = "1";
-
-		foreach my $chipNumber (@{$chipNumbers}) {
+		my $type = $external ? "2" : "1";
+		my @allChipNumbers = (@{$chipNumbers // []}, @{$gotexChipNumbers // []});
+		
+		foreach my $chipNumber (@allChipNumbers) {
 			if(!defined($dataByChip->{$chipNumber})) {
-				$dataByChip->{$chipNumber}->{$FIRSTNAME} = $firstName;
+				$dataByChip->{$chipNumber}->{$FIRSTNAME} = $external ? 'EXTERNISTA' : $firstName;
 				$dataByChip->{$chipNumber}->{$LASTNAME} = $lastName;
 				$dataByChip->{$chipNumber}->{$GOLD} = $resourceGold ? 1 : 0;
 				$dataByChip->{$chipNumber}->{$ARMING} = $resourceArming ? 1 : 0;
@@ -71,11 +79,9 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 				if($dataByChip->{$chipNumber}->{$LOGIN} ne $loginMU) {
 					die "There are two same chips with different user logins in namespace MU: '" . $loginMU . "' and '" . $dataByChip->{$chipNumber}->{'LOGIN'} . "'!\n";
 				}
-
 				if($resourceGold) { $dataByChip->{$chipNumber}->{$GOLD} = 1; }
 				if($resourceArming) { $dataByChip->{$chipNumber}->{$ARMING} = 1; };
 			}
-
 			if($isBanned eq 1) {
 				$dataByChip->{$chipNumber}->{$ACC_GROUPS}->{$resourceAccGroup . "-BAN"} = 1;
 			} else {
