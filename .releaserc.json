@@ -1,10 +1,58 @@
 {
-  "branches": [ "production", "+([0-9])?(.{+([0-9]),x}).x"],
-  "preset": "conventionalcommits",
-  "plugins": [
-    "@semantic-release/commit-analyzer",
-    "@semantic-release/release-notes-generator",
-    "@semantic-release/github"
-  ]
+	"branches": ["production", "+([0-9])?(.{+([0-9]),x}).x"],
+	"preset": "conventionalcommits",
+	"plugins": [
+		"@semantic-release/commit-analyzer",
+		[
+			"@semantic-release/release-notes-generator",
+			{
+				"preset": "conventionalcommits",
+				"presetConfig": {
+					"types": [
+						{
+							"type": "feat",
+							"section": "New features and notable changes",
+							"hidden": false
+						},
+						{ "type": "fix", "hidden": true },
+						{ "type": "perf", "hidden": true },
+						{ "type": "revert", "hidden": true },
+						{ "type": "docs", "hidden": true },
+						{ "type": "style", "hidden": true },
+						{ "type": "chore", "hidden": true },
+						{ "type": "refactor", "hidden": true },
+						{ "type": "test", "hidden": true },
+						{ "type": "build", "hidden": true },
+						{ "type": "ci", "hidden": true }
+					],
+					"issuePrefixes": ["ST"],
+					"issueUrlFormat": "https://perunaai.atlassian.net/browse/{{prefix}}{{id}}"
+				},
+				"parserOpts": {
+					"noteKeywords": [
+						"BREAKING CHANGE",
+						"BREAKING CHANGES",
+						"DEPLOYMENT NOTE",
+						"DEPLOYMENT NOTES",
+						"UPGRADE NOTE",
+						"UPGRADE NOTES"
+					]
+				}
+			}
+		],
+		[
+			"@semantic-release/changelog",
+			{
+				"changelogFile": "UPGRADE.md",
+				"changelogTitle": "Upgrade notes"
+			}
+		],
+		[
+			"@semantic-release/git",
+			{
+				"assets": ["UPGRADE.md"],
+				"message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+			}
+		]
+	]
 }
-
