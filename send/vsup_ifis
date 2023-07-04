@@ -570,8 +570,9 @@ foreach my $key (sort keys %$is_data) {
 	my $TYP_VZTAHU = $is_data->{$key}->{'TYP_VZTAHU'};
 	my $DRUH_VZTAHU = $is_data->{$key}->{'DRUH_VZTAHU'};
 	my $STU_FORMA = $is_data->{$key}->{'STU_FORMA'};
-	my $STUD_STAV = $is_data->{$key}->{'STUD_STAV'};
+	my $STU_STAV = $is_data->{$key}->{'STU_STAV'};
 	my $STU_PROGR = $is_data->{$key}->{'STU_PROGR'};
+	my $STU_GRADUATE = $is_data->{$key}->{'STU_GRADUATE'};
 	my $VZTAH_CISLO = $key;
 	my $VZTAH_OD = $is_data->{$key}->{'VZTAH_OD'};
 	my $VZTAH_DO = $is_data->{$key}->{'VZTAH_DO'};
@@ -601,8 +602,9 @@ foreach my $key (sort keys %$is_data) {
 		$select = appendParam(select => $select, params => \@params, paramName => 'NS', paramValue => $NS);
 		$select = appendParam(select => $select, params => \@params, paramName => 'DRUH_VZTAHU', paramValue => $DRUH_VZTAHU);
 		$select = appendParam(select => $select, params => \@params, paramName => 'STU_FORMA', paramValue => $STU_FORMA);
-		$select = appendParam(select => $select, params => \@params, paramName => 'STUD_STAV', paramValue => $STUD_STAV);
+		$select = appendParam(select => $select, params => \@params, paramName => 'STU_STAV', paramValue => $STU_STAV);
 		$select = appendParam(select => $select, params => \@params, paramName => 'STU_PROGR', paramValue => $STU_PROGR);
+		$select = appendParam(select => $select, params => \@params, paramName => 'STU_GRADUATE', paramValue => $STU_GRADUATE);
 		$select = appendParam(select => $select, params => \@params, paramName => 'OD', paramValue => $VZTAH_OD);
 		$select = appendParam(select => $select, params => \@params, paramName => 'DO_', paramValue => $VZTAH_DO);
 		$select = appendParam(select => $select, params => \@params, paramName => 'KARTA_IDENT', paramValue => $KARTA_IDENT);
@@ -613,8 +615,8 @@ foreach my $key (sort keys %$is_data) {
 
 		if(!$recordAreEquals->fetch) {
 
-			my $updatePerson = $dbh->prepare(qq{UPDATE $tableNameVzt SET NS=? , DRUH_VZTAHU=? , STU_FORMA=? , STUD_STAV=? , STU_PROGR=? , OD=? , DO_=? , KARTA_IDENT=? , EXT_ID=? WHERE OSB_ID=? AND VZTAH_CISLO=? AND TYP_VZTAHU=?});
-			$updatePerson->execute($NS, $DRUH_VZTAHU, $STU_FORMA, $STUD_STAV, $STU_PROGR, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID, $OSB_ID, $VZTAH_CISLO, $TYP_VZTAHU);
+			my $updatePerson = $dbh->prepare(qq{UPDATE $tableNameVzt SET NS=? , DRUH_VZTAHU=? , STU_FORMA=? , STU_STAV=? , STU_PROGR=? , STU_GRADUATE=? , OD=? , DO_=? , KARTA_IDENT=? , EXT_ID=? WHERE OSB_ID=? AND VZTAH_CISLO=? AND TYP_VZTAHU=?});
+			$updatePerson->execute($NS, $DRUH_VZTAHU, $STU_FORMA, $STU_STAV, $STU_PROGR, $STU_GRADUATE, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID, $OSB_ID, $VZTAH_CISLO, $TYP_VZTAHU);
 			handleAkt($OSB_ID, 'VZTAHY');
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
 			$is_foundAndUpdated++;
@@ -631,8 +633,8 @@ foreach my $key (sort keys %$is_data) {
 		if($DEBUG == 1) { print "INSERT NEW RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
 		$is_inserted++;
 		#We will insert new record to output database (IFIS)
-		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, NS, TYP_VZTAHU, DRUH_VZTAHU, STU_FORMA, STUD_STAV, STU_PROGR, VZTAH_CISLO, OD, DO_, KARTA_IDENT, EXT_ID) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)});
-		$insertPerson->execute($OSB_ID, $NS, $TYP_VZTAHU, $DRUH_VZTAHU, $STU_FORMA, $STUD_STAV, $STU_PROGR, $VZTAH_CISLO, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID);
+		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, NS, TYP_VZTAHU, DRUH_VZTAHU, STU_FORMA, STU_STAV, STU_PROGR, STU_GRADUATE, VZTAH_CISLO, OD, DO_, KARTA_IDENT, EXT_ID) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)});
+		$insertPerson->execute($OSB_ID, $NS, $TYP_VZTAHU, $DRUH_VZTAHU, $STU_FORMA, $STU_STAV, $STU_PROGR, $STU_GRADUATE, $VZTAH_CISLO, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID);
 		handleAkt($OSB_ID, 'VZTAHY');
 
 	}
