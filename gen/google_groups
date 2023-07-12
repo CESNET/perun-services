@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 our $SERVICE_NAME     = "google_groups";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -16,7 +16,6 @@ my $data      = perunServicesInit::getHashedDataWithGroups;
 #Constants
 our $A_FACILITY_GOOGLE_DOMAIN;            *A_FACILITY_GOOGLE_DOMAIN =             \'urn:perun:facility:attribute-def:def:googleGroupsDomain';
 our $A_GROUP_RESOURCE_GOOGLE_GROUP_NAME;  *A_GROUP_RESOURCE_GOOGLE_GROUP_NAME =   \'urn:perun:group_resource:attribute-def:virt:googleGroupName';
-our $A_USER_GOOGLE_NAMESPACE;             *A_USER_GOOGLE_NAMESPACE =              \'urn:perun:user:attribute-def:virt:logins-namespace:google';
 our $A_USER_GOOGLE_MAILS;                 *A_USER_GOOGLE_MAILS =                  \'urn:perun:user:attribute-def:virt:mails-namespace:google';
 our $A_RESOURCE_GOOGLE_TEAM_DRIVE;        *A_RESOURCE_GOOGLE_TEAM_DRIVE =         \'urn:perun:resource:attribute-def:def:googleTeamDriveName';
 
@@ -37,21 +36,18 @@ foreach my $resourceId ($data->getResourceIds()) {
 		}
 
 		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
-			my @logins = @{$data->getUserAttributeValue(attrName => $A_USER_GOOGLE_NAMESPACE, member => $memberId)};
 			my @mails = @{$data->getUserAttributeValue(attrName => $A_USER_GOOGLE_MAILS, member => $memberId)};
 
-			# skip users without google login, might happen, when user removes his UserExtSource
+			# skip users without google mails, might happen, when user removes his UserExtSource
 			# since google login is virtual attribute calculated from Google IdP UES.
-			if (@logins) {
+			if (@mails) {
 				if($groupName) {
-					foreach my $member(@logins){
-						unless(exists $groupStruc->{$groupName}->{$member}) {
-							$groupStruc->{$groupName}->{$member} = {};
-						}
+					foreach my $mail(@mails){
+						$groupStruc->{$groupName}->{$mail} = 1;
 					}
 				}
-				#process team drive for this user only if drive name has been set and google mails of this user has been obtained
-				if($googleTeamDriveName && @mails) {
+				#process team drive for this user only if drive name has been set
+				if($googleTeamDriveName) {
 					foreach my $mail(@mails){
 						#Add every google mail to team drive struc
 						$teamDriveStruc->{$googleTeamDriveName}->{$mail} = 1;
@@ -66,10 +62,10 @@ my $fileName = "$DIRECTORY/$::SERVICE_NAME" . "_groups.csv";
 open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
 
 # output of google_groups_groups.csv file:
-# - groupName;groupDisplayName;id1,id2,id3 where
+# - groupName;groupDisplayName;mail1,mail2,mail3 where
 # groupName is 'group1@domain.name.com'
 # groupDisplayName is optional and unused here
-# id[x] is a list of group member identifiers
+# mail[x] is a list of group member mails
 
 # output of google_groups_domain file:
 # - there is only one line containing name of the domain
