@@ -1,9 +1,21 @@
 {
-  "name": "perun-services",
-  "version": "0.0.0-development",
-  "devDependencies": {
-    "@semantic-release/github": "^8.0.2",
-    "conventional-changelog-conventionalcommits": "^5.0.0",
-    "semantic-release": "^19.0.3"
-  }
+	"name": "perun-services",
+	"version": "0.0.0-development",
+	"devDependencies": {
+		"@commitlint/cli": "^17.6.6",
+		"@commitlint/config-conventional": "^17.6.6",
+		"@commitlint/cz-commitlint": "^17.5.0",
+		"@semantic-release/changelog": "^6.0.3",
+		"@semantic-release/git": "^10.0.1",
+		"@semantic-release/github": "^8.0.2",
+		"commitizen": "^4.3.0",
+		"conventional-changelog-conventionalcommits": "^5.0.0",
+		"inquirer": "^8.2.5",
+		"semantic-release": "^19.0.3"
+	},
+	"config": {
+		"commitizen": {
+			"path": "./node_modules/@commitlint/cz-commitlint"
+		}
+	}
 }
