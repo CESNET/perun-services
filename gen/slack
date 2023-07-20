@@ -1,0 +1,90 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+use JSON::XS;
+
+local $::SERVICE_NAME = basename($0);
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+our $A_USER_LOGIN;                  *A_USER_LOGIN =                  \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_RESOURCE_NAME;               *A_RESOURCE_NAME =               \'urn:perun:resource:attribute-def:core:name';
+our $A_RESOURCE_PRIVATE_CHANNEL;    *A_RESOURCE_PRIVATE_CHANNEL=     \'urn:perun:resource:attribute-def:def:isSlackPrivateChannel';
+our $A_RESOURCE_GENERAL_CHANNEL;    *A_RESOURCE_GENERAL_CHANNEL=     \'urn:perun:resource:attribute-def:def:isSlackGeneralChannel';
+our $A_MAIL;                        *A_MAIL =                        \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_FIRST_NAME;                  *A_FIRST_NAME =                  \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;                   *A_LAST_NAME =                   \'urn:perun:user:attribute-def:core:lastName';
+our $A_MEMBER_STATUS;               *A_MEMBER_STATUS =               \'urn:perun:member:attribute-def:core:status';
+
+my $struc = {"users", {}, "channels", {}};
+# if resource representing general channel is propagated, all propagated users must be included in it
+# if no such resource is propagated, all members of resources are taken as Slack users
+my $hasGeneralChannel = 0;
+
+foreach my $resourceId ($data->getResourceIds()) {
+	my $isGeneralChannel = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_GENERAL_CHANNEL );
+	if ($isGeneralChannel) {
+		$hasGeneralChannel = 1;
+
+		foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+			next if $data->getMemberAttributeValue(attrName => $A_MEMBER_STATUS, member => $memberId) ne 'VALID';
+
+			my $login = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_USER_LOGIN);
+			my $email = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
+			my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+			my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+			$struc->{"users"}->{$login}->{"firstName"} = $firstName;
+			$struc->{"users"}->{$login}->{"lastName"} = $lastName;
+			$struc->{"users"}->{$login}->{"email"} = $email;
+		}
+	}
+}
+
+foreach my $resourceId ($data->getResourceIds()) {
+	my $channelName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_NAME );
+	my $isPrivateChannel = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_PRIVATE_CHANNEL );
+	my $isGeneralChannel = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_GENERAL_CHANNEL );
+	if ($channelName !~ /^[a-z0-9_-]+$/) {
+		die "Channel name may only contain lowercase letters, numbers, hyphens, and underscores";
+	}
+	if (exists($struc->{"channels"}->{$channelName})) {
+		die "Duplicated channel names found: " . $channelName;
+	}
+
+	if (!$isGeneralChannel) {
+		$struc->{"channels"}->{$channelName}->{"privateChannel"} = $isPrivateChannel ? JSON::XS::true : JSON::XS::false;
+		my @members;
+		foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+			next if $data->getMemberAttributeValue(attrName => $A_MEMBER_STATUS, member => $memberId) ne 'VALID';
+			my $login = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_USER_LOGIN);
+			push @members, $login;
+			if (!$hasGeneralChannel) {
+				my $email = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
+				my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+				my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+				$struc->{"users"}->{$login}->{"firstName"} = $firstName;
+				$struc->{"users"}->{$login}->{"lastName"} = $lastName;
+				$struc->{"users"}->{$login}->{"email"} = $email;
+			} elsif (!exists($struc->{"users"}->{$login})) {
+				die "User " . $login . " is not member of general resource!";
+			}
+		}
+		$struc->{"channels"}->{$channelName}->{"members"} = \@members;
+	}
+}
+
+my $file_name = "$DIRECTORY/$::SERVICE_NAME";
+####### output file ######################
+open FILE,">$file_name" or die "Cannot open $file_name: $! \n";
+print FILE JSON::XS->new->utf8->pretty->canonical->encode($struc);
+close(FILE);
+
+perunServicesInit::finalize;
