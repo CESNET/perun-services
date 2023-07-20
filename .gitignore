@@ -71,6 +71,7 @@ nb-configuration.xml
 !.editorconfig
 !.gitignore
 !.gitattributes
+!.commitlintrc.json
 *~
 
 # Window ignore #
