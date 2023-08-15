@@ -1,7 +1,7 @@
 package VsupIfis;
 use Exporter 'import';
 @ISA = ('Exporter');
-@EXPORT = qw(load_kos load_vema load_dc2 load_is);
+@EXPORT = qw(load_kos load_vema load_dc2 load_is load_stag);
 
 use strict;
 use warnings FATAL => 'all';
@@ -14,7 +14,7 @@ use DBI;
 sub init_config($) {
 
 	my $filename = shift;
-	my $configPath = "/etc/perun/ifis/$filename";
+	my $configPath = "/etc/perun/services/vsup_ifis/$filename";
 	my $result = {};
 
 	open FILE, $configPath or die "Could not open config file $configPath: $!";
@@ -42,12 +42,12 @@ sub init_config($) {
 }
 
 #
-# Load map of users relations from IS
+# Load map of users relations from IS/STAG
 # Require params: $hostname, $port, $db_name, $db_user, $db_password
 #
-sub load_is() {
+sub load_stag() {
 
-	my $config = init_config("is.conf");
+	my $config = init_config("stag.conf");
 
 	my $hostname = $config->{"hostname"};
 	my $port = $config->{"port"};
@@ -57,11 +57,11 @@ sub load_is() {
 
 	my $dbh = DBI->connect("dbi:Pg:dbname=$db_name;host=$hostname;port=$port", $db_user, $db_password,{ RaiseError=>1, AutoCommit=>0 }) or die "Connect to database $db_name Error!\n";
 
-	# Select query for input database (IS) - all students with UCO_PERUN not null and STUD_DO >= now or null
-	my $sth = $dbh->prepare(qq{select distinct ex_is2idm_studia.UCO_PERUN as UCO, NS, 'STU' as TYP_VZTAHU, STUD_FORMA as DRUH_VZTAHU, ex_is2idm_studia.ID_STUDIA as VZTAH_CISLO, STUD_FORMA as STU_FORMA, STUD_STAV as STU_STAV, STUD_TYP as STU_PROGR, STUD_OD, case when STUD_DO is not null then STUD_DO+28 ELSE STUD_DO END as STUD_DO, KARTA_LIC as KARTA_IDENT, UKONCENO as STU_GRADUATE from ex_is2idm_studia left join ex_is2idm_adresy on ex_is2idm_studia.ID_STUDIA=ex_is2idm_adresy.ID_STUDIA where ex_is2idm_studia.UCO_PERUN is not null and (STUD_DO >= CURRENT_DATE-28 OR STUD_DO is NULL)});
+	# Select query for input database (IS/STAG) - all students with UCO_PERUN not null and STUD_DO >= now-28 or null
+	my $sth = $dbh->prepare(qq{select distinct ex_stag2idm_studia.UCO_PERUN as UCO, NS, 'STU' as TYP_VZTAHU, STUD_FORMA as DRUH_VZTAHU, ex_stag2idm_studia.ID_STUDIA as VZTAH_CISLO, STUD_FORMA as STU_FORMA, STUD_STAV as STU_STAV, STUD_TYP as STU_PROGR, STUD_OD, case when STUD_DO is not null then STUD_DO+28 ELSE STUD_DO END as STUD_DO, KARTA_LIC as KARTA_IDENT, UKONCENO as STU_GRADUATE from ex_stag2idm_studia left join ex_stag2idm_adresy on ex_stag2idm_studia.ID_STUDIA=ex_stag2idm_adresy.ID_STUDIA where ex_stag2idm_studia.UCO_PERUN is not null and (STUD_DO >= CURRENT_DATE-28 OR STUD_DO is NULL)});
 	$sth->execute();
 
-	# Structure to store data from input database (IS)
+	# Structure to store data from input database (IS/STAG)
 	my $inputData = {};
 	while(my $row = $sth->fetchrow_hashref()) {
 		# disregarding the select Postgres is using lower-cased column names.
@@ -79,7 +79,7 @@ sub load_is() {
 		$inputData->{$key}->{'KARTA_IDENT'} = $row->{karta_ident};
 	}
 
-	# Disconnect from input database (IS)
+	# Disconnect from input database (IS/STAG)
 	$dbh->disconnect();
 
 	return $inputData;
@@ -127,6 +127,51 @@ sub load_dc2() {
 	}
 
 	# Disconnect from input database (DC2)
+	$dbh->disconnect();
+
+	return $inputData;
+
+}
+
+#
+# Load map of users relations from IS
+# Require params: $hostname, $port, $db_name, $db_user, $db_password
+#
+sub load_is() {
+
+	my $config = init_config("is.conf");
+
+	my $hostname = $config->{"hostname"};
+	my $port = $config->{"port"};
+	my $db_name = $config->{"db_name"};
+	my $db_user = $config->{"username"};
+	my $db_password = $config->{"password"};
+
+	my $dbh = DBI->connect("dbi:Pg:dbname=$db_name;host=$hostname;port=$port", $db_user, $db_password,{ RaiseError=>1, AutoCommit=>0 }) or die "Connect to database $db_name Error!\n";
+
+	# Select query for input database (IS) - all students with UCO_PERUN not null and STUD_DO >= now-28 or null
+	my $sth = $dbh->prepare(qq{select distinct ex_is2idm_studia.UCO_PERUN as UCO, NS, 'STU' as TYP_VZTAHU, STUD_FORMA as DRUH_VZTAHU, ex_is2idm_studia.ID_STUDIA as VZTAH_CISLO, STUD_FORMA as STU_FORMA, STUD_STAV as STU_STAV, STUD_TYP as STU_PROGR, STUD_OD, case when STUD_DO is not null then STUD_DO+28 ELSE STUD_DO END as STUD_DO, KARTA_LIC as KARTA_IDENT, UKONCENO as STU_GRADUATE from ex_is2idm_studia left join ex_is2idm_adresy on ex_is2idm_studia.ID_STUDIA=ex_is2idm_adresy.ID_STUDIA where ex_is2idm_studia.UCO_PERUN is not null and (STUD_DO >= CURRENT_DATE-28 OR STUD_DO is NULL)});
+	$sth->execute();
+
+	# Structure to store data from input database (IS)
+	my $inputData = {};
+	while(my $row = $sth->fetchrow_hashref()) {
+		# disregarding the select Postgres is using lower-cased column names.
+		my $key = $row->{vztah_cislo};
+		$inputData->{$key}->{'OSB_ID'} = $row->{uco};
+		$inputData->{$key}->{'TYP_VZTAHU'} = $row->{typ_vztahu};
+		$inputData->{$key}->{'DRUH_VZTAHU'} = $row->{druh_vztahu};
+		$inputData->{$key}->{'STU_FORMA'} = $row->{stu_forma};
+		$inputData->{$key}->{'STU_STAV'} = $row->{stu_stav};
+		$inputData->{$key}->{'STU_PROGR'} = $row->{stu_progr};
+		$inputData->{$key}->{'STU_GRADUATE'} = $row->{stu_graduate};
+		$inputData->{$key}->{'NS'} = $row->{ns};
+		$inputData->{$key}->{'VZTAH_OD'} = $row->{stud_od};
+		$inputData->{$key}->{'VZTAH_DO'} = $row->{stud_do};
+		$inputData->{$key}->{'KARTA_IDENT'} = $row->{karta_ident};
+	}
+
+	# Disconnect from input database (IS)
 	$dbh->disconnect();
 
 	return $inputData;
