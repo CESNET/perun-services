@@ -1,0 +1,170 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Time::Piece;
+sub resolveExpiration;
+
+local $::SERVICE_NAME = "vsup_stag";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName = "$DIRECTORY/$::SERVICE_NAME".".csv";
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+# Constants
+our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_OSB_ID_STAG; *A_OSB_ID_STAG = \'urn:perun:user:attribute-def:def:osbIdStag';
+our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
+
+our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
+our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_TITLE_AFTER;  *A_TITLE_AFTER = \'urn:perun:user:attribute-def:core:titleAfter';
+
+our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
+our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
+
+our $A_BIRTH_LAST_NAME;  *A_BIRTH_LAST_NAME = \'urn:perun:user:attribute-def:def:birthLastName';
+our $A_BIRTH_NUMBER;  *A_BIRTH_NUMBER = \'urn:perun:user:attribute-def:def:birthNumber';
+our $A_GENDER;  *A_GENDER = \'urn:perun:user:attribute-def:def:gender';
+our $A_JOB;  *A_JOB = \'urn:perun:user:attribute-def:def:job';
+our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
+our $A_EXPIRATION_MANUAL;  *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
+
+our $A_PHONE;  *A_PHONE = \'urn:perun:user:attribute-def:def:phoneDc2';
+our $A_EMAIL_PRIV;  *A_EMAIL_PRIV = \'urn:perun:user:attribute-def:opt:privateMail';
+our $A_EMAIL_PRIV_KOS;  *A_EMAIL_PRIV_KOS = \'urn:perun:user:attribute-def:opt:privateMailKos';
+our $A_PHONE_PRIV;  *A_PHONE_PRIV = \'urn:perun:user:attribute-def:opt:privatePhone';
+
+our $A_R_RELATION_TYPE; *A_R_RELATION_TYPE = \'urn:perun:resource:attribute-def:def:relationType';
+
+our $A_CARD_PHOTO;  *A_CARD_PHOTO = \'urn:perun:user:attribute-def:def:cardPhoto';
+
+our $A_VSUP_MAIL; *A_VSUP_MAIL= \'urn:perun:user:attribute-def:def:vsupMail';
+our $A_VSUP_PREF_MAIL; *A_VSUP_PREF_MAIL= \'urn:perun:user:attribute-def:def:vsupPreferredMail';
+
+# GATHER USERS
+my $users;  # $users->{$osbIddc2}->{ATTR} = $attrValue;
+
+#
+# AGGREGATE DATA
+#
+# FOR EACH RESOURCE
+foreach my $resourceId ($data->getResourceIds()) {
+
+	my $relationType = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_RELATION_TYPE);
+
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+
+		my $uco  = $data->getUserAttributeValue( member => $memberId, attrName => $A_UCO);
+		my $osbIdSTAG  = $data->getUserAttributeValue( member => $memberId, attrName => $A_OSB_ID_STAG);
+		my $login  = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN);
+		my $prefMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_VSUP_PREF_MAIL);
+		my $vsupMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_VSUP_MAIL);
+		my $titleBefore = $data->getUserAttributeValue(member => $memberId, attrName => $A_TITLE_BEFORE);
+		my $artisticFirstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_ARTISTIC_FIRST_NAME);
+		my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+		my $artisticLastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_ARTISTIC_LAST_NAME);
+		my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+		my $titleAfter = $data->getUserAttributeValue(member => $memberId, attrName => $A_TITLE_AFTER);
+		my $birthLastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_BIRTH_LAST_NAME);
+		my $birthNumber = $data->getUserAttributeValue(member => $memberId, attrName => $A_BIRTH_NUMBER);
+		my $gender = $data->getUserAttributeValue(member => $memberId, attrName => $A_GENDER);
+		my $job = $data->getUserAttributeValue(member => $memberId, attrName => $A_JOB);
+		my $expirationDC2 = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_DC2);
+		my $expirationManual = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_MANUAL);
+		my $phone = $data->getUserAttributeValue(member => $memberId, attrName => $A_PHONE);
+		my $emailPriv = $data->getUserAttributeValue(member => $memberId, attrName => $A_EMAIL_PRIV);
+		my $emailPrivKOS = $data->getUserAttributeValue(member => $memberId, attrName => $A_EMAIL_PRIV_KOS);
+		my $phonePriv = $data->getUserAttributeValue(member => $memberId, attrName => $A_PHONE_PRIV);
+		my $cardPhoto = $data->getUserAttributeValue(member => $memberId, attrName => $A_CARD_PHOTO);
+
+		my $key = $uco . ":" . $relationType;
+		$users->{$key}->{$A_UCO} = $uco;
+		$users->{$key}->{$A_OSB_ID_STAG} = $osbIdSTAG || '';
+		$users->{$key}->{$A_LOGIN} = $login;
+		$users->{$key}->{'EMAIL'} = ($prefMail || ($vsupMail || $login . '@vsup.cz'));
+		$users->{$key}->{'TYP_ZAZN'} = $relationType;
+		$users->{$key}->{$A_TITLE_BEFORE} = $titleBefore || '';
+		$users->{$key}->{$A_FIRST_NAME} = ($artisticFirstName || ($firstName || ''));
+		$users->{$key}->{$A_LAST_NAME} = ($artisticLastName || ($lastName || ''));
+		$users->{$key}->{$A_TITLE_AFTER} = $titleAfter || '';
+
+		$users->{$key}->{$A_BIRTH_LAST_NAME} = $birthLastName || '';
+		$users->{$key}->{$A_BIRTH_NUMBER} = $birthNumber || '';
+		$users->{$key}->{$A_GENDER} = $gender || '';
+		$users->{$key}->{$A_JOB} = $job || '';
+		$users->{$key}->{$A_EXPIRATION_DC2} = resolveExpiration($expirationDC2, $expirationManual);
+
+		$users->{$key}->{$A_PHONE} = $phone || '';
+		$users->{$key}->{$A_EMAIL_PRIV} = $emailPriv || ($emailPrivKOS || '');
+		$users->{$key}->{$A_PHONE_PRIV} = $phonePriv || '';
+
+		$users->{$key}->{$A_CARD_PHOTO} = $cardPhoto || '';
+
+	}
+
+}
+
+#
+# PRINT user data LDIF
+#
+open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
+binmode FILE, ":utf8";
+
+# FOR EACH USER ON FACILITY
+my @keys = sort keys %{$users};
+for my $key (@keys) {
+
+	# print attributes, which are never empty
+	print FILE $key . "\t" . $users->{$key}->{$A_UCO}. "\t" . $users->{$key}->{$A_OSB_ID_STAG} . "\t" . $users->{$key}->{$A_LOGIN} . "\t" .
+		$users->{$key}->{'EMAIL'} . "\t" . $users->{$key}->{'TYP_ZAZN'} . "\t" .
+		$users->{$key}->{$A_TITLE_BEFORE} . "\t" . $users->{$key}->{$A_FIRST_NAME} . "\t" .
+		$users->{$key}->{$A_LAST_NAME} . "\t" . $users->{$key}->{$A_TITLE_AFTER} . "\t" .
+		$users->{$key}->{$A_BIRTH_LAST_NAME} . "\t" . $users->{$key}->{$A_BIRTH_NUMBER} . "\t" .
+		$users->{$key}->{$A_GENDER} . "\t" . $users->{$key}->{$A_JOB} . "\t" . $users->{$key}->{$A_EXPIRATION_DC2} . "\t" .
+		$users->{$key}->{$A_PHONE} . "\t" . $users->{$key}->{$A_EMAIL_PRIV} . "\t" .
+		$users->{$key}->{$A_PHONE_PRIV} . "\t" . $users->{$key}->{$A_CARD_PHOTO} . "\n";
+
+}
+
+close(FILE);
+
+perunServicesInit::finalize;
+
+#
+# Return latest of two expiration dates (DC2 / Manual)
+#
+sub resolveExpiration() {
+
+	# read input
+	my $expirationDc2 = shift;
+	my $expirationMan = shift;
+	# parse to time or undef
+	my $expirationDc2Time = (defined $expirationDc2 and length($expirationDc2) > 0) ? Time::Piece->strptime($expirationDc2,"%Y-%m-%d") : undef;
+	my $expirationManTime = (defined $expirationMan and length($expirationMan) > 0) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
+
+	my @expirations = ();
+	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
+	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
+
+	# sort all expirations
+	my @sorted_expirations = sort { $a <=> $b } @expirations;
+	my $latest_expiration = $sorted_expirations[$#sorted_expirations];
+
+	if (defined $latest_expiration) {
+		if (defined $expirationDc2Time and ($latest_expiration == $expirationDc2Time->epoch)) {
+			return $expirationDc2;
+		}
+		if (defined $expirationManTime and ($latest_expiration == $expirationManTime->epoch)) {
+			return $expirationMan;
+		}
+	}
+	# expiration not set
+	return '';
+
+}
