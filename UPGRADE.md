@@ -1,5 +1,13 @@
 Upgrade notes
 
+## [8.2.0](https://github.com/CESNET/perun-services/compare/v8.1.0...v8.2.0) (2023-08-15)
+
+
+### New features and notable changes
+
+* **vsup_ifis:** extend library to support also IS/STAG ([420efe5](https://github.com/CESNET/perun-services/commit/420efe5c157e84f1e765bcd8b8c0035a73217335))
+* **vsup_stag:** new service for pushing data to IS/STAG ([84c8e8c](https://github.com/CESNET/perun-services/commit/84c8e8c8ff5e20e8d179e22b1d3b317e5d80d164))
+
 ## [8.1.0](https://github.com/CESNET/perun-services/compare/v8.0.0...v8.1.0) (2023-07-20)
 
 
