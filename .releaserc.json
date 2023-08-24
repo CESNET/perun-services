@@ -9,14 +9,10 @@
 				"preset": "conventionalcommits",
 				"presetConfig": {
 					"types": [
-						{
-							"type": "feat",
-							"section": "New features and notable changes",
-							"hidden": false
-						},
-						{ "type": "fix", "hidden": true },
-						{ "type": "perf", "hidden": true },
-						{ "type": "revert", "hidden": true },
+						{ "type": "feat", "hidden": false },
+						{ "type": "fix", "hidden": false },
+						{ "type": "perf", "hidden": false },
+						{ "type": "revert", "hidden": false },
 						{ "type": "docs", "hidden": true },
 						{ "type": "style", "hidden": true },
 						{ "type": "chore", "hidden": true },
