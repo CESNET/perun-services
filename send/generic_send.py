@@ -55,6 +55,17 @@ if __name__ == "__main__":
 		temp = tempfile.NamedTemporaryFile(mode="w+")
 		transport_command.extend(["-i", "-H", "Content-Type:application/x-tar", "-w", "%{http_code}", "--show-error",
 								  "--silent", "-o", temp.name, "-X", "PUT", "--data-binary", "@-"])
+		# Append optional BA credentials to URL destinations from standardized config
+		try:
+			sys.path.insert(1, f'/etc/perun/services/' + service_name + '/')
+			credentials = __import__(service_name).credentials
+			if destination in credentials.keys():
+				username = credentials.get(destination).get('username')
+				password = credentials.get(destination).get('password')
+				transport_command.extend(["-u", username + ":" + password])
+		except Exception:
+			# this means that config file does not exist or properties are not set
+			pass
 	else:
 		transport_command = ["ssh", "-o", "PasswordAuthentication=no", "-o", "StrictHostKeyChecking=no", "-o",
 							 "GSSAPIAuthentication=no", "-o", "GSSAPIKeyExchange=no", "-o", "ConnectTimeout=5"]

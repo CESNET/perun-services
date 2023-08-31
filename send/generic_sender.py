@@ -118,6 +118,12 @@ if __name__ == "__main__":
 		temp = tempfile.NamedTemporaryFile(mode="w+")
 		# errors will be saved to temp file
 		transport_command = prepare_url_transport_command(temp)
+		# append BA credentials if present in service config for the destination
+		auth = send_lib.get_auth_credentials(service_name, destination)
+		if auth != None:
+			username = auth[0]
+			password = auth[1]
+			transport_command.extend(["-u", username + ":" + password])
 	elif transport_command is None:
 		transport_command = prepare_ssh_transport_command()
 
