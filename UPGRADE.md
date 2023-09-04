@@ -1,5 +1,16 @@
 Upgrade notes
 
+## [8.3.0](https://github.com/CESNET/perun-services/compare/v8.2.0...v8.3.0) (2023-09-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **o365_groups_mu:** When merged, can remove gen-local-dev and send-local-dev changes including descriptions on idm-prod
+
+* **o365_groups_mu:** new service propagating to Teams via O365 ([2cf5d4f](https://github.com/CESNET/perun-services/commit/2cf5d4fb4db89c30f70d1b11916b1f0aa5edbc09))
+* **vsup_k4:** ignore smartmatch experimental warning ([64781a3](https://github.com/CESNET/perun-services/commit/64781a32f7811cf39ebdc816e664838281de7a84))
+* **vsup_tritius:** fixed utf8 encoding ([2472cd4](https://github.com/CESNET/perun-services/commit/2472cd4dc94790f04ccc7cada22e00d58208e4cf))
+
 ## [8.2.0](https://github.com/CESNET/perun-services/compare/v8.1.0...v8.2.0) (2023-08-15)
 
 
