@@ -76,7 +76,8 @@ def check_input_fields(args: list[str], destination_type_required: bool = False)
 		if destination_type_required:
 			die_with_error("Error: Expected number of arguments is 3 (FACILITY_NAME, DESTINATION and DESTINATION_TYPE)")
 		elif len(args) != 3:
-			die_with_error("Error: Expected number of arguments is 2 or 3 (FACILITY_NAME, DESTINATION and optional DESTINATION_TYPE)")
+			die_with_error(
+				"Error: Expected number of arguments is 2 or 3 (FACILITY_NAME, DESTINATION and optional DESTINATION_TYPE)")
 
 
 def check_destination_format(destination: str, destination_type: str, custom_pattern: re.Pattern = None) -> None:
@@ -370,3 +371,17 @@ def get_auth_credentials(service_name: str, destination: str):
 		# this means that config file does not exist or properties are not set
 		pass
 	return auth
+
+
+def get_custom_config_properties(service_name: str, destination: str, properties: list[str]):
+	try:
+		sys.path.insert(1, f'{SERVICES_DIR}/{service_name}/')
+		credentials = __import__(service_name).credentials
+		result = []
+		if destination in credentials.keys():
+			for p in properties:
+				result.append(credentials.get(destination).get(p))
+		return result
+	except Exception:
+		# this means that config file does not exist or properties are not set
+		return None
