@@ -95,21 +95,25 @@ def prepare_ssh_transport_command():
 			"GSSAPIAuthentication=no", "-o", "GSSAPIKeyExchange=no", "-o", "ConnectTimeout=5"]
 
 
-if __name__ == "__main__":
-	send_lib.check_input_fields(sys.argv)
-	facility_name = sys.argv[1]
-	destination = sys.argv[2]
-	if len(sys.argv) == 3:
-		# if there is no destination type, use default 'host'
-		destination_type = send_lib.DESTINATION_TYPE_HOST
-	else:
-		destination_type = sys.argv[3]
-		if destination_type == send_lib.DESTINATION_TYPE_EMAIL or destination_type == send_lib.DESTINATION_TYPE_SERVICE_SPECIFIC:
-			print("Destination type " + destination_type + " is not supported yet.", file=sys.stderr)
-			exit(1)
+def send(service_name: str, facility_name: str, destination: str, destination_type: str = send_lib.DESTINATION_TYPE_HOST, opts=None) -> None:
+	"""
+	Sends data generated for the specified service/facility to the desired destination.
+	This method runs complete generic sending logic and can be used directly from the service-specific
+	sending scripts written in python.
+	:param service_name: name of the service to send data for
+	:param facility_name: name of the facility to send data for
+	:param destination: name of the destination to send data to
+	:param destination_type: optional destination type, default is 'host'
+	:param opts: list of additional options passed to the SSH/CURL transport command
+	"""
+	if opts is None:
+		opts = []
+
+	if destination_type == send_lib.DESTINATION_TYPE_EMAIL or destination_type == send_lib.DESTINATION_TYPE_SERVICE_SPECIFIC:
+		print("Destination type " + destination_type + " is not supported yet.", file=sys.stderr)
+		exit(1)
 
 	send_lib.check_destination_format(destination, destination_type)
-	service_name = send_lib.get_global_service_name()
 
 	# choose transport command, only url type has different transport command at this moment
 	transport_command = send_lib.load_custom_transport_command(service_name)
@@ -124,6 +128,10 @@ if __name__ == "__main__":
 	host, hostname, port = send_lib.prepare_destination(destination, destination_type)
 	if port is not None:
 		transport_command.extend(["-p", port])
+
+	# Add OPTS from the service-specific send script to both SSH/cURL command
+	if (opts):
+		transport_command.extend(opts)
 
 	# add host to the transport command for all types of destination
 	transport_command.append(host)
@@ -194,3 +202,16 @@ if __name__ == "__main__":
 						  end='')
 
 			exit(return_code)
+
+
+# Runs complete generic sending logic from the CMD line
+if __name__ == "__main__":
+	send_lib.check_input_fields(sys.argv)
+	service_name = send_lib.get_global_service_name()
+	if len(sys.argv) == 3:
+		send(service_name, sys.argv[1], sys.argv[2])
+	elif len(sys.argv) == 4:
+		send(service_name, sys.argv[1], sys.argv[2], sys.argv[3])
+	else:
+		# shouldn't happen since we check input params at start
+		send_lib.die_with_error("Wrong number of input parameters")
