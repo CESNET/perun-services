@@ -65,19 +65,18 @@ sub load_stag() {
 	# Structure to store data from input database (IS/STAG)
 	my $inputData = {};
 	while(my $row = $sth->fetchrow_hashref()) {
-		# disregarding the select Postgres is using lower-cased column names.
 		my $key = $row->{vztah_cislo};
-		$inputData->{$key}->{'OSB_ID'} = $row->{uco};
-		$inputData->{$key}->{'TYP_VZTAHU'} = $row->{typ_vztahu};
-		$inputData->{$key}->{'DRUH_VZTAHU'} = $row->{druh_vztahu};
-		$inputData->{$key}->{'STU_FORMA'} = $row->{stu_forma};
-		$inputData->{$key}->{'STU_STAV'} = $row->{stu_stav};
-		$inputData->{$key}->{'STU_PROGR'} = $row->{stu_progr};
-		$inputData->{$key}->{'STU_GRADUATE'} = $row->{stu_graduate};
-		$inputData->{$key}->{'NS'} = $row->{ns};
-		$inputData->{$key}->{'VZTAH_OD'} = $row->{stud_od};
-		$inputData->{$key}->{'VZTAH_DO'} = $row->{stud_do};
-		$inputData->{$key}->{'KARTA_IDENT'} = $row->{karta_ident};
+		$inputData->{$key}->{'OSB_ID'} = $row->{UCO};
+		$inputData->{$key}->{'TYP_VZTAHU'} = $row->{TYP_VZTAHU};
+		$inputData->{$key}->{'DRUH_VZTAHU'} = $row->{DRUH_VZTAHU};
+		$inputData->{$key}->{'STU_FORMA'} = $row->{STU_FORMA};
+		$inputData->{$key}->{'STU_STAV'} = $row->{STU_STAV};
+		$inputData->{$key}->{'STU_PROGR'} = $row->{STU_PROGR};
+		$inputData->{$key}->{'STU_GRADUATE'} = $row->{STU_GRADUATE};
+		$inputData->{$key}->{'NS'} = $row->{NS};
+		$inputData->{$key}->{'VZTAH_OD'} = $row->{STUD_OD};
+		$inputData->{$key}->{'VZTAH_DO'} = $row->{STUD_DO};
+		$inputData->{$key}->{'KARTA_IDENT'} = $row->{KARTA_IDENT};
 	}
 
 	# Disconnect from input database (IS/STAG)
