@@ -9,17 +9,57 @@
 				"preset": "conventionalcommits",
 				"presetConfig": {
 					"types": [
-						{ "type": "feat", "hidden": false },
-						{ "type": "fix", "hidden": false },
-						{ "type": "perf", "hidden": false },
-						{ "type": "revert", "hidden": false },
-						{ "type": "docs", "hidden": true },
-						{ "type": "style", "hidden": true },
-						{ "type": "chore", "hidden": true },
-						{ "type": "refactor", "hidden": true },
-						{ "type": "test", "hidden": true },
-						{ "type": "build", "hidden": true },
-						{ "type": "ci", "hidden": true }
+						{
+							"type": "feat",
+							"section": "Features"
+						},
+						{
+							"type": "fix",
+							"section": "Bug Fixes"
+						},
+						{
+							"type": "perf",
+							"section": "Performance Improvements"
+						},
+						{
+							"type": "revert",
+							"section": "Reverts"
+						},
+						{
+							"type": "docs",
+							"section": "Documentation",
+							"hidden": true
+						},
+						{
+							"type": "style",
+							"section": "Code style",
+							"hidden": true
+						},
+						{
+							"type": "chore",
+							"section": "Others",
+							"hidden": true
+						},
+						{
+							"type": "refactor",
+							"section": "Refactoring",
+							"hidden": true
+						},
+						{
+							"type": "test",
+							"section": "Tests",
+							"hidden": true
+						},
+						{
+							"type": "build",
+							"section": "Build",
+							"hidden": true
+						},
+						{
+							"type": "ci",
+							"section": "CI",
+							"hidden": true
+						}
 					],
 					"issuePrefixes": ["ST"],
 					"issueUrlFormat": "https://perunaai.atlassian.net/browse/{{prefix}}{{id}}"
