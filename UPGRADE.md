@@ -1,5 +1,20 @@
 Upgrade notes
 
+## [8.4.0](https://github.com/CESNET/perun-services/compare/v8.3.0...v8.4.0) (2023-09-11)
+
+
+### Features
+
+* extract main generic_sender logic to python send() method ([266497a](https://github.com/CESNET/perun-services/commit/266497a457fb6013f9f70a59143b138a9977898c))
+* **pithia_portal:** added authorization token support ([1a98bd0](https://github.com/CESNET/perun-services/commit/1a98bd05104beec8b74ae6c2b8725c13915bfe52))
+* **webcentrum_eosc:** new configurable service ([bb268b0](https://github.com/CESNET/perun-services/commit/bb268b08af513f1da2211282b4f1786b5288b54f))
+
+
+### Bug Fixes
+
+* **vsup_ifis:** fixed column names for stag ([d25baaa](https://github.com/CESNET/perun-services/commit/d25baaa7f523b73ea451932654e38c87c0a282d5))
+* **vsup_ifis:** stag will use oracle db ([3538b1b](https://github.com/CESNET/perun-services/commit/3538b1bedb9b7ad29a88d84bca301f9eda1060ed))
+
 ## [8.3.0](https://github.com/CESNET/perun-services/compare/v8.2.0...v8.3.0) (2023-09-04)
 
 
