@@ -4,7 +4,7 @@ import requests
 import send_lib
 import tarfile
 
-SERVICE_NAME = "umbraco_mu"
+SERVICE_NAME = "webcentrum_eosc"
 TIMEOUT = 1800  # 30 * 60 sec = 30 min
 
 send_lib.check_input_fields(sys.argv, True)
@@ -32,4 +32,3 @@ with send_lib.prepare_temporary_directory() as temp_dir:
 		if not response.ok:
 			send_lib.die_with_error(
 				"Request ended with error code: " + str(response.status_code))
-

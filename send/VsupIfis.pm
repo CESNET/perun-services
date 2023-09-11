@@ -55,28 +55,28 @@ sub load_stag() {
 	my $db_user = $config->{"username"};
 	my $db_password = $config->{"password"};
 
-	my $dbh = DBI->connect("dbi:Pg:dbname=$db_name;host=$hostname;port=$port", $db_user, $db_password,{ RaiseError=>1, AutoCommit=>0 }) or die "Connect to database $db_name Error!\n";
+	my $dbh = DBI->connect("dbi:Oracle://$hostname:$port/$db_name", $db_user, $db_password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+	$dbh->do("alter session set nls_date_format='YYYY-MM-DD HH24:MI:SS'");
 
 	# Select query for input database (IS/STAG) - all students with UCO_PERUN not null and STUD_DO >= now-28 or null
-	my $sth = $dbh->prepare(qq{select distinct ex_stag2idm_studia.UCO_PERUN as UCO, NS, 'STU' as TYP_VZTAHU, STUD_FORMA as DRUH_VZTAHU, ex_stag2idm_studia.ID_STUDIA as VZTAH_CISLO, STUD_FORMA as STU_FORMA, STUD_STAV as STU_STAV, STUD_TYP as STU_PROGR, STUD_OD, case when STUD_DO is not null then STUD_DO+28 ELSE STUD_DO END as STUD_DO, KARTA_LIC as KARTA_IDENT, UKONCENO as STU_GRADUATE from ex_stag2idm_studia left join ex_stag2idm_adresy on ex_stag2idm_studia.ID_STUDIA=ex_stag2idm_adresy.ID_STUDIA where ex_stag2idm_studia.UCO_PERUN is not null and (STUD_DO >= CURRENT_DATE-28 OR STUD_DO is NULL)});
+	my $sth = $dbh->prepare(qq{select distinct STUDENT_STUDIUM.UCO_PERUN as UCO, NS, 'STU' as TYP_VZTAHU, STUD_FORMA as DRUH_VZTAHU, STUDENT_STUDIUM.ID_STUDIA as VZTAH_CISLO, STUD_FORMA as STU_FORMA, STUD_STAV as STU_STAV, STUD_TYP as STU_PROGR, STUD_OD, case when STUD_DO is not null then STUD_DO+28 ELSE STUD_DO END as STUD_DO, KARTA_LIC as KARTA_IDENT, UKONCENO as STU_GRADUATE from STUDENT_STUDIUM left join STUDENT_ADRESY on STUDENT_STUDIUM.ID_STUDIA=STUDENT_ADRESY.ID_STUDIA where STUDENT_STUDIUM.UCO_PERUN is not null and (STUD_DO >= TRUNC(SYSDATE)-28 OR STUD_DO is NULL)});
 	$sth->execute();
 
 	# Structure to store data from input database (IS/STAG)
 	my $inputData = {};
 	while(my $row = $sth->fetchrow_hashref()) {
-		# disregarding the select Postgres is using lower-cased column names.
 		my $key = $row->{vztah_cislo};
-		$inputData->{$key}->{'OSB_ID'} = $row->{uco};
-		$inputData->{$key}->{'TYP_VZTAHU'} = $row->{typ_vztahu};
-		$inputData->{$key}->{'DRUH_VZTAHU'} = $row->{druh_vztahu};
-		$inputData->{$key}->{'STU_FORMA'} = $row->{stu_forma};
-		$inputData->{$key}->{'STU_STAV'} = $row->{stu_stav};
-		$inputData->{$key}->{'STU_PROGR'} = $row->{stu_progr};
-		$inputData->{$key}->{'STU_GRADUATE'} = $row->{stu_graduate};
-		$inputData->{$key}->{'NS'} = $row->{ns};
-		$inputData->{$key}->{'VZTAH_OD'} = $row->{stud_od};
-		$inputData->{$key}->{'VZTAH_DO'} = $row->{stud_do};
-		$inputData->{$key}->{'KARTA_IDENT'} = $row->{karta_ident};
+		$inputData->{$key}->{'OSB_ID'} = $row->{UCO};
+		$inputData->{$key}->{'TYP_VZTAHU'} = $row->{TYP_VZTAHU};
+		$inputData->{$key}->{'DRUH_VZTAHU'} = $row->{DRUH_VZTAHU};
+		$inputData->{$key}->{'STU_FORMA'} = $row->{STU_FORMA};
+		$inputData->{$key}->{'STU_STAV'} = $row->{STU_STAV};
+		$inputData->{$key}->{'STU_PROGR'} = $row->{STU_PROGR};
+		$inputData->{$key}->{'STU_GRADUATE'} = $row->{STU_GRADUATE};
+		$inputData->{$key}->{'NS'} = $row->{NS};
+		$inputData->{$key}->{'VZTAH_OD'} = $row->{STUD_OD};
+		$inputData->{$key}->{'VZTAH_DO'} = $row->{STUD_DO};
+		$inputData->{$key}->{'KARTA_IDENT'} = $row->{KARTA_IDENT};
 	}
 
 	# Disconnect from input database (IS/STAG)
