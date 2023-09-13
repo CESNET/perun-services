@@ -6,8 +6,8 @@ use perunServicesUtils;
 use File::Basename;
 
 our $SERVICE_NAME = basename($0);
-our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+our $PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -16,6 +16,7 @@ my $data = perunServicesInit::getHashedHierarchicalData;
 #Constants
 
 our $A_USER_LOGIN_EINFRA_PERSIST; *A_USER_LOGIN_EINFRA_PERSIST = \'urn:perun:user:attribute-def:virt:login-namespace:einfraid-persistent';
+our $A_USER_LOGIN_EINFRA;         *A_USER_LOGIN_EINFRA =         \'urn:perun:user:attribute-def:def:login-namespace:einfra';
 our $A_ORGANIZATION;              *A_ORGANIZATION =              \'urn:perun:user:attribute-def:def:organization';
 our $A_BLOCK_COLLISION;           *A_BLOCK_COLLISION =           \'urn:perun:user:attribute-def:def:it4iBlockCollision';
 our $A_COMMON_NAME;               *A_COMMON_NAME =               \'urn:perun:user:attribute-def:core:commonName';
@@ -39,27 +40,28 @@ my $users;
 foreach my $memberId ($data->getMemberIdsForFacility()) {
 
 	my $collision = $data->getUserAttributeValue( member => $memberId, attrName => $A_BLOCK_COLLISION );
-	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_EINFRA_PERSIST ) || "";
+	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_EINFRA ) || "";
 
 	# Check if user is not prohibited in IT4I !!
 	if (defined $collision) {
 		die "Login '$login' has collision with old IT4I data. Propagations was stopped for safety."
 	}
 	$users->{$login}->{"uuid"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_UUID) || "";
+	$users->{$login}->{"id"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_EINFRA_PERSIST ) || "";
 	$users->{$login}->{"login"} = $login;
-	$users->{$login}->{"commonName"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_COMMON_NAME ) || "";
-	$users->{$login}->{"displayName"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME ) || "";
-	$users->{$login}->{"firstName"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME ) || "";
-	$users->{$login}->{"lastName"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME ) || "";
-	$users->{$login}->{"middleName"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_MIDDLE_NAME) || "";
-	$users->{$login}->{"titleAfter"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_TITLE_AFTER ) || "";
-	$users->{$login}->{"titleBefore"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_TITLE_BEFORE ) || "";
+	$users->{$login}->{"common_name"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_COMMON_NAME ) || "";
+	$users->{$login}->{"display_name"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME ) || "";
+	$users->{$login}->{"first_name"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME ) || "";
+	$users->{$login}->{"last_name"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME ) || "";
+	$users->{$login}->{"middle_name"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_MIDDLE_NAME) || "";
+	$users->{$login}->{"title_after"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_TITLE_AFTER ) || "";
+	$users->{$login}->{"title_before"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_TITLE_BEFORE ) || "";
 	$users->{$login}->{"citizenship"} = "";
 	$users->{$login}->{"country"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_COUNTRY ) || "";
 	$users->{$login}->{"organization"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_ORGANIZATION ) || "";
-	$users->{$login}->{"preferredLanguage"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_PREF_LANGUAGE ) || "";
-	$users->{$login}->{"preferredMail"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_PREF_MAIL ) || "";
-	$users->{$login}->{"institutionsCountries"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_INSTIT_COUNTRIES ) || [];
+	$users->{$login}->{"preferred_language"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_PREF_LANGUAGE ) || "";
+	$users->{$login}->{"preferred_mail"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_PREF_MAIL ) || "";
+	$users->{$login}->{"institutions_countries"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_INSTIT_COUNTRIES ) || [];
 
 }
 
