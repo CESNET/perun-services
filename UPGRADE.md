@@ -1,5 +1,23 @@
 Upgrade notes
 
+## [8.5.0](https://github.com/CESNET/perun-services/compare/v8.4.0...v8.5.0) (2023-09-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **atlassian_mu:** script needs to be run once with DEACTIVATED_PREFIX_INIT=1
+
+### Features
+
+* **atlassian_mu:** add 'del_' prefix to inactive users ([71afe61](https://github.com/CESNET/perun-services/commit/71afe61ad9c45659d5d9316ebcab47267fe6f885))
+* **o365_mu_ukb_forward_status:** add new service ([1f0fe02](https://github.com/CESNET/perun-services/commit/1f0fe02c28a56eab21273ffa53b0c4e322023fd2))
+
+
+### Bug Fixes
+
+* **scs_it4i:** use send_lib.py, support v2 API ([63611f4](https://github.com/CESNET/perun-services/commit/63611f4c4625d8c1a172fad54b0ce0f4dc68431f))
+* **vsup_stag:** update service for new DB schema ([be6835d](https://github.com/CESNET/perun-services/commit/be6835dfd3b953c54d5bc3a6393b4338c4ef466f))
+
 ## [8.4.0](https://github.com/CESNET/perun-services/compare/v8.3.0...v8.4.0) (2023-09-11)
 
 
