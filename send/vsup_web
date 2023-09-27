@@ -6,6 +6,7 @@ use Getopt::Long qw(:config no_ignore_case);
 use Data::Dumper;
 use Encode qw(encode);
 use ScriptLock;
+use utf8;
 binmode STDOUT, ":utf8";
 
 sub appendParam;
@@ -173,6 +174,7 @@ my $deletedCao2 = 0;
 my $deletedCao3 = 0;
 
 open FILE, $service_file_cao or die "Could not open $service_file_cao: $!";
+binmode FILE, ":utf8";
 while(my $line = <FILE>) {
 
 	my @parts = split /\t/, $line;
@@ -253,6 +255,7 @@ my $foundAndSkippedExt = 0;
 my $deletedExt = 0;
 
 open FILE, $service_file_ext or die "Could not open $service_file_ext: $!";
+binmode FILE, ":utf8";
 while(my $line = <FILE>) {
 
 	my @parts = split /\t/, $line;
@@ -346,6 +349,7 @@ my $passExist = $dbh->prepare(qq{select 1 from $tableName_pass where UCO=?});
 my $insertExt = $dbh->prepare(qq{INSERT INTO $tableName_pass (UCO, STUDIUM_ID, STUDIUM_OD, PRIHLASKA_KOD, ROCNIK, DR, ZMENENO_KDY) VALUES (?,?,STR_TO_DATE(?,'%Y-%m-%d'),?,?,?,NOW())});
 
 open FILE, $service_file_pass or die "Could not open $service_file_pass: $!";
+binmode FILE, ":utf8";
 while(my $line = <FILE>) {
 
 	my @parts = split /\t/, $line;
@@ -447,6 +451,7 @@ if (length $elementsPass) {
 my $dataByNs = {};
 
 open FILE, $service_file_ns or die "Could not open $service_file_ns: $!";
+binmode FILE, ":utf8";
 while(my $line = <FILE>) {
 	my @parts = split /\t/, $line;
 	chomp(@parts);
