@@ -8,12 +8,12 @@ use Data::Dumper;
 use ScriptLock;
 binmode STDOUT, ":utf8";
 
-sub solveClob;
 sub appendParam;
 
 my $username;
 my $password;
-my $table_osoby = 'ex_idm2stag_osoby';
+my $table_teacher = 'STAG_2_PERUN.UCITEL';
+my $table_student = 'STAG_2_PERUN.STUDENT';
 
 # define service
 my $service_name = "vsup_stag";
@@ -81,19 +81,24 @@ while(my $line = <FILE>) {
 }
 close FILE;
 
-my $dbh = DBI->connect("dbi:Pg:dbname=$db_name;host=$db_machine;port=$db_port", $username, $password,{ RaiseError=>1, AutoCommit=>0 }) or die "Connect to database $db_name Error!\n";
+my $dbh = DBI->connect("dbi:Oracle://$db_machine:$db_port/$db_name", $username, $password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+$dbh->do("alter session set nls_date_format='YYYY-MM-DD HH24:MI:SS'");
 
 my $DEBUG=0;
 #statistic and information variables
-my $foundAndSkipped = 0;
-my $foundAndUpdated = 0;
-my $inserted = 0;
+my $teachers_skipped = 0;
+my $teachers_updated = 0;
+my $teachers_nochange = 0;
+my $teachers_inserted = 0;
+my $students_skipped = 0;
+my $students_updated = 0;
+my $students_nochange = 0;
 
 #update and insert new
 foreach my $key (sort keys %$dataByKeys) {
 
 	my $UCO_PERUN = $dataByKeys->{$key}->{'UCO_PERUN'};
-	my $UCO_STAG = $dataByKeys->{$key}->{'UCO_STAG'};  # OSB_ID_STAG
+	my $UCO_STAG = $dataByKeys->{$key}->{'UCO_STAG'};  # FIXME - OSB_ID_STAG - we do not set this!
 	my $LOGIN = $dataByKeys->{$key}->{'LOGIN'};
 	my $EMAIL = $dataByKeys->{$key}->{'EMAIL'};
 	my $TYP_ZAZN = $dataByKeys->{$key}->{'TYP_ZAZN'};
@@ -113,123 +118,55 @@ foreach my $key (sort keys %$dataByKeys) {
 	my $EMAIL_PRIV = $dataByKeys->{$key}->{'EMAIL_PRIV'};
 	my $PHONE_PRIV = $dataByKeys->{$key}->{'PHONE_PRIV'};
 
+	# TODO - not sure if we will use it
 	my $IDCARD_PHOTO = $dataByKeys->{$key}->{'CARD_PHOTO'};
 
-	# Construct BIRTH_DATE from BIRTH_NUMBER
-	my $BIRTH_DATE = undef;
-	if (defined $BIRTH_NUMBER and length($BIRTH_NUMBER) > 0) {
+	if ($TYP_ZAZN eq "P") {
 
-		my $YY = substr($BIRTH_NUMBER, 0, 2);
-		my $MM = substr($BIRTH_NUMBER, 2, 2);
-		my $DD = substr($BIRTH_NUMBER, 4, 2);
-
-		# fix woman`s birth number month
-		if (substr($MM, 0, 1) eq "5") {
-			$MM = "0" . substr($BIRTH_NUMBER, 3, 1);
-		}
-		if (substr($MM, 0, 1) eq "6") {
-			$MM = "1" . substr($BIRTH_NUMBER, 3, 1);
+		unless(defined($UCO_PERUN)) {
+			print "Teacher $key is missing UCO_PERUN.\n";
+			$teachers_skipped++;
+			next;
 		}
 
-		if ($YY < 22) {
-			# assume young students 2000+
-			$BIRTH_DATE = "20" . $YY . "-" . $MM . "-" . $DD;
-		} else {
-			# assume older employees 1922+
-			$BIRTH_DATE = "19" . $YY . "-" . $MM . "-" . $DD;
-		}
+		my $teacherExists = $dbh->prepare(qq{select 1 from $table_teacher where UCO_PERUN=?});
+		$teacherExists->execute($UCO_PERUN);
+		if($teacherExists->fetch) {
 
-		# skip wrong values
-		if ($DD > 31) {
-			$BIRTH_DATE = undef;
-		}
+			# teacher found
+			if ($DEBUG == 1) { print "FOUND: $key\n"; }
 
-	}
+			my $select = "SELECT 1 from $table_teacher where UCO_PERUN=? and USERNAME=? and EMAIL_SKOLNI=? and TYP_ZAZN=?";
+			my @params = ($UCO_PERUN, uc($LOGIN), $EMAIL, $TYP_ZAZN);
 
-	# There is
-	my $personExists = $dbh->prepare(qq{select 1 from $table_osoby where UCO_PERUN=? and TYP_ZAZN=?});
-	$personExists->execute($UCO_PERUN, $TYP_ZAZN);
-
-	if($personExists->fetch) {
-		if($DEBUG == 1) { print "FIND: $key\n"; }
-
-		# we need to know if these two records are without changes, if yes, skip them
-		# CARD PHOTO is not checked here, since we can't pass CLOB to WHERE clause.
-		my $recordAreEquals;
-		if ($TYP_ZAZN eq "S") {
-
-			# S = students
-
-			my $select = "SELECT 1 from $table_osoby where UCO_PERUN=? and USERNAME=? and EMAIL_SKOLNI=? and TYP_ZAZN=?";
-			my @params = ($UCO_PERUN, $LOGIN, $EMAIL, $TYP_ZAZN);
-
-			if ($UCO_STAG) {
-				$select = $select . " and UCO_STAG=?";
-				push(@params, $UCO_STAG);
-			} else {
-				$select = $select . " and UCO_STAG is NULL";
-			}
-
-			$recordAreEquals = $dbh->prepare($select);
-			$recordAreEquals->execute(@params);
-
-		} else {
-
-			# P / Z = teachers / employees
-
-			my $select = "SELECT 1 from $table_osoby where UCO_PERUN=? and USERNAME=? and EMAIL_SKOLNI=? and TYP_ZAZN=?";
-			my @params = ($UCO_PERUN, $LOGIN, $EMAIL, $TYP_ZAZN);
-
-			$select = appendParam(select => $select, params => \@params, paramName => 'UCO_STAG', paramValue => $UCO_STAG);
+			$select = appendParam(select => $select, params => \@params, paramName => 'VZTAH_DO', paramValue => $VZTAH_DO);
 			$select = appendParam(select => $select, params => \@params, paramName => 'JMENO', paramValue => $FIRST_NAME);
 			$select = appendParam(select => $select, params => \@params, paramName => 'PRIJMENI', paramValue => $LAST_NAME);
 			$select = appendParam(select => $select, params => \@params, paramName => 'ROD_PRIJMENI', paramValue => $BIRTH_LAST_NAME);
 			$select = appendParam(select => $select, params => \@params, paramName => 'ROD_CISLO', paramValue => $BIRTH_NUMBER);
-			$select = appendParam(select => $select, params => \@params, paramName => 'DATUM_NAR', paramValue => $BIRTH_DATE);
 			$select = appendParam(select => $select, params => \@params, paramName => 'POHLAVI', paramValue => $GENDER);
 			$select = appendParam(select => $select, params => \@params, paramName => 'TITUL_PRED', paramValue => $TITLE_BEFORE);
 			$select = appendParam(select => $select, params => \@params, paramName => 'TITUL_ZA', paramValue => $TITLE_AFTER);
 			$select = appendParam(select => $select, params => \@params, paramName => 'TEL_SKOLNI', paramValue => $PHONE);
 			$select = appendParam(select => $select, params => \@params, paramName => 'EMAIL_SOUKR', paramValue => $EMAIL_PRIV);
 			$select = appendParam(select => $select, params => \@params, paramName => 'TEL_SOUKR', paramValue => $PHONE_PRIV);
-			$select = appendParam(select => $select, params => \@params, paramName => 'FUNKCE', paramValue => $JOB);
-			$select = appendParam(select => $select, params => \@params, paramName => 'VZTAH_DO', paramValue => $VZTAH_DO);
 
-			$recordAreEquals = $dbh->prepare($select);
-			$recordAreEquals->execute(@params);
+			my $recordsAreEquals = $dbh->prepare($select);
+			$recordsAreEquals->execute(@params);
 
-		}
+			if(!$recordsAreEquals->fetch) {
 
-		if(!$recordAreEquals->fetch) {
+				# there is a change in data -> update whole entry since missing column in update would cause value deletion in the backend.
+				if ($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
 
-			if ($TYP_ZAZN eq "S") {
-
-				# UPDATE STUDENT (without photo - solved later)
-				my $updatePerson = $dbh->prepare(qq{UPDATE $table_osoby SET UCO_STAG=? , USERNAME=? , EMAIL_SKOLNI=? , ZMENENO_KDY=now() WHERE UCO_PERUN=? and TYP_ZAZN=?});
-				$updatePerson->execute(
-					$UCO_STAG,
-					$LOGIN,
-					$EMAIL,
-					$UCO_PERUN,
-					$TYP_ZAZN);
-
-				solveClob($UCO_PERUN, $TYP_ZAZN, $IDCARD_PHOTO);
-
-				if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
-				$foundAndUpdated++;
-
-			} else {
-
-				# UPDATE TEACHERS and EMPLOYEES
-				my $updatePerson = $dbh->prepare(qq{UPDATE $table_osoby SET UCO_STAG=? , USERNAME=? , JMENO=? , PRIJMENI=? , ROD_PRIJMENI=? , ROD_CISLO=? , DATUM_NAR=?, POHLAVI=? , TITUL_PRED=? , TITUL_ZA=? , EMAIL_SKOLNI=? , TEL_SKOLNI=? , EMAIL_SOUKR=? , TEL_SOUKR=? , FUNKCE=? , VZTAH_DO=? , ZMENENO_KDY=now() WHERE UCO_PERUN=? and TYP_ZAZN=?});
-				$updatePerson->execute(
-					$UCO_STAG,
-					$LOGIN,
+				my $updateTeacher = $dbh->prepare(qq{UPDATE $table_teacher SET TYP_ZAZN=?, USERNAME=? , JMENO=? , PRIJMENI=? , ROD_PRIJMENI=? , ROD_CISLO=? , POHLAVI=? , TITUL_PRED=? , TITUL_ZA=? , EMAIL_SKOLNI=? , TEL_SKOLNI=? , EMAIL_SOUKR=? , TEL_SOUKR=? , FUNKCE=? , VZTAH_DO=? , ZMENENO_KDY=now() WHERE UCO_PERUN=?});
+				$updateTeacher->execute(
+					$TYP_ZAZN,
+					uc($LOGIN),
 					$FIRST_NAME,
 					$LAST_NAME,
 					$BIRTH_LAST_NAME,
 					$BIRTH_NUMBER,
-					$BIRTH_DATE,
 					$GENDER,
 					$TITLE_BEFORE,
 					$TITLE_AFTER,
@@ -237,79 +174,83 @@ foreach my $key (sort keys %$dataByKeys) {
 					$PHONE,
 					$EMAIL_PRIV,
 					$PHONE_PRIV,
-					$JOB,
 					$VZTAH_DO,
-					$UCO_PERUN,
-					$TYP_ZAZN);
+					$UCO_PERUN);
 
-				solveClob($UCO_PERUN, $TYP_ZAZN, $IDCARD_PHOTO);
+				$teachers_updated++;
 
-				if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
-				$foundAndUpdated++;
-
+			} else {
+				if ($DEBUG == 1) { print "KEEPING EXISTING RECORD: $key\n"; }
+				$teachers_nochange++;
 			}
 
 		} else {
 
-			# basic attributes were same, check also photo
+			if ($DEBUG == 1) { print "NOT FOUND, INSERTING: $key\n"; }
+			# Teacher not yet in the table -> insert as a new person
+			my $insertTeacher = $dbh->prepare(qq{INSERT INTO $table_teacher (UCO_PERUN, TYP_ZAZN, VZTAH_DO, USERNAME, JMENO, PRIJMENI, ROD_PRIJMENI, ROD_CISLO, POHLAVI, TITUL_PRED, TITUL_ZA, EMAIL_SKOLNI, TEL_SKOLNI, EMAIL_SOUKR, TEL_SOUKR, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'now()')});
+			$insertTeacher->execute($UCO_PERUN, $TYP_ZAZN, $VZTAH_DO, uc($LOGIN), $FIRST_NAME, $LAST_NAME, $BIRTH_LAST_NAME, $BIRTH_NUMBER, $GENDER, $TITLE_BEFORE, $TITLE_AFTER, $EMAIL, $PHONE, $EMAIL_PRIV, $PHONE_PRIV);
 
-			my $result = solveClob($UCO_PERUN, $TYP_ZAZN, $IDCARD_PHOTO);
-			if ($result == 1) {
-				if($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
-				$foundAndUpdated++;
+			$teachers_inserted++;
+
+		}
+
+	} elsif ($TYP_ZAZN eq "S") {
+
+		unless(defined($BIRTH_NUMBER)) {
+			print "Student $key is missing RC.\n";
+			$students_skipped++;
+			next;
+		}
+
+		unless(length($BIRTH_NUMBER) >= 9 && length($BIRTH_NUMBER) <= 10) {
+			print "Student $key has wrong RC format.\n";
+			$students_skipped++;
+			next;
+		}
+
+		# We only select and update students in STAG, since they must exists and table is a view to live data!
+		my $studentExists = $dbh->prepare(qq{select 1 from $table_student where ROD_CISLO=?});
+		$studentExists->execute($BIRTH_NUMBER);
+		if($studentExists->fetch) {
+
+			# student found
+			if ($DEBUG == 1) { print "FOUND: $key\n"; }
+
+			# check if entry has same data
+			my $select = "SELECT 1 from $table_student where UCO_PERUN=? and USERNAME=? and EMAIL_SKOLNI=? and ROD_CISLO=?";
+			my @params = ($UCO_PERUN, uc($LOGIN), $EMAIL, $BIRTH_NUMBER);
+
+			my $recordsAreEquals = $dbh->prepare($select);
+			$recordsAreEquals->execute(@params);
+			if(!$recordsAreEquals->fetch) {
+
+				# there is a change in data -> update whole entry since missing column in update would cause value deletion in the backend.
+				if ($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
+
+				my $updateStudent = $dbh->prepare(qq{UPDATE $table_student SET UCO_PERUN=? , USERNAME=? , EMAIL_SKOLNI=? WHERE ROD_CISLO=?});
+				$updateStudent->execute(
+					$UCO_PERUN,
+					uc($LOGIN),
+					$EMAIL,
+					$BIRTH_NUMBER);
+
+				$students_updated++;
+
 			} else {
-				if($DEBUG == 1) { print "SKIP RECORD: $key\n"; }
-				$foundAndSkipped++;
+				if ($DEBUG == 1) { print "KEEPING EXISTING RECORD: $key\n"; }
+				$students_nochange++;
 			}
 
+		} else {
+			print "Student $key not exists in STAG by RC: $BIRTH_NUMBER\n";
+			$students_skipped++;
 		}
 
 	} else {
-
-		if($DEBUG == 1) { print "INSERT NEW RECORD: $key\n"; }
-		$inserted++;
-		# we will do insert
-
-		if ($TYP_ZAZN eq "S") {
-
-			# INSERT STUDENT
-			my $insertPerson = $dbh->prepare(qq{INSERT INTO $table_osoby (UCO_STAG, UCO_PERUN, TYP_ZAZN, USERNAME, EMAIL_SKOLNI, FOTO , ZMENENO_KDY) VALUES (?,?,?,?,?,?,'now()')});
-			$insertPerson->bind_param(1, $UCO_STAG);
-			$insertPerson->bind_param(2, $UCO_PERUN);
-			$insertPerson->bind_param(3, $TYP_ZAZN);
-			$insertPerson->bind_param(4, $LOGIN);
-			$insertPerson->bind_param(5, $EMAIL);
-			$insertPerson->bind_param(6, $IDCARD_PHOTO, SQL_LONGVARCHAR);
-			$insertPerson->execute();
-
-		} else {
-
-			# INSERT TEACHER and EMPLOYEE
-			my $insertPerson = $dbh->prepare(qq{INSERT INTO $table_osoby (UCO_STAG, UCO_PERUN, TYP_ZAZN, USERNAME, JMENO, PRIJMENI, ROD_PRIJMENI, ROD_CISLO, DATUM_NAR, POHLAVI, TITUL_PRED, TITUL_ZA, EMAIL_SKOLNI, TEL_SKOLNI, EMAIL_SOUKR, TEL_SOUKR, FUNKCE, VZTAH_DO, FOTO, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'now()')});
-			$insertPerson->bind_param(1, $UCO_STAG);
-			$insertPerson->bind_param(2, $UCO_PERUN);
-			$insertPerson->bind_param(3, $TYP_ZAZN);
-			$insertPerson->bind_param(4, $LOGIN);
-			$insertPerson->bind_param(5, $FIRST_NAME);
-			$insertPerson->bind_param(6, $LAST_NAME);
-			$insertPerson->bind_param(7, $BIRTH_LAST_NAME);
-			$insertPerson->bind_param(8, $BIRTH_NUMBER);
-			$insertPerson->bind_param(9, $BIRTH_DATE);
-			$insertPerson->bind_param(10, $GENDER);
-			$insertPerson->bind_param(11, $TITLE_BEFORE);
-			$insertPerson->bind_param(12, $TITLE_AFTER);
-			$insertPerson->bind_param(13, $EMAIL);
-			$insertPerson->bind_param(14, $PHONE);
-			$insertPerson->bind_param(15, $EMAIL_PRIV);
-			$insertPerson->bind_param(16, $PHONE_PRIV);
-			$insertPerson->bind_param(17, $JOB);
-			$insertPerson->bind_param(18, $VZTAH_DO);
-			$insertPerson->bind_param(19, $IDCARD_PHOTO, SQL_LONGVARCHAR);
-			$insertPerson->execute();
-
-		}
-
+		print "Unknown type of entry: $TYP_ZAZN for $key\n";
 	}
+
 }
 
 #$dbh->rollback();
@@ -318,57 +259,17 @@ $dbh->disconnect();
 
 #Info about operations
 print "=======================================\n";
-print "Newly inserted:   \t$inserted\n";
-print "Found and skiped: \t$foundAndSkipped\n";
-print "Found and updated:\t$foundAndUpdated\n";
+print "Teachers skipped:\t$teachers_skipped\n";
+print "Teachers inserted:\t$teachers_inserted\n";
+print "Teachers updated:\t$teachers_updated\n";
+print "Teachers no change:\t$teachers_nochange\n";
+print "---------------------------------------\n";
+print "Students skipped:\t$students_skipped\n";
+print "Students updated:\t$students_updated\n";
+print "Students no change:\t$students_nochange\n";
 print "=======================================\n";
 
 $lock->unlock();
-
-#
-# Solve managing CLOB for photos on ID cards
-#
-# Params: $UCO_PERUN, $TYP_ZAZN, $FOTO
-#
-sub solveClob() {
-
-	my $UCO_PERUN = shift;
-	my $TYP_ZAZN = shift;
-	my $FOTO = shift;
-
-	# Check CARD PHOTO -> CLOB data
-	my $selectClob = $dbh->prepare(qq{SELECT foto FROM $table_osoby WHERE UCO_PERUN=? and TYP_ZAZN=?});
-	$selectClob->execute($UCO_PERUN, $TYP_ZAZN);
-	my $result = $selectClob->fetchrow_hashref;
-	my $clobData = $result->{"foto"};
-
-	if ((defined $clobData and defined $FOTO)) {
-		# both defined - check
-		unless ($clobData eq $FOTO) {
-			# photo changed - update
-			my $updateCard = $dbh->prepare(qq{UPDATE $table_osoby SET foto=? , ZMENENO_KDY=now() WHERE UCO_PERUN=? and TYP_ZAZN=?});
-			$updateCard->bind_param( 1, $FOTO, SQL_LONGVARCHAR);
-			$updateCard->bind_param( 2, $UCO_PERUN);
-			$updateCard->bind_param( 3, $TYP_ZAZN);
-			$updateCard->execute();
-			return 1;
-		}
-	} elsif ((!defined $clobData) and (!defined $FOTO)) {
-		# both undef - skip
-		return 0;
-	} else {
-		# one defined, other is not -> update
-		my $updateCard = $dbh->prepare(qq{UPDATE $table_osoby SET foto=? , ZMENENO_KDY=now() WHERE UCO_PERUN=? and TYP_ZAZN=?});
-		$updateCard->bind_param( 1, $FOTO, SQL_LONGVARCHAR);
-		$updateCard->bind_param( 2, $UCO_PERUN);
-		$updateCard->bind_param( 3, $TYP_ZAZN);
-		$updateCard->execute();
-		return 1;
-	}
-
-	return 0;
-
-}
 
 #
 # Appends PARAM with respecting to possible NULL to select

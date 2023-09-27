@@ -19,6 +19,8 @@ use Array::Utils qw(:all);
 # (0) no debug, (1) only messages of performed operations, (2) communication with server.
 my $DEBUG=0;
 
+my $DEACTIVATED_PREFIX_INIT=0;
+
 # Required setting for connection
 my $RESULTS_COUNT = 200; # This many objects will be fetched with one GET request on server. Limited by Atlassian ANYWAY!
 my $directoryUrl;
@@ -100,9 +102,12 @@ my $ourUsers = fetchOurUsers();
 my $ourGroups = fetchOurGroups();
 # Data from Atlassian into hash
 my $theirUsers = fetchTheirUsers();
-my $theirGroups = fetchTheirGroups();
 
+if ($DEACTIVATED_PREFIX_INIT) {
+	addPrefixToDeactivatedUsers();
+}
 evaluateUsers();
+my $theirGroups = fetchTheirGroups(); # Acquire groups now to account for updated usernames with prefixes
 $theirUsers = fetchTheirUsers(); # Acquire created users' IDs
 evaluateGroups();
 
@@ -288,15 +293,34 @@ sub fetchOurGroups {
 	return JSON::XS->new->decode($json_groups);
 }
 
+# temporary function to update atlassian with the new feature of prefixes for deactivated users
+sub addPrefixToDeactivatedUsers {
+	print("Updating usernames of deactivated users to contain the 'del' prefix. \n");
+	my $theirUserName;
+	my $theirUserInfo;
+	while (($theirUserName, $theirUserInfo) = each(%{$theirUsers})) {
+		my $prefix = substr $theirUserName, 0, 4;
+		if (!$theirUserInfo->{'active'} && $prefix ne "del_") {
+			$theirUserInfo->{"email"} = 'del_'.$theirUserInfo->{"email"};
+			updateUser('del_'.$theirUserName, $theirUserInfo, $theirUserInfo->{'id'}, 0);
+		}
+	}
+	print("Done updating usernames. \n");
+}
+
 # Compares Atlassian users with Perun users.
 # Sends request to create missing users, update outdated user data and deactivate users missing in Perun.
 sub evaluateUsers {
 	my $theirUserName;
 	my $theirUserInfo;
 	while (($theirUserName, $theirUserInfo) = each(%{$theirUsers})) {
+		# remove potential del_ prefix to correctly match with our users
+		$theirUserName =~ s/^del_//;
 		my $ourUserInfo = $ourUsers->{$theirUserName};
 		if (!$ourUserInfo && $theirUserInfo->{'active'}) {
-			updateUser($theirUserName, $theirUserInfo, $theirUserInfo->{'id'}, 0);
+			# add del_ prefix since we're deactivating user
+			$theirUserInfo->{"email"} = 'del_'.$theirUserInfo->{"email"};
+			updateUser('del_'.$theirUserName, $theirUserInfo, $theirUserInfo->{'id'}, 0);
 		}
 	}
 
@@ -304,6 +328,10 @@ sub evaluateUsers {
 	my $ourUserInfo;
 	while (($ourUserName, $ourUserInfo) = each(%{$ourUsers})) {
 		$theirUserInfo = $theirUsers->{$ourUserName};
+		# check if user isn't marked as deleted
+		if (!defined $theirUserInfo) {
+			$theirUserInfo = $theirUsers->{'del_'.$ourUserName};
+		}
 		if (defined $theirUserInfo) {
 			# check if attributes changed or our user got active again
 			if (checkUserAttributesDiffer($ourUserInfo, $theirUserInfo) || !$theirUserInfo->{"active"}) {
@@ -437,7 +465,8 @@ sub updateUser {
 	my $userInfo = shift;
 	my $userId = shift;
 	my $statusActive = shift;
-	if ($DEBUG) {print $statusActive ? "Updating user $userName.\n" : "Deactivating user $userName.\n" ;}
+	my $nameWithoutPrefix = substr $userName, 4;
+	if ($DEBUG) {print $statusActive ? "Updating user $userName.\n" : "Deactivating user $nameWithoutPrefix.\n" ;}
 
 	my $updateContent = {
 		"userName" => $userName,
