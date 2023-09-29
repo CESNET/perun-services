@@ -6,6 +6,8 @@ use DBI qw(:sql_types);
 use Getopt::Long qw(:config no_ignore_case);
 use Data::Dumper;
 use ScriptLock;
+use utf8;
+use open qw/ :std :encoding(utf8) /;
 binmode STDOUT, ":utf8";
 
 sub appendParam;
@@ -129,6 +131,12 @@ foreach my $key (sort keys %$dataByKeys) {
 			next;
 		}
 
+		# forever skip teacher with invalid RC
+		if ($UCO_PERUN eq 10037) { next; }
+
+		# FIXME - for now skip all teachers, since we break inner constraint by missing start date of the relation
+		next;
+
 		my $teacherExists = $dbh->prepare(qq{select 1 from $table_teacher where UCO_PERUN=?});
 		$teacherExists->execute($UCO_PERUN);
 		if($teacherExists->fetch) {
@@ -159,7 +167,7 @@ foreach my $key (sort keys %$dataByKeys) {
 				# there is a change in data -> update whole entry since missing column in update would cause value deletion in the backend.
 				if ($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
 
-				my $updateTeacher = $dbh->prepare(qq{UPDATE $table_teacher SET TYP_ZAZN=?, USERNAME=? , JMENO=? , PRIJMENI=? , ROD_PRIJMENI=? , ROD_CISLO=? , POHLAVI=? , TITUL_PRED=? , TITUL_ZA=? , EMAIL_SKOLNI=? , TEL_SKOLNI=? , EMAIL_SOUKR=? , TEL_SOUKR=? , FUNKCE=? , VZTAH_DO=? , ZMENENO_KDY=now() WHERE UCO_PERUN=?});
+				my $updateTeacher = $dbh->prepare(qq{UPDATE $table_teacher SET TYP_ZAZN=?, USERNAME=? , JMENO=? , PRIJMENI=? , ROD_PRIJMENI=? , ROD_CISLO=? , POHLAVI=? , TITUL_PRED=? , TITUL_ZA=? , EMAIL_SKOLNI=? , TEL_SKOLNI=? , EMAIL_SOUKR=? , TEL_SOUKR=? , VZTAH_DO=? , ZMENENO_KDY=SYSDATE WHERE UCO_PERUN=?});
 				$updateTeacher->execute(
 					$TYP_ZAZN,
 					uc($LOGIN),
@@ -188,7 +196,7 @@ foreach my $key (sort keys %$dataByKeys) {
 
 			if ($DEBUG == 1) { print "NOT FOUND, INSERTING: $key\n"; }
 			# Teacher not yet in the table -> insert as a new person
-			my $insertTeacher = $dbh->prepare(qq{INSERT INTO $table_teacher (UCO_PERUN, TYP_ZAZN, VZTAH_DO, USERNAME, JMENO, PRIJMENI, ROD_PRIJMENI, ROD_CISLO, POHLAVI, TITUL_PRED, TITUL_ZA, EMAIL_SKOLNI, TEL_SKOLNI, EMAIL_SOUKR, TEL_SOUKR, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'now()')});
+			my $insertTeacher = $dbh->prepare(qq{INSERT INTO $table_teacher (UCO_PERUN, TYP_ZAZN, VZTAH_DO, USERNAME, JMENO, PRIJMENI, ROD_PRIJMENI, ROD_CISLO, POHLAVI, TITUL_PRED, TITUL_ZA, EMAIL_SKOLNI, TEL_SKOLNI, EMAIL_SOUKR, TEL_SOUKR, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,SYSDATE)});
 			$insertTeacher->execute($UCO_PERUN, $TYP_ZAZN, $VZTAH_DO, uc($LOGIN), $FIRST_NAME, $LAST_NAME, $BIRTH_LAST_NAME, $BIRTH_NUMBER, $GENDER, $TITLE_BEFORE, $TITLE_AFTER, $EMAIL, $PHONE, $EMAIL_PRIV, $PHONE_PRIV);
 
 			$teachers_inserted++;
