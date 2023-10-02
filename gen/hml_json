@@ -17,7 +17,7 @@ my $data = perunServicesInit::getHashedHierarchicalData;
 #Constants
 our $A_USER_FIRSTNAME;            *A_USER_FIRSTNAME =        \'urn:perun:user:attribute-def:core:firstName';
 our $A_USER_LASTNAME;             *A_USER_LASTNAME =         \'urn:perun:user:attribute-def:core:lastName';
-our $A_USER_LOGIN;                *A_USER_LOGIN=             \'urn:perun:user:attribute-def:def:login-namespace:mu';
+our $A_USER_LOGIN;                *A_USER_LOGIN=             \'urn:perun:user:attribute-def:virt:scopedLogin-namespace:mu';
 our $A_USER_MAIL;                 *A_USER_MAIL =             \'urn:perun:user:attribute-def:def:preferredMail';
 
 my %usersByLogin;
