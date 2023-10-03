@@ -82,7 +82,6 @@ def create_user(client, our_user):
 	username = our_user["userName"]
 	user = User(
 		user_name=username,
-		display_name=f"{our_user['firstName']} {our_user['lastName']}",
 		name=UserName(
 			given_name=our_user["firstName"], family_name=our_user["lastName"]
 		),
@@ -109,7 +108,6 @@ def update_user(client, our_user, their_user):
 	print_debug(f"Updating user {our_user}")
 	user_data = User(
 		user_name=our_user["userName"],
-		display_name=f"{our_user['firstName']} {our_user['lastName']}",
 		name=UserName(
 			given_name=our_user["firstName"], family_name=our_user["lastName"]
 		),
