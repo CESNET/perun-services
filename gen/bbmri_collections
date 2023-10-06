@@ -14,7 +14,7 @@ use utf8;
 
 local $::SERVICE_NAME = "bbmri_collections";
 local $::PROTOCOL_VERSION = "1.0.1";
-my $SCRIPT_VERSION = "1.0.3";
+my $SCRIPT_VERSION = "1.0.4";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -27,7 +27,7 @@ sub processMemberships;
 
 #Constants
 our $A_USER_ID;                   *A_USER_ID =               \'urn:perun:user:attribute-def:core:id';
-our $A_BBMRI_USER_ID;             *A_BBMRI_USER_ID =         \'urn:perun:user:attribute-def:virt:login-namespace:bbmriid-persistent';
+our $A_LSRI_USER_ID;              *A_LSRI_USER_ID =          \'urn:perun:user:attribute-def:def:login-namespace:lifescienceid-persistent-shadow';
 our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:attribute-def:core:status';
 our $A_MEMBER_IS_SUSPENDED;       *A_MEMBER_IS_SUSPENDED =   \'urn:perun:member:attribute-def:virt:isSuspended';
 our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
@@ -49,7 +49,7 @@ our $u_email = {};
 our $u_name = {};
 our $u_eppn = {};
 our $u_organization = {};
-our $u_bbmri_user_id = {};
+our $u_lsri_user_id = {};
 
 our $groupStruc = {};
 our $g_name = {};
@@ -73,7 +73,7 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 my @users;
 foreach my $uid (sort keys %$userStruc) {
 	my $user = {};
-	$user->{"id"} = "$userStruc->{$uid}->{$u_bbmri_user_id}";
+	$user->{"id"} = "$userStruc->{$uid}->{$u_lsri_user_id}";
 	$user->{"perun_user_id"} = $uid;
 	$user->{"displayName"} = $userStruc->{$uid}->{$u_name};
 	$user->{"status"} = $userStruc->{$uid}->{$u_status};
@@ -103,7 +103,7 @@ foreach my $gid (sort keys %$groupStruc) {
 	my @members;
 	foreach my $uid (sort keys %{$membershipStruc->{$gid}}){
 		my $struct = {};
-		$struct->{"userId"} = "$userStruc->{$uid}->{$u_bbmri_user_id}";
+		$struct->{"userId"} = "$userStruc->{$uid}->{$u_lsri_user_id}";
 		push @members, $struct;
 	}
 
@@ -128,7 +128,7 @@ sub processUsers {
 	my ($gid, $memberId) = @_;
 
 	my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
-	my $bbmriUserId = $data->getUserAttributeValue( member => $memberId, attrName => $A_BBMRI_USER_ID );
+	my $lsriUserId = $data->getUserAttributeValue( member => $memberId, attrName => $A_LSRI_USER_ID );
 	my $status = $data->getMemberAttributeValue(member => $memberId, attrName => $A_USER_STATUS);
 	my $isSuspended = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_IS_SUSPENDED );
 	if ($isSuspended) { $status = $STATUS_SUSPENDED; }
@@ -152,10 +152,9 @@ sub processUsers {
 			# change from SUSPENDED to EXPIRED
 			$userStruc->{$uid}->{$u_status} = $status;
 		}
-	}
-	else{
+	} else {
 		$userStruc->{$uid}->{$u_status} = $status;
-		$userStruc->{$uid}->{$u_bbmri_user_id} = $bbmriUserId;
+		$userStruc->{$uid}->{$u_lsri_user_id} = $lsriUserId;
 		$userStruc->{$uid}->{$u_email} = $email;
 		$userStruc->{$uid}->{$u_name} = $d_name;
 		$userStruc->{$uid}->{$u_eppn} = \@eppns;
