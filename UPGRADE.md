@@ -1,5 +1,27 @@
 Upgrade notes
 
+## [8.6.0](https://github.com/CESNET/perun-services/compare/v8.5.0...v8.6.0) (2023-10-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **slack:** Requires Slack SDK to be installed
+* **hml_json:** Add new required attribute to the service configuration (user:virt:scopedLogin-namespace:mu).
+
+### Features
+
+* **hml_json:** changed hml_json gen script to use scoped mu login ([9be7196](https://github.com/CESNET/perun-services/commit/9be71964dadd0b0ab4ee16057f096ed65e693ae0))
+* **slack:** service for propagation to Slack ([2c814e6](https://github.com/CESNET/perun-services/commit/2c814e614e962e8c26dc0c171ea4ea36cd481265))
+
+
+### Bug Fixes
+
+* **slack:** don't update displayName ([c4af71d](https://github.com/CESNET/perun-services/commit/c4af71d2912e6a53acaca358842e1040c5a251eb))
+* **vsup_ifis:** proper utf8 handling and column reference ([7224314](https://github.com/CESNET/perun-services/commit/72243143617a3c1470869f5a62a049258fe65199))
+* **vsup_stag:** fix column mapping and sysdate ([43bf239](https://github.com/CESNET/perun-services/commit/43bf239d7d3253e52ab1ddb3e0426baebab5dcf0))
+* **vsup_web:** make sure to use utf8 ([02aef0f](https://github.com/CESNET/perun-services/commit/02aef0f8d3b20421a6ca855243c1222bfbe9c9aa))
+* **vsup_web:** temporary fix to chomp on input data ([d80c56d](https://github.com/CESNET/perun-services/commit/d80c56d540a71d9f13293e5e3e677908809d0ff3))
+
 ## [8.5.0](https://github.com/CESNET/perun-services/compare/v8.4.0...v8.5.0) (2023-09-27)
 
 
