@@ -135,6 +135,8 @@ foreach my $resourceId ($data->getResourceIds()) {
 			$users->{$uco}->{$A_STUDY_ID} = $studyId || '';
 			$users->{$uco}->{$A_STUDY_SINCE} = $studySince || '';
 			$users->{$uco}->{$A_STUDY_ROCNIK} = $studyRocnik || '';
+			# FIXME - temporary fix for input data
+			if (defined $studyPrihlaska) { chomp($studyPrihlaska); }
 			$users->{$uco}->{$A_STUDY_PRIHLASKA} = $studyPrihlaska || '';
 
 			# Convert BirthNumber to birth date

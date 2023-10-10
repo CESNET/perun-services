@@ -6,6 +6,9 @@ use Exporter 'import';
 use strict;
 use warnings FATAL => 'all';
 use DBI;
+use utf8;
+use open qw/ :std :encoding(utf8) /;
+binmode STDOUT, ":utf8";
 
 #
 # Return config
@@ -18,6 +21,7 @@ sub init_config($) {
 	my $result = {};
 
 	open FILE, $configPath or die "Could not open config file $configPath: $!";
+	binmode FILE, ":utf8";
 	while(my $line = <FILE>) {
 		if($line =~ /^username: .*/) {
 			my $username = ($line =~ m/^username: (.*)$/)[0];
@@ -65,7 +69,7 @@ sub load_stag() {
 	# Structure to store data from input database (IS/STAG)
 	my $inputData = {};
 	while(my $row = $sth->fetchrow_hashref()) {
-		my $key = $row->{vztah_cislo};
+		my $key = $row->{VZTAH_CISLO};
 		$inputData->{$key}->{'OSB_ID'} = $row->{UCO};
 		$inputData->{$key}->{'TYP_VZTAHU'} = $row->{TYP_VZTAHU};
 		$inputData->{$key}->{'DRUH_VZTAHU'} = $row->{DRUH_VZTAHU};

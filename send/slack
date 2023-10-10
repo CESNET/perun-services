@@ -1,0 +1,512 @@
+#!/usr/bin/env python3
+import json
+import sys
+
+from slack_sdk import WebClient
+from slack_sdk.scim import SCIMClient, User
+from slack_sdk.http_retry.builtin_handlers import (
+	RateLimitErrorRetryHandler,
+	ConnectionErrorRetryHandler,
+)
+from slack_sdk.scim.v1.user import UserName, UserEmail
+
+import send_lib
+
+""" Slack API library: https://slack.dev/python-slack-sdk/scim/index.html """
+
+SERVICE_NAME = "slack"
+COUNT = 100  # number of entries to retrieve with one GET call
+NOTIFICATIONS_CHANNEL_ID = ""
+DEBUG = 0
+# === stats ===
+CHANNELS_CREATED = 0
+CHANNELS_ARCHIVED = 0
+CHANNELS_UPDATED = 0
+USERS_CREATED = 0
+USERS_UPDATED = 0
+USERS_DEACTIVATED = 0
+MEMBERS_ADDED = 0
+MEMBERS_REMOVED = 0
+WARNING = []
+
+users_mapping = {}  # { login: Slack ID }
+
+
+def print_debug(message):
+	if DEBUG:
+		print(message)
+
+
+def check_response(response):
+	if response.errors is not None:
+		send_lib.die_with_error(
+			f"Error message received from API: "
+			f"{response.errors.code} - {response.errors.description}"
+		)
+
+
+def check_webclient_response(response):
+	if not response.get("ok", False):
+		send_lib.die_with_error(
+			"Error message received from WebAPI: "
+			+ response.get("error", "Unknown error")
+		)
+
+
+def get_configuration(destination):
+	"""
+	Expects configuration in /etc/perun/services/slack/slack.py:
+	credentials = { "<destination>":	"bot_token": "<token>",
+										"user_token": "<token>",
+										"skip_users" ["<username1>", <"username2">],
+										"notifications_channel_id": "C05JMQR87PU"
+									}
+	"""
+	properties = ["bot_token", "user_token", "skip_users", "notifications_channel_id"]
+	conf = send_lib.get_custom_config_properties(SERVICE_NAME, destination, properties)
+	if not conf or None in conf:
+		send_lib.die_with_error(
+			"Could not retrieve configuration or configuration invalid."
+		)
+	return conf
+
+
+def get_our_data(gen_folder):
+	our_datafile = f"{gen_folder}/{SERVICE_NAME}"
+	with open(our_datafile, "rb") as f:
+		return json.load(f)
+
+
+def create_user(client, our_user):
+	print_debug(f"Creating user {our_user['firstName']} {our_user['lastName']}")
+	username = our_user["userName"]
+	user = User(
+		user_name=username,
+		name=UserName(
+			given_name=our_user["firstName"], family_name=our_user["lastName"]
+		),
+		emails=[UserEmail(value=our_user["email"])],
+	)
+	response = client.create_user(user)
+	if response.errors is not None and response.errors.description.startswith(
+		"bad_email_address"
+	):
+		WARNING.append(
+			f"User {our_user['firstName']} {our_user['lastName']}"
+			f" ({our_user['userName']}) not created (email already taken: {our_user['email']})"
+		)
+		return None
+
+	check_response(response)
+	global USERS_CREATED
+	USERS_CREATED += 1
+
+	return response.user
+
+
+def update_user(client, our_user, their_user):
+	print_debug(f"Updating user {our_user}")
+	user_data = User(
+		user_name=our_user["userName"],
+		name=UserName(
+			given_name=our_user["firstName"], family_name=our_user["lastName"]
+		),
+		emails=[UserEmail(value=our_user["email"])],
+		active=True,
+	)
+
+	if their_user.get("is_restricted", False) or their_user.get("is_ultra_restricted"):
+		# if user is guest, make him regular user again
+		user_data.schemas = ["urn:scim:schemas:core:1.0"]
+		user_data.meta = {"attributes": ["urn:scim:schemas:extension:slack:guest:1.0"]}
+
+	response = client.patch_user(id=their_user["id"], partial_user=user_data)
+
+	if response.errors is not None and response.errors.description.startswith(
+		"bad_email_address"
+	):
+		WARNING.append(f"Found duplicated emails - user not updated {our_user}")
+		return None
+
+	check_response(response)
+	global USERS_UPDATED
+	USERS_UPDATED += 1
+
+	return response.user
+
+
+def deactivate_user(client, their_user):
+	print_debug(f"Deactivating user {their_user['real_name']}")
+	patch_result = client.patch_user(
+		id=their_user["id"], partial_user=User(active=False)
+	)
+	if patch_result.errors is not None and (
+		"cannot_modify_owner" in patch_result.errors.description
+	):
+		WARNING.append(f"Cannot deactivate {their_user.user_name}")
+		return
+
+	check_response(patch_result)
+	global USERS_DEACTIVATED
+	USERS_DEACTIVATED += 1
+
+
+def get_their_users(client):
+	users = []
+	while True:
+		response = client.search_users(
+			start_index=len(users) + 1,
+			count=COUNT,
+		)
+		check_response(response)
+		users.extend(response.users)
+
+		if len(response.users) < COUNT:
+			break
+	return users
+
+
+def update_users(client, our_data, their_users, skip_users):
+	"""
+	Users are matched by username
+	"""
+	our_users = our_data.get("users")
+	our_usernames = our_users.keys()
+	deactivated_users = []
+
+	for their_user in their_users:
+		if their_user["name"] in skip_users:
+			continue
+		if (
+			their_user["is_bot"]
+			or their_user["deleted"]
+			or their_user["is_restricted"]
+			or their_user["is_ultra_restricted"]
+			or their_user["is_app_user"]
+		):
+			continue
+
+		our_user = next((u for u in our_usernames if u == their_user["name"]), None)
+		# deactivate users (except bots, guests ...)
+		if our_user is None and not their_user["deleted"]:
+			deactivate_user(client, their_user)
+			deactivated_users.append(their_user["id"])
+
+	for our_username in our_usernames:
+		if our_username in skip_users:
+			continue
+		our_user = our_users[our_username]
+		our_user["userName"] = our_username
+		their_user = next((u for u in their_users if u["name"] == our_username), None)
+
+		# create missing users
+		if their_user is None:
+			created_user = create_user(client, our_user)
+			if created_user is not None:
+				users_mapping[created_user.user_name] = created_user.id
+				continue
+
+		# update users
+		elif (
+			our_user["firstName"] != their_user["profile"]["first_name"]
+			or our_user["lastName"] != their_user["profile"]["last_name"]
+			or our_user["email"] != their_user["profile"]["email"]
+			or their_user["deleted"]
+			or their_user["is_restricted"]
+			or their_user["is_ultra_restricted"]
+		):
+			update_user(client, our_user, their_user)
+
+	return deactivated_users
+
+
+def create_channel(webclient, name, is_private):
+	print_debug(f"Creating {'public' if not is_private else 'private'} channel {name}")
+	response = webclient.conversations_create(name=name, is_private=is_private)
+	if response.get("ok", False) and response.get("error", "").startswith("name_taken"):
+		WARNING.append(
+			f"Channel '{name}' already exists, but bot not integrated. Skipping."
+		)
+		return None
+
+	check_webclient_response(response)
+	global CHANNELS_CREATED
+	CHANNELS_CREATED += 1
+	return response["channel"]
+
+
+def get_their_channels(webclient):
+	print_debug("Fetching Slack channels")
+	channels = []
+	cursor = None
+	while cursor != "":
+		response = webclient.conversations_list(
+			cursor=cursor,
+			exclude_archived=False,
+			limit=COUNT,
+			types="public_channel,private_channel",
+		)
+		check_webclient_response(response)
+		channels.extend(response["channels"])
+		cursor = response["response_metadata"].get("next_cursor")
+
+	return channels
+
+
+def get_their_users_web(webclient):
+	print_debug("Fetching Slack users")
+	users = []
+	cursor = None
+	while cursor != "":
+		response = webclient.users_list(cursor=cursor, limit=COUNT)
+		check_webclient_response(response)
+		users.extend(response["members"])
+		cursor = response["response_metadata"].get("next_cursor")
+	return users
+
+
+def get_their_members(webclient, channel_id):
+	print_debug(f"Fetching members of channel {channel_id}")
+	members = []
+	cursor = None
+	while cursor != "":
+		response = webclient.conversations_members(
+			cursor=cursor,
+			channel=channel_id,
+			limit=COUNT,
+		)
+		check_webclient_response(response)
+		members.extend(response["members"])
+		cursor = response["response_metadata"].get("next_cursor")
+
+	return members
+
+
+def invite_members(webclient, members, channel_id):
+	print_debug(f"Inviting user {members} to {channel_id}")
+	response = webclient.conversations_invite(channel=channel_id, users=members)
+	if response.get("ok", False) and response.get("error", "").startswith(
+		"already_in_channel"
+	):
+		if len(members) == 1:
+			print_debug(
+				f"Tried to invite existing member {members} of channel {channel_id}, skipped."
+			)
+			return
+		else:
+			for member in members:
+				invite_members(webclient, [member], channel_id)
+
+	check_webclient_response(response)
+	global MEMBERS_ADDED
+	MEMBERS_ADDED += len(members)
+
+
+def kick_members(webclient, members, channel_id):
+	for user in members:
+		print_debug(f"Kicking user {user} from channel {channel_id}")
+		response = webclient.conversations_kick(channel=channel_id, user=user)
+		check_webclient_response(response)
+		global MEMBERS_REMOVED
+		MEMBERS_REMOVED += len(members)
+
+
+def archive_channel(webclient, channel_id):
+	print_debug(f"Archiving channel {channel_id}")
+	response = webclient.conversations_archive(channel=channel_id)
+	check_webclient_response(response)
+	global CHANNELS_ARCHIVED
+	CHANNELS_ARCHIVED += 1
+
+
+def unarchive_channel(webclient, channel_id):
+	print_debug(f"Restoring archivated channel {channel_id}")
+	response = webclient.conversations_unarchive(channel=channel_id)
+	check_webclient_response(response)
+	global CHANNELS_UPDATED
+	CHANNELS_UPDATED += 1
+
+
+def notify_users_deactivated(user_ids):
+	print_debug(f"Pushing notification about {len(user_ids)} deactivated users")
+	formatted_ids = ", ".join(["<@" + u + ">" for u in user_ids])
+	text = f"[UPOZORNĚNÍ] : Došlo k deaktivaci {'uživatelů' if len(user_ids) > 1 else 'uživatele'} {formatted_ids}.\n"
+	response = webclient.chat_postMessage(text=text, channel=NOTIFICATIONS_CHANNEL_ID)
+	check_webclient_response(response)
+
+
+def should_kick(member, their_users):
+	their_user = next(filter(lambda u: u["id"] == member, their_users), None)
+	if their_user is None:
+		warn_message = (
+			f"External member {member} was found in Perun managed channel! Skipped."
+		)
+		WARNING.append(warn_message)
+		print_debug(warn_message)
+	elif their_user["deleted"]:
+		return False
+	else:
+		# don't kick bots, guests and our bot's user
+		return (
+			not their_user["is_bot"]
+			and not their_user["is_restricted"]
+			and not their_user["is_ultra_restricted"]
+			and not their_user["is_app_user"]
+		)
+
+
+def update_channels(webclient, our_data, their_channels, bot_user_id):
+	for our_channel_name in our_data["channels"].keys():
+		their_channel = next(
+			(c for c in their_channels if c["name"] == our_channel_name), None
+		)
+		if their_channel is None:
+			# create missing channels
+			their_channel = create_channel(
+				webclient,
+				our_channel_name,
+				our_data["channels"][our_channel_name]["privateChannel"],
+			)
+			if their_channel is not None:
+				their_channels.append(their_channel)
+			else:
+				continue
+
+		# update channel
+		elif their_channel["is_archived"]:
+			WARNING.append(
+				f"Trying to revive channel {their_channel['name']} - need to manually unarchive in Slack!"
+			)
+			continue
+			# unarchive_channel(webclient, their_channel["id"])
+		elif (
+			their_channel["is_private"]
+			and not our_data["channels"][our_channel_name]["privateChannel"]
+		):
+			WARNING.append(
+				f"Channel {their_channel['name']} is private, but set as public in Perun - manual fix needed"
+			)
+		elif (
+			not their_channel["is_private"]
+			and our_data["channels"][our_channel_name]["privateChannel"]
+		):
+			WARNING.append(
+				f"Channel {their_channel['name']} is public, but set as private in Perun - manual fix needed"
+			)
+
+		# add missing members
+		their_members = get_their_members(webclient, their_channel["id"])
+		our_members = [
+			users_mapping.get(our_username)
+			for our_username in our_data["channels"][our_channel_name]["members"]
+			if users_mapping.get(our_username) is not None
+		]
+		our_members.append(bot_user_id)
+		missing_members = [m for m in our_members if m not in their_members]
+		if len(missing_members) > 0:
+			invite_members(webclient, missing_members, their_channel["id"])
+
+		# remove redundant members (not guests)
+		redundant_members = [m for m in their_members if m not in our_members]
+		redundant_members = [
+			m for m in redundant_members if should_kick(m, their_users)
+		]
+		if len(redundant_members) > 0:
+			kick_members(webclient, redundant_members, their_channel["id"])
+
+	for their_channel in their_channels:
+		if their_channel["is_general"]:
+			continue  # we don't want to manage the general channel if it wasn't propagated from Perun
+		if their_channel["id"] == NOTIFICATIONS_CHANNEL_ID:
+			continue  # we don't want to manage the notifications channel and need our bot in it
+		our_channel = next(
+			(ch for ch in our_data["channels"].keys() if their_channel["name"] == ch),
+			None,
+		)
+		if our_channel is None and not their_channel["is_archived"]:
+			archive_channel(webclient, their_channel["id"])
+
+
+def get_the_bot_id(webclient):
+	response = webclient.auth_test()
+	check_webclient_response(response)
+
+	return response["user_id"], response["bot_id"]
+
+
+def create_users_mapping(their_users):
+	for user in their_users:
+		users_mapping[user["name"]] = user["id"]
+
+
+def print_stats():
+	print(
+		f"Users created: {USERS_CREATED}\n"
+		f"Users updated: {USERS_UPDATED}\n"
+		f"Users deactivated: {USERS_DEACTIVATED}\n"
+		f"Channels created: {CHANNELS_CREATED}\n"
+		f"Channels archived: {CHANNELS_ARCHIVED}\n"
+		# f"Channels revived: {CHANNELS_UPDATED}\n"
+		f"Added to channels: {MEMBERS_ADDED}\n"
+		f"Removed from channels: {MEMBERS_REMOVED}\n"
+		f"WARNING: {WARNING}"
+	)
+
+
+if __name__ == "__main__":
+	send_lib.check_input_fields(sys.argv, destination_type_required=True)
+
+	facility = sys.argv[1]
+	destination = sys.argv[2]
+	destination_type = sys.argv[3]
+
+	send_lib.check_destination_type_allowed(
+		destination_type, send_lib.DESTINATION_TYPE_SERVICE_SPECIFIC
+	)
+	send_lib.check_destination_format(
+		destination, destination_type, send_lib.SIMPLE_PATTERN
+	)
+
+	send_lib.create_lock(SERVICE_NAME, destination)
+	gen_folder = send_lib.get_gen_folder(facility, SERVICE_NAME)
+
+	our_data = get_our_data(gen_folder)
+
+	config = get_configuration(destination)
+	bot_token = config[0]
+	user_token = config[1]
+	skip_users = config[2]
+	skip_users.append(
+		"slackbot"
+	)  # Slackbot is not considered bot account in Slack API -.-
+	NOTIFICATIONS_CHANNEL_ID = config[3]
+
+	"""
+	SCIM client is used to handle user objects, WebClient is used to handle channels.
+	Bot token cannot be used in SCIM client, but we use bot to indicate Perun-managed channels,
+	therefore we want to manage the channels with the bot token.
+	"""
+	client = SCIMClient(token=user_token)
+	webclient = WebClient(token=bot_token)
+	handlers = [
+		ConnectionErrorRetryHandler(max_retry_count=2),
+		RateLimitErrorRetryHandler(max_retry_count=2),
+	]
+	client.retry_handlers.extend(handlers)
+	webclient.retry_handlers.extend(handlers)
+
+	their_users = get_their_users_web(webclient)
+
+	create_users_mapping(their_users)
+	user_id, bot_id = get_the_bot_id(webclient)
+	deactivated_users = update_users(client, our_data, their_users, skip_users)
+	if len(deactivated_users) > 0:
+		notify_users_deactivated(deactivated_users)
+
+	their_channels = get_their_channels(webclient)
+	# filter out channels where bot is not integrated
+	their_channels = [ch for ch in their_channels if ch["is_member"]]
+	their_users = get_their_users_web(webclient)  # updated users
+	update_channels(webclient, our_data, their_channels, user_id)
+
+	print_stats()
