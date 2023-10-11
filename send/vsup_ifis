@@ -7,7 +7,8 @@ use Data::Dumper;
 use Time::Piece;
 use ScriptLock;
 use VsupIfis;
-
+use utf8;
+use open qw/ :std :encoding(utf8) /;
 binmode STDOUT, ":utf8";
 
 sub handleContact;
@@ -116,10 +117,10 @@ my $dc2_inserted = 0;
 my $dc2_foundAndUpdated = 0;
 my $dc2_foundAndSkipped = 0;
 my $dc2_deleted = 0;
-my $is_inserted = 0;
-my $is_foundAndUpdated = 0;
-my $is_foundAndSkipped = 0;
-my $is_deleted = 0;
+my $stag_inserted = 0;
+my $stag_foundAndUpdated = 0;
+my $stag_foundAndSkipped = 0;
+my $stag_deleted = 0;
 
 # Allow storing change info (AKT)
 my $insertAkt = $dbh->prepare(qq{INSERT INTO $tableNameAkt (OSB_ID, KDYZAP, OBJ, PRIO) VALUES (?,sysdate,?,?)});
@@ -558,25 +559,24 @@ while(my $row = $existingVztah_dc2->fetchrow_hashref()) {
 $existingVztah_dc2->finish();
 
 #
-# PROCESS RELATIONS FROM IS
+# PROCESS RELATIONS FROM STAG
 #
+my $stag_data = load_stag();
 
-my $is_data = load_is();
+foreach my $key (sort keys %$stag_data) {
 
-foreach my $key (sort keys %$is_data) {
-
-	my $OSB_ID = $is_data->{$key}->{'OSB_ID'};
-	my $NS = $is_data->{$key}->{'NS'};
-	my $TYP_VZTAHU = $is_data->{$key}->{'TYP_VZTAHU'};
-	my $DRUH_VZTAHU = $is_data->{$key}->{'DRUH_VZTAHU'};
-	my $STU_FORMA = $is_data->{$key}->{'STU_FORMA'};
-	my $STU_STAV = $is_data->{$key}->{'STU_STAV'};
-	my $STU_PROGR = $is_data->{$key}->{'STU_PROGR'};
-	my $STU_GRADUATE = $is_data->{$key}->{'STU_GRADUATE'};
+	my $OSB_ID = $stag_data->{$key}->{'OSB_ID'};
+	my $NS = $stag_data->{$key}->{'NS'};
+	my $TYP_VZTAHU = $stag_data->{$key}->{'TYP_VZTAHU'};
+	my $DRUH_VZTAHU = $stag_data->{$key}->{'DRUH_VZTAHU'};
+	my $STU_FORMA = $stag_data->{$key}->{'STU_FORMA'};
+	my $STU_STAV = $stag_data->{$key}->{'STU_STAV'};
+	my $STU_PROGR = $stag_data->{$key}->{'STU_PROGR'};
+	my $STU_GRADUATE = $stag_data->{$key}->{'STU_GRADUATE'};
 	my $VZTAH_CISLO = $key;
-	my $VZTAH_OD = $is_data->{$key}->{'VZTAH_OD'};
-	my $VZTAH_DO = $is_data->{$key}->{'VZTAH_DO'};
-	my $KARTA_IDENT = $is_data->{$key}->{'KARTA_IDENT'};
+	my $VZTAH_OD = $stag_data->{$key}->{'VZTAH_OD'};
+	my $VZTAH_DO = $stag_data->{$key}->{'VZTAH_DO'};
+	my $KARTA_IDENT = $stag_data->{$key}->{'KARTA_IDENT'};
 	my $EXT_ID = $key; # same as VZTAH_CISLO
 
 	#If osb_id or typ_vztahu are undef, skip this record
@@ -619,19 +619,19 @@ foreach my $key (sort keys %$is_data) {
 			$updatePerson->execute($NS, $DRUH_VZTAHU, $STU_FORMA, $STU_STAV, $STU_PROGR, $STU_GRADUATE, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID, $OSB_ID, $VZTAH_CISLO, $TYP_VZTAHU);
 			handleAkt($OSB_ID, 'VZTAHY');
 			if($DEBUG == 1) { print "UPDATING EXISTING RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
-			$is_foundAndUpdated++;
+			$stag_foundAndUpdated++;
 
 		} else {
 
 			if($DEBUG == 1) { print "SKIP RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
-			$is_foundAndSkipped++;
+			$stag_foundAndSkipped++;
 
 		}
 
 	} else {
 
 		if($DEBUG == 1) { print "INSERT NEW RECORD: UCO -> $OSB_ID, VZTAH_ID -> $VZTAH_CISLO\n"; }
-		$is_inserted++;
+		$stag_inserted++;
 		#We will insert new record to output database (IFIS)
 		my $insertPerson = $dbh->prepare(qq{INSERT INTO $tableNameVzt (OSB_ID, NS, TYP_VZTAHU, DRUH_VZTAHU, STU_FORMA, STU_STAV, STU_PROGR, STU_GRADUATE, VZTAH_CISLO, OD, DO_, KARTA_IDENT, EXT_ID) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)});
 		$insertPerson->execute($OSB_ID, $NS, $TYP_VZTAHU, $DRUH_VZTAHU, $STU_FORMA, $STU_STAV, $STU_PROGR, $STU_GRADUATE, $VZTAH_CISLO, $VZTAH_OD, $VZTAH_DO, $KARTA_IDENT, $EXT_ID);
@@ -642,23 +642,21 @@ foreach my $key (sort keys %$is_data) {
 }
 
 # Delete unwanted relations of STU type
-
-my $deleteVztah_is = $dbh->prepare(qq{DELETE FROM $tableNameVzt where VZTAH_CISLO=? and TYP_VZTAHU='STU'});
-my $existingVztah_is = $dbh->prepare(qq{select VZTAH_CISLO, OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null and TYP_VZTAHU='STU'});
-$existingVztah_is->execute();
-while(my $row = $existingVztah_is->fetchrow_hashref()) {
+my $deleteVztah_stag = $dbh->prepare(qq{DELETE FROM $tableNameVzt where VZTAH_CISLO=? and TYP_VZTAHU='STU'});
+my $existingVztah_stag = $dbh->prepare(qq{select VZTAH_CISLO, OSB_ID from $tableNameVzt where OSB_ID is not null and VZTAH_CISLO is not null and TYP_VZTAHU='STU'});
+$existingVztah_stag->execute();
+while(my $row = $existingVztah_stag->fetchrow_hashref()) {
 	my $VZTAH_CISLO = $row->{VZTAH_CISLO};
 	my $UCO = $row->{OSB_ID};
-	unless (exists $is_data->{$VZTAH_CISLO}) {
-		# STU vztah is not in IS source, remove from IFIS.
+	unless (exists $stag_data->{$VZTAH_CISLO}) {
+		# STU vztah is not in STAG source, remove from IFIS.
 		if ($DEBUG == 1) { print "DELETE VZTAH RECORD CISLO_VZTAHU: $VZTAH_CISLO /STU \n"; }
-		$deleteVztah_is->execute($VZTAH_CISLO);
-		$is_deleted++;
+		$deleteVztah_stag->execute($VZTAH_CISLO);
+		$stag_deleted++;
 		handleAkt($UCO, 'VZTAHY');
 	}
 }
-
-$existingVztah_is->finish();
+$existingVztah_stag->finish();
 
 #
 # SET WHICH RELATIONS ARE 'HLAVNI'
@@ -787,8 +785,11 @@ for my $UCO (sort keys %$dataByKey) {
 				}
 			} elsif ($existingVztah->{$key}->{"TYP_VZTAHU"} eq "STU")  {
 				if (exists $priorityMap->{3}) {
+					# VZTAH_ID from STAG contain chars, we must compare only numbers!
+					my $compareIdPriority = $priorityMap->{3}->{"VZTAH_CISLO"} =~ s/[^0-9]//gr;
+					my $compareIdExisting = $existingVztah->{$key}->{"VZTAH_CISLO"} =~ s/[^0-9]//gr;
 					# multiple STU VZTAH
-					unless ($priorityMap->{3}->{"VZTAH_CISLO"} gt $existingVztah->{$key}->{"VZTAH_CISLO"}) {
+					unless ($compareIdPriority gt $compareIdExisting) {
 						# next VZTAH has ID > current VZTAH
 						$priorityMap->{3}->{"VZTAH_CISLO"} = $existingVztah->{$key}->{"VZTAH_CISLO"};
 					}
@@ -853,7 +854,8 @@ $casExists->finish();
 
 # Commit all changes and disconnect
 
-commit $dbh;
+#$dbh->rollback();
+$dbh->commit();
 $dbh->disconnect();
 
 $lock->unlock();
@@ -885,10 +887,10 @@ print "Vztah (zam) skipped:  \t$dc2_foundAndSkipped\n";
 print "Vztah (zam) updated:  \t$dc2_foundAndUpdated\n";
 print "Vztah (zam) deleted:  \t$dc2_deleted\n";
 print "---------------------------------------\n";
-print "Vztah (stu) inserted: \t$is_inserted\n";
-print "Vztah (stu) skipped:  \t$is_foundAndSkipped\n";
-print "Vztah (stu) updated:  \t$is_foundAndUpdated\n";
-print "Vztah (stu) deleted:  \t$is_deleted\n";
+print "Vztah (stu) inserted: \t$stag_inserted\n";
+print "Vztah (stu) skipped:  \t$stag_foundAndSkipped\n";
+print "Vztah (stu) updated:  \t$stag_foundAndUpdated\n";
+print "Vztah (stu) deleted:  \t$stag_deleted\n";
 print "=======================================\n";
 
 #
