@@ -19,8 +19,6 @@ use Array::Utils qw(:all);
 # (0) no debug, (1) only messages of performed operations, (2) communication with server.
 my $DEBUG=0;
 
-my $DEACTIVATED_PREFIX_INIT=0;
-
 # Required setting for connection
 my $RESULTS_COUNT = 200; # This many objects will be fetched with one GET request on server. Limited by Atlassian ANYWAY!
 my $directoryUrl;
@@ -102,10 +100,6 @@ my $ourUsers = fetchOurUsers();
 my $ourGroups = fetchOurGroups();
 # Data from Atlassian into hash
 my $theirUsers = fetchTheirUsers();
-
-if ($DEACTIVATED_PREFIX_INIT) {
-	addPrefixToDeactivatedUsers();
-}
 evaluateUsers();
 my $theirGroups = fetchTheirGroups(); # Acquire groups now to account for updated usernames with prefixes
 $theirUsers = fetchTheirUsers(); # Acquire created users' IDs
@@ -291,21 +285,6 @@ sub fetchOurGroups {
 	};
 
 	return JSON::XS->new->decode($json_groups);
-}
-
-# temporary function to update atlassian with the new feature of prefixes for deactivated users
-sub addPrefixToDeactivatedUsers {
-	print("Updating usernames of deactivated users to contain the 'del' prefix. \n");
-	my $theirUserName;
-	my $theirUserInfo;
-	while (($theirUserName, $theirUserInfo) = each(%{$theirUsers})) {
-		my $prefix = substr $theirUserName, 0, 4;
-		if (!$theirUserInfo->{'active'} && $prefix ne "del_") {
-			$theirUserInfo->{"email"} = 'del_'.$theirUserInfo->{"email"};
-			updateUser('del_'.$theirUserName, $theirUserInfo, $theirUserInfo->{'id'}, 0);
-		}
-	}
-	print("Done updating usernames. \n");
 }
 
 # Compares Atlassian users with Perun users.
