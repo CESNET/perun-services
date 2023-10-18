@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# set handling script
+#DST_SCRIPT=/tmp/negotiator_script
