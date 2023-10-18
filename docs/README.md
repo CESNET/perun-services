@@ -18,6 +18,7 @@ Table of modules
 
 Table of services
 
+- [bbmri_negotiator](services/bbmri_negotiator.md)
 - [dhus](services/dhus.md)
 - [m365_cloud](services/m365_cloud.md)
 - [webcentrum_eosc](services/webcentrum_eosc.md)
