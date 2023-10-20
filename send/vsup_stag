@@ -131,11 +131,8 @@ foreach my $key (sort keys %$dataByKeys) {
 			next;
 		}
 
-		# forever skip teacher with invalid RC
-		if ($UCO_PERUN eq 10037) { next; }
-
-		# FIXME - for now skip all teachers, since we break inner constraint by missing start date of the relation
-		next;
+		# FIXME - skip teachers with invalid RČ.
+		if (($UCO_PERUN eq 10037) or ($UCO_PERUN eq 14086) or ($UCO_PERUN eq 14495)) { next; }
 
 		my $teacherExists = $dbh->prepare(qq{select 1 from $table_teacher where UCO_PERUN=?});
 		$teacherExists->execute($UCO_PERUN);
@@ -196,7 +193,7 @@ foreach my $key (sort keys %$dataByKeys) {
 
 			if ($DEBUG == 1) { print "NOT FOUND, INSERTING: $key\n"; }
 			# Teacher not yet in the table -> insert as a new person
-			my $insertTeacher = $dbh->prepare(qq{INSERT INTO $table_teacher (UCO_PERUN, TYP_ZAZN, VZTAH_DO, USERNAME, JMENO, PRIJMENI, ROD_PRIJMENI, ROD_CISLO, POHLAVI, TITUL_PRED, TITUL_ZA, EMAIL_SKOLNI, TEL_SKOLNI, EMAIL_SOUKR, TEL_SOUKR, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,SYSDATE)});
+			my $insertTeacher = $dbh->prepare(qq{INSERT INTO $table_teacher (UCO_PERUN, TYP_ZAZN, VZTAH_DO, USERNAME, JMENO, PRIJMENI, ROD_PRIJMENI, ROD_CISLO, POHLAVI, TITUL_PRED, TITUL_ZA, EMAIL_SKOLNI, TEL_SKOLNI, EMAIL_SOUKR, TEL_SOUKR, ZMENENO_KDY) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,SYSDATE)});
 			$insertTeacher->execute($UCO_PERUN, $TYP_ZAZN, $VZTAH_DO, uc($LOGIN), $FIRST_NAME, $LAST_NAME, $BIRTH_LAST_NAME, $BIRTH_NUMBER, $GENDER, $TITLE_BEFORE, $TITLE_AFTER, $EMAIL, $PHONE, $EMAIL_PRIV, $PHONE_PRIV);
 
 			$teachers_inserted++;
