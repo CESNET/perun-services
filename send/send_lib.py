@@ -345,7 +345,7 @@ def escape_filename(filename: str) -> str:
 
 def get_auth_credentials(service_name: str, destination: str):
 	"""
-	Retrieves credentials from a file located in the /etc/perun/services/service_name/service_name.py file.
+	Retrieves credentials from a file located in the /etc/perun/services/{service_name}/{service_name}.py file.
 	The file is a python file containing map of {destination: {'username': username, 'password': password}} mapping.
 
 	Example of such file - supplement $ variables with destination url, username and password
@@ -354,7 +354,7 @@ def get_auth_credentials(service_name: str, destination: str):
 		"$url2": { 'username': "$user2", 'password': "$pwd2" }
 	}
 
-	:param service_name: name of the destination (used both as the folder name and the credentials python file name)
+	:param service_name: name of the service (used both as the folder name and the credentials python file name)
 	:param destination: key used to search in the credentials map
 	:return: (username, password) if credentials retrieved, None otherwise
 	"""
@@ -374,6 +374,20 @@ def get_auth_credentials(service_name: str, destination: str):
 
 
 def get_custom_config_properties(service_name: str, destination: str, properties: list[str]):
+	"""
+	Retrieves custom properties from config file in /etc/perun/services/{service_name}/{service_name}.py file.
+
+	Example of such file - supplement $ variables with destination, property names and values
+	credentials = {
+		"$url1": { '$property_1': "$our_token", '$property_2': "$our_secret" },
+		"$url2": { '$property_1': "$our_other_token", '$property_2': "$our_other_secret" }
+	}
+
+	:param service_name: name of the service (used both as the folder name and the credentials python file name)
+	:param destination: key used to search in the credentials map
+	:param properties: list of properties to be retrieved
+	:return: list of values in the same order as provided properties, None if file does not exist or any property is missing
+	"""
 	try:
 		sys.path.insert(1, f'{SERVICES_DIR}/{service_name}/')
 		credentials = __import__(service_name).credentials
