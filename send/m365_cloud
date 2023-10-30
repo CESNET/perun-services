@@ -1,0 +1,677 @@
+#!/usr/bin/env python3
+import json
+import re
+import string
+import sys
+import time
+import secrets
+import requests
+import send_lib
+
+# constants
+SERVICE_NAME = "m365_cloud"
+DEBUG = 0
+TIMEOUT = 60  # 1 min
+RETRY_AFTER_DEFAULT = 15  # 15 sec
+TENANT_REGEX_FORMAT = re.compile(r'[\w-]+')
+BASE_URL = 'https://graph.microsoft.com/v1.0'
+PERUN_MANAGED_EXTENSION_SUFFIX = "PerunManaged"
+PERUN_MANAGED_EXTENSION_NAME = ""
+PERUN_ID_EXTENSION_SUFFIX = "PerunId"
+PERUN_ID_EXTENSION_NAME = ""
+ADD_MEMBERS_CHUNK_SIZE = 20  # max size of bulk to add members to group (API limitation)
+SCOPE = None
+REDIRECT_URL = None
+TEAMS_OWNER = None
+
+# authentication
+client_id = None
+client_secret = None
+access_token = None
+auth_endpoint = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+
+# attribute definitions
+mails_attr_prefix = "urn:perun:user:attribute-def:virt:mails-namespace:"
+emails_attr_name = None
+displayname_attr_name = "urn:perun:user:attribute-def:core:displayName"
+groupname_attr_name = "urn:perun:resource:attribute-def:def:m365GroupName"
+preferredlang_attr_name = "urn:perun:user:attribute-def:def:preferredLanguage"
+isteam_attr_name = "urn:perun:resource:attribute-def:def:m365IsTeamGroup"
+islicencegroup_attr_name = "urn:perun:resource:attribute-def:def:m365LicenseGroup"
+onlyinternals_attr_name = "urn:perun:resource:attribute-def:def:m365InternalAccountsOnly"
+scope_attribute_name = "urn:perun:facility:attribute-def:def:o365-domainName"
+user_id_attr_name = "urn:perun:user:attribute-def:core:id"
+resource_id_attr_name = "urn:perun:resource:attribute-def:core:uuid"
+login_attr_name = "urn:perun:user_facility:attribute-def:virt:login"
+redirect_url_attr_name = "urn:perun:facility:attribute-def:def:m365InviteRedirectUrl"
+teams_owner_attr_name = "urn:perun:facility:attribute-def:def:m365TeamsOwner"
+
+#  statistics
+users_not_existing = []
+users_invited = 0
+users_removed = 0
+users_created = 0
+users_updated = 0
+groups_created = 0
+groups_removed = 0
+groups_updated = 0
+
+# language mapping
+lang_mapping = {
+	"cs": "cs-CZ",
+	"en": "en-US"
+}
+users_mapping_internals = {}  # { "link_id": internal_account_id}
+users_mapping_externals = {}  # { "link_id": [external_account_ids]}
+our_internal_logins = []  # logins of our internal users
+created_teams_queue = []  # tuples of created teams requests and members to add later (async creation)
+
+
+def print_debug(message):
+	if DEBUG:
+		print(message)
+
+
+def print_stats():
+	""" Prints propagation statistics """
+	message = "Propagation finished.\n"
+	message += f"Invited {users_invited} account(s).\n"
+	message += f"Created {users_created} internal user(s).\n"
+	message += f"Updated {users_updated - users_invited} account(s).\n"
+	message += f"Removed {users_removed} account(s).\n"
+	message += f"{groups_created} group(s) created.\n"
+	message += f"{groups_removed} group(s) removed.\n"
+	message += f"Membership updated in {groups_updated} group(s).\n"
+	message += f"Skipped users (no Microsoft account found): {'; '.join(users_not_existing)}\n" if len(users_not_existing) > 0 else ""
+	print(message)
+
+
+def load_attribute_names(data):
+	""" Finds full name of email attribute and stores scope to global variable """
+
+	# UPN scope
+	if not data.get(scope_attribute_name):
+		send_lib.die_with_error("Missing scope attribute!")
+	global SCOPE
+	SCOPE = data[scope_attribute_name]
+
+	# redirect URL
+	if not data.get(redirect_url_attr_name):
+		send_lib.die_with_error("Missing redirect URL attribute!")
+	global REDIRECT_URL
+	REDIRECT_URL = data[redirect_url_attr_name]
+
+	# default teams owner
+	if not data.get(teams_owner_attr_name):
+		send_lib.die_with_error("Missing default teams owner!")
+	global TEAMS_OWNER
+	TEAMS_OWNER = data[teams_owner_attr_name]
+
+	if len(data["users"]) == 0:
+		return
+
+	# name of email attribute (can be different for namespaces)
+	global emails_attr_name
+	emails_attr_name = next(filter(lambda attr: attr.startswith(mails_attr_prefix), data["users"][0].keys()), None)
+	if not emails_attr_name:
+		send_lib.die_with_error("Invalid service settings - missing email attributes for users.")
+
+
+def request_access_token():
+	""" Obtains access token and saves it to global variable """
+	post_data = {
+		'client_id': client_id,
+		'client_secret': client_secret,
+		'scope': 'https://graph.microsoft.com/.default',
+		'grant_type': 'client_credentials'
+	}
+	response = requests.post(auth_endpoint, post_data)
+	print_debug(f'Response from auth endpoint ended with status code {response.status_code}')
+	if response.ok:
+		response_data = response.json()
+		global access_token
+		access_token = response_data['access_token']
+	else:
+		send_lib.die_with_error("Communication with authorization endpoint failed.")
+
+
+def generate_random_password(length=16):
+	"""
+	Generates random password that should comply with password policies specified here:
+	https://learn.microsoft.com/en-us/azure/active-directory/authentication/concept-sspr-policy#azure-ad-password-policies
+	"""
+	lowercase_letters = string.ascii_lowercase
+	uppercase_letters = string.ascii_uppercase
+	digits = string.digits
+	special_characters = '!@#$%^&*()_-+=<>?'
+
+	password = [
+		secrets.choice(lowercase_letters),
+		secrets.choice(uppercase_letters),
+		secrets.choice(digits),
+		secrets.choice(special_characters)
+	]
+
+	remaining_length = length - len(password)
+	all_characters = lowercase_letters + uppercase_letters + digits + special_characters
+	password.extend(secrets.choice(all_characters) for _ in range(remaining_length))
+	secrets.SystemRandom().shuffle(password)
+	generated_password = ''.join(password)
+
+	return generated_password
+
+
+def get_our_internal_users(our_data):
+	""" Returns all members of resources marked as m365 license groups """
+	link_ids = set()
+	for group in our_data["groups"]:
+		if group[islicencegroup_attr_name]:
+			for member in group["members"]:
+				link_ids.add(member["link_id"])
+	internals = list(filter(lambda u: u["link_id"] in link_ids, our_data["users"]))
+	return internals
+
+
+def get_immutable_id(our_user):
+	""" Creates immutable ID - it has to be unique, including restorable objects """
+	return f'{our_user[login_attr_name]}@{SCOPE}'
+
+
+def call_api(url: str, params=None, type='GET', retry_no=0, raw=False, await_event=None):
+	"""
+	Calls the API. Handles slowing requests down if limits are hit and renews access token if needed.
+	If parameter raw is True, returns whole response.
+	@return: response data
+	"""
+	HEADERS = {"Authorization": "Bearer " + access_token}
+	if retry_no > 3:
+		send_lib.die_with_error("Exceeded max number of retries.")
+	if type == 'GET':
+		response = requests.get(url=url, params=params, headers=HEADERS, timeout=TIMEOUT)
+	elif type == 'DELETE':
+		response = requests.delete(url=url, json=params, headers=HEADERS, timeout=TIMEOUT)
+	elif type == 'PATCH':
+		response = requests.patch(url=url, json=params, headers=HEADERS, timeout=TIMEOUT)
+	elif type == 'POST':
+		response = requests.post(url=url, json=params, headers=HEADERS, timeout=TIMEOUT)
+	else:
+		send_lib.die_with_error(f"Invalid request type {type}")
+	if response.ok:
+		if raw:
+			return response
+		try:
+			response = response.json()
+		except json.decoder.JSONDecodeError:
+			return None  # some requests don't return anything
+		data = response["value"] if "value" in response else response
+		if '@odata.nextLink' in response:
+			data.extend(call_api(response['@odata.nextLink'], None))
+		return data
+	else:
+		if response.status_code == 401:  # access token expired
+			print_debug("Renewing access token.")
+			request_access_token()
+			call_api(url=url, params=params, type=type, retry_no=retry_no+1, raw=raw, await_event=await_event)
+		elif response.status_code == 429:  # too many requests
+			retry_after = response.headers.get('Retry-After', RETRY_AFTER_DEFAULT)
+			print_debug(f'"Too many requests" in response, waiting {retry_after} sec.')
+			time.sleep(retry_after)
+			call_api(url=url, params=params, type=type, retry_no=retry_no+1, raw=raw, await_event=await_event)
+		elif await_event and response.json().get("error", {}).get("code", "") == await_event:
+			print_debug(f"Expected error araised: '{await_event}', waiting.")
+			time.sleep(RETRY_AFTER_DEFAULT)
+			call_api(url=url, params=params, type=type, retry_no=retry_no+1, raw=raw, await_event=await_event)
+		else:
+			send_lib.die_with_error(f"Request ended with error, response: {response.content}")
+
+
+########################
+### USERS MANAGEMENT ###
+########################
+
+def fetch_their_users():
+	""" Fetches all users in M365 """
+	print_debug(f"Fetching users.")
+	url = f'{BASE_URL}/users?$select={PERUN_MANAGED_EXTENSION_NAME},mail,userPrincipalName,displayName,id,proxyAddresses'
+	result = call_api(url)
+	print_debug(f"Fetched {len(result)} users.")
+	return result
+
+
+def fetch_removed_users():
+	""" Fetches recently removed users, we cannot create them anew as the internal users occupy the immutableId """
+	print_debug("Fetching removed users.")
+	url = f'{BASE_URL}/directory/deletedItems/microsoft.graph.user?$select={PERUN_MANAGED_EXTENSION_NAME},id,userPrincipalName,onPremisesImmutableId,displayName'
+	result = call_api(url)
+	print_debug(f"Fetched {len(result)} removed users.")
+	return result
+
+
+def invite_user(mail):
+	""" Invites external account to m365, with sendInvitationMessage set to False does not send actual mail """
+	print_debug(f"Inviting user {mail}")
+	url = f"{BASE_URL}/invitations"
+	params = {"invitedUserEmailAddress": mail,
+			  "inviteRedirectUrl": REDIRECT_URL,
+			  "sendInvitationMessage": False}
+	response = call_api(url, params, "POST")
+	global users_invited
+	users_invited += 1
+	return response["invitedUser"]["id"]
+
+
+def delete_user(user):
+	""" Deletes user in m365 """
+	print_debug(f"Removing user {user['userPrincipalName']}")
+	url = f"{BASE_URL}/users/{user['id']}"
+	call_api(url, None, "DELETE")
+	global users_removed
+	users_removed += 1
+
+
+def update_user(our_user, user_id):
+	""" Updates user in m365 - only display name and extension attribute """
+	print_debug(f"Updating user {our_user[displayname_attr_name]}")
+	url = f"{BASE_URL}/users/{user_id}"
+	params = {
+		"displayName": our_user[displayname_attr_name],
+		PERUN_MANAGED_EXTENSION_NAME: True
+	}
+	call_api(url, params, "PATCH")
+	global users_updated
+	users_updated += 1
+
+
+def create_internal_user(user, password, immutable_id, lang=None):
+	""" Creates 'full' user in m365 (manageable in this tenant) """
+	upn = f"{user[login_attr_name]}@{SCOPE}"
+	print_debug(f"Creating internal user (#{user[user_id_attr_name]}) {upn}")
+
+	params = {
+		"accountEnabled": True,
+		"displayName": user[displayname_attr_name],
+		"mailNickname": user[login_attr_name],
+		"userPrincipalName": upn,
+		"passwordProfile": {
+			"forceChangePasswordNextSignIn": True,
+			"password": password
+		},
+		"mail": upn,
+		"onPremisesImmutableId": immutable_id,
+		"preferredLanguage": lang,
+		PERUN_MANAGED_EXTENSION_NAME: True
+	}
+	url = f"{BASE_URL}/users"
+	created_user = call_api(url, params, "POST")
+	global users_created
+	users_created += 1
+	return created_user
+
+
+def get_mail_aliases(proxy_addresses):
+	""" Converts list of proxy addresses property to list of mail aliases without prefixes """
+	return [a.split(":")[1] for a in proxy_addresses]
+
+
+def create_external_users(their_users, our_users):
+	""" Checks which accounts are not in the M365 yet. User can have no identity, one or more of them. """
+	for our_user in our_users:
+		user_existing_accounts = our_user[emails_attr_name]
+		if len(user_existing_accounts) == 0 and our_user[login_attr_name] not in our_internal_logins:
+			users_not_existing.append(f"(#{our_user[user_id_attr_name]}) {our_user[displayname_attr_name]}")
+			continue
+		for our_account in user_existing_accounts:
+			if our_account == upn_from_login(our_user[login_attr_name]):
+				continue  # we want to skip internal accounts potentially stored in Perun
+			their_user = next(filter(lambda user: our_account in get_mail_aliases(user["proxyAddresses"]), their_users), None)
+			if not their_user:
+				user_id = invite_user(our_account)
+				update_user(our_user, user_id)  # add PerunManaged attribute
+				users_mapping_externals.setdefault(our_user["link_id"], []).append(user_id)
+
+
+def upn_from_login(login):
+	""" Returns {login}@{scope}, which is UserPrincipalName for internal users in m365 """
+	return f"{login}@{SCOPE}"
+
+
+def create_update_restore_internal_users(their_users, removed_users, our_internals):
+	""" Creates or updates internal users in M365. """
+	for our_internal in our_internals:
+		uppn = f"{our_internal[login_attr_name]}@{SCOPE}"
+		their_user = next(filter(lambda user: user["userPrincipalName"] == uppn, their_users), None)
+		if their_user is None:
+			removed_user = next(filter(lambda user: user["onPremisesImmutableId"] == get_immutable_id(our_internal), removed_users), None)
+			if removed_user is not None:
+				restore_object(removed_user)
+				users_mapping_internals[our_internal["link_id"]] = removed_user["id"]
+			else:
+				password = generate_random_password()
+				immutable_id = get_immutable_id(our_internal)
+				lang = lang_mapping.get(our_internal[preferredlang_attr_name], "en-US")
+				created_internal = create_internal_user(our_internal, password, immutable_id, lang)
+				users_mapping_internals[our_internal["link_id"]] = created_internal["id"]
+		elif our_internal[displayname_attr_name] != their_user["displayName"]:
+			update_user(our_internal, their_user["id"])
+
+
+def delete_users(their_users, our_users):
+	""" Checks which accounts are redundant in M365 and removes them, if managed by Perun.
+	Also removes internal accounts if they don't belong to any licensed group anymore.
+	As a side effect, creates mapping of internal and external users.
+	Internal users are matched by UPN, external users are matched by existing mail alias in proxyAddresses property. """
+	for their_user in their_users:
+		our_user = None
+		if not their_user.get(PERUN_MANAGED_EXTENSION_NAME):
+			continue  # skip users not managed by Perun
+
+		if '#EXT#@' in their_user["userPrincipalName"]:
+			for user in our_users:
+				if any(
+					user_mail in get_mail_aliases(their_user["proxyAddresses"])
+					for user_mail in user[emails_attr_name]
+				):
+					our_user = user
+					users_mapping_externals.setdefault(our_user["link_id"], []).append(their_user["id"])
+					break
+		else:
+			if their_user["userPrincipalName"].split("@")[0] in our_internal_logins:
+				our_user = next(filter(lambda user: their_user["userPrincipalName"] == f"{user[login_attr_name]}@{SCOPE}", our_users), None)
+				if our_user:
+					users_mapping_internals[our_user["link_id"]] = their_user["id"]
+
+		if our_user is None:
+			delete_user(their_user)
+
+
+def get_extension_names():
+	""" Get names of the extension attributes that mark Perun-managed objects in M365.
+		The format is something like 'extension_{random string}_PerunManaged' """
+	print_debug("Fetching extension attributes")
+	url = f"{BASE_URL}/directoryObjects/getAvailableExtensionProperties"
+	response = call_api(url, None, 'POST')
+	global PERUN_MANAGED_EXTENSION_NAME
+	global PERUN_ID_EXTENSION_NAME
+	for extension in response:
+		if extension["name"].endswith(PERUN_MANAGED_EXTENSION_SUFFIX):
+			PERUN_MANAGED_EXTENSION_NAME = extension["name"]
+		if extension["name"].endswith(PERUN_ID_EXTENSION_SUFFIX):
+			PERUN_ID_EXTENSION_NAME = extension["name"]
+	if not PERUN_MANAGED_EXTENSION_NAME:
+		send_lib.die_with_error("Extension attribute marking Perun managed objects not found in M365!")
+	if not PERUN_ID_EXTENSION_NAME:
+		send_lib.die_with_error("Extension attribute marking Perun IDs not found in M365!")
+
+
+#########################
+### GROUPS MANAGEMENT ###
+#########################
+
+def prepare_member_ids(group):
+	""" Converts link_ids of our group members to m365 user ids.
+	Includes internal and (multiple) external accounts based on group type."""
+	result = []
+	for member in group["members"]:
+		if not group[islicencegroup_attr_name] and not group[onlyinternals_attr_name]:
+			# externals will only be added to nonlicense groups and group not limited for internals
+			for externist_id in users_mapping_externals.get(member["link_id"], []):
+				result.append(externist_id)
+
+		# we want to add internals to all kinds of groups
+		if member["link_id"] in users_mapping_internals:
+			internist_id = users_mapping_internals.get(member["link_id"])
+			if internist_id:
+				result.append(internist_id)
+
+	return result
+
+
+def fetch_their_groups():
+	""" Fetches all groups in M365 """
+	print_debug("Fetching groups.")
+	url = (f'{BASE_URL}/groups?$select='
+		   f'{PERUN_MANAGED_EXTENSION_NAME},{PERUN_ID_EXTENSION_NAME},id,displayName,resourceProvisioningOptions')
+	result = call_api(url)
+	print_debug(f"Fetched {len(result)} groups.")
+	return result
+
+
+def fetch_removed_groups():
+	""" Fetches recently removed groups, so we could restore them instead of creating them """
+	print_debug("Fetching removed groups.")
+	url = (f'{BASE_URL}/directory/deletedItems/microsoft.graph.group?$select='
+		   f'{PERUN_MANAGED_EXTENSION_NAME},{PERUN_ID_EXTENSION_NAME},id,displayName,resourceProvisioningOptions')
+	result = call_api(url)
+	print_debug(f"Fetched {len(result)} removed groups.")
+	return result
+
+
+def restore_object(removed_object):
+	""" Restores recently removed object in m365 """
+	print_debug(f"Restoring removed object {removed_object['displayName']}")
+	url = f"{BASE_URL}/directory/deletedItems/{removed_object['id']}/restore"
+	call_api(url, params=None, type="POST")
+
+
+def remove_group(their_group):
+	""" Removes group from m365 - can be restored for 30 days, security groups are however deleted permanently."""
+	print_debug(f"Removing group {their_group['displayName']}")
+	url = f"{BASE_URL}/groups/{their_group['id']}"
+	call_api(url, params=None, type="DELETE")
+	global groups_removed
+	groups_removed += 1
+
+
+def remove_groups(our_groups, their_groups):
+	for their_group in their_groups:
+		if not their_group.get(PERUN_MANAGED_EXTENSION_NAME):
+			continue
+		our_group = next(filter(lambda g: g[groupname_attr_name] == their_group["displayName"], our_groups), None)
+		if our_group is None:
+			remove_group(their_group)
+
+
+def create_update_restore_groups(our_groups, removed_groups, their_groups):
+	""" Checks which groups are missing in m365 and creates them, updates members of existing groups """
+	for our_group in our_groups:
+		their_group = next(filter(lambda g: g["displayName"] == our_group[groupname_attr_name], their_groups), None)
+		if their_group is None:
+			their_removed_group = next(filter(lambda g: g["displayName"] == our_group[groupname_attr_name], removed_groups), None)
+			if (their_removed_group and their_removed_group.get(PERUN_MANAGED_EXTENSION_NAME)
+				and their_removed_group.get(PERUN_ID_EXTENSION_NAME, -1) == our_group[resource_id_attr_name]):
+				restore_object(their_removed_group)
+				update_group_memberships(our_group, their_removed_group)
+			else:
+				if not our_group[isteam_attr_name] or our_group[islicencegroup_attr_name]:
+					create_group(our_group)
+				else:
+					create_team(our_group)
+		elif not their_group.get(PERUN_MANAGED_EXTENSION_NAME):
+			# group name should be unique attribute in Perun, but it can already exist in m365 - if so, terminate
+			send_lib.die_with_error(f"Group/team with name {our_group[groupname_attr_name]} already exists!")
+		else:
+			update_group_memberships(our_group, their_group)
+
+
+def fetch_their_members(group):
+	"""	Fetches members of group in m365, retrieves their userPrincipalNames and internal ids. """
+	group_id = group["id"]
+	url = f'{BASE_URL}/groups/{group_id}/members'
+	params = {'$select': 'userPrincipalName,id'}
+	return call_api(url, params)
+
+
+def update_group_memberships(our_group, their_group):
+	""" Update members of existing group in m365 """
+	if (our_group[islicencegroup_attr_name] or not our_group[isteam_attr_name]) and "Team" in their_group["resourceProvisioningOptions"]:
+		print(f"WARNING: Group {our_group[groupname_attr_name]} type mismatch detected - is a team!")
+	if our_group[isteam_attr_name] and "Team" not in their_group["resourceProvisioningOptions"]:
+		print(f"WARNING: Group {our_group[groupname_attr_name]} type mismatch detected - not a team!")
+	our_member_ids = prepare_member_ids(our_group)
+	their_members = fetch_their_members(their_group)
+	their_member_ids = list(map(lambda m: m["id"], their_members))
+	our_missing_members = list(filter(lambda m: m not in their_member_ids, our_member_ids))
+	their_redundant_members = list(filter(lambda m: m not in our_member_ids, their_member_ids))
+	add_members_to_group(their_group, our_missing_members)
+	remove_members_from_group(their_group, their_redundant_members)
+	if len(our_missing_members) or len(their_redundant_members):
+		global groups_updated
+		groups_updated += 1
+
+
+def patch_group(group_id, params):
+	""" Updates group properties. Expects 'Request_ResourceNotFound' may araise, would then wait. """
+	url = f"{BASE_URL}/groups/{group_id}"
+	# beware: creating team doesn't grant the group is ready to be edited yet!
+	call_api(url, type="PATCH", params=params, await_event="Request_ResourceNotFound")
+
+
+def add_members_to_group(their_group, member_ids):
+	""" Adds missing members to group in m365 """
+	print_debug(f'{len(member_ids)} members to be added to group {their_group["displayName"]}') if len(member_ids) > 0 else None
+	member_links = list(map(lambda m_id: f"{BASE_URL}/users/{m_id}", member_ids))
+	for i in range(0, len(member_links), ADD_MEMBERS_CHUNK_SIZE):
+		print_debug(f'Adding members of chunk #{i // ADD_MEMBERS_CHUNK_SIZE + 1}')
+		chunk = member_links[i:i + ADD_MEMBERS_CHUNK_SIZE]
+		call_add_members(chunk, their_group["id"])
+
+
+def remove_members_from_group(their_group, member_ids):
+	"""	Removes members that are not present in Perun.	"""
+	for member_id in member_ids:
+		print_debug(f'Removing user {member_id} from group {their_group["displayName"]}')
+		url = f'{BASE_URL}/groups/{their_group["id"]}/members/{member_id}/$ref'
+		call_api(url, None, 'DELETE')
+
+
+def call_add_members(chunk, group_id):
+	url = f"{BASE_URL}/groups/{group_id}"
+	if len(chunk) == 0:
+		return
+	params = {
+		"members@odata.bind": chunk
+	}
+	call_api(url, params, 'PATCH')
+
+
+def create_group(group):
+	""" Create group in m365, requires complete users_mapping """
+	print_debug(f"Creating group {group[groupname_attr_name]}")
+	member_ids = prepare_member_ids(group)
+	params = {
+		"displayName": group[groupname_attr_name],
+		"mailNickname": group[groupname_attr_name],
+		PERUN_MANAGED_EXTENSION_NAME: True,
+		PERUN_ID_EXTENSION_NAME: str(group[resource_id_attr_name]),
+		"groupTypes": [],
+		"mailEnabled": False,
+		"securityEnabled": True,
+		}
+
+	url = f"{BASE_URL}/groups"
+	created_group = call_api(url, params, "POST")
+	global groups_created
+	groups_created += 1
+	# add members separately (size is limited)
+	add_members_to_group(created_group, member_ids)
+
+
+def create_team(team):
+	""" Create team in m365, requires complete users_mapping.
+		Creation is async, link to operation result is in the headers.
+		We add it to the queue now and add members later (number of members is also limited in the creation request). """
+	print_debug(f"Creating team {team[groupname_attr_name]}")
+	member_ids = prepare_member_ids(team)
+	params = {
+		"template@odata.bind": f"{BASE_URL}/teamsTemplates('standard')",
+		"displayName": team[groupname_attr_name],
+		"visibility": "Private",
+		"members": [
+			{
+				"@odata.type": "#microsoft.graph.aadUserConversationMember",
+				"roles": [
+					"owner"
+				],
+				"user@odata.bind": f"{BASE_URL}/users('{TEAMS_OWNER}')"
+			}
+		],
+		"resourceBehaviorOptions": ["WelcomeEmailDisabled"]
+	}
+	url = f"{BASE_URL}/teams"
+	response = call_api(url, params, "POST", raw=True)
+	global groups_created
+	groups_created += 1
+	location_url = f"{BASE_URL}/{response.headers.get('Location')}"
+	created_teams_queue.append((location_url, member_ids, team[resource_id_attr_name]))
+
+
+def resolve_teams():
+	""" Checks, if async teams creation was finished.
+		Then, updates team's related group with extension attributes.
+		Lastly, updates users. """
+	for link, member_ids, resource_uuid in created_teams_queue:
+		operation_location = call_api(link)
+		retries = 0
+		while operation_location.get("status", "") != "succeeded":
+			print_debug(f"Team not created yet, waiting {RETRY_AFTER_DEFAULT} seconds.")
+			time.sleep(RETRY_AFTER_DEFAULT)
+			retries += 1
+			if retries > 6:
+				send_lib.die_with_error(f"Timeout when waiting for a team to be created.")
+			operation_location = call_api(link)
+		resource_location = operation_location.get("targetResourceLocation")
+		team = call_api(f"{BASE_URL}{resource_location}")
+		print_debug("Team creation succeeded.")
+
+		# critical part - if update fails, the group won't be Perun managed!
+		params = {PERUN_MANAGED_EXTENSION_NAME: True,
+				  PERUN_ID_EXTENSION_NAME: resource_uuid}
+		patch_group(team["id"], params)
+
+		print_debug(f"Group updated, adding members.")
+		add_members_to_group(team, member_ids)
+
+
+if __name__ == "__main__":
+	# check input format
+	send_lib.check_input_fields(sys.argv, True)
+	facility = sys.argv[1]
+	destination = sys.argv[2]
+	destination_type = sys.argv[3]
+	send_lib.check_destination_type_allowed(destination_type, send_lib.DESTINATION_TYPE_SERVICE_SPECIFIC)
+	send_lib.check_destination_format(destination, destination_type, TENANT_REGEX_FORMAT)
+	send_lib.create_lock(SERVICE_NAME, destination)
+
+	# read configuration, obtain access token
+	auth_endpoint = auth_endpoint.replace("{tenant}", destination)
+	config_properties = send_lib.get_custom_config_properties(SERVICE_NAME, destination, ["clientId", "clientSecret"])
+	if not config_properties:
+		send_lib.die_with_error("Configuration not found or properties missing!")
+	client_id = config_properties[0]
+	client_secret = config_properties[1]
+	request_access_token()
+	get_extension_names()
+
+	# process data for each group
+	gen_folder = send_lib.get_gen_folder(facility, SERVICE_NAME)
+	with open(f'{gen_folder}/{SERVICE_NAME}', 'rb') as f:
+		our_complete_data = json.load(f)
+		load_attribute_names(our_complete_data)
+
+		# users management
+		their_users = fetch_their_users()
+		removed_users = fetch_removed_users()  # users recently removed in m365
+		our_internal_users = get_our_internal_users(our_complete_data)
+		our_internal_logins = list(map(lambda u: u[login_attr_name], our_internal_users))
+		delete_users(their_users, our_complete_data["users"])
+		create_update_restore_internal_users(their_users, removed_users, our_internal_users)
+		create_external_users(their_users, our_complete_data["users"])
+
+		# groups management
+		their_groups = fetch_their_groups()
+		removed_groups = fetch_removed_groups()  # groups recently removed in m365
+		remove_groups(our_complete_data["groups"], their_groups)
+		create_update_restore_groups(our_complete_data["groups"], removed_groups, their_groups)
+		resolve_teams()
+
+	print_stats()

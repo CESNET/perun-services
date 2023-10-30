@@ -144,8 +144,20 @@ local $::SKIP_NON_VALID_MEMBERS = 1;
 sub generateUsersDataInJSON {
 	perunServicesInit::init;
 
-	my $DIRECTORY = perunServicesInit::getDirectory;
 	my $data = perunServicesInit::getHashedHierarchicalData;
+	my $DIRECTORY = perunServicesInit::getDirectory;
+	my ($users, $ids) = finalizeUsersData($data);
+	my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+	open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
+	print FILE JSON::XS->new->utf8->pretty->canonical->encode($users);
+	close FILE or die "Cannot close $fileName: $! \n";
+
+	perunServicesInit::finalize;
+}
+
+# Returns completed users data
+sub finalizeUsersData {
+	my $data = shift;
 	my $agent = perunServicesInit->getAgent;
 	my $attributesAgent = $agent->getAttributesAgent;
 	my $servicesAgent = $agent->getServicesAgent;
@@ -155,14 +167,7 @@ sub generateUsersDataInJSON {
 	my @userRequiredAttributes = getRequiredAttributesByType(\@requiredAttributesDefinitions, $USER_ATTR_PREFIX);
 	my @userFacilityRequiredAttributes = getRequiredAttributesByType(\@requiredAttributesDefinitions, $USER_FACILITY_ATTR_PREFIX);
 
-	my ($users, $ids) = prepareUsersData($data, \@userRequiredAttributes, \@userFacilityRequiredAttributes);
-
-	my $fileName = "$DIRECTORY/$::SERVICE_NAME";
-	open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
-	print FILE JSON::XS->new->utf8->pretty->canonical->encode($users);
-	close FILE or die "Cannot close $fileName: $! \n";
-
-	perunServicesInit::finalize;
+	return prepareUsersData($data, \@userRequiredAttributes, \@userFacilityRequiredAttributes);
 }
 
 =c
@@ -188,6 +193,18 @@ sub generateMemberUsersDataInJson {
 
 	my $DIRECTORY = perunServicesInit::getDirectory;
 	my $data = perunServicesInit::getHashedHierarchicalData;
+	my $result = finalizeMemberUsersData($data);
+	my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+	open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
+	print FILE JSON::XS->new->utf8->pretty->canonical->encode($result);
+	close FILE or die "Cannot close $fileName: $! \n";
+
+	perunServicesInit::finalize;
+}
+
+# Returns completed member-users data
+sub finalizeMemberUsersData {
+	my $data = shift;
 	my $agent = perunServicesInit->getAgent;
 	my $attributesAgent = $agent->getAttributesAgent;
 	my $servicesAgent = $agent->getServicesAgent;
@@ -233,12 +250,7 @@ sub generateMemberUsersDataInJson {
 		push @{$result->{"groups"}}, $resource;
 	}
 
-	my $fileName = "$DIRECTORY/$::SERVICE_NAME";
-	open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
-	print FILE JSON::XS->new->utf8->pretty->canonical->encode($result);
-	close FILE or die "Cannot close $fileName: $! \n";
-
-	perunServicesInit::finalize;
+	return $result;
 }
 
 return 1;
