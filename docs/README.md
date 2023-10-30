@@ -19,4 +19,5 @@ Table of modules
 Table of services
 
 - [dhus](services/dhus.md)
+- [m365_cloud](services/m365_cloud.md)
 - [webcentrum_eosc](services/webcentrum_eosc.md)
