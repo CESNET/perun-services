@@ -1,0 +1,79 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use File::Basename;
+use perunDataGenerator;
+no if $] >= 5.017011, warnings => 'experimental::smartmatch';
+
+local $::SERVICE_NAME = basename($0);
+local $::PROTOCOL_VERSION = "3.0.0";
+local $::SKIP_NON_VALID_MEMBERS = 1;
+
+# REQUIRED ATTRIBUTES
+# urn:perun:user:attribute-def:def:preferredLanguage
+# urn:perun:user:attribute-def:virt:mails-namespace:microsoft
+# urn:perun:user:attribute-def:core:displayName
+# urn:perun:user_facility:attribute-def:virt:login
+# urn:perun:facility:attribute-def:def:o365-domainName
+# urn:perun:resource:attribute-def:def:m365IsTeamGroup
+# urn:perun:resource:attribute-def:def:m365InternalAccountsOnly
+# urn:perun:resource:attribute-def:def:m365GroupName
+# urn:perun:member:attribute-def:core:status
+# urn:perun:resource:attribute-def:def:m365LicenseGroup
+# urn:perun:facility:attribute-def:def:m365TeamsOwner
+# urn:perun:user:attribute-def:core:id
+# urn:perun:resource:attribute-def:core:uuid
+# urn:perun:facility:attribute-def:def:m365InviteRedirectUrl
+our $M365_LICENSE_GROUP;    *M365_LICENSE_GROUP =        \'urn:perun:resource:attribute-def:def:m365LicenseGroup';
+our $M365_LICENSES_MAP;     *M365_LICENSES_MAP =         \'urn:perun:facility:attribute-def:def:m365AllowedLicensesPriorities';
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+my $preparedData = perunDataGenerator::finalizeMemberUsersData($data);
+
+my $licenses_map = $data->getFacilityAttributeValue(attrName => $M365_LICENSES_MAP);
+my @sorted_license_groups = map { $licenses_map->{$_} } sort { $b <=> $a } keys %$licenses_map;
+my @licensed_users;
+
+foreach my $license_name (@sorted_license_groups) {
+	# check each license group, starting from the most prioritized one, if it is defined in the mapping
+	foreach my $group (@{ $preparedData->{"groups"} }) {
+		my $group_license = $group->{$M365_LICENSE_GROUP};
+		unless ($group_license) {
+			next;
+		}
+		unless ($licenses_map) {
+			die "License priority mapping attribute '$M365_LICENSES_MAP' is not specified, but some resources
+			are marked as license groups!";
+		}
+		if (! grep { $_ eq $group_license } @sorted_license_groups) {
+			die "License '$group_license' is not specified in licence names!";
+		}
+		if ($license_name ne $group_license) {
+			next;
+		}
+
+		# filter the members who have already been assigned to some (prioritized) license group
+		my @members;
+		foreach my $member (@{ $group->{"members"} }) {
+			if ($member->{"link_id"} ~~ @licensed_users) {
+				next;
+			} else {
+				push @licensed_users, $member->{"link_id"};
+				push @members, $member;
+			}
+		}
+
+		# replace with filtered members
+		$group->{"members"} = \@members;
+	}
+}
+
+my $fileName = "$DIRECTORY/$::SERVICE_NAME";
+open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
+print FILE JSON::XS->new->utf8->pretty->canonical->encode($preparedData);
+close FILE or die "Cannot close $fileName: $! \n";
+
+perunServicesInit::finalize;

@@ -7,11 +7,11 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "myq_printsvc";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHashedHierarchicalData;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 # Output file name
 my $output_fileName = "$DIRECTORY/import_users-perun".".csv";
@@ -23,6 +23,9 @@ our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_CHIPNUMBERS; *A_CHIPNUMBERS = \'urn:perun:user:attribute-def:def:chipNumbers';
 our $A_R_NAME; *A_R_NAME = \'urn:perun:resource:attribute-def:core:name';
+our $A_R_MYQGROUPS; *A_R_MYQGROUPS = \'urn:perun:resource:attribute-def:def:myqIncludeWorkplaceInGroups';
+our $A_G_CISPR; *A_G_CISPR = \'urn:perun:group:attribute-def:def:inetCispr';
+our $A_G_INDIRECT; *A_G_INDIRECT = \'urn:perun:member_group:attribute-def:virt:groupStatusIndirect';
 
 # GATHER USERS
 my $users;  # $users->{$login}->{ATTR} = $attrValue;
@@ -31,25 +34,40 @@ my $users;  # $users->{$login}->{ATTR} = $attrValue;
 #
 # FOR EACH RESOURCE
 foreach my $resourceId ( $data->getResourceIds() ){
-
+	# keep track of users, process each only once per resource (except their workplaces)
+	my $processedUsers;
 	# EACH USER ON RESOURCE
-    my $resourceName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_NAME);
+	my $resourceName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_NAME);
 
-	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+	my $includeGroups = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_MYQGROUPS);
 
-		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
+	if ($includeGroups) {
+		foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId)) {
+			my $groupCISPR = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_CISPR);
 
-		# store standard attrs
-		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
-		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
-		$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
-		$users->{$login}->{$A_CHIPNUMBERS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_CHIPNUMBERS);
-        if (exists $users->{$login}->{"groups"}){
-            push @{$users->{$login}->{"groups"}}, $resourceName;
-        } else {
-            my @userGroups = ($resourceName);
-            $users->{$login}->{"groups"} = \@userGroups;
-        }
+			foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId)) {
+				my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
+				my $isIndirect = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_G_INDIRECT);
+
+				unless (exists $processedUsers->{$login}) {
+					$processedUsers->{$login} = 1;
+					fillUserData($memberId, $resourceName);
+				}
+				# is group workplace + is member direct
+				if (defined($groupCISPR) && !$isIndirect) {
+					if (exists($users->{$login}->{"groups"})) {
+						push @{$users->{$login}->{"groups"}}, $resourceName.'-'.$groupCISPR;
+					} else {
+						my @userWorkplaces =  ($resourceName.'-'.$groupCISPR);
+						$users->{$login}->{"groups"} = \@userWorkplaces;
+					}
+				}
+			}
+		}
+	} else {
+		foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+			fillUserData($memberId, $resourceName);
+		}
 	}
 }
 
@@ -81,10 +99,10 @@ for my $login (@logins) {
     # GROUPS
     my $groups_str = join ",",@{$users->{$login}->{"groups"}};
     print FILE '"' . $groups_str . '";';
-    # CODE
+	# CODE
     print FILE $login . ";";
     # SCANSTORAGE
-    print FILE '"' . "\\\\ha-bay.ics.muni.cz\\sciscan\\$login\\Scan" . '";';
+    print FILE '"' . "\\\\ha-bay.ics.muni.cz\\MyQscan\\$login\\Scan" . '";';
     # PIN
     print FILE ";";
     # MANAGED_GROUPS
@@ -106,7 +124,28 @@ for my $login (@logins) {
 
 close(FILE);
 
-print "OK.";
+print "OK.\n";
+
+sub fillUserData {
+	my $memberId = shift;
+	my $resourceName = shift;
+
+	my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
+	unless (exists($users->{$login})) {
+		# store standard attrs
+		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
+		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
+		$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
+		$users->{$login}->{$A_CHIPNUMBERS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_CHIPNUMBERS);
+	}
+
+	if (exists $users->{$login}->{"groups"}){
+		push @{$users->{$login}->{"groups"}}, $resourceName;
+	} else {
+		my @userGroups = ($resourceName);
+		$users->{$login}->{"groups"} = \@userGroups;
+	}
+}
 
 sub checkBase64 {
 	my $value = shift;
