@@ -1,5 +1,37 @@
 Upgrade notes
 
+## [9.0.0](https://github.com/CESNET/perun-services/compare/v8.6.0...v9.0.0) (2023-11-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **myq_printsvc:** resource def boolean attribute `myqIncludeWorkplaceInGroups` has to be created on the instance and added to the required attributes of the service
+ Group def `inetCispr` and member-group virt `groupStatusIndirect` also have to be added to required attributes
+ Scan storage path changed to `\\ha-bay.ics.muni.cz\MyQscan\$login\Scan`
+* 🧨 bbmri_networks, bbmri_collections now use LS IDs and LS
+usernames
+* Services need to have `urn:perun:user:attribute-def:def:login
+-namespace:lifescienceid-persistent-shadow` and `urn:perun:user:attribute-def:
+def:login-namespace:lifescienceid-username` attributes assigned as required
+in Peurn configuration if they used BBMRI IDs or BBMRI usernames. See changes
+to get hint what attribute needs to be assigned for which service. Consents should
+be modified to be granted for these attributes, as the ID change is internal
+change and does not reall affect users.
+
+### Features
+
+* **m365_cloud:** new service for provisioning to m365 ([efac6d8](https://github.com/CESNET/perun-services/commit/efac6d8e2dc074feb9216cdaaed6cc866de59293))
+* **myq_printsvc:** include workplace information ([77ae34d](https://github.com/CESNET/perun-services/commit/77ae34defcaecaab56733cf8a0c4ecaeaa6ff57a))
+
+
+### Bug Fixes
+
+* 🐛 Use LS ID in BBMRI negotiator scripts ([a196c21](https://github.com/CESNET/perun-services/commit/a196c2160080b5dfd4c6dc7e29627fe8a42691ed))
+* **docs:** moved service docs to correct folder ([56171a0](https://github.com/CESNET/perun-services/commit/56171a080c0fb9bc5426538d2ba77df9fca76037))
+* **vsup_ifis:** include new ids from DC2 ([7531120](https://github.com/CESNET/perun-services/commit/753112082d3d37766f00e92ae7f0b41a3e27cb70))
+* **vsup_ifis:** use only relations from stag ([6f73a59](https://github.com/CESNET/perun-services/commit/6f73a593db75209da9849dc1b006e63e30a4648f))
+* **vsup_stag:** fixed number of columns when inserting teachers ([8744d55](https://github.com/CESNET/perun-services/commit/8744d558828a3d17addd1bede4cf15d115115e30))
+
 ## [8.6.0](https://github.com/CESNET/perun-services/compare/v8.5.0...v8.6.0) (2023-10-10)
 
 
