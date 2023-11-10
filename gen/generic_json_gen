@@ -1,0 +1,328 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use JSON::XS;
+use Data::Dumper;
+
+our $SERVICE_NAME = "generic_json_gen";
+our $PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+sub crawlFlatten {
+	my $data = shift;
+
+	# If not HASH, return
+	return unless ref($data) eq "HASH";
+
+	foreach my $key (keys %$data) {
+		my $item = $data->{$key};
+		# Check if it is undef, if yes, delete it
+		if (!defined($item)) {
+			delete($data->{$key});
+			next;
+		}
+		# Check if it is array, if yes, check if it is empty, if yes, delete it
+		if (ref($data->{$key}) eq "ARRAY") {
+			if (scalar(@{$data->{$key}}) == 0) {
+				delete($data->{$key});
+				next;
+			}
+		}
+		# Check if it is hash, if yes, check if it is empty, if yes, delete it
+		if (ref($data->{$key}) eq "HASH") {
+			if (scalar(keys %{$data->{$key}}) == 0) {
+				delete($data->{$key});
+				next;
+			}
+		}
+		# Recursively call this function
+		crawlFlatten($data->{$key});
+	}
+}
+# Get information about service and its attributes
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedDataWithGroups;
+
+my $agent = perunServicesInit->getAgent;
+my $attributesAgent = $agent->getAttributesAgent;
+my $servicesAgent = $agent->getServicesAgent;
+my $service = $servicesAgent->getServiceByName(name => $::SERVICE_NAME);
+# Get all required attributes definitions for this service
+my @requiredAttributesDefinitions = $attributesAgent->getRequiredAttributesDefinition(service => $service->getId);
+
+# Constant attributes
+our $A_R_UUID;					 *A_R_UUID =                   \'urn:perun:resource:attribute-def:core:uuid';
+our $A_G_UUID;					 *A_G_UUID =                   \'urn:perun:group:attribute-def:core:uuid';
+our $A_V_UUID;					 *A_V_UUID =                   \'urn:perun:vo:attribute-def:core:uuid';
+our $A_U_UUID;					 *A_U_UUID =                   \'urn:perun:user:attribute-def:core:uuid';
+
+# Check attribute definitions, if all required attributes are present, group them by entity
+my $requiredAttributes = {
+	"facility"        => {},
+	"vo"              => {},
+	"group"           => {},
+	"group_resource"  => {},
+	"resource"        => {},
+	"user"            => {},
+	"user_facility"   => {},
+	"member"          => {},
+	"member_resource" => {},
+	"member_group"    => {},
+};
+for my $attribute (@requiredAttributesDefinitions) {
+	my $namespace = $attribute->getNamespace();
+	my @namespaceParts = split(":", $namespace);
+	my $entity = $namespaceParts[2];
+	my $urn = $namespace.":".$attribute->getFriendlyName;
+	$requiredAttributes->{$entity}->{$urn} = undef;
+}
+# Check if const attributes are present
+# if (!exists($requiredAttributes->{"vo"}->{$A_V_UUID})) {
+# 	die("Attribute $A_V_UUID is required for this service");
+# }
+if (!exists($requiredAttributes->{"group"}->{$A_G_UUID})) {
+	die("Attribute $A_G_UUID is required for this service");
+}
+if (!exists($requiredAttributes->{"resource"}->{$A_R_UUID})) {
+	die("Attribute $A_R_UUID is required for this service");
+}
+if (!exists($requiredAttributes->{"user"}->{$A_U_UUID})) {
+	die("Attribute $A_U_UUID is required for this service");
+}
+
+# Get constant information for facility
+my $facility = perunServicesInit::getFacility;
+my $facilityName = $facility->getName;
+print("Generating JSON for facility '".$facilityName."'\n");
+
+my @destinations = $servicesAgent->getDestinations(service => $service->getId, facility => $facility->getId);
+my @facilityDestinations;
+for my $destination (@destinations) {
+	push(@facilityDestinations, $destination->getDestination);
+}
+
+# List all attributes for facility
+my %facility_attributes;
+for my $urn (keys %{$requiredAttributes->{facility}}) {
+	my $attr = $data->getFacilityAttributeValue(attrName => $urn);
+	$facility_attributes{$urn} = $attr;
+}
+
+
+# Init Structure
+my $output = {
+	"metadata"  => {
+		"version"  => $SCRIPT_VERSION,
+		"facility" => {
+			"facility_name" => $facilityName,
+			"destinations" => \@facilityDestinations,
+			"attributes"   => \%facility_attributes,
+		}
+	},
+	"users"     => {}, # Fill later
+	"vos"       => {}, # Fill later
+	"groups"    => {}, # Fill later
+	"resources" => {} # Fill later
+};
+
+
+# Generate structure with required attributes
+# For fast lookup of UUID <-> ID mapping
+my $lookup = {
+	"uuids" => {}, 		# UUID -> ID mapping
+	"ids"   => { 		# ID -> UUID mapping
+		"vo" 	=> {}, 	# VO ID -> UUID mapping
+		"group" => {}, 	# Group ID -> UUID mapping
+		"resource" => {}, # Resource ID -> UUID mapping
+	},
+};
+
+# VOs
+print("Generating JSON for VOs\n");
+my $voAgent = $agent->getVosAgent;
+for my $voId ($data->getVoIds()) {
+	my $vo = $voAgent->getVoById(id => $voId);
+	my $voUUID = $vo->getUuid;
+	if (!defined($voUUID)) {
+		$voUUID = $voId;
+	}
+	# Lookup update
+	$lookup->{uuids}->{$voUUID} = $voId;
+	$lookup->{ids}->{vo}->{$voId} = $voUUID;
+
+	# Load VO attributes
+	my %vo_attributes;
+	for my $urn (keys %{$requiredAttributes->{vo}}) {
+		my $value = $data->getVoAttributeValue(vo => $voId, attrName => $urn);
+		$vo_attributes{$urn} = $value;
+	}
+
+	my $voobj = {
+		"attributes" => \%vo_attributes,
+	};
+	$output->{vos}->{$voUUID} = $voobj;
+}
+
+
+# Groups
+print("Generating JSON for groups\n");
+my $groupAgent = $agent->getGroupsAgent;
+for my $gropuId ($data->getGroupIds()) {
+	my $group = $groupAgent->getGroupById(id => $gropuId);
+	my $groupUUID = $group->getUuid;
+	if (!defined($groupUUID)) {
+		$groupUUID = $gropuId;
+	}
+
+	# Lookup update
+	$lookup->{uuids}->{$groupUUID} = $gropuId;
+	$lookup->{ids}->{group}->{$gropuId} = $groupUUID;
+
+	# Load Group attributes (undef if not present)
+	my %group_attributes;
+	for my $urn (keys %{$requiredAttributes->{group}}) {
+		my $value = $data->getGroupAttributeValue(group => $gropuId, attrName => $urn);
+		$group_attributes{$urn} = $value;
+	}
+
+	my $groupobj = {
+		"voUuid"          => $lookup->{ids}->{vo}->{$group->getVoId},
+		"attributes"      => \%group_attributes,
+		"parent_group"    => undef
+	};
+	$output->{groups}->{$groupUUID} = $groupobj;
+}
+# Re-fill parent_group
+for my $groupId ($data->getGroupIds()) {
+	my $group = $groupAgent->getGroupById(id => $groupId);
+	my $groupUUID = $group->getUuid;
+	my $groupobj = $output->{groups}->{$groupUUID};
+	my $parentGroupId = $group->getParentGroupId;
+	if (!defined($parentGroupId)){
+		next;
+	}
+	my $parentGroupUuid = $lookup->{ids}->{group}->{$parentGroupId};
+	if (defined($parentGroupUuid)) {
+		$groupobj->{"parent_group"} = $parentGroupUuid;
+	}
+	$output->{groups}->{$groupUUID} = $groupobj;
+}
+
+# Resources
+print("Generating JSON for resources\n");
+my $resourceAgent = $agent->getResourcesAgent;
+for my $resourceId ($data->getResourceIds()) {
+	my $resource = $resourceAgent->getResourceById(id => $resourceId);
+	my $resourceUUID = $resource->getUuid;
+	if (!defined($resourceUUID)) {
+		$resourceUUID = $resourceId;
+	}
+
+	# Lookup update
+	$lookup->{"uuids"}->{$resourceUUID} = $resourceId;
+	$lookup->{"ids"}->{"resource"}->{$resourceId} = $resourceUUID;
+
+	# Resource attributes
+	my %resource_attributes;
+	for my $urn (keys %{$requiredAttributes->{resource}}) {
+		my $value = $data->getResourceAttributeValue(resource => $resourceId, attrName => $urn);
+		$resource_attributes{$urn} = $value;
+	}
+
+	my %resource_group_attributes;
+	for my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
+		my $groupUUID = $lookup->{ids}->{group}->{$groupId};
+		for my $urn (keys %{$requiredAttributes->{group_resource}}) {
+			# FIXME: This is bugged, it fails, even if attribute is correct
+			#my $value = $data->getGroupAttributeValue(group => $groupId, resource => $resourceId, attrName => $resource_group);
+			$resource_group_attributes{$groupUUID}->{$urn} = undef;
+		}
+	}
+
+	my $resourceobj = {
+		"voUuid"          => $lookup->{ids}->{vo}->{$resource->getVoId},
+		"attributes"      => \%resource_attributes,
+		"assigned_groups" => \%resource_group_attributes,
+	};
+	$output->{resources}->{$resourceUUID} = $resourceobj;
+}
+
+# Users
+print("Generating JSON for users\n");
+my $userAgent = $agent->getUsersAgent;
+for my $memberId ($data->getMemberIdsForFacility()) {
+	print("Generating JSON for member $memberId\n");
+	my $userId = $data->getUserIdForMember(member => $memberId);
+	my $user = $userAgent->getUserById(id => $userId);
+	my $userUUID = $user->getUuid;
+	if (!defined($userUUID)) {
+		$userUUID = $userId;
+	}
+
+	# Lookup update
+	$lookup->{uuids}->{$userUUID} = $userId;
+	$lookup->{ids}->{user}->{$userId} = $userUUID;
+
+	my %vo_attributes;
+	my %group_attributes;
+	my %resource_attributes;
+	for my $voId ($data->getVoIdsForMember(member => $memberId)) {
+		my $voUUID = $lookup->{ids}->{vo}->{$voId};
+
+		# Fill Vo attributes
+		for my $urn (keys %{$requiredAttributes->{member}}) {
+			my $value = $data>getMemberAttributeValue(member => $memberId, attrName => $urn);
+			$vo_attributes{$voUUID}->{$urn} = $value;
+		}
+
+		# Group - Member
+		for my $groupId ($data->getGroupIdsForVo(vo => $voId)) {
+			my $groupUUID = $lookup->{ids}->{group}->{$groupId};
+			# Fill Group attributes
+			for my $urn (keys %{$requiredAttributes->{member_group}}) {
+				my $value = $data->getMemberGroupAttributeValue(member => $memberId, group => $groupId, attrName => $urn);
+				$group_attributes{$voUUID}->{$groupUUID}->{$urn} = $value;
+			}
+		}
+
+		# Resource - Member
+		for my $resourceId ($data->getResourceIdsForMember(member => $memberId)) {
+			my $resourceUUID = $lookup->{ids}->{resource}->{$resourceId};
+			# Fill Resource attributes
+			for my $urn (keys %{$requiredAttributes->{member_resource}}) {
+				my $value = $data->getMemberResourceAttributeValue(member => $memberId, resource => $resourceId, attrName => $urn);
+				$resource_attributes{$voUUID}->{$resourceUUID}->{$urn} = $value;
+			}
+		}
+	}
+
+	my %other_attributes;
+	for my $urn (keys %{$requiredAttributes->{user}}) {
+		my $value = $data->getUserAttributeValue(user => $userId, member => $memberId, attrName => $urn);
+		$other_attributes{$urn} = $value;
+	}
+	for my $urn (keys %{$requiredAttributes->{user_facility}}) {
+		my $value = $data->getUserFacilityAttributeValue(user => $userId, member => $memberId, attrName => $urn);
+		$other_attributes{$urn} = $value;
+	}
+
+	my $userobj = {
+		"allowed_vos"    => \%vo_attributes,
+		"allowed_groups" => \%group_attributes,
+		"allowed_resources" => \%resource_attributes,
+		"attributes"     => \%other_attributes,
+	};
+	$output->{users}->{$userUUID} = $userobj;
+}
+
+# Pretty print $output
+my $file = "$DIRECTORY/$::SERVICE_NAME.json";
+open FILE_USERS, ">$file" or die "Cannot open $file: $! \n";
+print FILE_USERS JSON::XS->new->utf8->pretty->canonical->encode($output), "\n";
+close(FILE_USERS) or die "Cannot close $file: $! \n";
+
+perunServicesInit::finalize;
