@@ -1,0 +1,198 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Perun::Agent;
+use Perun::GroupsAgent;
+use open qw/:std :utf8/;
+use JSON::XS;
+use Tie::IxHash;
+use utf8;
+
+local $::SERVICE_NAME = "bbmri_negotiator";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "1.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedDataWithGroups;
+
+#forward declaration
+sub processUsers;
+sub processGroups;
+sub processMemberships;
+
+#Constants
+our $A_LSRI_USER_ID;              *A_LSRI_USER_ID =          \'urn:perun:user:attribute-def:def:login-namespace:lifescienceid-persistent-shadow';
+our $A_MEMBER_IS_SUSPENDED;       *A_MEMBER_IS_SUSPENDED =   \'urn:perun:member:attribute-def:virt:isSuspended';
+our $A_MEMBER_STATUS;             *A_MEMBER_STATUS =         \'urn:perun:member:attribute-def:core:status';
+our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_D_NAME;               *A_USER_D_NAME =           \'urn:perun:user:attribute-def:core:displayName';
+our $A_G_COLLECTION_ID;           *A_G_COLLECTION_ID =       \'urn:perun:group:attribute-def:def:collectionID';
+our $A_G_BIOBANK_ID;              *A_G_BIOBANK_ID =          \'urn:perun:group:attribute-def:def:biobankID';
+our $A_G_NATIONAL_NODE_ID;        *A_G_NATIONAL_NODE_ID =    \'urn:perun:group:attribute-def:def:nationalNodeID';
+our $A_G_NETWORK_ID;              *A_G_NETWORK_ID =            \'urn:perun:group:attribute-def:def:networkID';
+our $A_G_ADM_COLLECTION_ID;       *A_G_ADM_COLLECTION_ID =     \'urn:perun:group:attribute-def:def:admCollectionID';
+our $A_G_ADM_BIOBANK_ID;          *A_G_ADM_BIOBANK_ID =        \'urn:perun:group:attribute-def:def:admBiobankID';
+our $A_G_ADM_NATIONAL_NODE_ID;    *A_G_ADM_NATIONAL_NODE_ID =  \'urn:perun:group:attribute-def:def:admNationalNodeID';
+our $A_G_ADM_NETWORK_ID;          *A_G_ADM_NETWORK_ID =        \'urn:perun:group:attribute-def:def:admNetworkID';
+
+our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
+
+our $ROLE_COLLECTION;       *ROLE_COLLECTION =   \'COLLECTION';
+our $ROLE_BIOBANK;          *ROLE_BIOBANK =      \'BIOBANK';
+our $ROLE_NN;               *ROLE_NN =           \'NATIONAL_NODE';
+our $ROLE_NETWORK;          *ROLE_NETWORK =      \'NETWORK';
+
+our $ROLE_ADM_COLLECTION;       *ROLE_ADM_COLLECTION =   \'ADM_COLLECTION';
+our $ROLE_ADM_BIOBANK;          *ROLE_ADM_BIOBANK =      \'ADM_BIOBANK';
+our $ROLE_ADM_NN;               *ROLE_ADM_NN =           \'ADM_NATIONAL_NODE';
+our $ROLE_ADM_NETWORK;          *ROLE_ADM_NETWORK =      \'ADM_NETWORK';
+
+our $userStruc = {};
+our $USER_EMAIL = "EMAIL";
+our $USER_NAME = "NAME";
+
+my $fileUsers = $DIRECTORY . "negotiator.json";
+
+foreach my $resourceId ( $data->getResourceIds() ) {
+	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
+		processGroups $groupId, $resourceId;
+	}
+}
+
+# PREPARE USERSDATA TO JSON
+my @users;
+foreach my $uid (sort keys %$userStruc) {
+	my $user = {};
+	$user->{"id"} = $uid;
+	$user->{"displayName"} = $userStruc->{$uid}->{$USER_NAME};
+	$user->{"mail"} = $userStruc->{$uid}->{$USER_EMAIL};
+	$user->{"membership"} = {};
+	$user->{"membership"}->{"collections"} = $userStruc->{$uid}->{$ROLE_COLLECTION};
+	$user->{"membership"}->{"biobanks"} = $userStruc->{$uid}->{$ROLE_BIOBANK};
+	$user->{"membership"}->{"national_nodes"} = $userStruc->{$uid}->{$ROLE_NN};
+	$user->{"membership"}->{"networks"} = $userStruc->{$uid}->{$ROLE_NETWORK};
+	$user->{"administrator"} = {};
+	$user->{"administrator"}->{"collections"} = $userStruc->{$uid}->{$ROLE_ADM_COLLECTION};
+	$user->{"administrator"}->{"biobanks"} = $userStruc->{$uid}->{$ROLE_ADM_BIOBANK};
+	$user->{"administrator"}->{"national_nodes"} = $userStruc->{$uid}->{$ROLE_ADM_NN};
+	$user->{"administrator"}->{"networks"} = $userStruc->{$uid}->{$ROLE_ADM_NETWORK};
+
+	push @users, $user;
+}
+
+# PRINT USERS TO JSON
+open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
+binmode(FILE_USERS);
+print FILE_USERS JSON::XS->new->utf8->pretty->canonical->encode(\@users);
+close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
+
+perunServicesInit::finalize;
+
+## creates users structure
+sub processGroups {
+	my $groupId = shift;
+	my $resourceId = shift;
+
+	my $roleIdValue;
+	my $groupRole;
+
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_COLLECTION_ID )) {
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_COLLECTION_ID );
+		$groupRole = $ROLE_COLLECTION;
+	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_BIOBANK_ID )) {
+	    if ($roleIdValue) {
+	        die "Group cannot have two roles set (#" . $groupId . ")";
+	    }
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_BIOBANK_ID );
+		$groupRole = $ROLE_BIOBANK;
+	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_NATIONAL_NODE_ID )) {
+		if ($roleIdValue) {
+			die "Group cannot have two roles set (#" . $groupId . ")";
+		}
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_NATIONAL_NODE_ID );
+		$groupRole = $ROLE_NN;
+	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_NETWORK_ID )) {
+		if ($roleIdValue) {
+			die "Group cannot have two roles set (#" . $groupId . ")";
+		}
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_NETWORK_ID );
+		$groupRole = $ROLE_NETWORK;
+	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_COLLECTION_ID )) {
+		if ($roleIdValue) {
+			die "Group cannot have two roles set (#" . $groupId . ")";
+		}
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_COLLECTION_ID );
+		$groupRole = $ROLE_ADM_COLLECTION;
+	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_BIOBANK_ID )) {
+		if ($roleIdValue) {
+			die "Group cannot have two roles set (#" . $groupId . ")";
+		}
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_BIOBANK_ID );
+		$groupRole = $ROLE_ADM_BIOBANK;
+	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_NATIONAL_NODE_ID )) {
+		if ($roleIdValue) {
+			die "Group cannot have two roles set (#" . $groupId . ")";
+		}
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_NATIONAL_NODE_ID );
+		$groupRole = $ROLE_ADM_NN;
+	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_NETWORK_ID )) {
+		if ($roleIdValue) {
+			die "Group cannot have two roles set (#" . $groupId . ")";
+		}
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_NETWORK_ID );
+		$groupRole = $ROLE_ADM_NETWORK;
+	}
+	if (! $roleIdValue) {
+		return;
+	}
+
+	for my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
+		processUsers $groupId, $memberId, $roleIdValue, $groupRole;
+	}
+}
+
+sub initializeUser {
+	my ($uid, $memberId) = @_;
+	$userStruc->{$uid} = {};
+	my $email = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EMAIL );
+	my $d_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_D_NAME );
+
+	$userStruc->{$uid}->{$USER_EMAIL} = $email;
+	$userStruc->{$uid}->{$USER_NAME} = $d_name;
+	$userStruc->{$uid}->{$ROLE_COLLECTION} = [];
+	$userStruc->{$uid}->{$ROLE_BIOBANK} = [];
+	$userStruc->{$uid}->{$ROLE_NN} = [];
+	$userStruc->{$uid}->{$ROLE_NETWORK} = [];
+	$userStruc->{$uid}->{$ROLE_ADM_COLLECTION} = [];
+	$userStruc->{$uid}->{$ROLE_ADM_BIOBANK} = [];
+	$userStruc->{$uid}->{$ROLE_ADM_NN} = [];
+	$userStruc->{$uid}->{$ROLE_ADM_NETWORK} = [];
+}
+
+sub processUsers {
+	my ($gid, $memberId, $roleIdValue, $groupRole) = @_;
+
+	my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+	my $isSuspended = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_IS_SUSPENDED );
+	if ($isSuspended || $status ne $STATUS_VALID) {
+		return;
+	}
+
+	my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_LSRI_USER_ID );
+	unless(exists $userStruc->{$uid}) {
+		initializeUser $uid, $memberId; 
+	}
+
+	push @{$userStruc->{$uid}->{$groupRole}}, $roleIdValue;
+}

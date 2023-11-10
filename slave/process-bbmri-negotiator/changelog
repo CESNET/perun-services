@@ -1,0 +1,5 @@
+perun-slave-process-bbmri_negotiator (3.0.0) stable; urgency=low
+
+  * New service bbmri_negotiator
+
+ -- Johana Supikova <supikova@ics.muni.cz>  Wed, 23 Oct 2023 09:32:00 +0100
