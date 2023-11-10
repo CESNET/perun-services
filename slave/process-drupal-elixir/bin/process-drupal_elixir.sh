@@ -36,10 +36,22 @@ function process {
 		fi
 	done
 
-	FILE_USER_DUPLICATES="$WORK_DIR/users-duplicities.csv"
-	#there are some duplicates between emails, need to end with error
+  EXIT_CODE = 1
+	FILE_USER_DUPLICATES="$WORK_DIR/users-duplicities.txt"
+	#there are some duplicates between emails, need to end with warning
 	if [ -s "${FILE_USER_DUPLICATES}" ]; then
 		DUPLICATES=`cat $FILE_USER_DUPLICATES`
-		log_warn_to_err_exit "Email duplicates: ${DUPLICATES}"
+		log_warn_to_err "Email duplicates: ${DUPLICATES}"
+		EXIT_CODE = 0
 	fi
+
+	FILE_USER_INVALID_NAMES="$WORK_DIR/users-invalid-names.txt"
+	#there are some users without first and/or last names, need to end with warning
+	if [ -s "${FILE_USER_INVALID_NAMES}" ]; then
+		INVALID_NAMES=`cat $FILE_USER_INVALID_NAMES`
+		log_warn_to_err "Invalid user names: ${INVALID_NAMES}"
+		EXIT_CODE = 0
+	fi
+
+	exit $EXIT_CODE
 }
