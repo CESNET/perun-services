@@ -1,6 +1,7 @@
 {
 	"branches": ["production", "+([0-9])?(.{+([0-9]),x}).x"],
 	"preset": "conventionalcommits",
+	"extends": "@semantic-release/gitlab-config",
 	"plugins": [
 		"@semantic-release/commit-analyzer",
 		[
@@ -90,6 +91,6 @@
 				"message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
 			}
 		],
-		"@semantic-release/github"
+		"@semantic-release/gitlab"
 	]
 }
