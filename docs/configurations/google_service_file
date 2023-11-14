@@ -1,0 +1,16 @@
+# JSON configuration as downloaded from https://console.cloud.google.com/iam-admin/serviceaccounts
+# -> select Project -> select or create service account -> select Keys tab -> Add key -> Paste the JSON here
+
+{
+  "type": "{service_account}",
+  "project_id": "{project_id}",
+  "private_key_id": "{private_key_id}",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n={private_key}=\n-----END PRIVATE KEY-----\n",
+  "client_email": "{email}@developer.gserviceaccount.com",
+  "client_id": "{client}.apps.googleusercontent.com",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/{cert}%40developer.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
