@@ -53,7 +53,7 @@ class FileLock(object):
 		self.dir_fd = os.open(self.lockfile, os.O_CREAT | os.O_RDWR)
 		try:
 			fcntl.flock(self.dir_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-		except IOError as ex:
+		except IOError:
 			die_with_error('Unable to get lock, service propagation was already running.')
 
 	def __enter__(self):
@@ -171,7 +171,7 @@ def copy_files_to_directory(path_from: str, path_to: str, name_pattern: re.Patte
 		if os.path.isfile(f) and name_pattern.match(filename):
 			try:
 				shutil.copy(f, path_to)
-			except IOError as e:
+			except IOError:
 				die_with_error("Cannot copy to " + path_to, 254)
 
 
