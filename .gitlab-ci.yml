@@ -10,5 +10,7 @@ variables:
 ruff:
   stage: test
   image: registry.gitlab.com/pipeline-components/ruff:latest
+  tags:
+    - k8s
   script:
     - ruff --output-format=gitlab $PYTHON_FILES
