@@ -1,0 +1,5 @@
+perun-slave-process-sympa-cesnet (3.0.0) stable; urgency=low
+
+  * New package version for perun-slave-process-sympa-cesnet
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Thr, 16 Nov 2023 19:40:00 +0100
