@@ -12,7 +12,8 @@
 		"commitizen": "^4.3.0",
 		"conventional-changelog-conventionalcommits": "^5.0.0",
 		"inquirer": "^8.2.5",
-		"semantic-release": "21.1.2"
+		"semantic-release": "21.1.2",
+		"semantic-release-pypi": "^3.0.0"
 	},
 	"config": {
 		"commitizen": {

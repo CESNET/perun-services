@@ -6,7 +6,6 @@ from ftplib import FTP_TLS
 from urllib.parse import urlparse
 
 import send_lib
-import tarfile
 
 service_name = "ftps_generic"
 port = 21

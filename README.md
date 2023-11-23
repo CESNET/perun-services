@@ -71,6 +71,9 @@ Pre scripts are processed before slave script and post scripts are processed aft
     -   Brackets for function calls are not necessary, if it doesn't hurt code readability.
     -   Code commenting - the more, the better. For each function we comment input, output a how does it modify global variables (if used).
     -   `man perlstyle`
+-   For Python sources:
+    - lint your code with [ruff](https://docs.astral.sh/ruff/)
+    - add names of new Python files into the `PYTHON_FILES` variable in `.gitlab-ci.yml`
 
 ### License
 

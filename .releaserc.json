@@ -85,9 +85,15 @@
 			}
 		],
 		[
+			"semantic-release-pypi",
+			{
+				"pypiPublish": false
+			}
+		],
+		[
 			"@semantic-release/git",
 			{
-				"assets": ["UPGRADE.md"],
+				"assets": ["UPGRADE.md", "pyproject.toml"],
 				"message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
 			}
 		],

@@ -234,7 +234,7 @@ def call_api(url: str, params=None, type='GET', retry_no=0, raw=False, await_eve
 
 def fetch_their_users():
 	""" Fetches all users in M365 """
-	print_debug(f"Fetching users.")
+	print_debug("Fetching users.")
 	url = f'{BASE_URL}/users?$select={PERUN_MANAGED_EXTENSION_NAME},mail,userPrincipalName,displayName,id,proxyAddresses'
 	result = call_api(url)
 	print_debug(f"Fetched {len(result)} users.")
@@ -638,7 +638,7 @@ def resolve_teams():
 			time.sleep(RETRY_AFTER_DEFAULT)
 			retries += 1
 			if retries > 6:
-				send_lib.die_with_error(f"Timeout when waiting for a team to be created.")
+				send_lib.die_with_error("Timeout when waiting for a team to be created.")
 			operation_location = call_api(link)
 		resource_location = operation_location.get("targetResourceLocation")
 		team = call_api(f"{BASE_URL}{resource_location}")
@@ -649,7 +649,7 @@ def resolve_teams():
 				  PERUN_ID_EXTENSION_NAME: resource_uuid}
 		patch_group(team["id"], params)
 
-		print_debug(f"Group updated, adding members.")
+		print_debug("Group updated, adding members.")
 		add_members_to_group(team, member_ids)
 
 
