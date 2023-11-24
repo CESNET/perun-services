@@ -85,12 +85,6 @@
 			}
 		],
 		[
-			"semantic-release-pypi",
-			{
-				"pypiPublish": false
-			}
-		],
-		[
 			"@semantic-release/git",
 			{
 				"assets": ["UPGRADE.md", "pyproject.toml"],
