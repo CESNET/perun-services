@@ -66,12 +66,13 @@ nb-configuration.xml
 # LINUX ignore #
 
 .*
-!.github
 !.releaserc.json
 !.editorconfig
 !.gitignore
 !.gitattributes
 !.commitlintrc.json
+!.gitlab-ci.yml
+!.npmrc
 *~
 
 # Window ignore #

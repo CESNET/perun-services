@@ -114,11 +114,11 @@ def call_api(url: str, params=None, type='GET', retry_no=0):
 				print_debug(f'Object not found - {params}.')
 				return None
 			elif "error" in response and "message" in response["error"] and "already exist" in response["error"]["message"]:
-				print_debug(f'Some member of the chunk is already member of the group.')
+				print_debug('Some member of the chunk is already member of the group.')
 				return False
 			elif "error" in response and "message" in response["error"] and \
 				"Invalid URL format specified in @odata.bind for members" in response["error"]["message"]:
-				print_debug(f'Invalid object id in the request (might have been removed).')
+				print_debug('Invalid object id in the request (might have been removed).')
 				return False
 			else:
 				send_lib.die_with_error(f"Request ended with error 400, response: {response.content}")

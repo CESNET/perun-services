@@ -1,0 +1,16 @@
+include:
+  - project: perun/common
+    file: /templates/.gitlab-ci-template.yml
+
+image: $CI_DEPENDENCY_PROXY_DIRECT_GROUP_IMAGE_PREFIX/bitnami/python:3.9
+
+variables:
+  PYTHON_FILES: 'send/pithia_portal send/ftps_generic send/bbmri_networks send/tinia send/feudal.py send/webcentrum_eosc send/umbraco_mu send/openstack_projects send/m365_cloud send/slack send/o365_groups_mu send/atlassian_mu send/bbmri_collections send/generic_send.py send/generic_sender.py send/send_lib.py send/scs_it4i'
+
+ruff:
+  stage: test
+  image: registry.gitlab.com/pipeline-components/ruff:latest
+  tags:
+    - k8s
+  script:
+    - ruff --output-format=gitlab $PYTHON_FILES

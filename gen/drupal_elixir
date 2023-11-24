@@ -10,7 +10,7 @@ use open qw/:std :utf8/;
 
 local $::SERVICE_NAME = "drupal_elixir";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.1.2";
+my $SCRIPT_VERSION = "3.2.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -29,6 +29,8 @@ our $A_MEMBER_IS_SUSPENDED;       *A_MEMBER_IS_SUSPENDED =   \'urn:perun:member:
 our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_EPPNS;                *A_USER_EPPNS =            \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 our $A_USER_D_NAME;               *A_USER_D_NAME =           \'urn:perun:user:attribute-def:core:displayName';
+our $A_USER_F_NAME;               *A_USER_F_NAME =           \'urn:perun:user:attribute-def:core:firstName';
+our $A_USER_L_NAME;               *A_USER_L_NAME =           \'urn:perun:user:attribute-def:core:lastName';
 our $A_GROUP_ID;                  *A_GROUP_ID =              \'urn:perun:group:attribute-def:core:id';
 our $A_GROUP_NAME;                *A_GROUP_NAME =            \'urn:perun:group:attribute-def:core:name';
 our $A_PARENT_GROUP_ID;           *A_PARENT_GROUP_ID =       \'urn:perun:group:attribute-def:core:parentGroupId';
@@ -45,6 +47,8 @@ our $u_login = {};
 our $u_status = {};
 our $u_email = {};
 our $u_name = {};
+our $u_fname = {};
+our $u_lname = {};
 our $u_eppn = {};
 
 our $duplicityUserStruc = {};
@@ -75,27 +79,34 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 # USERS: user_id login status e-mail display_name
 open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
 foreach my $uid (sort keys %$userStruc) {
-	print FILE_USERS "\"$uid\", \"$userStruc->{$uid}->{$u_login}\", \"$userStruc->{$uid}->{$u_status}\", \"$userStruc->{$uid}->{$u_email}\", \"$userStruc->{$uid}->{$u_name}\", \"$userStruc->{$uid}->{$u_eppn}\"","\n";
+	my $login = $userStruc->{$uid}->{$u_login};
+	my $status = $userStruc->{$uid}->{$u_status};
+	my $email = $userStruc->{$uid}->{$u_email};
+	my $name = $userStruc->{$uid}->{$u_name};
+	my $eppn = $userStruc->{$uid}->{$u_eppn};
+	my $f_name = $userStruc->{$uid}->{$u_fname};
+	my $l_name = $userStruc->{$uid}->{$u_lname};
+
+	print FILE_USERS "$uid,$login,$status,$email,$name,$eppn,$f_name,$l_name\n";
 }
 close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
 
 # USERS-duplicities: $uid login e-mail
 open FILE_USERS_DUPLICITIES,">$fileUsersDuplicities" or die "Cannot open $fileUsersDuplicities: $! \n";
 foreach my $uid (sort keys %$duplicityUserStruc) {
-	print FILE_USERS_DUPLICITIES "UID:\"$uid\", LOGIN:\"$duplicityUserStruc->{$uid}->{$u_login}\", EMAIL:\"$duplicityUserStruc->{$uid}->{$u_email}\"", "\n";
+	my $login = $duplicityUserStruc->{$uid}->{$u_login};
+	my $email = $duplicityUserStruc->{$uid}->{$u_email};
+	print FILE_USERS_DUPLICITIES "UID: $uid, LOGIN:$login, EMAIL:$email\n";
 }
 close (FILE_USERS_DUPLICITIES) or die "Cannot close $fileUsersDuplicities: $! \n";
 
 # GROUPS: group_id group_name type parent_id
 open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
 foreach my $gid (sort keys %$groupStruc) {
-	print FILE_GROUPS "\"$gid\", \"$groupStruc->{$gid}->{$g_name}\", \"$groupStruc->{$gid}->{$g_type}\", ";
-	if ($groupStruc->{$gid}->{$g_parent_id}) {
-		print FILE_GROUPS "\"$groupStruc->{$gid}->{$g_parent_id}\""
-	} else {
-		print FILE_GROUPS "\"0\"";
-	}
-	print FILE_GROUPS "\n";
+	my $name = $groupStruc->{$gid}->{$g_name};
+	my $type = $groupStruc->{$gid}->{$g_type}; 
+	my $parent_id = $groupStruc->{$gid}->{$g_parent_id} ? $groupStruc->{$gid}->{$g_parent_id} : 0;
+	print FILE_GROUPS "$gid,$name,$type,$parent_id\n";
 }
 close (FILE_GROUPS) or die "Cannot close $fileGroups: $! \n";
 
@@ -111,7 +122,7 @@ foreach my $uid (sort keys %$membershipStruc) {
 				last;
 			}
 		}
-		print FILE_MEMBERSHIPS "\"$uid\", \"$gid\", \"$membershipType\"", "\n";
+		print FILE_MEMBERSHIPS "$uid,$gid,$membershipType\n";
 	}
 }
 close (FILE_MEMBERSHIPS) or die "Cannot close $fileMemberships: $! \n";
@@ -135,10 +146,11 @@ sub processUsers {
 	}
 	my $email = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EMAIL );
 	my $d_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_D_NAME );
+	my $f_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_F_NAME );
+	my $l_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_L_NAME );
 
 	# Select right eppn from the list of eppns, TEMPORARILY get google one, then we will use elixir
 	my @eppns = @{$data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EPPNS)};
-
 
 	#select first eppn which ends with '@elixir-europe.org', if there is no one matching select first eppn, if there is no eppn at all use empty string
 	my $eppn = (grep /\@elixir-europe.org$/, @eppns)[0] || $eppns[0] || "";
@@ -167,6 +179,8 @@ sub processUsers {
 			$userStruc->{$uid}->{$u_status} = $status;
 			$userStruc->{$uid}->{$u_email} = $email;
 			$userStruc->{$uid}->{$u_name} = $d_name;
+			$userStruc->{$uid}->{$u_fname} = $f_name;
+			$userStruc->{$uid}->{$u_lname} = $l_name;
 			$userStruc->{$uid}->{$u_eppn} = $eppn;
 			$lowerCaseEmailStruc->{$lowerCaseEmail} = 1;
 		}

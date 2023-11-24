@@ -7,6 +7,7 @@ import time
 import secrets
 import requests
 import send_lib
+import unicodedata
 
 # constants
 SERVICE_NAME = "m365_cloud"
@@ -54,6 +55,7 @@ users_created = 0
 users_updated = 0
 groups_created = 0
 groups_removed = 0
+memberships_updated = 0
 groups_updated = 0
 
 # language mapping
@@ -81,7 +83,8 @@ def print_stats():
 	message += f"Removed {users_removed} account(s).\n"
 	message += f"{groups_created} group(s) created.\n"
 	message += f"{groups_removed} group(s) removed.\n"
-	message += f"Membership updated in {groups_updated} group(s).\n"
+	message += f"{groups_updated} group(s) updated.\n"
+	message += f"Membership updated in {memberships_updated} group(s).\n"
 	message += f"Skipped users (no Microsoft account found): {'; '.join(users_not_existing)}\n" if len(users_not_existing) > 0 else ""
 	print(message)
 
@@ -231,7 +234,7 @@ def call_api(url: str, params=None, type='GET', retry_no=0, raw=False, await_eve
 
 def fetch_their_users():
 	""" Fetches all users in M365 """
-	print_debug(f"Fetching users.")
+	print_debug("Fetching users.")
 	url = f'{BASE_URL}/users?$select={PERUN_MANAGED_EXTENSION_NAME},mail,userPrincipalName,displayName,id,proxyAddresses'
 	result = call_api(url)
 	print_debug(f"Fetched {len(result)} users.")
@@ -407,6 +410,20 @@ def get_extension_names():
 ### GROUPS MANAGEMENT ###
 #########################
 
+def group_name_to_mail_nickname(display_name):
+	""" Mail nickname mustn't contain special and non ascii characters.
+	Its length is limited to 64 characters. """
+	mail_nickname = unicodedata.normalize("NFKD", display_name)
+	mail_nickname = mail_nickname.encode('ASCII', 'ignore').decode('utf8').strip()
+	restricted_chars = ['@', '(', ')', '\\', '[', ']', '"', '<', '>', ',', ';', ':', ' ']
+	mail_nickname = ''.join([c if (ord(c) < 128 and c not in restricted_chars) else '' for c in mail_nickname])
+	mail_nickname = mail_nickname[:64]
+	if len(mail_nickname) == 0:
+		send_lib.die_with_error(f"Cannot create mail nickname for group {display_name}! Need some valid character!")
+
+	return mail_nickname
+
+
 def prepare_member_ids(group):
 	""" Converts link_ids of our group members to m365 user ids.
 	Includes internal and (multiple) external accounts based on group type."""
@@ -466,7 +483,7 @@ def remove_groups(our_groups, their_groups):
 	for their_group in their_groups:
 		if not their_group.get(PERUN_MANAGED_EXTENSION_NAME):
 			continue
-		our_group = next(filter(lambda g: g[groupname_attr_name] == their_group["displayName"], our_groups), None)
+		our_group = next(filter(lambda g: g[resource_id_attr_name] == their_group[PERUN_ID_EXTENSION_NAME], our_groups), None)
 		if our_group is None:
 			remove_group(their_group)
 
@@ -474,13 +491,13 @@ def remove_groups(our_groups, their_groups):
 def create_update_restore_groups(our_groups, removed_groups, their_groups):
 	""" Checks which groups are missing in m365 and creates them, updates members of existing groups """
 	for our_group in our_groups:
-		their_group = next(filter(lambda g: g["displayName"] == our_group[groupname_attr_name], their_groups), None)
+		their_group = next(filter(lambda g: g.get(PERUN_ID_EXTENSION_NAME) == our_group[resource_id_attr_name], their_groups), None)
 		if their_group is None:
-			their_removed_group = next(filter(lambda g: g["displayName"] == our_group[groupname_attr_name], removed_groups), None)
-			if (their_removed_group and their_removed_group.get(PERUN_MANAGED_EXTENSION_NAME)
-				and their_removed_group.get(PERUN_ID_EXTENSION_NAME, -1) == our_group[resource_id_attr_name]):
+			their_removed_group = next(filter(lambda g: g.get(PERUN_MANAGED_EXTENSION_NAME, False)
+				and g.get(PERUN_ID_EXTENSION_NAME) == our_group[resource_id_attr_name], removed_groups), None)
+			if their_removed_group:
 				restore_object(their_removed_group)
-				update_group_memberships(our_group, their_removed_group)
+				update_group(our_group, their_removed_group)
 			else:
 				if not our_group[isteam_attr_name] or our_group[islicencegroup_attr_name]:
 					create_group(our_group)
@@ -490,7 +507,7 @@ def create_update_restore_groups(our_groups, removed_groups, their_groups):
 			# group name should be unique attribute in Perun, but it can already exist in m365 - if so, terminate
 			send_lib.die_with_error(f"Group/team with name {our_group[groupname_attr_name]} already exists!")
 		else:
-			update_group_memberships(our_group, their_group)
+			update_group(our_group, their_group)
 
 
 def fetch_their_members(group):
@@ -501,8 +518,8 @@ def fetch_their_members(group):
 	return call_api(url, params)
 
 
-def update_group_memberships(our_group, their_group):
-	""" Update members of existing group in m365 """
+def update_group(our_group, their_group):
+	""" Update displayName and members of existing group in m365 """
 	if (our_group[islicencegroup_attr_name] or not our_group[isteam_attr_name]) and "Team" in their_group["resourceProvisioningOptions"]:
 		print(f"WARNING: Group {our_group[groupname_attr_name]} type mismatch detected - is a team!")
 	if our_group[isteam_attr_name] and "Team" not in their_group["resourceProvisioningOptions"]:
@@ -515,7 +532,11 @@ def update_group_memberships(our_group, their_group):
 	add_members_to_group(their_group, our_missing_members)
 	remove_members_from_group(their_group, their_redundant_members)
 	if len(our_missing_members) or len(their_redundant_members):
+		global memberships_updated
+		memberships_updated += 1
+	if our_group[groupname_attr_name] != their_group["displayName"]:
 		global groups_updated
+		patch_group(their_group["id"], {"displayName": our_group[groupname_attr_name]})
 		groups_updated += 1
 
 
@@ -560,7 +581,7 @@ def create_group(group):
 	member_ids = prepare_member_ids(group)
 	params = {
 		"displayName": group[groupname_attr_name],
-		"mailNickname": group[groupname_attr_name],
+		"mailNickname": group_name_to_mail_nickname(group[groupname_attr_name]),
 		PERUN_MANAGED_EXTENSION_NAME: True,
 		PERUN_ID_EXTENSION_NAME: str(group[resource_id_attr_name]),
 		"groupTypes": [],
@@ -617,7 +638,7 @@ def resolve_teams():
 			time.sleep(RETRY_AFTER_DEFAULT)
 			retries += 1
 			if retries > 6:
-				send_lib.die_with_error(f"Timeout when waiting for a team to be created.")
+				send_lib.die_with_error("Timeout when waiting for a team to be created.")
 			operation_location = call_api(link)
 		resource_location = operation_location.get("targetResourceLocation")
 		team = call_api(f"{BASE_URL}{resource_location}")
@@ -628,7 +649,7 @@ def resolve_teams():
 				  PERUN_ID_EXTENSION_NAME: resource_uuid}
 		patch_group(team["id"], params)
 
-		print_debug(f"Group updated, adding members.")
+		print_debug("Group updated, adding members.")
 		add_members_to_group(team, member_ids)
 
 

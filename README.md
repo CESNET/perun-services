@@ -1,19 +1,14 @@
-<a href="https://perun-aai.org"><img style="float: left; position: relative;" src="https://raw.githubusercontent.com/CESNET/perun/master/perun-web-gui/src/main/webapp/img/logo.png"></a>
+[![Perun](https://webcentrum.muni.cz/media/3153530/perun.svg)](https://perun-aai.org)
 
 ## Perun services
-
-[![conventional commits](https://img.shields.io/badge/semantic--release-conventional-e10079?logo=semantic-release)](https://www.conventionalcommits.org/)
-[![commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](https://commitizen.github.io/cz-cli/)
-[![CI status](https://github.com/cesnet/perun-services/actions/workflows/semantic-release.yml/badge.svg)](https://github.com/cesnet/perun-services/actions/workflows/semantic-release.yml)
-[![latest release](https://img.shields.io/github/v/release/cesnet/perun-services)](https://github.com/CESNET/perun-services/releases)
 
 This repository contains all scripts, which are used by [Perun](https://perun-aai.org/) for provisioning and deprovisioning users to your services (managing access rights to them). Perun can manage any kind of a service, which has either accessible API or has accessible config files. We will be happy to help you with writing your own scripts for managing your service.
 
 ### Related projects
 
--   [Perun](https://github.com/CESNET/perun) - main Perun repository
--   [Perun Web Apps](https://github.com/CESNET/perun-web-apps) - new web user interface for Perun using Angular
--   [Perun WUI](https://github.com/CESNET/perun-wui) - current web user interface for Perun
+-   [Perun](https://gitlab.ics.muni.cz/perun/perun-idm/perun) - main Perun repository
+-   [Perun Web Apps](https://gitlab.ics.muni.cz/perun/perun-idm/perun-web-apps) - new web user interface for Perun using Angular
+-   [Perun WUI](https://gitlab.ics.muni.cz/perun/perun-idm/perun-wui) - current web user interface for Perun
 -   [Google Group connector](https://github.com/CESNET/google-group-connector) - allow provisioning of Google groups on your domain
 
 ### Sources structure
@@ -76,6 +71,9 @@ Pre scripts are processed before slave script and post scripts are processed aft
     -   Brackets for function calls are not necessary, if it doesn't hurt code readability.
     -   Code commenting - the more, the better. For each function we comment input, output a how does it modify global variables (if used).
     -   `man perlstyle`
+-   For Python sources:
+    - lint your code with [ruff](https://docs.astral.sh/ruff/)
+    - add names of new Python files into the `PYTHON_FILES` variable in `.gitlab-ci.yml`
 
 ### License
 
