@@ -1,6 +1,5 @@
 [project]
 name = "perun-services"
-version = "9.0.0"
 requires-python = "==3.9"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = {file = "LICENSE"}
