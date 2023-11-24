@@ -1,5 +1,19 @@
 Upgrade notes
 
+## [9.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v9.0.0...v9.1.0) (2023-11-24)
+
+
+### Features
+
+* **drupal_elixir:** 🎸 Add firstName and lastName to ELIXIR Drupal ([ffc2da7](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/ffc2da7ad7287a3cdf2cea7ad3b619004a58ae84))
+* **m365_cloud:** allow change of group name ([83e607b](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/83e607b0053ea11c5b02e247f2d7deb4a84ca7c1))
+
+
+### Bug Fixes
+
+* empty commit to trigger first GitLab release ([84bb84e](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/84bb84e11bc99c35c25eaa2c5d57c8692a2cf4b0))
+* remove version number from pyproject.toml ([30bee7c](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/30bee7ca7385afb27e0d7356c7dd0a15ee511552))
+
 ## [9.0.0](https://github.com/CESNET/perun-services/compare/v8.6.0...v9.0.0) (2023-11-07)
 
 
