@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "myq_printsvc";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -45,21 +45,17 @@ foreach my $resourceId ( $data->getResourceIds() ){
 		foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId)) {
 			my $groupCISPR = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_CISPR);
 
-			foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId)) {
+			foreach my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
 				my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 				my $isIndirect = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_G_INDIRECT);
 
-				unless (exists $processedUsers->{$login}) {
-					$processedUsers->{$login} = 1;
-					fillUserData($memberId, $resourceName);
-				}
 				# is group workplace + is member direct
 				if (defined($groupCISPR) && !$isIndirect) {
-					if (exists($users->{$login}->{"groups"})) {
+					if (exists $processedUsers->{$login}) {
 						push @{$users->{$login}->{"groups"}}, $resourceName.'-'.$groupCISPR;
 					} else {
-						my @userWorkplaces =  ($resourceName.'-'.$groupCISPR);
-						$users->{$login}->{"groups"} = \@userWorkplaces;
+						$processedUsers->{$login} = 1;
+						fillUserData($memberId, $resourceName.'-'.$groupCISPR);
 					}
 				}
 			}
