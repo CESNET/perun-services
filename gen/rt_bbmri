@@ -8,7 +8,7 @@ use JSON::XS;
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.1.1";
-my $SCRIPT_VERSION = "3.0.3";
+my $SCRIPT_VERSION = "3.0.4";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -16,8 +16,8 @@ my $data = perunServicesInit::getHashedHierarchicalData;
 
 #Constants
 our $A_USER_ID;                 *A_USER_ID =                   \'urn:perun:user:attribute-def:core:id';
-our $A_USER_IDENTIFIER;         *A_USER_IDENTIFIER =           \'urn:perun:user:attribute-def:def:login-namespace:bbmri-persistent-shadow';
-our $A_USER_LOGIN_BBMRI;        *A_USER_LOGIN_BBMRI =          \'urn:perun:user:attribute-def:def:login-namespace:bbmri';
+our $A_USER_IDENTIFIER;         *A_USER_IDENTIFIER =           \'urn:perun:user:attribute-def:def:login-namespace:lifescienceid-persistent-shadow';
+our $A_USER_LOGIN_LSID;         *A_USER_LOGIN_LSID =           \'urn:perun:user:attribute-def:def:login-namespace:lifescienceid-username';
 our $A_USER_PREFERRED_MAIL;     *A_USER_PREFERRED_MAIL =       \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_USER_RT_PREF_MAIL;       *A_USER_RT_PREF_MAIL =         \'urn:perun:user:attribute-def:def:rtPreferredMail';
 our $A_USER_LAST_NAME;          *A_USER_LAST_NAME =            \'urn:perun:user:attribute-def:core:lastName';
@@ -58,7 +58,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 		my $userId = $data->getUserAttributeValue(attrName => $A_USER_ID, member => $memberId);
 		unless(defined $usersStructureByUserId->{$userId}) {
-			my $login = $data->getUserAttributeValue(attrName => $A_USER_LOGIN_BBMRI, member => $memberId);
+			my $login = $data->getUserAttributeValue(attrName => $A_USER_LOGIN_LSID, member => $memberId);
 			my $identifier = $data->getUserAttributeValue(attrName => $A_USER_IDENTIFIER, member => $memberId);
 			my $userPrefMail = $data->getUserAttributeValue(attrName => $A_USER_RT_PREF_MAIL, member => $memberId)
 				|| $data->getUserAttributeValue(attrName => $A_USER_PREFERRED_MAIL, member => $memberId);;
