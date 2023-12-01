@@ -1,0 +1,4 @@
+#!/bin/bash
+export SERVICE_NAME="generic_json_gen"
+
+python3 generic_sender.py "$1" "$2" "$3"
