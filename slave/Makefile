@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 SHELL=/bin/bash
-maintainer_name="Michal Stava"
-maintainer_email="stavamichal@gmail.com"
+maintainer_name="Martin Kuba"
+maintainer_email="makub@ics.muni.cz"
 comma:=,
 empty:=
 space:=$(empty) $(empty)

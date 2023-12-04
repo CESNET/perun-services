@@ -4,6 +4,10 @@
 
 This repository contains all scripts, which are used by [Perun](https://perun-aai.org/) for provisioning and deprovisioning users to your services (managing access rights to them). Perun can manage any kind of a service, which has either accessible API or has accessible config files. We will be happy to help you with writing your own scripts for managing your service.
 
+### Repository information
+
+-   All development takes place in [public repository](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services) on our self-hosted GitLab instance. This repository is mirrored on [GitHub](https://github.com/CESNET/perun-services) for visibility.
+
 ### Related projects
 
 -   [Perun](https://gitlab.ics.muni.cz/perun/perun-idm/perun) - main Perun repository
