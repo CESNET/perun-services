@@ -1,4 +1,4 @@
-[![Perun](https://webcentrum.muni.cz/media/3153530/perun.svg)](https://perun-aai.org)
+# [![Perun](https://webcentrum.muni.cz/media/3153530/perun.svg)](https://perun-aai.org)
 
 ## Perun services
 
@@ -6,39 +6,39 @@ This repository contains all scripts, which are used by [Perun](https://perun-aa
 
 ### Repository information
 
--   All development takes place in [public repository](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services) on our self-hosted GitLab instance. This repository is mirrored on [GitHub](https://github.com/CESNET/perun-services) for visibility.
+All development takes place in [public repository](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services) on our self-hosted GitLab instance. This repository is mirrored on [GitHub](https://github.com/CESNET/perun-services) for visibility.
 
 ### Related projects
 
--   [Perun](https://gitlab.ics.muni.cz/perun/perun-idm/perun) - main Perun repository
--   [Perun Web Apps](https://gitlab.ics.muni.cz/perun/perun-idm/perun-web-apps) - new web user interface for Perun using Angular
--   [Perun WUI](https://gitlab.ics.muni.cz/perun/perun-idm/perun-wui) - current web user interface for Perun
--   [Google Group connector](https://github.com/CESNET/google-group-connector) - allow provisioning of Google groups on your domain
+- [Perun](https://gitlab.ics.muni.cz/perun/perun-idm/perun) - main Perun repository
+- [Perun Web Apps](https://gitlab.ics.muni.cz/perun/perun-idm/perun-web-apps) - new web user interface for Perun using Angular
+- [Perun WUI](https://gitlab.ics.muni.cz/perun/perun-idm/perun-wui) - current web user interface for Perun
+- [Google Group connector](https://github.com/CESNET/google-group-connector) - allow provisioning of Google groups on your domain
 
 ### Sources structure
 
--   **gen/** - These perl scripts fetch data from Perun and generate new configuration files for each service and destination.
--   **send/** - Scripts ensures transfer of configuration files to destination using SSH.
--   **slave/** - These (mainly bash) scripts process new files on destination machine and perform change itself.
--   **other/perun-propagate/** - New packaging of perun-propagate to force service propagation from client side.
--   **other/perun-slave-metacentrum/** - Meta package to install all perun services used by MetaCentrum.
--   **scripts/** - Server side of perun-propagate service located on Perun instance.
+- **gen/** - These perl scripts fetch data from Perun and generate new configuration files for each service and destination.
+- **send/** - Scripts ensures transfer of configuration files to destination using SSH.
+- **slave/** - These (mainly bash) scripts process new files on destination machine and perform change itself.
+- **other/perun-propagate/** - New packaging of perun-propagate to force service propagation from client side.
+- **other/perun-slave-metacentrum/** - Meta package to install all perun services used by MetaCentrum.
+- **scripts/** - Server side of perun-propagate service located on Perun instance.
 
 Gen and send scripts are located on your Perun instance and are used by _perun-engine_ component. Slave scripts are then located on destination machines.
 
 ### Build
 
--   Install required dependencies:
+- Install required dependencies:
 
-```
-apt-get install dh-make rpm equivs devscripts
-```
+    ```sh
+    apt-get install dh-make rpm equivs devscripts
+    ```
 
--   Go to _slave/_ folder and run:
+- Go to _slave/_ folder and run:
 
-```
-make all
-```
+    ```sh
+    make all
+    ```
 
 To build only specific service you can use `make process-passwd` for _passwd_ service etc. To build a metapackage, which will install all slave scripts you can use `make meta`.
 
@@ -46,18 +46,18 @@ To build only specific service you can use `make process-passwd` for _passwd_ se
 
 Perun uses _push model_, so when configuration change occur in a Perun, new config files are generated for affected services and sent to the destinations, where they are processed. Result of such operation is then reported back to the Perun.
 
--   Slave scripts for each service can be automatically installed on destination machines as .deb or .rpm packages.
--   You must allow access to destination from your Perun instance by SSH key as user with all necessary privileges (usually root).
--   You can specify different user in Perun and it's good practice to restrict access on destination to run only command `/opt/perun/bin/perun`.
--   You can override default behavior of services on each destination by creating file `/etc/perunv3.conf` and put own config data here. As example, you can define white/black list of services, which you allow to configure on your destination. You can also set expected destination and facility names, so nobody can push own data to your destination from same Perun instance.
+- Slave scripts for each service can be automatically installed on destination machines as .deb or .rpm packages.
+- You must allow access to destination from your Perun instance by SSH key as user with all necessary privileges (usually root).
+- You can specify different user in Perun and it's good practice to restrict access on destination to run only command `/opt/perun/bin/perun`.
+- You can override default behavior of services on each destination by creating file `/etc/perunv3.conf` and put own config data here. As example, you can define white/black list of services, which you allow to configure on your destination. You can also set expected destination and facility names, so nobody can push own data to your destination from same Perun instance.
 
-```
-# syntax: (item1 item2 item3)
-SERVICE_BLACKLIST=()
-SERVICE_WHITELIST=()
-DNS_ALIAS_WHITELIST=( `hostname -f` )
-FACILITY_WHITELIST=()
-```
+    ```perl
+    # syntax: (item1 item2 item3)
+    SERVICE_BLACKLIST=()
+    SERVICE_WHITELIST=()
+    DNS_ALIAS_WHITELIST=( `hostname -f` )
+    FACILITY_WHITELIST=()
+    ```
 
 ### Service behavior and configuration
 
@@ -67,17 +67,24 @@ Pre scripts are processed before slave script and post scripts are processed aft
 
 ### Contributing
 
--   Indent all sources by tabs, not spaces.
--   For perl sources:
-    -   Use `use strict` and `use warnings`.
-    -   Use own global variables with caution (key word `our`).
-    -   For defined global variables (e.g. formatting ones $, $",...) always use `local`.
-    -   Brackets for function calls are not necessary, if it doesn't hurt code readability.
-    -   Code commenting - the more, the better. For each function we comment input, output a how does it modify global variables (if used).
-    -   `man perlstyle`
--   For Python sources:
-    - lint your code with [ruff](https://docs.astral.sh/ruff/)
-    - add names of new Python files into the `PYTHON_FILES` variable in `.gitlab-ci.yml`
+- Indent all sources by tabs, not spaces.
+- Use [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/). To construct a proper commit message, run:
+
+    ```sh
+    npx cz
+    ```
+
+  instead of `git commit`.
+- For perl sources:
+  - Use `use strict` and `use warnings`.
+  - Use own global variables with caution (key word `our`).
+  - For defined global variables (e.g. formatting ones $, $",...) always use `local`.
+  - Brackets for function calls are not necessary, if it doesn't hurt code readability.
+  - Code commenting - the more, the better. For each function we comment input, output a how does it modify global variables (if used).
+  - `man perlstyle`
+- For Python sources:
+  - lint your code with [ruff](https://docs.astral.sh/ruff/)
+  - add names of new Python files into the `PYTHON_FILES` variable in `.gitlab-ci.yml`
 
 ### License
 
@@ -87,8 +94,8 @@ Pre scripts are processed before slave script and post scripts are processed aft
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
--   Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
--   Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+- Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+- Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
 CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
