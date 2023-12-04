@@ -121,7 +121,7 @@ def call_api(url: str, params=None, type='GET', retry_no=0):
 				print_debug('Invalid object id in the request (might have been removed).')
 				return False
 			else:
-				send_lib.die_with_error(f"Request ended with error 400, response: {response.content}")
+				send_lib.die_with_error(f"Request to {url} with {params} ended with error 400, response: {response}")
 		else:
 			send_lib.die_with_error(f"Request ended with error, response: {response.content}")
 
@@ -174,7 +174,7 @@ def check_group_description(our_group):
 	group_id = our_group["groupId"]
 	url = f'{BASE_URL}/groups/{group_id}'
 	response = call_api(url)
-	their_description = response["description"]
+	their_description = response["description"] or ""
 	if not their_description.startswith(PERUN_MANAGED):
 		new_description = PERUN_MANAGED + their_description + " | Manage in Perun: " + our_group["perunResourceUrl"]
 	elif their_description.startswith(PERUN_MANAGED) and not their_description.endswith(our_group["perunResourceUrl"]):
