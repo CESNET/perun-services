@@ -1,5 +1,31 @@
 Upgrade notes
 
+## [10.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v9.1.0...v10.0.0) (2023-12-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **bbmri_rt:** 🧨 rt_bbmri now uses LS IDs and LS usernames
+* **bbmri_rt:** Service need to have `urn:perun:user:attribute-def:def:login
+-namespace:lifescienceid-persistent-shadow` and `urn:perun:user:attribute-def:
+def:login-namespace:lifescienceid-username` attributes assigned as required
+in Peurn configuration if they used BBMRI IDs or BBMRI usernames. See changes
+to get hint what attribute needs to be assigned for which service. Consents should
+be modified to be granted for these attributes, as the ID change is internal
+change and does not reall affect users.
+
+### Features
+
+* **gen:** generic_json service ([fdcce27](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/fdcce275f40c70b011cf9a2872fc8cb62a2473f3))
+* **sympa_cesnet:** added new version of sympa service ([40bcd4d](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/40bcd4d50d3134c235528c5356d1ac6340c1e040))
+
+
+### Bug Fixes
+
+* **bbmri_rt:** 🐛 use LS ID in BBMRI_rt gen scripti ([7ed49da](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/7ed49daf8313f90cb47f316a118df47172c3b562))
+* **myq_printsvc:** correctly determine group membership ([b0a902a](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/b0a902a32121e05b499e2e980a19f710d36f7fb6))
+* **o365_groups_mu:** handle null description from O365 ([cd5e90b](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/cd5e90b64e539a9b7a3723359708f8a4b5716906))
+
 ## [9.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v9.0.0...v9.1.0) (2023-11-24)
 
 
