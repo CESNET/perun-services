@@ -54,7 +54,7 @@ ldap_bind($ldap, $conf[1], $conf[2]);
 
 # load all data
 my @users = load_perun($service_file);
-my @previousUsers = load_ad($ldap, $base_dn, $filter, ['uid','givenName','sn','cn','displayName','mail','status','sshPublicKey','userPassword']);
+my @previousUsers = load_ad($ldap, $base_dn, $filter, ['uid', 'einfraID','givenName','sn','cn','displayName','mail','status','sshPublicKey','userPassword']);
 
 my %previousUsersMap = ();
 foreach my $previousUser (@previousUsers) {
@@ -94,7 +94,7 @@ sub process_update() {
 
 			my $previousUser = $previousUsersMap{$user->get_value('uid')};
 
-			my @attrs = ('givenName','sn','cn','displayName','mail','status','sshPublicKey','userPassword');
+			my @attrs = ('einfraID','givenName','sn','cn','displayName','mail','status','sshPublicKey','userPassword');
 
 			# stored log messages to check if entry should be updated
 			my @entry_changed = ();
