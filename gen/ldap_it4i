@@ -6,8 +6,8 @@ use perunServicesInit;
 use perunServicesUtils;
 
 our $SERVICE_NAME = "ldap_it4i";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+local $::PROTOCOL_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -19,6 +19,7 @@ my $data = perunServicesInit::getHashedHierarchicalData;
 # constants
 our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDN';
 our $A_USER_LOGIN_EINFRA; *A_USER_LOGIN_EINFRA = \'urn:perun:user:attribute-def:def:login-namespace:einfra';
+our $A_USER_ID_EINFRA; *A_USER_ID_EINFRA = \'urn:perun:user:attribute-def:virt:login-namespace:einfraid-persistent';
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_DISPLAY_NAME;  *A_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
@@ -75,6 +76,7 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 			}
 		}
 
+		$users->{$login}->{$A_USER_ID_EINFRA} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID_EINFRA );
 		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
 		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
 		$users->{$login}->{$A_DISPLAY_NAME} = $data->getUserAttributeValue( member => $memberId, attrName => $A_DISPLAY_NAME );
@@ -103,11 +105,13 @@ open FILE,">:encoding(UTF-8)","$fileName" or die "Cannot open $fileName: $! \n";
 
 for my $login (sort keys %$users) {
 
+	my $einfraID = $users->{$login}->{$A_USER_ID_EINFRA};
 	my $givenName = $users->{$login}->{$A_FIRST_NAME};
 	my $sn = $users->{$login}->{$A_LAST_NAME};
 
 	print FILE "dn: uid=" . $login . "," . $ldapBaseDN . "\n";
 	print FILE "uid: " . $login . "\n";
+	print FILE "einfraID: " . $einfraID . "\n";
 
 	if (defined $givenName and length $givenName) {
 		print FILE "givenName: " . $givenName . "\n";
