@@ -8,12 +8,7 @@ This repository contains all scripts, which are used by [Perun](https://perun-aa
 
 All development takes place in [public repository](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services) on our self-hosted GitLab instance. This repository is mirrored on [GitHub](https://github.com/CESNET/perun-services) for visibility.
 
-### Related projects
-
-- [Perun](https://gitlab.ics.muni.cz/perun/perun-idm/perun) - main Perun repository
-- [Perun Web Apps](https://gitlab.ics.muni.cz/perun/perun-idm/perun-web-apps) - new web user interface for Perun using Angular
-- [Perun WUI](https://gitlab.ics.muni.cz/perun/perun-idm/perun-wui) - current web user interface for Perun
-- [Google Group connector](https://github.com/CESNET/google-group-connector) - allow provisioning of Google groups on your domain
+See also other related repositories in the [Perun IdM](https://gitlab.ics.muni.cz/perun/perun-idm) group.
 
 ### Sources structure
 
