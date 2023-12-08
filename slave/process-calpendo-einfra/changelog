@@ -1,0 +1,5 @@
+perun-slave-process-calpendo (3.0.0) stable; urgency=low
+
+  * New package for processing service calpendo_einfra
+
+ -- Johana Supikova <supikova@ics.muni.cz>  Thu, 07 Dec 2023 16:25:00 +0100
