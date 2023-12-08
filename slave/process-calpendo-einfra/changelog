@@ -1,4 +1,4 @@
-perun-slave-process-calpendo (3.0.0) stable; urgency=low
+perun-slave-process-calpendo-einfra (3.0.0) stable; urgency=low
 
   * New package for processing service calpendo_einfra
 
