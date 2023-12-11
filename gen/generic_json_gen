@@ -81,6 +81,8 @@ my $facilityUuid = $data->getFacilityAttributeValue(attrName => $A_F_UUID);
 if ($DEBUG == 1) {
 	print("Generating JSON for facility '" . $facilityName . "'\n");
 }
+# Signal the SLAVE that we are generating generic JSON
+perunServicesInit::updateGenericJsonLookup();
 
 my @destinations = $servicesAgent->getDestinations(service => $service->getId, facility => $facility->getId);
 my @facilityDestinations;

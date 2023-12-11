@@ -182,4 +182,10 @@ sub createFacilityNameFile($) {
 	close FACILITY_NAME_FILE;
 }
 
+sub updateGenericJsonLookup {
+	open FACILITY_NAME_FILE, ">$tmp_directory" . "/GEN_LOOKUP";
+	print FACILITY_NAME_FILE $::SERVICE_NAME, "\n";
+	close FACILITY_NAME_FILE;
+}
+
 return 1;
