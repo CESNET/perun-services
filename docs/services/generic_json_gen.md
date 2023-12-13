@@ -8,7 +8,7 @@ Based on the required attributes set on the service (see Perun Admin panel), the
 
 ### [SEND](../concepts/send.md)
 
-The script uses [generic_send.py](../modules/generic_sender.md) to send data to the API.
+The script uses [generic_sender.py](../modules/generic_sender.md) to send data to the API.
 
 ### [SLAVE](../concepts/slave.md)
 
