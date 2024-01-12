@@ -12,4 +12,4 @@ The script uses [generic_sender.py](../modules/generic_sender.md) to send data t
 
 ### [SLAVE](../concepts/slave.md)
 
-No slave script is provided.
+Calls external script, which location needs to be set in a [PRE](../concepts/pre-mid-post.md#pre-script) script. 

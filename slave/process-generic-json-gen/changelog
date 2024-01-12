@@ -1,0 +1,5 @@
+perun-slave-process-generic-json-gen (3.0.0) stable; urgency=low
+
+ * New version of perun-slave-process-generic-json-gen
+
+ -- Matej Hakoš <492968@mail.muni.cz>, Mon, 11 Dec 2023 17:19:00 +0200

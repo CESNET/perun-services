@@ -74,14 +74,14 @@ def check_input_fields(args: list[str], destination_type_required: bool = False,
 	:param args: parameters passed to script (sys.argv)
 	"""
 
-	if generic_script and len(args) != 5:
-		die_with_error(
-			"Error: Expected number of arguments is 4 (FACILITY_NAME, DESTINATION, DESTINATION_TYPE and SERVICE_NAME)")
-	elif destination_type_required and len(args) != 4:
-		die_with_error("Error: Expected number of arguments is 3 (FACILITY_NAME, DESTINATION and DESTINATION_TYPE)")
-	elif len(args) != 3:
-		die_with_error(
-			"Error: Expected number of arguments is 2 or 3 (FACILITY_NAME, DESTINATION and optional DESTINATION_TYPE)")
+	if generic_script:
+		if len(args) != 5:
+			die_with_error("Error: Expected number of arguments is 4 (FACILITY_NAME, DESTINATION, DESTINATION_TYPE and SERVICE_NAME)")
+	else:
+		if destination_type_required and len(args) != 4:
+			die_with_error("Error: Expected number of arguments is 3 (FACILITY_NAME, DESTINATION and DESTINATION_TYPE)")
+		elif len(args) != 3:
+			die_with_error("Error: Expected number of arguments is 2 or 3 (FACILITY_NAME, DESTINATION and optional DESTINATION_TYPE)")
 
 
 def check_destination_format(destination: str, destination_type: str, custom_pattern: re.Pattern = None) -> None:
