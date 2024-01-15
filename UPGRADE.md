@@ -1,5 +1,35 @@
 Upgrade notes
 
+## [10.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v10.0.0...v10.1.0) (2024-01-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* **m365_cloud:**   * This PR includes changes already set on EINFRA, no need for update there.
+  * Beware, that python 3.9 version is used on EINFRA specifically (send_lib).
+  * Should the gen script be updated on EINFRA,
+    perunDataGenerator needs to be updated to contain finalizeMemberUsersData method.
+* vsup_is and vsup_kos service definitions can be removed
+* **ldap_it4i:** Add user:virt:login-namespace:einfraid-persistent attribute between required.
+
+### Features
+
+* **calpendo_einfra:** new service calpendo ([164a8d1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/164a8d10770123e52a0a5b69988776204db69566))
+* **generic_json_gen:** added SLAVE script for generic service ([1511fde](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/1511fdedf052428200600dcd23b46421ae8612e7))
+* **ldap_it4i:** provide also einfra ID attribute ([a86fb21](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/a86fb21dd0598be8a92d6d4d313334bdfc082637))
+* **m365_cloud:** change source login attribute ([15bfe92](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/15bfe9290fd25a65f816981562c66e569d257323))
+
+
+### Bug Fixes
+
+* **calpendo_einfra:** fixed name in changelog ([55ac9c3](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/55ac9c30ab50dcc10a042c328bc47ee1a10b0e4b))
+* **generic_json_gen:** send script correctly finds gen folder ([c269fa3](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/c269fa3076a13987c6b19cbf5bba3d6e1ae6db57))
+
+
+### Refactoring
+
+* removed unused services vsup_is and vsup_kos ([4d4b3bf](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/4d4b3bfea262805f4ce7414bb7aff856d4861ed2))
+
 ## [10.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v9.1.0...v10.0.0) (2023-12-04)
 
 
