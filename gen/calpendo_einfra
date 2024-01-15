@@ -1,0 +1,52 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Perun::Agent;
+use open qw/:std :utf8/;
+use Data::Dumper;
+
+local $::SERVICE_NAME = "calpendo_einfra";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_USER_LOGIN;                *A_USER_LOGIN =            \'urn:perun:user:attribute-def:def:login-namespace:einfraid-persistent-shadow';
+our $A_MEMBER_STATUS;             *A_MEMBER_STATUS =         \'urn:perun:member:attribute-def:core:status';
+our $A_FIRST_NAME;                *A_FIRST_NAME =            \'urn:perun:user:attribute-def:core:firstName';
+our $A_LAST_NAME;                 *A_LAST_NAME =             \'urn:perun:user:attribute-def:core:lastName';
+our $A_EMAIL;                     *A_EMAIL =                 \'urn:perun:user:attribute-def:def:preferredMail';
+our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
+
+my $agent = perunServicesInit->getAgent;
+my %printed_logins;
+
+my $fileUsers = $DIRECTORY . "users.csv";
+open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
+print FILE_USERS "LOGIN,EMAIL,FIRSTNAME,LASTNAME\n";
+
+foreach my $memberId ($data->getMemberIdsForFacility()) {
+	my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+    unless ($status eq $STATUS_VALID) {
+    	next;
+    }
+
+
+	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
+	my $f_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
+	my $l_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
+	my $email =  $data->getUserAttributeValue( member => $memberId, attrName => $A_EMAIL );
+	unless (exists $printed_logins{$login}) {
+		$printed_logins{$login} = 1;
+		print FILE_USERS "$login,$email,$f_name,$l_name\n";
+	}
+}
+close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
+
+perunServicesInit::finalize;

@@ -14,7 +14,7 @@ local $::SKIP_NON_VALID_MEMBERS = 1;
 # urn:perun:user:attribute-def:def:preferredLanguage
 # urn:perun:user:attribute-def:virt:mails-namespace:microsoft
 # urn:perun:user:attribute-def:core:displayName
-# urn:perun:user_facility:attribute-def:virt:login
+# urn:perun:user:attribute-def:virt:optional-login-namespace:{namespace}
 # urn:perun:facility:attribute-def:def:o365-domainName
 # urn:perun:resource:attribute-def:def:m365IsTeamGroup
 # urn:perun:resource:attribute-def:def:m365InternalAccountsOnly

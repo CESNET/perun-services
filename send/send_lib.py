@@ -65,19 +65,23 @@ class FileLock(object):
 		os.close(self.dir_fd)
 
 
-def check_input_fields(args: list[str], destination_type_required: bool = False) -> None:
+def check_input_fields(args: list[str], destination_type_required: bool = False, generic_script: bool = False) -> None:
 	"""
 	Checks input script parameters are present (facility name, destination, (optional) destination type).
 	Dies if parameters mismatch.
+	:param generic_script: True if calling script is generic (and includes the service name argument)
 	:param destination_type_required: True if destination type is required, default is False
 	:param args: parameters passed to script (sys.argv)
 	"""
-	if len(args) != 4:
-		if destination_type_required:
+
+	if generic_script:
+		if len(args) != 5:
+			die_with_error("Error: Expected number of arguments is 4 (FACILITY_NAME, DESTINATION, DESTINATION_TYPE and SERVICE_NAME)")
+	else:
+		if destination_type_required and len(args) != 4:
 			die_with_error("Error: Expected number of arguments is 3 (FACILITY_NAME, DESTINATION and DESTINATION_TYPE)")
 		elif len(args) != 3:
-			die_with_error(
-				"Error: Expected number of arguments is 2 or 3 (FACILITY_NAME, DESTINATION and optional DESTINATION_TYPE)")
+			die_with_error("Error: Expected number of arguments is 2 or 3 (FACILITY_NAME, DESTINATION and optional DESTINATION_TYPE)")
 
 
 def check_destination_format(destination: str, destination_type: str, custom_pattern: re.Pattern = None) -> None:

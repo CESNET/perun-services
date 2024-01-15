@@ -33,7 +33,9 @@ auth_endpoint = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 
 # attribute definitions
 mails_attr_prefix = "urn:perun:user:attribute-def:virt:mails-namespace:"
-emails_attr_name = None
+login_attr_prefix = "urn:perun:user:attribute-def:virt:optional-login-namespace:"
+emails_attr_name = None  # fill dynamically from generated data
+login_attr_name = None
 displayname_attr_name = "urn:perun:user:attribute-def:core:displayName"
 groupname_attr_name = "urn:perun:resource:attribute-def:def:m365GroupName"
 preferredlang_attr_name = "urn:perun:user:attribute-def:def:preferredLanguage"
@@ -43,7 +45,6 @@ onlyinternals_attr_name = "urn:perun:resource:attribute-def:def:m365InternalAcco
 scope_attribute_name = "urn:perun:facility:attribute-def:def:o365-domainName"
 user_id_attr_name = "urn:perun:user:attribute-def:core:id"
 resource_id_attr_name = "urn:perun:resource:attribute-def:core:uuid"
-login_attr_name = "urn:perun:user_facility:attribute-def:virt:login"
 redirect_url_attr_name = "urn:perun:facility:attribute-def:def:m365InviteRedirectUrl"
 teams_owner_attr_name = "urn:perun:facility:attribute-def:def:m365TeamsOwner"
 
@@ -118,6 +119,12 @@ def load_attribute_names(data):
 	emails_attr_name = next(filter(lambda attr: attr.startswith(mails_attr_prefix), data["users"][0].keys()), None)
 	if not emails_attr_name:
 		send_lib.die_with_error("Invalid service settings - missing email attributes for users.")
+
+	# name of login attribute (can be different for namespaces)
+	global login_attr_name
+	login_attr_name = next(filter(lambda attr: attr.startswith(login_attr_prefix), data["users"][0].keys()), None)
+	if not login_attr_name:
+		send_lib.die_with_error("Invalid service settings - missing optional login attribute for users.")
 
 
 def request_access_token():
@@ -653,6 +660,17 @@ def resolve_teams():
 		add_members_to_group(team, member_ids)
 
 
+def internal_users_to_logins(internal_users):
+	""" Collects logins of internal users and fails, if some internal user does not have login set. """
+	internal_logins = []
+	for internal_user in internal_users:
+		if not internal_user.get(login_attr_name):
+			send_lib.die_with_error(f"User {internal_user.get(displayname_attr_name)} does not have mandatory "
+									f"login attribute set.")
+		internal_logins.append(internal_user[login_attr_name])
+	return internal_logins
+
+
 if __name__ == "__main__":
 	# check input format
 	send_lib.check_input_fields(sys.argv, True)
@@ -683,7 +701,7 @@ if __name__ == "__main__":
 		their_users = fetch_their_users()
 		removed_users = fetch_removed_users()  # users recently removed in m365
 		our_internal_users = get_our_internal_users(our_complete_data)
-		our_internal_logins = list(map(lambda u: u[login_attr_name], our_internal_users))
+		our_internal_logins = internal_users_to_logins(our_internal_users)
 		delete_users(their_users, our_complete_data["users"])
 		create_update_restore_internal_users(their_users, removed_users, our_internal_users)
 		create_external_users(their_users, our_complete_data["users"])
