@@ -6,3 +6,6 @@ license = {file = "LICENSE"}
 
 [project.urls]
 Repository = "https://gitlab.ics.muni.cz/perun/perun-idm/perun-services.git"
+
+[tool.ruff.format]
+indent-style = "tab"
