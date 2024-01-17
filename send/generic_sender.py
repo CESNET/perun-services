@@ -17,27 +17,40 @@ def process(tar_command, transport_command, destination: str, destination_type: 
 	process_tar = subprocess.Popen(tar_command, stdout=subprocess.PIPE)
 	if destination_type == send_lib.DESTINATION_TYPE_USER_HOST_WINDOWS_PROXY:
 		# converts stdin to base64 and append single space and "$DESTINATION" at the end of it
-		transformation_process_1 = subprocess.Popen("base64", stdin=process_tar.stdout, stdout=subprocess.PIPE)
+		transformation_process_1 = subprocess.Popen(
+			"base64", stdin=process_tar.stdout, stdout=subprocess.PIPE
+		)
 		sed_command = ["sed", "-e", "$s/$/ " + destination + "/g"]
-		transformation_process = subprocess.Popen(sed_command, stdin=transformation_process_1.stdout,
-												  stdout=subprocess.PIPE)
+		transformation_process = subprocess.Popen(
+			sed_command, stdin=transformation_process_1.stdout, stdout=subprocess.PIPE
+		)
 		transformation_process_1.stdout.close()
 	elif destination_type == send_lib.DESTINATION_TYPE_USER_HOST_WINDOWS:
 		# converts stdin to base64
-		transformation_process = subprocess.Popen("base64", stdin=process_tar.stdout, stdout=subprocess.PIPE)
+		transformation_process = subprocess.Popen(
+			"base64", stdin=process_tar.stdout, stdout=subprocess.PIPE
+		)
 	else:
 		# just prints stdin to stdout for other destination types
-		transformation_process = subprocess.Popen("cat", stdin=process_tar.stdout, stdout=subprocess.PIPE)
+		transformation_process = subprocess.Popen(
+			"cat", stdin=process_tar.stdout, stdout=subprocess.PIPE
+		)
 	process_tar.stdout.close()
 
-	the_process = subprocess.Popen(transport_command, stdin=transformation_process.stdout, stdout=subprocess.PIPE,
-								   stderr=subprocess.PIPE)
+	the_process = subprocess.Popen(
+		transport_command,
+		stdin=transformation_process.stdout,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.PIPE,
+	)
 	transformation_process.stdout.close()
 	(stdout, stderr) = the_process.communicate()
 	return the_process.returncode, stdout, stderr
 
 
-def prepare_tar_command(tar_mode: str, hostname_dir: str, service_files_dir: str, destination: str) -> list[str]:
+def prepare_tar_command(
+	tar_mode: str, hostname_dir: str, service_files_dir: str, destination: str
+) -> list[str]:
 	"""
 	Prepares command for extracting generated service files and hostname.
 	Default tar mode can be obtained for destination type.
@@ -66,7 +79,9 @@ def prepare_tar_command(tar_mode: str, hostname_dir: str, service_files_dir: str
 	return tar_command
 
 
-def prepare_url_transport_command(temp, content_type: str = "application/x-tar", method: str = "PUT"):
+def prepare_url_transport_command(
+	temp, content_type: str = "application/x-tar", method: str = "PUT"
+):
 	"""
 	Prepares base transport command for CURL connection.
 	If available, adds common perun certificate.
@@ -76,13 +91,39 @@ def prepare_url_transport_command(temp, content_type: str = "application/x-tar",
 	"""
 	transport_command = ["curl"]
 	# add certificate to the curl if cert file and key file exist, and they are readable
-	if os.access(send_lib.PERUN_CERT, os.R_OK) and os.access(send_lib.PERUN_KEY, os.R_OK) and os.access(
-		send_lib.PERUN_CHAIN, os.R_OK):
+	if (
+		os.access(send_lib.PERUN_CERT, os.R_OK)
+		and os.access(send_lib.PERUN_KEY, os.R_OK)
+		and os.access(send_lib.PERUN_CHAIN, os.R_OK)
+	):
 		transport_command.extend(
-			["--cert", send_lib.PERUN_CERT, "--key", send_lib.PERUN_KEY, "--cacert", send_lib.PERUN_CHAIN])
+			[
+				"--cert",
+				send_lib.PERUN_CERT,
+				"--key",
+				send_lib.PERUN_KEY,
+				"--cacert",
+				send_lib.PERUN_CHAIN,
+			]
+		)
 	# add standard CURL params
-	transport_command.extend(["-i", "-H", "Content-Type:" + content_type, "-w", "%{http_code}", "--show-error",
-							  "--silent", "-o", temp.name, "-X", method, "--data-binary", "@-"])
+	transport_command.extend(
+		[
+			"-i",
+			"-H",
+			"Content-Type:" + content_type,
+			"-w",
+			"%{http_code}",
+			"--show-error",
+			"--silent",
+			"-o",
+			temp.name,
+			"-X",
+			method,
+			"--data-binary",
+			"@-",
+		]
+	)
 	return transport_command
 
 
@@ -91,11 +132,28 @@ def prepare_ssh_transport_command():
 	Prepares base transport command for SSH connection.
 	:return: transport command
 	"""
-	return ["ssh", "-o", "PasswordAuthentication=no", "-o", "StrictHostKeyChecking=no", "-o",
-			"GSSAPIAuthentication=no", "-o", "GSSAPIKeyExchange=no", "-o", "ConnectTimeout=5"]
+	return [
+		"ssh",
+		"-o",
+		"PasswordAuthentication=no",
+		"-o",
+		"StrictHostKeyChecking=no",
+		"-o",
+		"GSSAPIAuthentication=no",
+		"-o",
+		"GSSAPIKeyExchange=no",
+		"-o",
+		"ConnectTimeout=5",
+	]
 
 
-def send(service_name: str, facility_name: str, destination: str, destination_type: str = send_lib.DESTINATION_TYPE_HOST, opts=None) -> None:
+def send(
+	service_name: str,
+	facility_name: str,
+	destination: str,
+	destination_type: str = send_lib.DESTINATION_TYPE_HOST,
+	opts=None,
+) -> None:
 	"""
 	Sends data generated for the specified service/facility to the desired destination.
 	This method runs complete generic sending logic and can be used directly from the service-specific
@@ -109,8 +167,14 @@ def send(service_name: str, facility_name: str, destination: str, destination_ty
 	if opts is None:
 		opts = []
 
-	if destination_type == send_lib.DESTINATION_TYPE_EMAIL or destination_type == send_lib.DESTINATION_TYPE_SERVICE_SPECIFIC:
-		print("Destination type " + destination_type + " is not supported yet.", file=sys.stderr)
+	if (
+		destination_type == send_lib.DESTINATION_TYPE_EMAIL
+		or destination_type == send_lib.DESTINATION_TYPE_SERVICE_SPECIFIC
+	):
+		print(
+			"Destination type " + destination_type + " is not supported yet.",
+			file=sys.stderr,
+		)
 		exit(1)
 
 	send_lib.check_destination_format(destination, destination_type)
@@ -130,7 +194,7 @@ def send(service_name: str, facility_name: str, destination: str, destination_ty
 		transport_command.extend(["-p", port])
 
 	# Add OPTS from the service-specific send script to both SSH/cURL command
-	if (opts):
+	if opts:
 		transport_command.extend(opts)
 
 	# add host to the transport command for all types of destination
@@ -143,7 +207,7 @@ def send(service_name: str, facility_name: str, destination: str, destination_ty
 
 	# prepare temporary directory with hostfile, use as context manager, so it gets removed automatically
 	with send_lib.prepare_temporary_directory() as hostname_dir:
-		with open(os.path.join(hostname_dir, "HOSTNAME"), mode='w+') as hostfile:
+		with open(os.path.join(hostname_dir, "HOSTNAME"), mode="w+") as hostfile:
 			# prepare hostfile
 			hostfile.write(hostname)
 			hostfile.flush()
@@ -157,23 +221,36 @@ def send(service_name: str, facility_name: str, destination: str, destination_ty
 			if destination_type == send_lib.DESTINATION_TYPE_URL:
 				# send a gziped tar archive via HTTP(s)
 				tar_mode = tar_mode + "z"
-			tar_command = prepare_tar_command(tar_mode, hostname_dir, generated_files_dir, destination)
+			tar_command = prepare_tar_command(
+				tar_mode, hostname_dir, generated_files_dir, destination
+			)
 
 			# prepend timeout command
-			timeout_command = ["timeout", "-k", str(send_lib.TIMEOUT_KILL), str(send_lib.TIMEOUT)]
+			timeout_command = [
+				"timeout",
+				"-k",
+				str(send_lib.TIMEOUT_KILL),
+				str(send_lib.TIMEOUT),
+			]
 			timeout_command.extend(transport_command)
 			transport_command = timeout_command
 
 			# process
-			return_code, stdout, stderr = process(tar_command, transport_command, destination, destination_type)
+			return_code, stdout, stderr = process(
+				tar_command, transport_command, destination, destination_type
+			)
 
 			if return_code == 124:
 				# special situation when error code 124 has been thrown. That means - timeout and terminated from our side
-				print(stdout.decode("utf-8"), end='')
-				print(stderr.decode("utf-8"), file=sys.stderr, end='')
-				print("Communication with slave script was timed out with return code: " + str(
-					return_code) + " (Warning: this error can mask original error 124 from peer!)", file=sys.stderr,
-					  end='')
+				print(stdout.decode("utf-8"), end="")
+				print(stderr.decode("utf-8"), file=sys.stderr, end="")
+				print(
+					"Communication with slave script was timed out with return code: "
+					+ str(return_code)
+					+ " (Warning: this error can mask original error 124 from peer!)",
+					file=sys.stderr,
+					end="",
+				)
 			else:
 				# in all other cases we need to resolve if 'ssh' or 'curl' was used
 				# TODO: how do we treat custom configed transport commands?
@@ -194,12 +271,16 @@ def send(service_name: str, facility_name: str, destination: str, destination_ty
 							exit(0)
 				else:
 					# in this situation 'ssh' was used, STDOUT has to be printed
-					print(stdout.decode("utf-8"), end='')
-					print(stderr.decode("utf-8"), file=sys.stderr, end='')
+					print(stdout.decode("utf-8"), end="")
+					print(stderr.decode("utf-8"), file=sys.stderr, end="")
 				# for all situations different from time-out by our side we can return value from ERR_CODE as the result
 				if return_code != 0:
-					print("Communication with slave script ends with return code: " + str(return_code), file=sys.stderr,
-						  end='')
+					print(
+						"Communication with slave script ends with return code: "
+						+ str(return_code),
+						file=sys.stderr,
+						end="",
+					)
 
 			exit(return_code)
 
