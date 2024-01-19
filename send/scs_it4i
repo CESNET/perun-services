@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.11
+#!/usr/bin/env python3
 
 import sys
 import requests
@@ -6,7 +6,6 @@ import json
 import send_lib
 from json.decoder import JSONDecodeError
 
-# FIXME - change to default python when we migrate to containers
 SERVICE_NAME = "scs_it4i"
 
 if __name__ == "__main__":
