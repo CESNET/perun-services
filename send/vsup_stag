@@ -123,10 +123,10 @@ foreach my $key (sort keys %$dataByKeys) {
 	# TODO - not sure if we will use it
 	my $IDCARD_PHOTO = $dataByKeys->{$key}->{'CARD_PHOTO'};
 
-	if ($TYP_ZAZN eq "P") {
+	if ($TYP_ZAZN eq "P" || $TYP_ZAZN eq "Z") {
 
 		unless(defined($UCO_PERUN)) {
-			print "Teacher $key is missing UCO_PERUN.\n";
+			print "Teacher/employee $key is missing UCO_PERUN.\n";
 			$teachers_skipped++;
 			next;
 		}

@@ -7,8 +7,8 @@ use Time::Piece;
 sub resolveExpiration;
 
 local $::SERVICE_NAME = "vsup_stag";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+local $::PROTOCOL_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -61,6 +61,18 @@ foreach my $resourceId ($data->getResourceIds()) {
 	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 
 		my $uco  = $data->getUserAttributeValue( member => $memberId, attrName => $A_UCO);
+
+		# "Teacher" relation replaces standard "employee".
+		if ($relationType eq 'P') {
+			delete $users->{$uco . ":Z"};
+		}
+		# Skip "employee" relation if "teacher" already present
+		if ($relationType eq 'Z') {
+			if (exists $users->{$uco . ":P"}) {
+				next;
+			}
+		}
+
 		my $osbIdSTAG  = $data->getUserAttributeValue( member => $memberId, attrName => $A_OSB_ID_STAG);
 		my $login  = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN);
 		my $prefMail = $data->getUserAttributeValue(member => $memberId, attrName => $A_VSUP_PREF_MAIL);
