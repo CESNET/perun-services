@@ -1,5 +1,11 @@
+perun-slave-process-generic-json-gen (3.0.1) stable; urgency=medium
+
+  * Fix package dependency on perun-slave-base >= 3.1.19
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 22 Jan 2024 14:15:00 +0100
+
 perun-slave-process-generic-json-gen (3.0.0) stable; urgency=low
 
  * New version of perun-slave-process-generic-json-gen
 
- -- Matej Hakoš <492968@mail.muni.cz>, Mon, 11 Dec 2023 17:19:00 +0200
+ -- Matej Hakoš <492968@mail.muni.cz>, Mon, 11 Dec 2023 17:19:00 +0100
