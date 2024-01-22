@@ -5,4 +5,30 @@ include:
 variables:
   # release from production branch instead of main
   RELEASE_FROM_PRODUCTION: 1
-  PYTHON_FILES: 'send/pithia_portal send/ftps_generic send/bbmri_networks send/tinia send/feudal.py send/webcentrum_eosc send/umbraco_mu send/openstack_projects send/m365_cloud send/slack send/o365_groups_mu send/atlassian_mu send/bbmri_collections send/generic_send.py send/generic_sender.py send/send_lib.py send/scs_it4i'
+
+python-files-check:
+    image: registry.gitlab.ics.muni.cz:443/perun-proxy-aai/containers/ci-tools/minideb:latest
+    stage: test
+    script:
+        # Find files with Python shebang
+        - >
+            python_shebang_files=$(find . -type f -not -path "./node_modules/*" -not -path "./vendor/*" -not -path "./venv/*" -exec awk '
+            /^#!.*python/{print FILENAME}
+            {nextfile}' {} +)
+
+        # Extract 'extend-include' files from pyproject.toml
+        - >
+            extend_include_files=$(grep -oP 'extend-include\s*=\s*\[\K[^]]+' pyproject.toml | tr -d '[:space:]')
+
+        - result=0
+        # Check if Python shebang files are in extend-include list
+        - >
+            for file in $python_shebang_files; do
+                if [[ ! $extend_include_files =~ "$file" ]]; then
+                    echo "$file is NOT included in 'extend-include'"
+                    result=1
+                fi
+            done
+
+        - >
+            exit $result
