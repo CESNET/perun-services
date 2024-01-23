@@ -15,23 +15,34 @@ DESTINATION_REGEX = "[.A-Za-z_0-9-]*"
 
 
 if __name__ == "__main__":
+    send_lib.check_input_fields(sys.argv)
+    facility_name = sys.argv[1]
+    destination = sys.argv[2]
+    send_lib.check_destination_format(destination, "", re.compile(DESTINATION_REGEX))
 
-	send_lib.check_input_fields(sys.argv)
-	facility_name = sys.argv[1]
-	destination = sys.argv[2]
-	send_lib.check_destination_format(destination, '', re.compile(DESTINATION_REGEX))
+    # create lock to ensure only one script of this type is running
+    send_lib.create_lock(SERVICE_NAME, destination)
 
-	# create lock to ensure only one script of this type is running
-	send_lib.create_lock(SERVICE_NAME, destination)
+    # prepare temporary working directory and copy all needed files into it
+    with send_lib.prepare_temporary_directory() as tmpDir:
+        send_lib.copy_files_to_directory(
+            send_lib.get_gen_folder(facility_name, SERVICE_NAME),
+            tmpDir,
+            re.compile(".*scim$"),
+        )
 
-	# prepare temporary working directory and copy all needed files into it
-	with send_lib.prepare_temporary_directory() as tmpDir:
-		send_lib.copy_files_to_directory(send_lib.get_gen_folder(facility_name, SERVICE_NAME), tmpDir, re.compile(".*scim$"))
-
-		# run script
-		process = send_lib.exec_script(EXECSCRIPT, ["-c", f"/etc/perun/services/{SERVICE_NAME}/{destination}", "-d", f"{tmpDir}/"])
-		stdout, stderr = process.communicate()
-		print(stdout.decode("utf-8"), end='')
-		print(stderr.decode("utf-8"), file=sys.stderr, end='')
-		if process.returncode != OK:
-			send_lib.die_with_error("Process exit with error", process.returncode)
+        # run script
+        process = send_lib.exec_script(
+            EXECSCRIPT,
+            [
+                "-c",
+                f"/etc/perun/services/{SERVICE_NAME}/{destination}",
+                "-d",
+                f"{tmpDir}/",
+            ],
+        )
+        stdout, stderr = process.communicate()
+        print(stdout.decode("utf-8"), end="")
+        print(stderr.decode("utf-8"), file=sys.stderr, end="")
+        if process.returncode != OK:
+            send_lib.die_with_error("Process exit with error", process.returncode)
