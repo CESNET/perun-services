@@ -1,0 +1,4 @@
+#!/bin/bash
+export SERVICE_NAME="kerberos_admin_principals"
+
+python3 generic_sender.py "$1" "$2" "$3"

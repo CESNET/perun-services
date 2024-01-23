@@ -1,0 +1,5 @@
+perun-slave-process-kerberos-admin-principals (3.0.0) stable; urgency=low
+
+  * added new service kerberos-admin-principals
+
+ -- Matej Hakoš <492968@mail.muni.cz>  Mon, 22 Jan 2024 09:20:00 +0100
