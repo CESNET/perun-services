@@ -83,6 +83,18 @@ if __name__ == "__main__":
                 "@-",
             ]
         )
+        # Append optional BA credentials to URL destinations from standardized config
+        try:
+            sys.path.insert(1, "/etc/perun/services/" + service_name + "/")
+            credentials = __import__(service_name).credentials
+            if destination in credentials:
+                username = credentials.get(destination).get("username")
+                password = credentials.get(destination).get("password")
+                if username is not None and password is not None:
+                    transport_command.extend(["-u", username + ":" + password])
+        except Exception:
+            # this means that config file does not exist or properties are not set or are empty
+            pass
     else:
         transport_command = [
             "ssh",
