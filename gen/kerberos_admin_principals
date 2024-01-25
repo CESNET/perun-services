@@ -1,0 +1,37 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+
+local $::SERVICE_NAME = basename($0);
+local $::PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $data = perunServicesInit::getHashedHierarchicalData;
+my $DIRECTORY = perunServicesInit::getDirectory;
+
+our $A_ADMIN_LOGIN;     *A_ADMIN_LOGIN =    \'urn:perun:user:attribute-def:def:kerberosAdminPrincipal';
+our $A_MEMBER_STATUS;   *A_MEMBER_STATUS =  \'urn:perun:member:attribute-def:core:status';
+
+my %logins;
+foreach my $resourceId ($data->getResourceIds()) {
+	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
+		# Skip members with status other than VALID
+		next if $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS ) ne 'VALID';
+		my $memberLogin = $data->getUserAttributeValue( member => $memberId, attrName => $A_ADMIN_LOGIN );
+		$logins{$memberLogin} = 1;
+	}
+}
+
+my $file = "$DIRECTORY/$::SERVICE_NAME";
+open FILE_USERS, ">$file" or die "Cannot open $file: $! \n";
+foreach my $login (sort keys %logins) {
+	print FILE_USERS $login, "\n";
+}
+close(FILE_USERS) or die "Cannot close $file: $! \n";
+
+perunServicesInit::finalize;
