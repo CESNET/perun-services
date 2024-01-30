@@ -1,5 +1,34 @@
 Upgrade notes
 
+## [10.2.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v10.1.0...v10.2.0) (2024-01-30)
+
+
+### ⚠ BREAKING CHANGES
+
+*   * All services using URL destination and standard send script will
+    start append basic auth credentials if stored in their config
+    at `/etc/perun/services/service_name/service_name.py`
+  * Locally modified send scripts need to be checked and updated.
+  * Configuration for `pithia_portal` service must be updated to not
+    use default properties for authentication to token endpoint
+    (username -> tokenUsername, password -> tokenPassword).
+
+### Features
+
+* added ruff rules ([8baf816](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/8baf816d1c8e18efed14a5aa9d3a8fd7f39f58a6))
+* **base:** 🎸 Add function to log to err output in base ([c6be12c](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/c6be12c9d24472ce90d5aa7c779742d68194c023))
+* **bbmri_negotiator:** new service bbmri_negotiator ([8a69003](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/8a69003291d85296992877f81f28869d2ac9a613))
+* **drupal_elixir:** 🎸 Print out drupal_elixir invalid user names ([acae27a](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/acae27a8b715855eed55dd09f9f65f249594706f))
+* **kerberos_admin_principals:** added kerberos_admin_principals service ([a0ab9eb](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/a0ab9eb65efbc9b8d5442f0125f55198fff32f28))
+* optionally append BA credentials to URL destinations ([3d1934e](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/3d1934ea035fc5804b88940641ba675d936ef07a))
+
+
+### Bug Fixes
+
+* **scs_it4i:** use default python from container ([76f66b2](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/76f66b29d5570e32b2b5155912ecc185e66376fb))
+* update version of perun-slave-base package ([0391cf7](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/0391cf743d1ea9834620348abdca0f77a8e44ffb))
+* **vsup_stag:** support also non-teaching employees ([4715985](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/4715985f05a13a961d857de2a0bb4999e4bda070))
+
 ## [10.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v10.0.0...v10.1.0) (2024-01-15)
 
 
