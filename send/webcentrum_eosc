@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import sys
+import tarfile
+
 import requests
 import send_lib
-import tarfile
 
 SERVICE_NAME = "webcentrum_eosc"
 TIMEOUT = 1800  # 30 * 60 sec = 30 min
@@ -21,14 +22,19 @@ auth = send_lib.get_auth_credentials(SERVICE_NAME, destination)
 send_lib.create_lock(SERVICE_NAME, destination)
 gen_folder = send_lib.get_gen_folder(facility, SERVICE_NAME)
 with send_lib.prepare_temporary_directory() as temp_dir:
-	send_lib.copy_files_to_directory(gen_folder, temp_dir)
+    send_lib.copy_files_to_directory(gen_folder, temp_dir)
 
-	with tarfile.open(temp_dir + '/perun_data.tar.gz', 'w:gz', format=tarfile.GNU_FORMAT) as archive:
-		archive.add(temp_dir, arcname='.')
+    with tarfile.open(
+        temp_dir + "/perun_data.tar.gz", "w:gz", format=tarfile.GNU_FORMAT
+    ) as archive:
+        archive.add(temp_dir, arcname=".")
 
-	with open(temp_dir + '/perun_data.tar.gz', 'rb') as compressed:
-		headers = {'Content-type': 'application/tar+gzip'}
-		response = requests.put(destination, headers=headers, data=compressed, auth=auth, timeout=TIMEOUT)
-		if not response.ok:
-			send_lib.die_with_error(
-				"Request ended with error code: " + str(response.status_code))
+    with open(temp_dir + "/perun_data.tar.gz", "rb") as compressed:
+        headers = {"Content-type": "application/tar+gzip"}
+        response = requests.put(
+            destination, headers=headers, data=compressed, auth=auth, timeout=TIMEOUT
+        )
+        if not response.ok:
+            send_lib.die_with_error(
+                "Request ended with error code: " + str(response.status_code)
+            )

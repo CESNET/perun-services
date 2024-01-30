@@ -62,24 +62,7 @@ Pre scripts are processed before slave script and post scripts are processed aft
 
 ### Contributing
 
-- Indent all sources by tabs, not spaces.
-- Use [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/). To construct a proper commit message, run:
-
-    ```sh
-    npx cz
-    ```
-
-  instead of `git commit`.
-- For perl sources:
-  - Use `use strict` and `use warnings`.
-  - Use own global variables with caution (key word `our`).
-  - For defined global variables (e.g. formatting ones $, $",...) always use `local`.
-  - Brackets for function calls are not necessary, if it doesn't hurt code readability.
-  - Code commenting - the more, the better. For each function we comment input, output a how does it modify global variables (if used).
-  - `man perlstyle`
-- For Python sources:
-  - lint your code with [ruff](https://docs.astral.sh/ruff/)
-  - add names of new Python files into the `PYTHON_FILES` variable in `.gitlab-ci.yml`
+If you want to contribute, you can check [CONTRIBUTING.md](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/-/blob/main/CONTRIBUTING.md) for more details.
 
 ### License
 

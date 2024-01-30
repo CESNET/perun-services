@@ -1,16 +1,15 @@
-#!/usr/local/bin/python3.11
+#!/usr/bin/env python3
 
-import sys
-import requests
 import json
-import send_lib
+import sys
 from json.decoder import JSONDecodeError
 
-# FIXME - change to default python when we migrate to containers
+import requests
+import send_lib
+
 SERVICE_NAME = "scs_it4i"
 
 if __name__ == "__main__":
-
     send_lib.check_input_fields(sys.argv, True)
 
     facility = sys.argv[1]
@@ -48,11 +47,11 @@ if __name__ == "__main__":
     # Request authorization token via client_id/client_secret
     token_req = requests.post(
         TOKEN_API,
-        data = {
+        data={
             "client_id": CLIENT_ID,
             "client_secret": CLIENT_SECRET,
-            "grant_type": "client_credentials"
-        }
+            "grant_type": "client_credentials",
+        },
     )
 
     if token_req.status_code != 200:
@@ -67,9 +66,8 @@ if __name__ == "__main__":
 
     # read all lines at once
     service_files_dir = send_lib.get_gen_folder(facility, SERVICE_NAME)
-    file = open(service_files_dir + "/scs_it4i", mode='r')
-    all_of_it = file.read()
-    file.close()
+    with open(service_files_dir + "/scs_it4i") as file:
+        all_of_it = file.read()
 
     try:
         all_of_it_json = json.loads(all_of_it)
@@ -80,8 +78,8 @@ if __name__ == "__main__":
     # Call einfra-user-attr with auth token
     user_attr_req = requests.post(
         destination,
-        headers = { "Authorization": "Bearer " + token_st["access_token"] },
-        json = all_of_it_json
+        headers={"Authorization": "Bearer " + token_st["access_token"]},
+        json=all_of_it_json,
     )
 
     response = user_attr_req.text.strip()

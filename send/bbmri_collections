@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-import os
-import send_lib
-import sys
-import requests
 import json
+import os
+import sys
+
+import requests
+import send_lib
 
 SERVICE_NAME = "bbmri_collections"
 TIMEOUT = 5400  # 90s * 60 sec = 1.5h
@@ -29,22 +30,42 @@ group_endpoint = "mapping"
 # Read username and password from configuration if it is present - else auth is not added to the request
 auth = send_lib.get_auth_credentials(SERVICE_NAME, destination)
 
-with open(user_filepath, 'rb') as f:
-	headers = {'Content-Type': 'application/json'}
-	response = requests.post(destination + user_endpoint, headers=headers, auth=auth, timeout=TIMEOUT, json=json.load(f))
-	if response.status_code == 124:
-		send_lib.die_with_error("Propagation users - Communication with the peer has timed out with return code:"
-								" 124 (Warning: this error can mask original error 124 from peer!)")
-	if not response.ok:
-		send_lib.die_with_error(
-			"Propagation users - Communication with the peer ends with return code: " + str(response.status_code))
+with open(user_filepath, "rb") as f:
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(
+        destination + user_endpoint,
+        headers=headers,
+        auth=auth,
+        timeout=TIMEOUT,
+        json=json.load(f),
+    )
+    if response.status_code == 124:
+        send_lib.die_with_error(
+            "Propagation users - Communication with the peer has timed out with return code:"
+            " 124 (Warning: this error can mask original error 124 from peer!)"
+        )
+    if not response.ok:
+        send_lib.die_with_error(
+            "Propagation users - Communication with the peer ends with return code: "
+            + str(response.status_code)
+        )
 
-with open(group_filepath, 'rb') as f:
-	headers = {'Content-Type': 'application/json'}
-	response = requests.post(destination + group_endpoint, headers=headers, auth=auth, timeout=TIMEOUT, json=json.load(f))
-	if response.status_code == 124:
-		send_lib.die_with_error("Propagation groups - Communication with the peer has timed out with return code:"
-								" 124 (Warning: this error can mask original error 124 from peer!)")
-	if not response.ok:
-		send_lib.die_with_error(
-			"Propagation groups - Communication with the peer ends with return code: " + str(response.status_code))
+with open(group_filepath, "rb") as f:
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(
+        destination + group_endpoint,
+        headers=headers,
+        auth=auth,
+        timeout=TIMEOUT,
+        json=json.load(f),
+    )
+    if response.status_code == 124:
+        send_lib.die_with_error(
+            "Propagation groups - Communication with the peer has timed out with return code:"
+            " 124 (Warning: this error can mask original error 124 from peer!)"
+        )
+    if not response.ok:
+        send_lib.die_with_error(
+            "Propagation groups - Communication with the peer ends with return code: "
+            + str(response.status_code)
+        )

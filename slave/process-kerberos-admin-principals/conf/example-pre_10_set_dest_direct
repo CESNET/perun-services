@@ -1,0 +1,4 @@
+#!/bin/sh
+
+# set destination directory
+# DST_DIR="/var/spool/perun/kerberos_admin_principals"

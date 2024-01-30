@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import sys
-import send_lib
+
 import generic_sender
+import send_lib
 
 send_lib.check_input_fields(sys.argv)
 

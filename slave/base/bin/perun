@@ -142,6 +142,16 @@ function log_warn_to_err_exit {
 	exit 0
 }
 
+### Log message to stderr, but do not exit
+function log_warn_to_err {
+	TEXT="$1"
+	TIME=`date "+%H:%M:%S"`
+
+	MSG="Info: ${TEXT}"
+	echo "${TIME} ${MSG}" >&2
+	logger -t "${NAME}" -p daemon.error "${SERVICE}: ${MSG}" &>/dev/null
+}
+
 ### Log debug only if variable DEBUG exists and is the length of this variable is nonzero
 function log_debug {
 	MSG="$1"

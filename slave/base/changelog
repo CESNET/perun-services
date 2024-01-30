@@ -1,3 +1,9 @@
+perun-slave-base (3.1.19) stable; urgency=medium
+
+  * Support "generic_json_gen" services
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 22 Jan 2024 14:10:00 +0100
+
 perun-slave-base (3.1.18) stable; urgency=low
 
   * Fixed package priority from 'extra' to 'optional'.

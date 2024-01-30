@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import sys
-import send_lib
-import requests
+
 import generic_sender
+import requests
+import send_lib
 
 SERVICE_NAME = "pithia_portal"
 
@@ -16,23 +17,30 @@ send_lib.check_destination_type_allowed(destination_type, send_lib.DESTINATION_T
 
 auth_token = None
 
-auth = send_lib.get_auth_credentials(SERVICE_NAME, destination)
-tokenUrl = send_lib.get_custom_config_properties(SERVICE_NAME, destination, ["tokenUrl"])[0]
-data = {
-	"username": auth[0],
-	"password": auth[1]
-}
-response = requests.post(tokenUrl, data)
+authData = send_lib.get_custom_config_properties(
+    SERVICE_NAME, destination, ["tokenUsername", "tokenPassword", "tokenUrl"]
+)
+data = {"username": authData[0], "password": authData[1]}
+response = requests.post(authData[2], data)
 resp_cookies = response.cookies.get_dict()
 if response.status_code == 200:
-	response = response.json()
-	if "token" not in response:
-		send_lib.die_with_error("Token missing in response from token server")
-	auth_token = response["token"]
+    response = response.json()
+    if "token" not in response:
+        send_lib.die_with_error("Token missing in response from token server")
+    auth_token = response["token"]
 else:
-	send_lib.die_with_error("Response from token server ended with error code: " + str(response.status_code)
-							+ ", content: " + response.text)
+    send_lib.die_with_error(
+        "Response from token server ended with error code: "
+        + str(response.status_code)
+        + ", content: "
+        + response.text
+    )
 
-opts = ['-H', 'Authorization: Bearer ' + auth_token, '--cookie', 'sessionid=' + resp_cookies['sessionid']]
+opts = [
+    "-H",
+    "Authorization: Bearer " + auth_token,
+    "--cookie",
+    "sessionid=" + resp_cookies["sessionid"],
+]
 
 generic_sender.send(SERVICE_NAME, facility, destination, destination_type, opts)

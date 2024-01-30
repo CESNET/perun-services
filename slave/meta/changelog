@@ -1,3 +1,9 @@
+perun-slave-full (3.1.20) stable; urgency=low
+
+  * New package for processing service bbmri_negotiator
+
+ -- Johana Supikova <supikova@ics.muni.cz>  Mon, 11 Dec 2023 07:51:00 +0100
+
 perun-slave-full (3.1.19) stable; urgency=low
 
   * New package for processing service calpendo_einfra
