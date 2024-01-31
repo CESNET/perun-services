@@ -1,4 +1,4 @@
-perun-slave-process-bbmri_negotiator (3.0.0) stable; urgency=low
+perun-slave-process-bbmri-negotiator (3.0.0) stable; urgency=low
 
   * New service bbmri_negotiator
 
