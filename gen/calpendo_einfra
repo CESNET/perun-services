@@ -10,7 +10,7 @@ use Data::Dumper;
 
 local $::SERVICE_NAME = "calpendo_einfra";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -21,15 +21,20 @@ our $A_USER_LOGIN;                *A_USER_LOGIN =            \'urn:perun:user:at
 our $A_MEMBER_STATUS;             *A_MEMBER_STATUS =         \'urn:perun:member:attribute-def:core:status';
 our $A_FIRST_NAME;                *A_FIRST_NAME =            \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;                 *A_LAST_NAME =             \'urn:perun:user:attribute-def:core:lastName';
-our $A_EMAIL;                     *A_EMAIL =                 \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_EMAIL;                     *A_EMAIL =                 \'urn:perun:member:attribute-def:def:mail';
 our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
+our $A_PHONE;                     *A_PHONE =                 \'urn:perun:member:attribute-def:def:phone';
+our $A_VMCF_ORG_UNIT;             *A_VMCF_ORG_UNIT =         \'urn:perun:member:attribute-def:def:vmcfOrgUnit';
+our $A_VMCF_USER_POSITION;        *A_VMCF_USER_POSITION =    \'urn:perun:member:attribute-def:def:vmcfUserPosition';
+our $A_VMCF_UKCO;                 *A_VMCF_UKCO =             \'urn:perun:member:attribute-def:def:vmcfUKCO';
+our $A_VMCF_UK_LOGIN;             *A_VMCF_UK_LOGIN =         \'urn:perun:member:attribute-def:def:vmcfUKlogin';
 
 my $agent = perunServicesInit->getAgent;
 my %printed_logins;
 
 my $fileUsers = $DIRECTORY . "users.csv";
 open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
-print FILE_USERS "LOGIN,EMAIL,FIRSTNAME,LASTNAME\n";
+print FILE_USERS "LOGIN,EMAIL,FIRSTNAME,LASTNAME,PHONE,ORG_UNIT,USER_POSITION,UKCO,UK_LOGIN\n";
 
 foreach my $memberId ($data->getMemberIdsForFacility()) {
 	my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
@@ -41,10 +46,15 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
 	my $f_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
 	my $l_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_LAST_NAME );
-	my $email =  $data->getUserAttributeValue( member => $memberId, attrName => $A_EMAIL );
+	my $email =  $data->getMemberAttributeValue( member => $memberId, attrName => $A_EMAIL );
+	my $phone =  $data->getMemberAttributeValue( member => $memberId, attrName => $A_PHONE );
+	my $orgUnit = $data->getMemberAttributeValue( member => $memberId, attrName => $A_VMCF_ORG_UNIT );
+	my $position = $data->getMemberAttributeValue( member => $memberId, attrName => $A_VMCF_USER_POSITION );
+	my $ukco = $data->getMemberAttributeValue( member => $memberId, attrName => $A_VMCF_UKCO );
+	my $ukLogin = $data->getMemberAttributeValue( member => $memberId, attrName => $A_VMCF_UK_LOGIN );
 	unless (exists $printed_logins{$login}) {
 		$printed_logins{$login} = 1;
-		print FILE_USERS "$login,$email,$f_name,$l_name\n";
+		print FILE_USERS "$login,$email,$f_name,$l_name,$phone,".($orgUnit//"").",".($position//"").",".($ukco//"").",".($ukLogin//"")."\n";
 	}
 }
 close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
