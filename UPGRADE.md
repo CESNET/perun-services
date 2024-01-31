@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [10.2.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v10.2.0...v10.2.1) (2024-01-31)
+
+
+### Bug Fixes
+
+* check_input_fields() now allows 3-4 input args again ([01b3f6b](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/01b3f6b8c36ee722cf06908eed2b4208982899d7))
+
 ## [10.2.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v10.1.0...v10.2.0) (2024-01-30)
 
 
