@@ -1,3 +1,10 @@
+perun-slave-process-kerberos-admin-principals (3.0.1) stable; urgency=medium
+
+  * fixed bash reference in main script
+  * fixed path for work directory
+
+ -- Pavel Zlámal <zlamal@cesnet.cz>  Mon, 05 Feb 2024 10:40:00 +0100
+
 perun-slave-process-kerberos-admin-principals (3.0.0) stable; urgency=low
 
   * added new service kerberos-admin-principals
