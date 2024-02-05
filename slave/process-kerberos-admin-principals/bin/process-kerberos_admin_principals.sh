@@ -1,10 +1,9 @@
-./#!/bin/bash
+#!/bin/bash
 PROTOCOL_VERSION='3.1.0'
 
 function process {
 
 	DEFAULT_DIR="/var/spool/perun/kerberos_admin_principals"
-	FROM_PERUN_DIR="${WORK_DIR}/kerberos_admin_principals/"
 
 	if [ -z "$DST_DIR" ]; then
 		DST_DIR=$DEFAULT_DIR
@@ -15,5 +14,5 @@ function process {
 	fi
 
 	# Copy `kerberos_admin_principals` file to destination directory
-	cp -f "${FROM_PERUN_DIR}/kerberos_admin_principals" "$DST_DIR"
+	cp -f "${WORK_DIR}/kerberos_admin_principals" "$DST_DIR"
 }
