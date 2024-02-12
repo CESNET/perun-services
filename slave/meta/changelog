@@ -1,3 +1,9 @@
+perun-slave-full (3.1.21) stable; urgency=low
+
+  * New package for processing service kerberos_admin_principals
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 12 Feb 2024 12:15:00 +0100
+
 perun-slave-full (3.1.20) stable; urgency=low
 
   * New package for processing service bbmri_negotiator
