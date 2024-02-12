@@ -13,6 +13,7 @@ perun-slave-process-group-nfs4
 perun-slave-process-k5login
 perun-slave-process-k5login-generic
 perun-slave-process-k5login-root
+perun-slave-process-kerberos-admin-principals
 perun-slave-process-kerberos-renewal-principals
 perun-slave-process-ldap
 perun-slave-process-mailaliases
