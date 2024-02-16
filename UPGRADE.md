@@ -1,5 +1,27 @@
 Upgrade notes
 
+## [11.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v10.2.1...v11.0.0) (2024-02-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **google_groups:** Install python libraries, rewrite config files (see docs)
+* Changed structure of generated data, UUIDs attributes signal relationships
+
+### Features
+
+* **calpendo_einfra:** added more attributes to gen script of service calpendo_einfra ([2ee11f6](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/2ee11f6694759f16a4206f496a60b1dab506fd5b))
+* generic_json_gen rewrite ([acdded8](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/acdded897759432c284fae36fccd5061282a1aab))
+* **google_groups:** removing dependency on java connector ([383b826](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/383b8268af2481292626c94246fd85334e70e54c))
+
+
+### Bug Fixes
+
+* fixed deb dependency for perun-slave-process-generic-json-gen ([dbee68f](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/dbee68f59f348a5f77e3f69f0e1f34be8f841bea))
+* **fs_project:** sort output file for better comparison of changes ([b8cf617](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/b8cf617907e711bd213a5ab38b73b5ec8cab7e4b))
+* include kerberos_admin_principals in perun-slave-full ([708632a](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/708632a6d6ea636a7abb689c14380b66f79073e1))
+* **kerberos_admin_principal:** bash reference and work dir path ([21e5477](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/21e5477178138d565af03e47b150f0e492a063d5))
+
 ## [10.2.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v10.2.0...v10.2.1) (2024-01-31)
 
 
