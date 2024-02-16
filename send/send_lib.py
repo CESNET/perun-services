@@ -1,3 +1,4 @@
+import csv
 import fcntl
 import os
 import re
@@ -468,3 +469,32 @@ def get_custom_config_properties(
     except Exception:
         # this means that config file does not exist or properties are not set
         return None
+
+
+def parse_input_csv_file(file, column_names):
+    """
+    Parses csv file, expects rows delimited by ';' and list values delimited by ','.
+    :param file: Path to the file
+    :param column_names: Names of columns, first is used as the key in the dictionary. If name starts with '[]',
+            it will be considered a list and the prefix removed in the dictionary
+    :return: Dictionary of {column_name_1: {"column_name_1": value, "column_name_2": value, "column_name_3": value}}
+    """
+    objects = {}
+    with open(file) as csvfile:
+        reader = csv.reader(csvfile, delimiter=";")
+        for row in reader:
+            if len(row) != len(column_names):
+                print(f"Skipping invalid row: {row}")
+                continue
+            object_key = row[0]
+            object_info = {}
+            for i in range(len(column_names)):
+                if column_names[i].startswith("[]"):
+                    object_info[column_names[i][2:]] = [
+                        name.strip() for name in row[i].split(",") if name.strip()
+                    ]
+                else:
+                    object_info[column_names[i]] = row[i] if row[i] else None
+            objects[object_key] = object_info
+
+    return objects
