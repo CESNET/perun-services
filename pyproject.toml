@@ -8,7 +8,7 @@ license = {file = "LICENSE"}
 Repository = "https://gitlab.ics.muni.cz/perun/perun-idm/perun-services.git"
 
 [tool.ruff]
-extend-include = ["./send/pithia_portal", "./send/ftps_generic", "./send/bbmri_networks", "./send/tinia", "./send/feudal.py", "./send/webcentrum_eosc", "./send/umbraco_mu", "./send/openstack_projects", "./send/m365_cloud", "./send/slack", "./send/o365_groups_mu", "./send/atlassian_mu", "./send/bbmri_collections", "./send/generic_send.py", "./send/generic_sender.py", "./send/send_lib.py", "./send/scs_it4i", "./send/generic_json_gen", "./send/sympa_cesnet", "./slave/process-scim/lib/process-scim.example"]
+extend-include = ["./send/pithia_portal", "./send/ftps_generic", "./send/bbmri_networks", "./send/tinia", "./send/feudal.py", "./send/webcentrum_eosc", "./send/umbraco_mu", "./send/openstack_projects", "./send/m365_cloud", "./send/slack", "./send/o365_groups_mu", "./send/atlassian_mu", "./send/bbmri_collections", "./send/generic_send.py", "./send/generic_sender.py", "./send/send_lib.py", "./send/scs_it4i", "./send/generic_json_gen", "./send/sympa_cesnet", "./slave/process-scim/lib/process-scim.example", "./send/google_groups", "./send/vsup_google_groups"]
 ignore = ['E501'] # ignore line too long - formatter does a best-effort wrap
 
 [tool.ruff.lint]

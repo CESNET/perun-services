@@ -5,12 +5,12 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 use JSON::XS;
-use Data::Dumper;
 
 our $SERVICE_NAME = "generic_json_gen";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
+our $JSON_FORMAT = "json";
 # Get information about service and its attributes
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -37,13 +37,40 @@ our $A_F_UUID;
 
 my $DEBUG = 0;
 
+sub generateDefaultValue {
+	my $entity = shift;
+	my $type = shift;
+
+	if ($entity eq "virt") {
+		return undef;
+	}
+	if ($type eq "integer") {
+		return undef;
+	}
+	elsif ($type eq "string") {
+		return "";
+	}
+	elsif ($type eq "array") {
+		return [];
+	}
+	elsif ($type eq "hash") {
+		return {};
+	}
+	elsif ($type eq "boolean") {
+		return JSON::XS::false;
+	}
+	else {
+		die("Unknown type $type");
+	}
+}
+
 # Check attribute definitions, if all required attributes are present, group them by entity
 my $requiredAttributes = {
 	"facility"        => {},
 	"vo"              => {},
 	"group"           => {},
-	"group_resource"  => {},
 	"resource"        => {},
+	"group_resource"  => {},
 	"user"            => {},
 	"user_facility"   => {},
 	"member"          => {},
@@ -55,24 +82,135 @@ for my $attribute (@requiredAttributesDefinitions) {
 	my @namespaceParts = split(":", $namespace);
 	my $entity = $namespaceParts[2];
 	my $urn = $namespace . ":" . $attribute->getFriendlyName;
-	$requiredAttributes->{$entity}->{$urn} = undef;
+	$requiredAttributes->{$entity}->{$urn} = generateDefaultValue($namespaceParts[4], $attribute->getType);
 }
-# Check if const attributes are present
+
+sub checkRequiredAttributes {
+	my $attributes = shift;
+
+	# If entity attribute, uuid is required
+	# If mixed entity attribute, uuids of both entities are required
+	# If attribute is not present, die
+
+	# Facility
+	if (keys %{$attributes->{"facility"}} >= 1) {
+		if (!exists($attributes->{"facility"}->{$A_F_UUID})) {
+			die("Facility attribute detected, but $A_F_UUID is not present");
+		}
+	}
+
+	# VO
+	if (keys %{$attributes->{"vo"}} >= 1) {
+		if (!exists($attributes->{"vo"}->{$A_V_UUID})) {
+			die("Vo attribute detected, but $A_V_UUID is not present");
+		}
+	}
+
+	# Group
+	if (keys %{$attributes->{"group"}} >= 1) {
+		if (!exists($attributes->{"group"}->{$A_G_UUID})) {
+			die("Group attribute detected, but $A_G_UUID is not present");
+		}
+	}
+
+	# Resource
+	if (keys %{$attributes->{"resource"}} >= 1) {
+		if (!exists($attributes->{"resource"}->{$A_R_UUID})) {
+			die("Resource attribute detected, but $A_R_UUID is not present");
+		}
+	}
+
+	# Group-Resource
+	if (keys %{$attributes->{"group_resource"}} >= 1) {
+		my $shouldDie = 0;
+		if (!exists($attributes->{"group"}->{$A_G_UUID})) {
+			$shouldDie = 1;
+		}
+		if (!exists($attributes->{"resource"}->{$A_R_UUID})) {
+			$shouldDie = 1;
+		}
+		if ($shouldDie) {
+			die("Group-Resource attribute detected, but $A_G_UUID or $A_R_UUID is not present");
+		}
+	}
+
+	# User
+	if (keys %{$attributes->{"user"}} >= 1) {
+		if (!exists($attributes->{"user"}->{$A_U_UUID})) {
+			die("User attribute detected, but $A_U_UUID is not present");
+		}
+	}
+
+	# User-Facility
+	if (keys %{$attributes->{"user_facility"}} >= 1) {
+		my $shouldDie = 0;
+		if (!exists($attributes->{"user"}->{$A_U_UUID})) {
+			$shouldDie = 1;
+		}
+		if (!exists($attributes->{"facility"}->{$A_F_UUID})) {
+			$shouldDie = 1;
+		}
+		if ($shouldDie) {
+			die("User-Facility attribute detected, but $A_U_UUID or $A_F_UUID is not present");
+		}
+	}
+
+	# Member
+	if (keys %{$attributes->{"member"}} >= 1) {
+		my $shouldDie = 0;
+		if (!exists($attributes->{"user"}->{$A_U_UUID})) {
+			$shouldDie = 1;
+		}
+		if (!exists($attributes->{"vo"}->{$A_V_UUID})) {
+			$shouldDie = 1;
+		}
+		if ($shouldDie) {
+			die("Member attribute detected, but $A_U_UUID or $A_V_UUID is not present");
+		}
+	}
+
+	# Member-Resource
+	if (keys %{$attributes->{"member_resource"}} >= 1) {
+		my $shouldDie = 0;
+		if (!exists($attributes->{"user"}->{$A_U_UUID})) {
+			$shouldDie = 1;
+		}
+		if (!exists($attributes->{"vo"}->{$A_V_UUID})) {
+			$shouldDie = 1;
+		}
+		if (!exists($attributes->{"resource"}->{$A_R_UUID})) {
+			$shouldDie = 1;
+		}
+		if ($shouldDie) {
+			die("Member-Resource attribute detected, but $A_U_UUID or $A_V_UUID or $A_R_UUID is not present");
+		}
+	}
+
+	# Member-Group
+	if (keys %{$attributes->{"member_group"}} >= 1) {
+		my $shouldDie = 0;
+		if (!exists($attributes->{"user"}->{$A_U_UUID})) {
+			$shouldDie = 1;
+		}
+		if (!exists($attributes->{"vo"}->{$A_V_UUID})) {
+			$shouldDie = 1;
+		}
+		if (!exists($attributes->{"group"}->{$A_G_UUID})) {
+			$shouldDie = 1;
+		}
+		if ($shouldDie) {
+			die("Member-Group attribute detected, but $A_U_UUID or $A_V_UUID or $A_G_UUID is not present");
+		}
+	}
+}
+
+# Check if facility uuid is present, die if not
 if (!exists($requiredAttributes->{"facility"}->{$A_F_UUID})) {
 	die("Attribute $A_F_UUID is required for this service");
 }
-if (!exists($requiredAttributes->{"vo"}->{$A_V_UUID})) {
-	die("Attribute $A_V_UUID is required for this service");
-}
-if (!exists($requiredAttributes->{"group"}->{$A_G_UUID})) {
-	die("Attribute $A_G_UUID is required for this service");
-}
-if (!exists($requiredAttributes->{"resource"}->{$A_R_UUID})) {
-	die("Attribute $A_R_UUID is required for this service");
-}
-if (!exists($requiredAttributes->{"user"}->{$A_U_UUID})) {
-	die("Attribute $A_U_UUID is required for this service");
-}
+
+# Check if all required attributes are present
+checkRequiredAttributes($requiredAttributes);
 
 # Get constant information for facility
 my $facility = perunServicesInit::getFacility;
@@ -90,21 +228,21 @@ for my $destination (@destinations) {
 	push(@facilityDestinations, $destination->getDestination);
 }
 
+my $facilityAttributes = $data->getAllFacilityAttributes();
+# Remove facility uuid from attributes
+delete($facilityAttributes->{$A_F_UUID});
+
 # Init Structure
 my $output = {
-	"metadata"  => {
+	"metadata" => {
 		"version"  => $SCRIPT_VERSION,
 		"facility" => {
-			"facility_uuid" => $facilityUuid,
-			"facility_name" => $facilityName,
-			"destinations"  => \@facilityDestinations,
-			"attributes"    => $data->getAllFacilityAttributes(),
+			"facilityUuid" => $facilityUuid,
+			"facilityName" => $facilityName,
+			"destinations" => \@facilityDestinations,
+			"attributes"   => $facilityAttributes,
 		}
-	},
-	"users"     => {}, # Fill later
-	"vos"       => {}, # Fill later
-	"groups"    => {}, # Fill later
-	"resources" => {}  # Fill later
+	}
 };
 
 # Generate structure with required attributes
@@ -119,177 +257,206 @@ my $lookup = {
 };
 
 # VOs
-if ($DEBUG == 1) {
-	print("Generating JSON for VOs\n");
-}
-for my $voId ($data->getVoIds()) {
-	# If we know, that the VOs UUID has to be present, we can use it
-	my $voUUID = $data->getVoAttributeValue(vo => $voId, attrName => $A_V_UUID);
-	# Lookup update
-	$lookup->{uuids}->{$voUUID} = $voId;
-	$lookup->{ids}->{vo}->{$voId} = $voUUID;
+# Skip VOs if VO UUID is not present
+if (exists($requiredAttributes->{"vo"}->{$A_V_UUID})) {
 
-	my $voobj = {
-		"attributes" => $data->getAllVoAttributes(vo => $voId),
-	};
-	$output->{vos}->{$voUUID} = $voobj;
+	if ($DEBUG == 1) {
+		print("Generating JSON for VOs\n");
+	}
+	$output->{vos} = {};
+	for my $voId ($data->getVoIds()) {
+		# If we know, that the VOs UUID has to be present, we can use it
+		my $voUUID = $data->getVoAttributeValue(vo => $voId, attrName => $A_V_UUID);
+		next if (exists($output->{vos}->{$voUUID}));
+
+		# Lookup update
+		$lookup->{uuids}->{$voUUID} = $voId;
+		$lookup->{ids}->{vo}->{$voId} = $voUUID;
+
+		my $voAttributes = $data->getAllVoAttributes(vo => $voId);
+		# Remove VO UUID from attributes
+		delete($voAttributes->{$A_V_UUID});
+
+		my $voobj = {
+			"attributes" => $voAttributes,
+		};
+		$output->{vos}->{$voUUID} = $voobj;
+	}
 }
 
 # Groups
-if ($DEBUG == 1) {
-	print("Generating JSON for groups\n");
-}
-for my $groupId ($data->getGroupIds()) {
-	my $groupUUID = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_UUID);
-	# Lookup update
-	$lookup->{uuids}->{$groupUUID} = $groupId;
-	$lookup->{ids}->{group}->{$groupId} = $groupUUID;
+# Skip Groups if Group UUID is not present
+if (exists($requiredAttributes->{"group"}->{$A_G_UUID})) {
 
-	my $voId = $data->getVoIdForGroup(group => $groupId);
-	my $groupobj = {
-		"voUuid"     => $lookup->{ids}->{vo}->{$voId},
-		"attributes" => $data->getAllGroupAttributes(group => $groupId),
-	};
-	$output->{groups}->{$groupUUID} = $groupobj;
+	if ($DEBUG == 1) {
+		print("Generating JSON for groups\n");
+	}
+	$output->{groups} = {};
+	for my $groupId ($data->getGroupIds()) {
+		my $groupUUID = $data->getGroupAttributeValue(group => $groupId, attrName => $A_G_UUID);
+		next if (exists($output->{groups}->{$groupUUID}));
+
+		# Lookup update
+		$lookup->{uuids}->{$groupUUID} = $groupId;
+		$lookup->{ids}->{group}->{$groupId} = $groupUUID;
+
+		my $groupAttributes = $data->getAllGroupAttributes(group => $groupId);
+		delete($groupAttributes->{$A_G_UUID});
+
+		my $groupobj = {
+			"attributes" => $groupAttributes,
+		};
+
+		# If VO UUID is present, add `voUuid` to group
+		if (exists($requiredAttributes->{"vo"}->{$A_V_UUID})) {
+			my $voId = $data->getVoIdForGroup(group => $groupId);
+			$groupobj->{"voUuid"} = $lookup->{ids}->{vo}->{$voId};
+		}
+		$output->{groups}->{$groupUUID} = $groupobj;
+	}
 }
 
 # Resources
-if ($DEBUG == 1) {
-	print("Generating JSON for resources\n");
-}
-for my $resourceId ($data->getResourceIds()) {
-	my $resourceUUID = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_UUID);
-	# Lookup update
-	$lookup->{"uuids"}->{$resourceUUID} = $resourceId;
-	$lookup->{"ids"}->{"resource"}->{$resourceId} = $resourceUUID;
-
-	# Resource attributes
-	my %resource_group_attributes;
-	for my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
-		my $groupUUID = $lookup->{ids}->{group}->{$groupId};
-		# Fill Group attributes
-		my $attrs = $data->getAllGroupResourceAttributes(resource => $resourceId, group => $groupId);
-		$resource_group_attributes{$groupUUID} = $attrs;
+# Skip Resources if Resource UUID is not present
+if (exists($requiredAttributes->{"resource"}->{$A_R_UUID})) {
+	if ($DEBUG == 1) {
+		print("Generating JSON for resources\n");
 	}
+	$output->{resources} = {};
+	for my $resourceId ($data->getResourceIds()) {
+		my $resourceUUID = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_UUID);
+		next if (exists($output->{resources}->{$resourceUUID}));
 
-	my $voId = $data->getVoIdForResource(resource => $resourceId);
-	my $resourceobj = {
-		"voUuid"          => $lookup->{ids}->{vo}->{$voId},
-		"attributes"      => $data->getAllResourceAttributes(resource => $resourceId),
-		"assigned_groups" => \%resource_group_attributes,
-	};
-	$output->{resources}->{$resourceUUID} = $resourceobj;
+		# Lookup update
+		$lookup->{"uuids"}->{$resourceUUID} = $resourceId;
+		$lookup->{"ids"}->{"resource"}->{$resourceId} = $resourceUUID;
+
+		my $resourceAttributes = $data->getAllResourceAttributes(resource => $resourceId);
+		delete($resourceAttributes->{$A_R_UUID});
+
+		my $resourceobj = {
+			"attributes" => $resourceAttributes,
+		};
+
+		if (exists($requiredAttributes->{"vo"}->{$A_V_UUID})) {
+			my $voId = $data->getVoIdForResource(resource => $resourceId);
+			$resourceobj->{"voUuid"} = $lookup->{ids}->{vo}->{$voId};
+		}
+
+		if (exists($requiredAttributes->{"group"}->{$A_G_UUID})) {
+			my %group_attributes;
+			for my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
+				my $groupUUID = $lookup->{ids}->{group}->{$groupId};
+				# Fill Group attributes
+				my $attrs = $data->getAllGroupResourceAttributes(resource => $resourceId, group => $groupId);
+				$group_attributes{$groupUUID} = {
+					"attributes" => $attrs,
+				};
+			}
+			$resourceobj->{"assigned_groups"} = \%group_attributes;
+		}
+		$output->{resources}->{$resourceUUID} = $resourceobj;
+	}
 }
 
 # Users
-if ($DEBUG == 1) {
-	print("Generating JSON for users\n");
-}
-for my $memberId ($data->getMemberIdsForFacility()) {
-	my $userId = $data->getUserIdForMember(member => $memberId);
-	my $userUUID = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_UUID);
-	if (!defined($userUUID)) {
-		die("ERROR: Member $memberId has no UUID\n");
+# Skip Users if User UUID is not present
+if (exists($requiredAttributes->{"user"}->{$A_U_UUID})) {
+	if ($DEBUG == 1) {
+		print("Generating JSON for users\n");
 	}
+	$output->{users} = {};
+	for my $memberId ($data->getMemberIdsForFacility()) {
+		my $userId = $data->getUserIdForMember(member => $memberId);
+		my $userUUID = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_UUID);
 
-	# Lookup update
-	$lookup->{uuids}->{$userUUID} = $userId;
-	$lookup->{ids}->{user}->{$userId} = $userUUID;
+		next if (exists($output->{users}->{$userUUID}));
 
-	my $voId = $data->getVoIdForMember(member => $memberId);
-	my $voUUID = $lookup->{ids}->{vo}->{$voId};
+		# Lookup update
+		$lookup->{uuids}->{$userUUID} = $userId;
+		$lookup->{ids}->{user}->{$userId} = $userUUID;
 
-	# Fill Vo attributes
-	my $vo_attributes = $data->getAllMemberAttributes(member => $memberId, vo => $voId);
-
-	# Group - Member
-	my %group_attributes;
-	for my $groupId ($data->getGroupIdsForVo(vo => $voId)) {
-		my $groupUUID = $lookup->{ids}->{group}->{$groupId};
-		# Fill Group attributes
-		my $g_attrs = $data->getAllMemberGroupAttributes(member => $memberId, group => $groupId);
-		$group_attributes{$voUUID}->{$groupUUID} = $g_attrs;
-	}
-
-	# Resource - Member
-	my %resource_attributes;
-	for my $resourceId ($data->getResourceIdsForMember(member => $memberId)) {
-		my $resourceUUID = $lookup->{ids}->{resource}->{$resourceId};
-		# Fill Resource attributes
-		my $r_attrs = $data->getAllMemberResourceAttributes(member => $memberId, resource => $resourceId);
-		$resource_attributes{$voUUID}->{$resourceUUID} = $r_attrs;
-	}
-
-	my %other_attributes;
-	if (exists($output->{users}->{$userUUID}->{attributes})) {
-		# We can safely skip loading attributes, because they are already loaded
-		%other_attributes = $output->{users}->{$userUUID}->{attributes};
-	} else {
+		my %other_attributes;
 		my $user_attributes = $data->getAllUserAttributes(member => $memberId);
 		for my $attr (keys %$user_attributes) {
+			next if ($attr eq $A_U_UUID);
 			$other_attributes{$attr} = $user_attributes->{$attr};
 		}
 		my $user_facility_attributes = $data->getAllUserFacilityAttributes(member => $memberId);
 		for my $attr (keys %$user_facility_attributes) {
 			$other_attributes{$attr} = $user_facility_attributes->{$attr};
 		}
-	}
 
-	my $userobj = {
-		"allowed_vos"       => $vo_attributes,
-		"allowed_groups"    => \%group_attributes,
-		"allowed_resources" => \%resource_attributes,
-		"attributes"        => \%other_attributes,
-	};
-	$output->{users}->{$userUUID} = $userobj;
+		my $userobj = {
+			"attributes" => \%other_attributes || {},
+		};
+
+		if (exists($requiredAttributes->{"vo"}->{$A_V_UUID})) {
+			my $voId = $data->getVoIdForMember(member => $memberId);
+			my $voUUID = $lookup->{ids}->{vo}->{$voId};
+			$userobj->{"allowed_vos"}->{$voUUID} = {
+				"attributes" => $data->getAllMemberAttributes(member => $memberId, vo => $voId) || {},
+			};
+		}
+
+		# Group - Member
+		if (exists($requiredAttributes->{"group"}->{$A_G_UUID})) {
+			my %group_attributes;
+			for my $groupId ($data->getGroupIdsForMember(member => $memberId)) {
+				my $groupUUID = $lookup->{ids}->{group}->{$groupId};
+				# Fill Group attributes
+				my $attrs = $data->getAllMemberGroupAttributes(member => $memberId, group => $groupId);
+				$group_attributes{$groupUUID} = {
+					"attributes" => $attrs || {}
+				};
+			}
+			$userobj->{"allowed_groups"} = \%group_attributes;
+		}
+
+		if (exists($requiredAttributes->{"resource"}->{$A_R_UUID})) {
+			my %resource_attributes;
+			for my $resourceId ($data->getResourceIdsForMember(member => $memberId)) {
+				my $resourceUUID = $lookup->{ids}->{resource}->{$resourceId};
+				# Fill Resource attributes
+				my $r_attrs = $data->getAllMemberResourceAttributes(member => $memberId, resource => $resourceId);
+				$resource_attributes{$resourceUUID} = {
+					"attributes" => $r_attrs || {}
+				};
+			}
+			$userobj->{"allowed_resources"} = \%resource_attributes;
+		}
+		$output->{users}->{$userUUID} = $userobj;
+	}
 }
 
 if ($DEBUG == 1) {
 	print("Cleaning up JSON\n");
 }
-# Removes: undef, empty arrays, empty hashes
-sub crawlFlatten {
-	my $value = shift;
+
+sub cleanupStructure {
+	my $root = shift;
 
 	# If not HASH, return
-	return unless ref($value) eq "HASH";
+	return unless ref($root) eq "HASH";
 
-	foreach my $key (keys %$value) {
+	foreach my $key (keys %$root) {
 		# Recursively call crawl first, then check if it is undef, if yes, delete it
-		crawlFlatten($value->{$key});
+		cleanupStructure($root->{$key});
 
-		my $item = $value->{$key};
-		# Check if it is undef, if yes, delete it
-		if (!defined($item)) {
-			delete($value->{$key});
-			next;
-		}
+		my $item = $root->{$key};
+		my @list = $key =~ /(urn:perun:(facility|group|group_resource|member|member_resource|resource|user|user_facility|vo):attribute-def:(def|opt|core|virt):.*)/g;
+		if (scalar @list != 0) {
+			my $entity = $list[1];
+			my $def = $list[2];
 
-		# Check if the key is UUID, if yes, delete it
-		if ($key =~ m/urn:perun:(facility|vo|group|resource|user):attribute-def:core:uuid/) {
-			delete($value->{$key});
-			next;
-		}
-
-		# Check if it is array, if yes, check if it is empty, if yes, delete it
-		if (ref($value->{$key}) eq "ARRAY") {
-			if (scalar(@{$value->{$key}}) == 0) {
-				delete($value->{$key});
-				next;
+			# If non-virtual attribute is undef, consult the requiredAttributes hash and set it to default value
+			if (!($def eq "virt") && !defined($item)) {
+				$root->{$key} = $requiredAttributes->{$entity}->{$key};
 			}
 		}
-		# Check if it is hash, if yes, check if it is empty, if yes, delete it
-		if (ref($value->{$key}) eq "HASH") {
-			if (scalar(keys %{$value->{$key}}) == 0) {
-				delete($value->{$key});
-				next;
-			}
-		}
-
 	}
 }
-
-crawlFlatten($output);
+cleanupStructure($output);
 # Pretty print $output
 my $file = "$DIRECTORY/$::SERVICE_NAME.json";
 open FILE_USERS, ">$file" or die "Cannot open $file: $! \n";

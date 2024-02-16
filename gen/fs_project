@@ -1,5 +1,5 @@
 #!/usr/bin/perl
- 
+
 use strict;
 use warnings;
 use perunServicesInit;
@@ -8,7 +8,7 @@ use File::Basename;
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.0.0";
-our $SCRIPT_VERSION = "3.0.1";
+our $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -29,9 +29,7 @@ our $PROJECT_FILE_QUOTA; *PROJECT_FILE_QUOTA = \'0';
 our $PROJECT_FILE_LIMIT;  *PROJECT_FILE_LIMIT = \'0';
 
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
-
-####### output file ######################
-open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
+my $projects;
 
 my $quotaEnabled = $data->getFacilityAttributeValue( attrName => $A_F_QUOTA_ENABLED );
 
@@ -40,9 +38,11 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 	my $projectBasePath = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_PROJECTS_BASE_PATH );
 
 	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
+
 		my $projectName = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_GR_PROJECT_NAME );
 		my $unixGroupName = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_V_GR_UNIX_GROUP_NAME );
 
+		# skip groups which are not unix groups and project groups
 		if( !defined($projectName) ) { next; }
 		if( !defined($unixGroupName) ) { next; }
 
@@ -52,20 +52,43 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 		my $softDataQuota = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_GR_SOFT_QUOTA_DATA );
 		my $hardDataQuota = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_GR_HARD_QUOTA_DATA );
 
-		# Print attributes
-		print SERVICE_FILE $projectBasePath . "\t";
-		print SERVICE_FILE $projectName . "\t";
-		print SERVICE_FILE defined($projectDirPerms) ? $projectDirPerms . "\t" : "750\t";
-		print SERVICE_FILE defined($projectOwnerLogin) ? $projectOwnerLogin . "\t" : "nobody\t";
-		print SERVICE_FILE $unixGroupName . "\t";
-		print SERVICE_FILE $unixGID . "\t";
-		print SERVICE_FILE quotaToKb($softDataQuota) . "\t";
-		print SERVICE_FILE quotaToKb($hardDataQuota) . "\t";
-		print SERVICE_FILE $PROJECT_FILE_QUOTA . "\t";
-		print SERVICE_FILE $PROJECT_FILE_LIMIT . "\t";
-		print SERVICE_FILE defined($quotaEnabled) ? $quotaEnabled . "\n" : "0\n";
+		my $project;
+		$project->{$A_R_PROJECTS_BASE_PATH} = $projectBasePath;
+		$project->{$A_GR_PROJECT_NAME} = $projectName;
+		$project->{$A_GR_PROJECT_DIR_PERMS} = defined($projectDirPerms) ? $projectDirPerms : "750";
+		$project->{$A_GR_PROJECT_OWNER_LOGIN} = defined($projectOwnerLogin) ? $projectOwnerLogin : "nobody";
+		$project->{$A_V_GR_UNIX_GROUP_NAME} = $unixGroupName;
+		$project->{$A_V_GR_GID} = $unixGID;
+		$project->{$A_GR_SOFT_QUOTA_DATA} = quotaToKb($softDataQuota);
+		$project->{$A_GR_HARD_QUOTA_DATA} = quotaToKb($hardDataQuota);
+		$project->{$A_F_QUOTA_ENABLED} = defined($quotaEnabled) ? $quotaEnabled : "0";
+
+		$projects->{"$projectBasePath/$projectName"} = $project;
+
 	}
 }
+
+# print results
+open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
+
+foreach my $key (sort { "\L$a" cmp "\L$b" } keys %{$projects}) {
+
+	my $project = $projects->{$key};
+
+	print SERVICE_FILE $project->{$A_R_PROJECTS_BASE_PATH} . "\t";
+	print SERVICE_FILE $project->{$A_GR_PROJECT_NAME} . "\t";
+	print SERVICE_FILE $project->{$A_GR_PROJECT_DIR_PERMS} . "\t";
+	print SERVICE_FILE $project->{$A_GR_PROJECT_OWNER_LOGIN} . "\t";
+	print SERVICE_FILE $project->{$A_V_GR_UNIX_GROUP_NAME} . "\t";
+	print SERVICE_FILE $project->{$A_V_GR_GID} . "\t";
+	print SERVICE_FILE $project->{$A_GR_SOFT_QUOTA_DATA} . "\t";
+	print SERVICE_FILE $project->{$A_GR_HARD_QUOTA_DATA} . "\t";
+	print SERVICE_FILE $PROJECT_FILE_QUOTA . "\t";
+	print SERVICE_FILE $PROJECT_FILE_LIMIT . "\t";
+	print SERVICE_FILE $project->{$A_F_QUOTA_ENABLED} . "\n";
+
+}
+
 close(SERVICE_FILE);
-#####################################################
+
 perunServicesInit::finalize;

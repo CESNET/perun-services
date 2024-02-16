@@ -1,18 +1,68 @@
-#!/bin/bash
-SERVICE_NAME="vsup_google_groups"
+#!/usr/bin/env python3
+import sys
 
-FACILITY_NAME=$1
+import google_connector
+import send_lib
 
-SERVICE_FILES_BASE_DIR="`pwd`/../gen/spool"
-SERVICE_FILES_DIR="$SERVICE_FILES_BASE_DIR/$FACILITY_NAME/$SERVICE_NAME"
+DEBUG = 0
+DRY_RUN = 0
 
-#Just safety check. This should not happen.
-if [ ! -d "$SERVICE_FILES_DIR" ]; then echo 'SERVICE_FILES_DIR: '"$SERVICE_FILES_DIR"' is not a directory' >&2 ; exit 1; fi
+SERVICE_NAME = "vsup_google_groups"
 
-JAR='/home/perun/perun-google-group-connector/google-group-connector-2.0.0.jar'
-LOGBACK='-Dlogback.configurationFile=/etc/perun/logback-google-groups.xml'
+if __name__ == "__main__":
+    if DRY_RUN:
+        print("=== DRY RUN - no changes will be applied ===")
+    send_lib.check_input_fields(sys.argv, True)
+    facility = sys.argv[1]
+    destination = sys.argv[2]
+    destination_type = sys.argv[3]
+    send_lib.check_destination_type_allowed(
+        destination_type, send_lib.DESTINATION_TYPE_SERVICE_SPECIFIC
+    )
+    send_lib.check_destination_format(destination, destination_type)
+    send_lib.create_lock(SERVICE_NAME, destination)
 
-# manage users
-java $LOGBACK -jar $JAR "$(cat "${SERVICE_FILES_DIR}/vsup_google_groups_domain")" "users" "$SERVICE_FILES_DIR/vsup_google_groups_users.csv" || exit 1;
-# manage groups
-java $LOGBACK -jar $JAR "$(cat "${SERVICE_FILES_DIR}/vsup_google_groups_domain")" "groups" "$SERVICE_FILES_DIR/vsup_google_groups_groups.csv" || exit 1;
+    gen_folder = send_lib.get_gen_folder(facility, SERVICE_NAME)
+    domain = google_connector.parse_domain(gen_folder, SERVICE_NAME)
+    config = send_lib.get_custom_config_properties(
+        SERVICE_NAME,
+        destination,
+        ["scopes", "delegate", "service_file", "allow_delete"],
+    )
+    if not config:
+        send_lib.die_with_error(
+            "Configuration not found or properties missing! "
+            "Expecting 'scopes', 'delegate', 'service_file' and 'allow_delete' fields."
+        )
+    scopes = config[0]
+    delegate = config[1]
+    service_file = config[2]
+    allow_delete = config[3]
+
+    connector = google_connector.GoogleConnector(
+        service_file, scopes, delegate, domain, DEBUG, DRY_RUN
+    )
+
+    their_users = connector.fetch_users()
+    our_users = send_lib.parse_input_csv_file(
+        gen_folder + "/vsup_google_groups_users.csv",
+        google_connector.USERS_COLUMN_NAMES,
+    )
+    connector.resolve_users(our_users, their_users, allow_delete)
+
+    their_groups = connector.fetch_groups()
+    our_groups = send_lib.parse_input_csv_file(
+        gen_folder + "/vsup_google_groups_groups.csv",
+        google_connector.GROUPS_COLUMN_NAMES,
+    )
+    connector.resolve_groups(our_groups, their_groups)
+
+    print(
+        f"Users created: {connector.users_created}\n"
+        f"Users removed: {connector.users_removed}\n"
+        f"Users updated: {connector.users_updated}\n"
+        f"Groups created: {connector.groups_created}\n"
+        f"Group names updated: {connector.groups_updated}\n"
+        f"Groups removed: {connector.groups_removed}\n"
+        f"Groups with updated members: {connector.memberships_updated}\n"
+    )
