@@ -38,10 +38,9 @@ print FILE_USERS "LOGIN,EMAIL,FIRSTNAME,LASTNAME,PHONE,ORG_UNIT,USER_POSITION,UK
 
 foreach my $memberId ($data->getMemberIdsForFacility()) {
 	my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
-    unless ($status eq $STATUS_VALID) {
-    	next;
-    }
-
+	unless ($status eq $STATUS_VALID) {
+		next;
+	}
 
 	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
 	my $f_name = $data->getUserAttributeValue( member => $memberId, attrName => $A_FIRST_NAME );
