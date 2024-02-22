@@ -2,7 +2,12 @@
 
 ### [GEN](../concepts/gen.md)
 
-This script generates login, first name, last name and email of each assigned valid member to a csv file.
+This script generates a CSV file with the following columns: LOGIN, EMAIL, FIRSTNAME, LASTNAME, PHONE, ORG_UNIT, USER_POSITION, UKCO, UK_LOGIN.
+
+It uses the [Text::CSV](https://metacpan.org/pod/Text::CSV) library to generate the CSV format, with suppressed quotation marks, 
+because the receiving application is unable to parse them.
+
+The Text:CSV library can be installed on Debian Linux from the package [libtext-csv-perl](https://packages.debian.org/sid/libtext-csv-perl).
 
 ### [SEND](../concepts/send.md)
 

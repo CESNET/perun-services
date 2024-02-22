@@ -6,11 +6,11 @@ use perunServicesInit;
 use perunServicesUtils;
 use Perun::Agent;
 use open qw/:std :utf8/;
-use Data::Dumper;
+use Text::CSV;
 
 local $::SERVICE_NAME = "calpendo_einfra";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -32,9 +32,10 @@ our $A_VMCF_UK_LOGIN;             *A_VMCF_UK_LOGIN =         \'urn:perun:member:
 my $agent = perunServicesInit->getAgent;
 my %printed_logins;
 
+my $csv = Text::CSV->new({ auto_diag => 1, eol => "\n", quote_char => undef, binary => 1 });
 my $fileUsers = $DIRECTORY . "users.csv";
-open FILE_USERS,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
-print FILE_USERS "LOGIN,EMAIL,FIRSTNAME,LASTNAME,PHONE,ORG_UNIT,USER_POSITION,UKCO,UK_LOGIN\n";
+open my $fh,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
+$csv->print($fh,['LOGIN','EMAIL','FIRSTNAME','LASTNAME','PHONE','ORG_UNIT','USER_POSITION','UKCO','UK_LOGIN']);
 
 foreach my $memberId ($data->getMemberIdsForFacility()) {
 	my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
@@ -53,9 +54,9 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 	my $ukLogin = $data->getMemberAttributeValue( member => $memberId, attrName => $A_VMCF_UK_LOGIN );
 	unless (exists $printed_logins{$login}) {
 		$printed_logins{$login} = 1;
-		print FILE_USERS "$login,$email,$f_name,$l_name,$phone,".($orgUnit//"").",".($position//"").",".($ukco//"").",".($ukLogin//"")."\n";
+		$csv->print($fh,[ $login, $email, $f_name, $l_name, $phone, $orgUnit, $position, $ukco, $ukLogin ] );
 	}
 }
-close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
+close ($fh) or die "Cannot close $fileUsers: $! \n";
 
 perunServicesInit::finalize;
