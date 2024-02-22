@@ -117,7 +117,7 @@ def call_api(url: str, params=None, type="GET", retry_no=0):
             response = response.json()
         except json.decoder.JSONDecodeError:
             return None  # some requests don't return anything
-        data = response["value"] if "value" in response else response
+        data = response.get("value", response)
         if "@odata.nextLink" in response:
             data.extend(call_api(response["@odata.nextLink"], None))
         return data

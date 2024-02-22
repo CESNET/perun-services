@@ -3,6 +3,8 @@ use strict;
 use warnings FATAL => 'all';
 use DBI;
 use DBI qw(:sql_types);
+use DBD::Oracle qw(:ora_types);
+use MIME::Base64;
 use Getopt::Long qw(:config no_ignore_case);
 use Data::Dumper;
 use ScriptLock;
@@ -11,6 +13,7 @@ use open qw/ :std :encoding(utf8) /;
 binmode STDOUT, ":utf8";
 
 sub appendParam;
+sub solveBlob;
 
 my $username;
 my $password;
@@ -83,7 +86,8 @@ while(my $line = <FILE>) {
 }
 close FILE;
 
-my $dbh = DBI->connect("dbi:Oracle://$db_machine:$db_port/$db_name", $username, $password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>65536, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
+# LongReadLen = 1024 * 1024 * 2 = 2MB
+my $dbh = DBI->connect("dbi:Oracle://$db_machine:$db_port/$db_name", $username, $password,{ RaiseError=>1, AutoCommit=>0, LongReadLen=>2097152, ora_charset => 'AL32UTF8'}) or die "Connect to database $db_name Error!\n";
 $dbh->do("alter session set nls_date_format='YYYY-MM-DD HH24:MI:SS'");
 
 my $DEBUG=0;
@@ -120,8 +124,7 @@ foreach my $key (sort keys %$dataByKeys) {
 	my $EMAIL_PRIV = $dataByKeys->{$key}->{'EMAIL_PRIV'};
 	my $PHONE_PRIV = $dataByKeys->{$key}->{'PHONE_PRIV'};
 
-	# TODO - not sure if we will use it
-	my $IDCARD_PHOTO = $dataByKeys->{$key}->{'CARD_PHOTO'};
+	my $FOTO = $dataByKeys->{$key}->{'CARD_PHOTO'};
 
 	if ($TYP_ZAZN eq "P" || $TYP_ZAZN eq "Z") {
 
@@ -228,17 +231,31 @@ foreach my $key (sort keys %$dataByKeys) {
 
 			my $recordsAreEquals = $dbh->prepare($select);
 			$recordsAreEquals->execute(@params);
-			if(!$recordsAreEquals->fetch) {
+			my $fotoChanged = solveBlob($BIRTH_NUMBER, $FOTO);
+			if(!$recordsAreEquals->fetch or $fotoChanged) {
 
 				# there is a change in data -> update whole entry since missing column in update would cause value deletion in the backend.
 				if ($DEBUG == 1) { print "UPDATING EXISTING RECORD: $key\n"; }
 
-				my $updateStudent = $dbh->prepare(qq{UPDATE $table_student SET UCO_PERUN=? , USERNAME=? , EMAIL_SKOLNI=? WHERE ROD_CISLO=?});
-				$updateStudent->execute(
-					$UCO_PERUN,
-					uc($LOGIN),
-					$EMAIL,
-					$BIRTH_NUMBER);
+				if (defined $FOTO and length($FOTO) > 0) {
+					# update with foto
+					my $updateStudent = $dbh->prepare(qq{UPDATE $table_student SET UCO_PERUN=? , USERNAME=? , EMAIL_SKOLNI=?, FOTO=? WHERE ROD_CISLO=?});
+					$updateStudent->bind_param( 1, $UCO_PERUN);
+					$updateStudent->bind_param( 2, uc($LOGIN));
+					$updateStudent->bind_param( 3, $EMAIL);
+					$updateStudent->bind_param( 4, $FOTO, {ora_type=>SQLT_BIN});
+					$updateStudent->bind_param( 5, $BIRTH_NUMBER);
+					$updateStudent->execute();
+
+				} else {
+					# update without foto / clear foto
+					my $updateStudent = $dbh->prepare(qq{UPDATE $table_student SET UCO_PERUN=? , USERNAME=? , EMAIL_SKOLNI=?, FOTO=NULL WHERE ROD_CISLO=?});
+					$updateStudent->execute(
+						$UCO_PERUN,
+						uc($LOGIN),
+						$EMAIL,
+						$BIRTH_NUMBER);
+				}
 
 				$students_updated++;
 
@@ -295,5 +312,43 @@ sub appendParam() {
 	}
 
 	return $select;
+
+}
+
+#
+# Determine if FOTO (BLOB) value for student has changed
+#
+# Params: $ROD_CISLO, $FOTO
+# Return: 1 if value has changed, 0 otherwise
+#
+sub solveBlob() {
+
+	my $ROD_CISLO = shift;
+	my $FOTO = shift;
+
+	# Check FOTO -> BLOB data of Students
+	my $selectBlob = $dbh->prepare(qq{SELECT FOTO from $table_student WHERE ROD_CISLO=?});
+	$selectBlob->execute($ROD_CISLO);
+	my $result = $selectBlob->fetchrow_hashref;
+	my $blobData = $result->{"FOTO"};
+
+	# both defined - check
+	if ((defined $blobData and defined $FOTO)) {
+		# convert BLOB to base64 line like from Perun
+		my $line = encode_base64($blobData);
+		$line =~ s/\R//g;
+		if ($line ne $FOTO) {
+			# photo changed - update
+			return 1;
+		}
+	} elsif ((!defined $blobData) and (!defined $FOTO)) {
+		# both undef - skip
+		return 0;
+	} else {
+		# one defined, other is not -> update
+		return 1;
+	}
+
+	return 0;
 
 }
