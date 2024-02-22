@@ -1,5 +1,18 @@
 Upgrade notes
 
+## [11.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v11.0.0...v11.1.0) (2024-02-22)
+
+
+### Features
+
+* **vsup_stag:** support transfering students photos ([dc52091](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/dc52091d18a815ae9b3c0a7824e82e9700eef5f4))
+
+
+### Bug Fixes
+
+* apply ruff lint suggestions when getting json value ([42a18f8](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/42a18f8309c0dca6abd543c03fb3be5f8127a61f))
+* **calpendo_einfra:** fixed undefined values when printing CSV ([126832e](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/126832e4a8576ae1be7855fe4a3290cf5efcf82f))
+
 ## [11.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v10.2.1...v11.0.0) (2024-02-16)
 
 
