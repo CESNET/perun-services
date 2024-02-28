@@ -10,10 +10,10 @@
 #export DH_VERBOSE=1
 
 %:
-	dh $@ 
+	dh $@
 
 override_dh_builddeb:
 	dh_builddeb -- -Zgzip
 
 override_dh_gencontrol:
-	dh_gencontrol -- -Vmisc:Depends="bash (>= 2.05a-11), sed (>= 3.02-8), grep (>= 2.4.2-3), coreutils (>= 5.0-5), perl-base (>= 5.10.1-17), remctl-client, heimdal-clients | krb5-user, openssh-server, moreutils, logrotate"
+	dh_gencontrol -- -Vmisc:Depends="bash (>= 2.05a-11), sed (>= 3.02-8), grep (>= 2.4.2-3), coreutils (>= 5.0-5), wget, moreutils, logrotate"

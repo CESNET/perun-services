@@ -35,7 +35,7 @@ if [ ! -z "$SOURCE_DIR1" -a -d "$SERVICE_NAME/$SOURCE_DIR1" ]; then
 	if [ -z "$DEST_DIR1" ]; then
 		echo "It is defined first source directory but missing path to first destination directory!"
 		exit 1;
-	fi		
+	fi
 	WITH_DIR1=1;
 fi
 
@@ -81,7 +81,7 @@ BUILDROOT="%{_tmppath}/%{name}-%{version}-build"
 DESCRIPTION=`grep '^Description:' "$SERVICE_NAME/debian/control" | sed -e 's/^Description: //'`
 
 # load dependencies
-if [ -f "$DEPENDENCIES" ]; then 
+if [ -f "$DEPENDENCIES" ]; then
 	REQUIRES=`sed -e '$ ! s/$/,/' $DEPENDENCIES | tr '\n' ' '`
 	if [ ! -z "$REQUIRES" ]; then
 		REQUIRES="Requires: ${REQUIRES}";

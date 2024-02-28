@@ -1,0 +1,19 @@
+[Unit]
+Description=LSB: Perun propagate
+Before=multi-user.target
+Before=graphical.target
+After=remote-fs.target
+After=network-online.target
+After=sshd.service
+Wants=network-online.target
+
+[Service]
+Type=forking
+Restart=no
+TimeoutSec=15min
+IgnoreSIGPIPE=no
+KillMode=process
+GuessMainPID=no
+RemainAfterExit=yes
+ExecStart=/etc/init.d/perun_propagate start
+ExecStop=/etc/init.d/perun_propagate stop

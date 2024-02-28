@@ -21,7 +21,7 @@ perun-propagate:
 	@rm -rf ./$@/debian/$@*
 	@rm -f ./$@/debian/files
 	@echo "Generate spec file for $@..."
-	@./generate_rpm.sh $@ "etc" "/etc/init.d/" "log" "/etc/logrotate.d/"
+	@./generate_rpm.sh $@ "etc" "/etc/init.d/" "log" "/etc/logrotate.d/" "systemd" "/lib/systemd/system/"
 
 generic-package:
 	cd $@ && debuild -us -uc --lintian-opts --profile debian

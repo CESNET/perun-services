@@ -1,3 +1,19 @@
+perun-propagate (4.0.0) stable; urgency=high
+
+  * Reworked all perun-propagate logic.
+    Client calls Perun API instead of using remctl with Kerberos.
+  * Package requires new configuration in /etc/default/perun-propagate.
+    You must configure at least username and path to script which will
+    print user's password to stdout:
+    PERUN_PROPAG_USER=perun_propag
+    PERUN_PROPAG_USER_ASKPASS=/etc/perun/perun_propag.askpass
+  * You must create proper user account in Perun and assign
+    it with necessary rights to make that API request.
+  * Adjusted dependencies.
+  * Package uses own systemd unit perun-propagate.service
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Wed, 28 Feb 2024 17:10:00 +0100
+
 perun-propagate (3.0.9) stable; urgency=low
 
   * Fixed package priority from 'extra' to 'optional'.
