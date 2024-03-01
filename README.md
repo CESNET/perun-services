@@ -17,7 +17,6 @@ See also other related repositories in the [Perun IdM](https://gitlab.ics.muni.c
 - **slave/** - These (mainly bash) scripts process new files on destination machine and perform change itself.
 - **other/perun-propagate/** - New packaging of perun-propagate to force service propagation from client side.
 - **other/perun-slave-metacentrum/** - Meta package to install all perun services used by MetaCentrum.
-- **scripts/** - Server side of perun-propagate service located on Perun instance.
 
 Gen and send scripts are located on your Perun instance and are used by _perun-engine_ component. Slave scripts are then located on destination machines.
 

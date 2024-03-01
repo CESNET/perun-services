@@ -278,7 +278,7 @@ if (exists($requiredAttributes->{"vo"}->{$A_V_UUID})) {
 		delete($voAttributes->{$A_V_UUID});
 
 		my $voobj = {
-			"attributes" => $voAttributes,
+			"attributes" => $voAttributes || {},
 		};
 		$output->{vos}->{$voUUID} = $voobj;
 	}
@@ -304,7 +304,7 @@ if (exists($requiredAttributes->{"group"}->{$A_G_UUID})) {
 		delete($groupAttributes->{$A_G_UUID});
 
 		my $groupobj = {
-			"attributes" => $groupAttributes,
+			"attributes" => $groupAttributes || {},
 		};
 
 		# If VO UUID is present, add `voUuid` to group
@@ -335,7 +335,7 @@ if (exists($requiredAttributes->{"resource"}->{$A_R_UUID})) {
 		delete($resourceAttributes->{$A_R_UUID});
 
 		my $resourceobj = {
-			"attributes" => $resourceAttributes,
+			"attributes" => $resourceAttributes || {},
 		};
 
 		if (exists($requiredAttributes->{"vo"}->{$A_V_UUID})) {
@@ -350,7 +350,7 @@ if (exists($requiredAttributes->{"resource"}->{$A_R_UUID})) {
 				# Fill Group attributes
 				my $attrs = $data->getAllGroupResourceAttributes(resource => $resourceId, group => $groupId);
 				$group_attributes{$groupUUID} = {
-					"attributes" => $attrs,
+					"attributes" => $attrs || {},
 				};
 			}
 			$resourceobj->{"assigned_groups"} = \%group_attributes;
