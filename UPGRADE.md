@@ -1,5 +1,17 @@
 Upgrade notes
 
+## [11.2.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v11.1.0...v11.2.0) (2024-03-01)
+
+
+### Features
+
+* **perun-propagate:** reworked perun-propagate client package ([253c6ea](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/253c6eab9ccbdf56c5b4c9d65eafd3676caf98c7))
+
+
+### Bug Fixes
+
+* **generic_json_gen:** inconsistent attributes value ([bae4ccc](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/bae4ccc2b59d272ea60790ae48cdda1411217c2c))
+
 ## [11.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v11.0.0...v11.1.0) (2024-02-22)
 
 
