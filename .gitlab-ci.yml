@@ -7,7 +7,7 @@ variables:
   RELEASE_FROM_PRODUCTION: 1
 
 python-files-check:
-    image: registry.gitlab.ics.muni.cz:443/perun-proxy-aai/containers/ci-tools/minideb:latest
+    image: registry.gitlab.ics.muni.cz:443/perun/ci/pipeline-components/minideb:latest
     stage: test
     script:
         # Find files with Python shebang
