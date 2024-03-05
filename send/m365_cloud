@@ -50,6 +50,7 @@ user_id_attr_name = "urn:perun:user:attribute-def:core:id"
 resource_id_attr_name = "urn:perun:resource:attribute-def:core:uuid"
 redirect_url_attr_name = "urn:perun:facility:attribute-def:def:m365InviteRedirectUrl"
 teams_owner_attr_name = "urn:perun:facility:attribute-def:def:m365TeamsOwner"
+isbanned_attr_name = "urn:perun:user_facility:attribute-def:virt:isBanned"
 
 #  statistics
 users_not_existing = []
@@ -260,7 +261,7 @@ def call_api(
         elif response.status_code == 429:  # too many requests
             retry_after = response.headers.get("Retry-After", RETRY_AFTER_DEFAULT)
             print_debug(f'"Too many requests" in response, waiting {retry_after} sec.')
-            time.sleep(retry_after)
+            time.sleep(int(retry_after))
             call_api(
                 url=url,
                 params=params,
@@ -297,7 +298,10 @@ def call_api(
 def fetch_their_users():
     """Fetches all users in M365"""
     print_debug("Fetching users.")
-    url = f"{BASE_URL}/users?$select={PERUN_MANAGED_EXTENSION_NAME},mail,userPrincipalName,displayName,id,proxyAddresses"
+    url = (
+        f"{BASE_URL}/users?$select={PERUN_MANAGED_EXTENSION_NAME},mail,userPrincipalName,displayName,"
+        f"id,proxyAddresses,accountEnabled"
+    )
     result = call_api(url)
     print_debug(f"Fetched {len(result)} users.")
     return result
@@ -340,11 +344,12 @@ def delete_user(user):
 
 
 def update_user(our_user, user_id):
-    """Updates user in m365 - only display name and extension attribute"""
+    """Updates user in m365 - only display name, account enabled and extension attribute"""
     print_debug(f"Updating user {our_user[displayname_attr_name]}")
     url = f"{BASE_URL}/users/{user_id}"
     params = {
         "displayName": our_user[displayname_attr_name],
+        "accountEnabled": not our_user[isbanned_attr_name],
         PERUN_MANAGED_EXTENSION_NAME: True,
     }
     call_api(url, params, "PATCH")
@@ -358,7 +363,7 @@ def create_internal_user(user, password, immutable_id, lang=None):
     print_debug(f"Creating internal user (#{user[user_id_attr_name]}) {upn}")
 
     params = {
-        "accountEnabled": True,
+        "accountEnabled": not user[isbanned_attr_name],
         "displayName": user[displayname_attr_name],
         "mailNickname": user[login_attr_name],
         "userPrincipalName": upn,
@@ -383,8 +388,9 @@ def get_mail_aliases(proxy_addresses):
     return [a.split(":")[1] for a in proxy_addresses]
 
 
-def create_external_users(their_users, our_users):
-    """Checks which accounts are not in the M365 yet. User can have no identity, one or more of them."""
+def create_disable_external_users(their_users, our_users):
+    """Checks which accounts are not in the M365 yet and invites them. User can have no identity, one or more of them.
+    Banned users in Perun get updated in M365 and their session is revoked."""
     for our_user in our_users:
         user_existing_accounts = our_user[emails_attr_name]
         if (
@@ -412,6 +418,15 @@ def create_external_users(their_users, our_users):
                 users_mapping_externals.setdefault(our_user["link_id"], []).append(
                     user_id
                 )
+            elif their_user["accountEnabled"] == our_user[isbanned_attr_name]:
+                update_user(our_user, their_user["id"])
+
+
+def deactivate_session(user_id):
+    """Revokes session of a user with the specified id."""
+    print_debug(f"Revoking session to user {user_id}")
+    url = f"{BASE_URL}/users/{user_id}/revokeSignInSessions"
+    call_api(url, None, "POST")
 
 
 def upn_from_login(login):
@@ -437,6 +452,7 @@ def create_update_restore_internal_users(their_users, removed_users, our_interna
             )
             if removed_user is not None:
                 restore_object(removed_user)
+                update_user(our_internal, removed_user["id"])
                 users_mapping_internals[our_internal["link_id"]] = removed_user["id"]
             else:
                 password = generate_random_password()
@@ -448,8 +464,13 @@ def create_update_restore_internal_users(their_users, removed_users, our_interna
                 users_mapping_internals[our_internal["link_id"]] = created_internal[
                     "id"
                 ]
-        elif our_internal[displayname_attr_name] != their_user["displayName"]:
+        elif (
+            our_internal[displayname_attr_name] != their_user["displayName"]
+            or our_internal[isbanned_attr_name] == their_user["accountEnabled"]
+        ):
             update_user(our_internal, their_user["id"])
+            if our_internal[isbanned_attr_name]:
+                deactivate_session(their_user["id"])
 
 
 def delete_users(their_users, our_users):
@@ -883,7 +904,7 @@ if __name__ == "__main__":
         create_update_restore_internal_users(
             their_users, removed_users, our_internal_users
         )
-        create_external_users(their_users, our_complete_data["users"])
+        create_disable_external_users(their_users, our_complete_data["users"])
 
         # groups management
         their_groups = fetch_their_groups()

@@ -7,6 +7,25 @@ method, not valid VO members are filtered out. The data is additionally filtered
 group - the one with the highest priority. Prioritization of licences is expressed in the _m365AllowedLicensesPriorities_
 facility attribute.
 
+#### Required attributes
+* urn:perun:user:attribute-def:def:preferredLanguage
+* urn:perun:user:attribute-def:virt:mails-namespace:microsoft
+* urn:perun:user:attribute-def:core:displayName
+* urn:perun:user:attribute-def:virt:optional-login-namespace:{namespace}
+* urn:perun:facility:attribute-def:def:o365-domainName
+* urn:perun:resource:attribute-def:def:m365IsTeamGroup
+* urn:perun:resource:attribute-def:def:m365InternalAccountsOnly
+* urn:perun:resource:attribute-def:def:m365GroupName
+* urn:perun:member:attribute-def:core:status
+* urn:perun:resource:attribute-def:def:m365LicenseGroup
+* urn:perun:facility:attribute-def:def:m365TeamsOwner
+* urn:perun:user:attribute-def:core:id
+* urn:perun:resource:attribute-def:core:uuid
+* urn:perun:facility:attribute-def:def:m365InviteRedirectUrl
+* urn:perun:user_facility:attribute-def:virt:isBanned
+* urn:perun:resource:attribute-def:def:m365LicenseGroup
+* urn:perun:facility:attribute-def:def:m365AllowedLicensesPriorities
+
 ### [SEND](../concepts/send.md)
 The data is sent to the Microsoft Graph API with obtained access token. Objects created by Perun
 get PerunManaged extension attribute in M365 set to True. Users and groups not marked by this M365 attribute should stay intact.
@@ -20,7 +39,8 @@ in other Microsoft tenants) - UPN is in format _formattedEmail#EXT#@scope.onmicr
 from existing user's Microsoft mails (_mails-namespace:microsoft_), internal accounts are only created if the user
 is assigned to any license group. Both types of accounts are removed from m365 in case they are no longer part of
 any Perun managed group. If user has no existing Microsoft mail and no internal identity can be added to group,
-the user is skipped and returned in the propagation overview.
+the user is skipped and returned in the propagation overview. Banned users in Perun are disabled in M365, session are
+revoked for internal users in that case.
 
 #### Groups Management
 Perun resource can represent Team, Security group or Licensed group. Teams and Security groups are filled with all user's
