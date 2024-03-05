@@ -1,3 +1,11 @@
+perun-propagate (4.0.1) stable; urgency=low
+
+  * Extend package configuration with PERUN_AUTHZ_TYPE variable
+    defaulting to "krb". It can be used to switch to a different
+    authentication endpoint in Perun API.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Tue, 5 Mar 2024 07:10:00 +0100
+
 perun-propagate (4.0.0) stable; urgency=high
 
   * Reworked all perun-propagate logic.
