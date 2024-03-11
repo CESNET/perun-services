@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [11.3.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v11.2.0...v11.3.0) (2024-03-11)
+
+
+### Features
+
+* **perun-propagate:** allow changing authz type in Perun API url ([7674d53](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/7674d53d888f07aae4ef25aef616e90128b84974))
+
 ## [11.2.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v11.1.0...v11.2.0) (2024-03-01)
 
 
