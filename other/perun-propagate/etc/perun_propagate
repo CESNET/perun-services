@@ -19,6 +19,7 @@ PERUN_PROPAG_USER=perun_propag
 # a script printing user's password
 PERUN_PROPAG_USER_ASKPASS=/etc/perun/perun_propag.askpass
 PERUN_SERVER=perun-api.e-infra.cz
+PERUN_AUTHZ_TYPE=krb
 PERUN_SLAVE_LOG=/var/log/syslog
 #Timeout in seconds
 TIMEOUT=200
@@ -81,7 +82,7 @@ perun_propagate_start() {
 	        --header='Content-Type:application/json' -O service_list \
 	        --use-askpass=$PERUN_PROPAG_USER_ASKPASS \
 	        --no-verbose --timeout=60 \
-	        https://$PERUN_PROPAG_USER:@$PERUN_SERVER/krb/rpc/json/servicesManager/forceServicePropagationForHostname >api_err 2>&1
+	        https://$PERUN_PROPAG_USER:@$PERUN_SERVER/$PERUN_AUTHZ_TYPE/rpc/json/servicesManager/forceServicePropagationForHostname >api_err 2>&1
 	then
 	   for service in $(sed 's/"//g' < service_list)
 	   do
