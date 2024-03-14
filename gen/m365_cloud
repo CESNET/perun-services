@@ -10,21 +10,6 @@ local $::SERVICE_NAME = basename($0);
 local $::PROTOCOL_VERSION = "3.0.0";
 local $::SKIP_NON_VALID_MEMBERS = 1;
 
-# REQUIRED ATTRIBUTES
-# urn:perun:user:attribute-def:def:preferredLanguage
-# urn:perun:user:attribute-def:virt:mails-namespace:microsoft
-# urn:perun:user:attribute-def:core:displayName
-# urn:perun:user:attribute-def:virt:optional-login-namespace:{namespace}
-# urn:perun:facility:attribute-def:def:o365-domainName
-# urn:perun:resource:attribute-def:def:m365IsTeamGroup
-# urn:perun:resource:attribute-def:def:m365InternalAccountsOnly
-# urn:perun:resource:attribute-def:def:m365GroupName
-# urn:perun:member:attribute-def:core:status
-# urn:perun:resource:attribute-def:def:m365LicenseGroup
-# urn:perun:facility:attribute-def:def:m365TeamsOwner
-# urn:perun:user:attribute-def:core:id
-# urn:perun:resource:attribute-def:core:uuid
-# urn:perun:facility:attribute-def:def:m365InviteRedirectUrl
 our $M365_LICENSE_GROUP;    *M365_LICENSE_GROUP =        \'urn:perun:resource:attribute-def:def:m365LicenseGroup';
 our $M365_LICENSES_MAP;     *M365_LICENSES_MAP =         \'urn:perun:facility:attribute-def:def:m365AllowedLicensesPriorities';
 
