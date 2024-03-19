@@ -9,7 +9,7 @@ use Tie::IxHash;
 
 our $SERVICE_NAME = "du_info_export";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.3";
+my $SCRIPT_VERSION = "3.0.4";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -56,6 +56,7 @@ our $A_GROUP_NAME;               *A_GROUP_NAME =               \'urn:perun:group
 our $A_GROUP_UUID;               *A_GROUP_UUID =               \'urn:perun:group:attribute-def:core:uuid';
 
 our $A_RESOURCE_VO_ID;           *A_RESOURCE_VO_ID =           \'urn:perun:resource:attribute-def:core:voId';
+our $A_RESOURCE_UUID;            *A_RESOURCE_UUID =            \'urn:perun:resource:attribute-def:core:uuid';
 our $A_M_STATUS;                 *A_M_STATUS =                 \'urn:perun:member:attribute-def:core:status';
 our $A_USER_ID;                  *A_USER_ID =                  \'urn:perun:user:attribute-def:core:id';
 our $A_USER_FIRSTNAME;           *A_USER_FIRSTNAME =           \'urn:perun:user:attribute-def:core:firstName';
@@ -253,6 +254,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 	my $maxFileQuotas = $data->getResourceAttributeValue(attrName => $A_R_MAX_FILE_QUOTAS, resource => $resourceId);
 	my $defaultDataQuotas = $data->getResourceAttributeValue(attrName => $A_R_DEFAULT_DATA_QUOTAS, resource => $resourceId);
 	my $defaultFileQuotas = $data->getResourceAttributeValue(attrName => $A_R_DEFAULT_FILE_QUOTAS, resource => $resourceId);
+	my $resourceUUID = $data->getResourceAttributeValue(attrName => $A_RESOURCE_UUID, resource => $resourceId);
 	push @{$attributesByVo{$voName}->{"Resources"}},
 					{
 						"Name"               => $resourceName,
@@ -264,6 +266,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 						"DefaultDataQuotas"  => defined $defaultDataQuotas ? $defaultDataQuotas : {},
 						"DefaultFilesQuotas" => defined $defaultFileQuotas ? $defaultFileQuotas : {},
 						"UnixGroups"         => \@unixGroups,
+						"UUID"               => defined $resourceUUID ? $resourceUUID : undef,
 					};
 }
 
