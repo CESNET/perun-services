@@ -27,7 +27,11 @@ fi
 
 # read custom configurations
 if [ -d "/etc/${NAME}.d/" ]; then
-	for F in `ls "/etc/${NAME}.d"/* 2>/dev/null` ;do . "$F" ; done
+	for F in /etc/${NAME}.d/* ;
+	do
+	    [[ -e "$F" ]] || break # skip if no files present
+	    . "$F" ;
+	done
 fi
 
 # Temporarily set umask to 077 in order to have all temp configuration files private

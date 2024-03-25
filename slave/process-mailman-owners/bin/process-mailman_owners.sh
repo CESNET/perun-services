@@ -12,7 +12,8 @@ function process {
 
 	create_lock
 
-	for FILE in `ls $FROM_PERUN_DIR/` ; do
+	for FILE in $FROM_PERUN_DIR/* ; do
+	    [[ -e "$FILE" ]] || break # skip if no files present
 		DST_FILE=${DST_DIR}/$FILE
 		CHANGED=0
 		# Create diff between old and new
