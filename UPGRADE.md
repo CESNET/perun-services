@@ -1,5 +1,27 @@
 Upgrade notes
 
+## [12.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v11.3.0...v12.0.0) (2024-03-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **myq_printsvc:** service myq_printsvc has a different required attribute,
+change from preferredMail to o365PrimaryEmailAddress:mu
+* **m365_cloud:** add user_facility isBanned attribute as required
+* **du_info_export:** json structure of the VO export has changed to contain resource UUID
+* **du_info_export:** resource UUID needs to be set as required attribute of the service
+in order for the script to be able to use it
+
+### Features
+
+* **du_info_export:** add UUID to Resource UUID to VO export ([c3708c6](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/c3708c6c9acee411214b9c952882bab9fa68a440))
+* **m365_cloud:** revoke sessions of banned users ([381572c](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/381572cd3dc4960255490d678d2b70ec1d39e5dc))
+
+
+### Bug Fixes
+
+* **myq_printsvc:** use O365 e-mail instead of preferredMail ([1dd63a9](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/1dd63a9a5adf950caab3fafecac166c277602201))
+
 ## [11.3.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v11.2.0...v11.3.0) (2024-03-11)
 
 
