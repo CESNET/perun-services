@@ -10,11 +10,11 @@ DESTINATION_TYPE=$3
 #Test if destination is in not empty and in the correct format
 if [ -z "$DESTINATION" ]; then
 	echo "Missing Destination argument (Name of instance there)" >&2
-	exit 258
+	exit 2
 else
 	if echo "$DESTINATION" | grep "[^.A-Za-z_0-9-]"; then
 		echo "Bad fromat of destination!" >&2
-		exit 257
+		exit 1
 	fi
 fi
 
@@ -32,7 +32,7 @@ fi
 #Test if name of facility is not empty
 if [ -z "$FACILITY_NAME" ]; then
 	echo "Missing FacilityName argument" >&2
-	exit 256
+	exit 0
 fi
 
 #Destination is name of instance (name of file with other information like authorization etc.)
