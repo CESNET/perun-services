@@ -32,3 +32,16 @@ python-files-check:
 
         - >
             exit $result
+
+shellcheck:
+  stage: test
+  image: registry.gitlab.com/pipeline-components/shellcheck:latest
+  script:
+        # anything ending on .sh, should be shell script
+    - |
+      find . -name .git -type d -prune -o -type f -name \*.sh -print0 |
+      xargs -0 -P $(nproc) -r -n1 shellcheck -S error
+    # magic, any file with a valid shebang should be scanned aswell
+    - |
+      find . -name .git -type d -prune -o -type f -regex '.*/[^.]*$' -print0 |
+      xargs -0 -P $(nproc) -r -n1 sh -c 'FILE="$0"; if head -n1 "$FILE" |grep -q "^#\\! \?/.\+\(ba|d|k\)\?sh" ; then shellcheck -S error "$FILE" ; else /bin/true ; fi '
