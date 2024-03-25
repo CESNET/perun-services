@@ -6,8 +6,8 @@ use perunServicesInit;
 use perunServicesUtils;
 
 local $::SERVICE_NAME = "myq_printsvc";
-local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.3";
+local $::PROTOCOL_VERSION = "3.1.1";
+my $SCRIPT_VERSION = "3.0.4";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -19,7 +19,7 @@ my $output_fileName = "$DIRECTORY/import_users-perun".".csv";
 #Constants
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
-our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:o365PrimaryEmailAddress:mu';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_CHIPNUMBERS; *A_CHIPNUMBERS = \'urn:perun:user:attribute-def:def:chipNumbers';
 our $A_R_NAME; *A_R_NAME = \'urn:perun:resource:attribute-def:core:name';

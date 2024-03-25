@@ -1,6 +1,6 @@
 {
 	"extends": ["@commitlint/config-conventional"],
-	"helpUrl": "https://perunaai.atlassian.net/wiki/spaces/STRIBOG/pages/13467868/Semantic+versioning",
+	"helpUrl": "https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/-/blob/main/CONTRIBUTING.md",
 	"rules": {
 		"body-max-line-length": [2, "always", 200]
 	},
