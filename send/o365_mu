@@ -32,7 +32,7 @@ fi
 #Test if name of facility is not empty
 if [ -z "$FACILITY_NAME" ]; then
 	echo "Missing FacilityName argument" >&2
-	exit 0
+	exit 243
 fi
 
 #Destination is name of instance (name of file with other information like authorization etc.)
