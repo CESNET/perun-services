@@ -487,9 +487,9 @@ sub checkUserAttributesDiffer {
 	my $ourUserInfo = shift;
 	my $theirUserInfo = shift;
 
-	if ($ourUserInfo->{"givenName"} ne $theirUserInfo->{"givenName"} ||
-		$ourUserInfo->{"familyName"} ne $theirUserInfo->{"familyName"} ||
-		$ourUserInfo->{"email"} ne $theirUserInfo->{"email"}) {
+	if (($ourUserInfo->{"givenName"} // "") ne ($theirUserInfo->{"givenName"} // "") ||
+		($ourUserInfo->{"familyName"} // "") ne ($theirUserInfo->{"familyName"} // "") ||
+		($ourUserInfo->{"email"} // "") ne ($theirUserInfo->{"email"}) // "") {
 		return 1;
 	}
 	return 0;

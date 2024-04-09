@@ -284,6 +284,12 @@ foreach my $uco (sort keys %$dataByKey) {
 	my $ADR_TYPE = $dataByKey->{$uco}->{'ADR_TYPE'};
 
 	if ($ULICE and $MST_NAZEV and $PSC and $COUNTRY_CODE and $ADR_TYPE) {
+
+		# new IFIS require accented version of address type
+		if ($ADR_TYPE eq "PRECH") {
+			$ADR_TYPE = "PŘECH";
+		}
+
 		# user has address
 		$addressExists->execute($uco);
 
