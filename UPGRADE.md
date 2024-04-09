@@ -1,5 +1,13 @@
 Upgrade notes
 
+## [12.0.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v12.0.0...v12.0.1) (2024-04-09)
+
+
+### Bug Fixes
+
+* **atlassian_mu:** allow empty name ([84a9e56](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/84a9e56416f5e4df7f9849778e8dfc17dbd957d0))
+* **vsup_ifis:** use accented chars in ADR_TYPE ([d7aa09c](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/d7aa09cb05ad1e90268da6145b5c4415184200a1))
+
 ## [12.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v11.3.0...v12.0.0) (2024-03-25)
 
 
