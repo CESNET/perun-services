@@ -6,8 +6,8 @@ use perunServicesInit;
 use perunServicesUtils;
 
 local $::SERVICE_NAME = "myq_printsvc";
-local $::PROTOCOL_VERSION = "3.1.1";
-my $SCRIPT_VERSION = "3.0.4";
+local $::PROTOCOL_VERSION = "3.1.2";
+my $SCRIPT_VERSION = "3.0.5";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -20,6 +20,7 @@ my $output_fileName = "$DIRECTORY/import_users-perun".".csv";
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
 our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_MAIL;  *A_MAIL = \'urn:perun:user:attribute-def:def:o365PrimaryEmailAddress:mu';
+our $A_BACKUP_MAIL; *A_BACKUP_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
 our $A_CHIPNUMBERS; *A_CHIPNUMBERS = \'urn:perun:user:attribute-def:def:chipNumbers';
 our $A_R_NAME; *A_R_NAME = \'urn:perun:resource:attribute-def:core:name';
@@ -48,21 +49,20 @@ foreach my $resourceId ( $data->getResourceIds() ){
 			foreach my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
 				my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 				my $isIndirect = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_G_INDIRECT);
-
 				# is group workplace + is member direct
 				if (defined($groupCISPR) && !$isIndirect) {
 					if (exists $processedUsers->{$login}) {
 						push @{$users->{$login}->{"groups"}}, $resourceName.'-'.$groupCISPR;
 					} else {
 						$processedUsers->{$login} = 1;
-						fillUserData($memberId, $resourceName.'-'.$groupCISPR);
+						fillUserData($memberId, $resourceName.'-'.$groupCISPR, 1);
 					}
 				}
 			}
 		}
 	} else {
 		foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
-			fillUserData($memberId, $resourceName);
+			fillUserData($memberId, $resourceName, 0);
 		}
 	}
 }
@@ -86,7 +86,8 @@ for my $login (@logins) {
     # LOGIN
     print FILE $login . ";";
     # MAIL
-    print FILE '"' . $users->{$login}->{$A_MAIL} . '";';
+    my $mail = $users->{$login}->{$A_R_MYQGROUPS} && defined $users->{$login}->{$A_MAIL} ? $users->{$login}->{$A_MAIL} : $users->{$login}->{$A_BACKUP_MAIL};
+    print FILE '"' . $mail . '";';
     # CARDS
     my @cards = grep {!($_ =~ s/^\s+|\s+$//g)} map {checkBase64($_)} @{$users->{$login}->{$A_CHIPNUMBERS}};
     @cards = map {reverseCardBits($_)} @cards;
@@ -120,11 +121,10 @@ for my $login (@logins) {
 
 close(FILE);
 
-print "OK.\n";
-
 sub fillUserData {
 	my $memberId = shift;
 	my $resourceName = shift;
+	my $includeGroups = shift;
 
 	my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
 	unless (exists($users->{$login})) {
@@ -132,7 +132,9 @@ sub fillUserData {
 		$users->{$login}->{$A_FIRST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_FIRST_NAME);
 		$users->{$login}->{$A_LAST_NAME} = $data->getUserAttributeValue(member => $memberId, attrName => $A_LAST_NAME);
 		$users->{$login}->{$A_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_MAIL);
+		$users->{$login}->{$A_BACKUP_MAIL} = $data->getUserAttributeValue(member => $memberId, attrName => $A_BACKUP_MAIL);
 		$users->{$login}->{$A_CHIPNUMBERS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_CHIPNUMBERS);
+		$users->{$login}->{$A_R_MYQGROUPS} = $includeGroups;
 	}
 
 	if (exists $users->{$login}->{"groups"}){
