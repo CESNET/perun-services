@@ -9,7 +9,7 @@ the user belongs to.
 For resources with the _myqIncludeWorkplaceInGroups_ attribute set to true the name is replaced with a 
 list of workplaces the user belongs to in that resource - in this context _workplace_ constitutes as a group with the 
 _inetCispr_ attribute set, which also serves as the name of that workplace. In this case only direct members of assigned
-groups are processed
+groups are processed. Also, for users on these resources, O365 primary e-mail address is used instead of preferredMail (if available).
 
 Finally, the script prepares the CSV in the desired format. Because chip numbers are stored in a hexadecimal format in Perun,
  and in an inverted byte order on the destination server, the card bits need to be reversed during this process.
