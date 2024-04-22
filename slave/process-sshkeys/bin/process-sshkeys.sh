@@ -27,7 +27,8 @@ function process {
 	create_lock
 
 
-	for USER in `ls $FROM_PERUN_DIR` ; do
+	for USER in $FROM_PERUN_DIR/* ; do
+	    [[ -e "$USER" ]] || break # skip if no files present
 		FROM_PERUN_AUTHORIZED_KEYS="$FROM_PERUN_DIR/$USER"
 
 		HOME_DIR=`eval "echo ~$USER"`

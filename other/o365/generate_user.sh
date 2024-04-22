@@ -3,7 +3,7 @@
 # script needs following arguments: display_name  email  password
 # password must be at least 8 characters long
 
-if [ -z "$1" -o -z "$2" -o -z "$3"]
+if [ -z "$1" -o -z "$2" -o -z "$3" ]
 then
     echo "USAGE: $0  display_name  email  password"
     exit 1
