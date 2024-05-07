@@ -1,3 +1,9 @@
+perun-slave-process-afs (3.1.10) stable; urgency=low
+
+  * Removed references to 'ruk.cuni.cz' AFS cell.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Tue, 07 May 2024 10:00:00 +0200
+
 perun-slave-process-afs (3.1.9) stable; urgency=low
 
   * Fixed package priority from 'extra' to 'optional'.
