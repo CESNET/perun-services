@@ -6,8 +6,8 @@ use perunServicesUtils;
 use File::Basename;
 
 our $SERVICE_NAME = basename($0);
-our $PROTOCOL_VERSION = "3.1.1";
-my $SCRIPT_VERSION = "3.0.3";
+our $PROTOCOL_VERSION = "3.1.2";
+my $SCRIPT_VERSION = "3.0.4";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -24,7 +24,7 @@ our $A_R_USERS_MOUNT_POINT;       *A_R_USERS_MOUNT_POINT =     \'urn:perun:resou
 our $A_R_USERS_VOLUME;            *A_R_USERS_VOLUME =          \'urn:perun:resource:attribute-def:def:afsUsersVolume';
 our $A_R_VOLUME;                  *A_R_VOLUME =                \'urn:perun:resource:attribute-def:def:afsVolume';
 our $A_UF_USER_QUOTA;             *A_UF_USER_QUOTA =           \'urn:perun:user_facility:attribute-def:def:afsUserQuota';
-our $A_U_ORGANIZATIONSWITHLOA;    *A_U_ORGANIZATIONSWITHLOA =  \'urn:perun:user:attribute-def:virt:organizationsWithLoa:en';
+our $A_U_EPPNS;                   *A_U_EPPNS =                 \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
 
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 
@@ -60,14 +60,16 @@ foreach my $resourceId ($data->getResourceIds()) {
 		}
 		print SERVICE_FILE "$quota\t";
 
-		my $organizationsWithLoa = $data->getUserAttributeValue(attrName => $A_U_ORGANIZATIONSWITHLOA, member => $memberId);
-		if(defined $organizationsWithLoa->{"University of West Bohemia"}) {
-			print SERVICE_FILE "zcu.cz" . "\n";
-		} elsif(defined $organizationsWithLoa->{"Charles University in Prague"}) {
-			print SERVICE_FILE "ruk.cuni.cz" . "\n";
-		} else {
-			print SERVICE_FILE $data->getFacilityAttributeValue(attrName => $A_F_CELL) . "\n";
+		# default afs cell
+		my $afs_cell = $data->getFacilityAttributeValue(attrName => $A_F_CELL);
+		my $eppns = $data->getUserAttributeValue(attrName => $A_U_EPPNS, member => $memberId);
+		foreach my $val (sort @$eppns) {
+			if ($val =~ /\@zcu.cz$/) {
+				$afs_cell = "zcu.cz";
+				last;
+			}
 		}
+		print SERVICE_FILE $afs_cell . "\n";
 	}
 }
 close(SERVICE_FILE);
