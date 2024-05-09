@@ -26,8 +26,8 @@ our $A_RES_VO_NAME;    			*A_RES_VO_NAME =     		   \'urn:perun:resource:attribu
 our $STATUS_VALID;              *STATUS_VALID =                \'VALID';
 
 #Other constants
-our $EINFRA_DOMAIN = '@einfra.cesnet.cz';
-our $META_DOMAIN   = '@meta.cesnet.cz';
+our $EINFRA_IDP_DOMAIN   = '@idp.e-infra.cz';
+our $EINFRA_PROXY_DOMAIN = '@einfra.cesnet.cz';
 
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 
@@ -59,9 +59,9 @@ foreach my $resourceId ($data->getResourceIds()) {
 			#if user has meta eppn, he should have also einfra eppn
 			my %userEPPNs = map { $_ => 1 } @{$data->getUserAttributeValue(attrName => $A_USER_EPPN, member => $memberId)};
 			foreach my $eppn (keys %userEPPNs) {
-				if($eppn =~ m/$META_DOMAIN/) {
+				if($eppn =~ m/$EINFRA_IDP_DOMAIN/) {
 					my $neweppn = $eppn;
-					$neweppn =~ s/$META_DOMAIN/$EINFRA_DOMAIN/ge;
+					$neweppn =~ s/$EINFRA_IDP_DOMAIN/$EINFRA_PROXY_DOMAIN/ge;
 					$userEPPNs{$neweppn} = 1;
 				}
 			}
