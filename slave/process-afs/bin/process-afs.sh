@@ -1,5 +1,5 @@
 #!/bin/bash
-PROTOCOL_VERSION='3.1.1'
+PROTOCOL_VERSION='3.1.2'
 
 function process {
 
@@ -43,7 +43,7 @@ function process {
 			fi
 		fi
 
-		[ "$TARGET_AFS_CELL" = 'ics.muni.cz' -o "$TARGET_AFS_CELL" = 'ruk.cuni.cz' ] || continue;
+		[ "$TARGET_AFS_CELL" = 'ics.muni.cz' ] || continue;
 
 		[ -z "$AFS_USERS_MOUNT_POINT" -o -z "$AFS_USERS_VOLUME" -o -z "$AFS_VOLUME" ] && continue
 

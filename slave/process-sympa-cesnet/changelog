@@ -1,3 +1,9 @@
+perun-slave-process-sympa-cesnet (3.0.1) stable; urgency=low
+
+  * Handle filenames with spaces correctly
+
+ -- Pavel Brousek <brousek@cesnet.cz>  Fri, 29 Mar 2024 9:54:00 +0100
+
 perun-slave-process-sympa-cesnet (3.0.0) stable; urgency=low
 
   * New package version for perun-slave-process-sympa-cesnet

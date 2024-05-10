@@ -17,7 +17,8 @@ function process {
 
 	create_lock
 
-	for MAILING_LIST_NAME in `ls $FROM_PERUN_DIR/` ; do
+	for MAILING_LIST_NAME in $FROM_PERUN_DIR/* ; do
+	    [[ -e "$MAILING_LIST_NAME" ]] || break # skip if no files present
 		# check if the mailing lists is managed by perun
 		if [ `grep -c "^${MAILING_LIST_NAME} " ${EXISTING_MAILING_LISTS}` -eq 1 ]; then
 			# extract the mailman mailing list name from $EXISTING_MAILING_LISTS

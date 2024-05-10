@@ -2,7 +2,7 @@
 
 # script needs following arguments: email  password
 
-if [ -o -z "$1" -o -z "$2" ]
+if [ -z "$1" -o -z "$2" ]
 then
     echo "USAGE: $0  email  password"
     exit 1

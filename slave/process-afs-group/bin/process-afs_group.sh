@@ -17,7 +17,8 @@ function process {
 	#create directory for filtered groups
 	catch_error E_CANNOT_CREATE_FILTERED_DIRECTORY mkdir -p "$FILTERED_GROUPS"
 	
-	for GROUP_NAME in `ls $FROM_PERUN_DIR/` ; do
+	for GROUP_NAME in $FROM_PERUN_DIR/* ; do
+	    [[ -e "$GROUP_NAME" ]] || break # skip if no files present
 
 		USERS_FROM_PERUN_FILE="$FROM_PERUN_DIR/$GROUP_NAME"
 		USERS_FROM_PERUN_FILE_FILTERED="$FILTERED_GROUPS/$GROUP_NAME"

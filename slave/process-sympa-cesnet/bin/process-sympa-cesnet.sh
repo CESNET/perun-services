@@ -30,7 +30,8 @@ function process {
 
 	create_lock
 
-	for MAILING_LIST_NAME in `ls $FROM_PERUN_DIR/` ; do
+	for MAILING_LIST_NAME in $FROM_PERUN_DIR/* ; do
+	    [[ -e "$MAILING_LIST_NAME" ]] || break # skip if no files present
 		catch_error E_PERMISSIONS chmod $UMASK "${FROM_PERUN_DIR}/${MAILING_LIST_NAME}"
 		catch_error E_CHANGEOWNER chown ${USER}:${GROUP} "${FROM_PERUN_DIR}/${MAILING_LIST_NAME}"
 		mv_sync "${FROM_PERUN_DIR}/${MAILING_LIST_NAME}" "${SYMPA_MAILINGLISTS_DIR}/${MAILING_LIST_NAME}"
