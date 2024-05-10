@@ -39,8 +39,8 @@ our $ORGANIZATION_HEADER = 'organization';
 our $GROUPS_IN_RT_HEADER = 'groupsInRT';
 
 #Other constants
-our $EINFRA_DOMAIN = '@einfra.cesnet.cz';
-our $META_DOMAIN   = '@meta.cesnet.cz';
+our $EINFRA_IDP_DOMAIN   = '@idp.e-infra.cz';
+our $EINFRA_PROXY_DOMAIN = '@einfra.cesnet.cz';
 
 my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
 my $file_with_output_file_name = "$DIRECTORY/output_file_name";
@@ -81,14 +81,13 @@ foreach my $resourceId ($data->getResourceIds()) {
 			#if user has meta eppn, he should have also einfra eppn
 			my %userEPPNs = map { $_ => 1 } @{$data->getUserAttributeValue(attrName => $A_USER_EPPN, member => $memberId)};
 			foreach my $eppn (keys %userEPPNs) {
-				if($eppn =~ m/$META_DOMAIN/) {
+				if($eppn =~ m/$EINFRA_IDP_DOMAIN/) {
 					my $neweppn = $eppn;
-					$neweppn =~ s/$META_DOMAIN/$EINFRA_DOMAIN/ge;
+					$neweppn =~ s/$EINFRA_IDP_DOMAIN/$EINFRA_PROXY_DOMAIN/ge;
 					$userEPPNs{$neweppn} = 1;
 				}
 			}
 			#list of eppns must be unique
-			
 
 			$usersStructureByUserId->{$userId}->{$PREF_MAIL_HEADER} = $userPrefMail;
 			$usersStructureByUserId->{$userId}->{$DISPLAY_NAME_HEADER} = $userName;
