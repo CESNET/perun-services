@@ -1,5 +1,45 @@
 Upgrade notes
 
+## [13.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v12.0.1...v13.0.0) (2024-05-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **hadoop_hdfs:** Removed `hadoop_hdfs` service.
+* **hadoop_hdfs:** Remove `hadoop_hdfs` service from perun instance.
+* **hadoop_hbase:** Removed `hadoop_hbase` service.
+* **hadoop_hbase:** Remove `hadoop_hbase` service from perun instance.
+* **firewall:** Removed `firewall` service.
+* **firewall:** Remove `firewall` service from Perun instance and delete required
+attributes `user:def:IPAddresses` and `resource:def:firewallRules`.
+* **afs:** Remove "user:virt:organizationsWithLoa:en" from required attributes of AFS service.
+Add "user:virt:eduPersonPrincipalNames" instead. Users formerly belonging to 'ruk.cuni.cz' cell will
+use facility default, most probably 'ics.muni.cz'.
+* Removed `feudal` and `operations_portal_egi` services
+* **myq_printsvc:** preferredMail is now a required attribute
+
+### Features
+
+* **afs:** use user:virt:eduPersonPrincipalNames to determine AFS cell ([bdbc8d2](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/bdbc8d20578598ea6e77128ca1f966eb46480e3a))
+
+
+### Bug Fixes
+
+* handle file names with special characters or spaces correctly ([aba8b58](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/aba8b588ee8e0d5d8368268eab76d420593f48bb))
+* **myq_printsvc:** use O365 mail for workplaces if available, preferredMail otherwise ([9add5c8](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/9add5c867e62aacab10222f9701d04144f1e88c1))
+* **o365_mu:** use an error code for missing facility name ([3833fc4](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/3833fc40af0b1e25b208a77b4dcef62749a2c383))
+* remove extra -o, add missing space in o365 scripts ([53be623](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/53be62347a841b83a99cef029d1ef2ba3a6bb69d))
+* **rt:** generate proxy idp eppns from einfra idp identities ([835c0ab](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/835c0abfdbe548a2aafa25cc2ecc43325be03904))
+* update slave changelogs ([8f69ac4](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/8f69ac4f6d6b532b1f11a9499b8b40c3d1fd81f8))
+
+
+### Others
+
+* **firewall:** remove unused service ([e37f926](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/e37f9263aa842125a36d204dd4d42724f2452de7))
+* **hadoop_hbase:** remove unused service ([0069ec9](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/0069ec9f5d106f2352b3d6f5131458a3642e46b7))
+* **hadoop_hdfs:** remove unused service ([d48674f](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/d48674f9df4e7ddccf1ef18e95d2901761e85965))
+* removed services ([3686e0b](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/3686e0b8b4c52acb79c6ab8052deab642c71132d))
+
 ## [12.0.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v12.0.0...v12.0.1) (2024-04-09)
 
 
