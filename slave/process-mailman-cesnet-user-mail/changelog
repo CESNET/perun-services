@@ -1,8 +1,14 @@
+perun-slave-process-mailman-cesnet-user-mail (3.0.3) stable; urgency=medium
+
+  * Fixed mailing list name resolving
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Tue, 14 May 2024 08:15:00 +0200
+
 perun-slave-process-mailman-cesnet-user-mail (3.0.2) stable; urgency=low
 
   * Handle filenames with spaces correctly
 
- -- Pavel Brousek <brousek@cesnet.cz>  Fri, 29 Mar 2024 9:54:00 +0100
+ -- Pavel Brousek <brousek@cesnet.cz>  Fri, 29 Mar 2024 09:54:00 +0100
 
 perun-slave-process-mailman-cesnet-user-mail (3.0.1) stable; urgency=low
 

@@ -14,8 +14,9 @@ E_EXISTING_MAILING_LISTS_NOT_EXISTS=(1 'File ${EXISTING_MAILING_LISTS} with list
 # Check if the file with Perun managed mailing lists exists
 catch_error E_EXISTING_MAILING_LISTS_NOT_EXISTS stat ${EXISTING_MAILING_LISTS} >/dev/null
 
-for MAILING_LIST_NAME in $FROM_PERUN_DIR/* ; do
-        [[ -e "$MAILING_LIST_NAME" ]] || break # skip if no files present
+for MAILING_LIST_FILE_NAME in $FROM_PERUN_DIR/* ; do
+        [[ -e "$MAILING_LIST_FILE_NAME" ]] || break # skip if no files present
+        MAILING_LIST_NAME=$(basename "$MAILING_LIST_FILE_NAME")
         if [ `grep -c "^${MAILING_LIST_NAME} " ${EXISTING_MAILING_LISTS}` -eq 0 ]; then
                 # Mailing lists doesn't exists, so generate mail to the mailman administrators
 
