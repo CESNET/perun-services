@@ -25,7 +25,7 @@ DESTINATION_TYPE_USER_HOST_WINDOWS = "user@host-windows"
 DESTINATION_TYPE_USER_HOST_WINDOWS_PROXY = "host-windows-proxy"
 DESTINATION_TYPE_SERVICE_SPECIFIC = "service-specific"
 
-TIMEOUT = 7200  # 120 * 60 sec = 2h
+TIMEOUT = 9000  # 150 * 60 sec = 2.5h
 TIMEOUT_KILL = 60  # 60 sec to kill after timeout
 
 http_ok_codes = [200, 201, 202, 203, 204]
