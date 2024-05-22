@@ -34,10 +34,14 @@ our $A_G_COLLECTION_ID;           *A_G_COLLECTION_ID =       \'urn:perun:group:a
 our $A_G_BIOBANK_ID;              *A_G_BIOBANK_ID =          \'urn:perun:group:attribute-def:def:biobankID';
 our $A_G_NATIONAL_NODE_ID;        *A_G_NATIONAL_NODE_ID =    \'urn:perun:group:attribute-def:def:nationalNodeID';
 our $A_G_NETWORK_ID;              *A_G_NETWORK_ID =            \'urn:perun:group:attribute-def:def:networkID';
+our $A_G_SP_ID;                   *A_G_SP_ID =                 \'urn:perun:group:attribute-def:def:serviceProviderID';
+our $A_G_SERVICE_ID;              *A_G_SERVICE_ID =            \'urn:perun:group:attribute-def:def:serviceID';
 our $A_G_ADM_COLLECTION_ID;       *A_G_ADM_COLLECTION_ID =     \'urn:perun:group:attribute-def:def:admCollectionID';
 our $A_G_ADM_BIOBANK_ID;          *A_G_ADM_BIOBANK_ID =        \'urn:perun:group:attribute-def:def:admBiobankID';
 our $A_G_ADM_NATIONAL_NODE_ID;    *A_G_ADM_NATIONAL_NODE_ID =  \'urn:perun:group:attribute-def:def:admNationalNodeID';
 our $A_G_ADM_NETWORK_ID;          *A_G_ADM_NETWORK_ID =        \'urn:perun:group:attribute-def:def:admNetworkID';
+our $A_G_ADM_SP_ID;               *A_G_ADM_SP_ID =             \'urn:perun:group:attribute-def:def:admServiceProviderID';
+our $A_G_ADM_SERVICE_ID;          *A_G_ADM_SERVICE_ID =        \'urn:perun:group:attribute-def:def:admServiceID';
 
 our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
 
@@ -45,11 +49,15 @@ our $ROLE_COLLECTION;       *ROLE_COLLECTION =   \'COLLECTION';
 our $ROLE_BIOBANK;          *ROLE_BIOBANK =      \'BIOBANK';
 our $ROLE_NN;               *ROLE_NN =           \'NATIONAL_NODE';
 our $ROLE_NETWORK;          *ROLE_NETWORK =      \'NETWORK';
+our $ROLE_SP;               *ROLE_SP =           \'SERVICE_PROVIDER';
+our $ROLE_SERVICE;          *ROLE_SERVICE =      \'SERVICE';
 
 our $ROLE_ADM_COLLECTION;       *ROLE_ADM_COLLECTION =   \'ADM_COLLECTION';
 our $ROLE_ADM_BIOBANK;          *ROLE_ADM_BIOBANK =      \'ADM_BIOBANK';
 our $ROLE_ADM_NN;               *ROLE_ADM_NN =           \'ADM_NATIONAL_NODE';
 our $ROLE_ADM_NETWORK;          *ROLE_ADM_NETWORK =      \'ADM_NETWORK';
+our $ROLE_ADM_SP;               *ROLE_ADM_SP =           \'ADM_SERVICE_PROVIDER';
+our $ROLE_ADM_SERVICE;          *ROLE_ADM_SERVICE =      \'ADM_SERVICE';
 
 our $userStruc = {};
 our $USER_EMAIL = "EMAIL";
@@ -75,11 +83,15 @@ foreach my $uid (sort keys %$userStruc) {
 	$user->{"membership"}->{"biobanks"} = $userStruc->{$uid}->{$ROLE_BIOBANK};
 	$user->{"membership"}->{"national_nodes"} = $userStruc->{$uid}->{$ROLE_NN};
 	$user->{"membership"}->{"networks"} = $userStruc->{$uid}->{$ROLE_NETWORK};
+	$user->{"membership"}->{"service_providers"} = $userStruc->{$uid}->{$ROLE_SP};
+	$user->{"membership"}->{"services"} = $userStruc->{$uid}->{$ROLE_SERVICE};
 	$user->{"administrator"} = {};
 	$user->{"administrator"}->{"collections"} = $userStruc->{$uid}->{$ROLE_ADM_COLLECTION};
 	$user->{"administrator"}->{"biobanks"} = $userStruc->{$uid}->{$ROLE_ADM_BIOBANK};
 	$user->{"administrator"}->{"national_nodes"} = $userStruc->{$uid}->{$ROLE_ADM_NN};
 	$user->{"administrator"}->{"networks"} = $userStruc->{$uid}->{$ROLE_ADM_NETWORK};
+	$user->{"administrator"}->{"service_providers"} = $userStruc->{$uid}->{$ROLE_ADM_SP};
+	$user->{"administrator"}->{"services"} = $userStruc->{$uid}->{$ROLE_ADM_SERVICE};
 
 	push @users, $user;
 }
@@ -125,6 +137,20 @@ sub processGroups {
 		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_NETWORK_ID );
 		$groupRole = $ROLE_NETWORK;
 	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_SP_ID )) {
+		if ($roleIdValue) {
+			die "Group cannot have two roles set (#" . $groupId . ")";
+		}
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_SP_ID );
+		$groupRole = $ROLE_SP;
+	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_SERVICE_ID )) {
+		if ($roleIdValue) {
+			die "Group cannot have two roles set (#" . $groupId . ")";
+		}
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_SERVICE_ID );
+		$groupRole = $ROLE_SERVICE;
+	}
 	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_COLLECTION_ID )) {
 		if ($roleIdValue) {
 			die "Group cannot have two roles set (#" . $groupId . ")";
@@ -153,6 +179,20 @@ sub processGroups {
 		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_NETWORK_ID );
 		$groupRole = $ROLE_ADM_NETWORK;
 	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_SP_ID )) {
+		if ($roleIdValue) {
+			die "Group cannot have two roles set (#" . $groupId . ")";
+		}
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_SP_ID );
+		$groupRole = $ROLE_ADM_SP;
+	}
+	if ($data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_SERVICE_ID )) {
+		if ($roleIdValue) {
+			die "Group cannot have two roles set (#" . $groupId . ")";
+		}
+		$roleIdValue = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_ADM_SERVICE_ID );
+		$groupRole = $ROLE_ADM_SERVICE;
+	}
 	if (! $roleIdValue) {
 		return;
 	}
@@ -174,10 +214,14 @@ sub initializeUser {
 	$userStruc->{$uid}->{$ROLE_BIOBANK} = [];
 	$userStruc->{$uid}->{$ROLE_NN} = [];
 	$userStruc->{$uid}->{$ROLE_NETWORK} = [];
+	$userStruc->{$uid}->{$ROLE_SP} = [];
+	$userStruc->{$uid}->{$ROLE_SERVICE} = [];
 	$userStruc->{$uid}->{$ROLE_ADM_COLLECTION} = [];
 	$userStruc->{$uid}->{$ROLE_ADM_BIOBANK} = [];
 	$userStruc->{$uid}->{$ROLE_ADM_NN} = [];
 	$userStruc->{$uid}->{$ROLE_ADM_NETWORK} = [];
+	$userStruc->{$uid}->{$ROLE_ADM_SP} = [];
+	$userStruc->{$uid}->{$ROLE_ADM_SERVICE} = [];
 }
 
 sub processUsers {
