@@ -4,7 +4,7 @@ import subprocess
 import sys
 import tempfile
 
-timeout = "7200"  # 120 * 60 sec = 2h
+timeout = "9000"  # 150 * 60 sec = 2.5h
 timeout_kill = "60"  # 60 sec to kill after timeout
 
 perun_cert = "/etc/perun/ssl/perun-send.pem"
