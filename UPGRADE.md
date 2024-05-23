@@ -1,5 +1,21 @@
 Upgrade notes
 
+## [13.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v13.0.0...v13.1.0) (2024-05-23)
+
+
+### Features
+
+* update some services from generic_send to generic_sender ([e359ce1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/e359ce1a3ff0012a55981476dcae9ca2f19b11b5))
+
+
+### Bug Fixes
+
+* **afs_group:** fixed group name resolving ([5da92f8](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/5da92f8b2ab4fad80bd4e789f3193389f5bfd91d))
+* **drupal_elixir:** 🐛 Unresolved variable in GEN script ([a4e29ea](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/a4e29eac7250400af0bd8a26ec6ab2456f76ba7d))
+* extend default sending timeout to 2.5h ([75e6420](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/75e64203938adcd335c9540419a02214002e441c))
+* resolving malinglist name / username in various services ([7493351](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/7493351b27cee931080488a0fa8e18d3993b0f55))
+* **vsup_stag:** resolve expiration also from study system ([4ac34f1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/4ac34f1ddea062abf9d6331076c4b495ccbed1cd))
+
 ## [13.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v12.0.1...v13.0.0) (2024-05-10)
 
 
