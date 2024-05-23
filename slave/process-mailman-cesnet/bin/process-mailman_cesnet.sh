@@ -19,8 +19,9 @@ function process {
 		catch_error E_CANNOT_CREATE_DIR mkdir -p ${DST_DIR}
 	fi
 
-	for FILE in $FROM_PERUN_DIR/* ; do
-	    [[ -e "$FILE" ]] || break # skip if no files present
+	for FILE_PATH in $FROM_PERUN_DIR/* ; do
+		[[ -e "$FILE_PATH" ]] || break # skip if no files present
+		FILE=$(basename "$FILE_PATH")
 		DST_FILE=${DST_DIR}/$FILE
 		CHANGED=0
 		# Create diff between old.perun and .new

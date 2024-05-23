@@ -42,8 +42,8 @@ our $STATUS_VALID;                *STATUS_VALID =            \'VALID';
 our $STATUS_EXPIRED;              *STATUS_EXPIRED =          \'EXPIRED';
 our $STATUS_SUSPENDED;            *STATUS_SUSPENDED =        \'SUSPENDED';
 
-our $INVALID_USER_NAMES;          *INVALID_USER_NAMES =      \'invalid';
-our $VALID_USER_NAMES;            *VALID_USER_NAMES =        \'valid';
+our $USER_NAME_INVALID;           *USER_NAME_INVALID =       \'invalid';
+our $USER_NAME_VALID;             *USER_NAME_VALID =         \'valid';
 
 our $userStruc = {};
 our $uLogin = {};
@@ -128,18 +128,19 @@ open FILE_USERS_DUPLICITIES,">$fileUsersDuplicities" or die "Cannot open $fileUs
 foreach my $uid (sort keys %$duplicityUserStruc) {
 	my $login = $duplicityUserStruc->{$uid}->{$uLogin};
 	my $email = $duplicityUserStruc->{$uid}->{$uEmail};
-	print FILE_USERS_DUPLICITIES "UID: $uid, LOGIN:$login, EMAIL:$email\n";
+	print FILE_USERS_DUPLICITIES "UID:$uid, LOGIN:$login, EMAIL:$email\n";
 }
 close (FILE_USERS_DUPLICITIES) or die "Cannot close $fileUsersDuplicities: $! \n";
 
 # USERS-invalid name: uid login e-mail firstname lastname
 open FILE_USERS_INVALID_NAMES,">$fileUserInvalidNames" or die "Cannot open $fileUserInvalidNames: $! \n";
-foreach my $uid (sort keys %invalidNamesUserStruc) {
+foreach my $uid (sort keys %$invalidNamesUserStruc) {
 	my $login = $invalidNamesUserStruc->{$uid}->{$uLogin};
 	my $email = $invalidNamesUserStruc->{$uid}->{$uEmail};
 	my $firstName = $invalidNamesUserStruc->{$uid}->{$uFirstName};
 	my $lastName = $invalidNamesUserStruc->{$uid}->{$uLastName};
-	print FILE_USERS_INVALID_NAMES "UID: $uid, LOGIN:$login, EMAIL:$email, F_NAME:$firstName, L_NAME:$lastName\n";
+	my $displayName = $invalidNamesUserStruc->{$uid}->{$uName};
+	print FILE_USERS_INVALID_NAMES "UID:$uid, LOGIN:$login, EMAIL:$email, F_NAME:$firstName, L_NAME:$lastName, D_NAME:$displayName\n";
 }
 close (FILE_USERS_INVALID_NAMES) or die "Cannot close $fileUserInvalidNames: $! \n";
 
@@ -153,6 +154,7 @@ perunServicesInit::finalize;
 sub processUsers {
 	my ($groupId, $memberId, $admins_ref) = @_;
 	my @admins = @$admins_ref;
+	my $user_name_validity = $USER_NAME_VALID;
 
 	my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
 	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
@@ -161,17 +163,23 @@ sub processUsers {
 		$status = $STATUS_SUSPENDED;
 	}
 	my $email = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EMAIL );
-	my $uName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_D_NAME );
+
+	my $displayName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_D_NAME );
+	if (not defined($displayName)) {
+		$displayName = "";
+		$user_name_validity = $USER_NAME_INVALID;
+	}
+	
 	my $firstName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_F_NAME );
-	my $invalid_name_user = $VALID_USER_NAMES;
 	if (not defined($firstName)) {
 		$firstName = "";
-		my $invalid_name_user = $INVALID_USER_NAMES;
+		$user_name_validity = $USER_NAME_INVALID;
 	}
+
 	my $lastName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_L_NAME );
 	if (not defined($lastName)) {
 		$lastName = "";
-		my $invalid_name_user = $INVALID_USER_NAMES;
+		$user_name_validity = $USER_NAME_INVALID;
 	}
 
 	# Select right eppn from the list of eppns
@@ -180,11 +188,13 @@ sub processUsers {
 	#select first eppn which ends with '@elixir-europe.org', if there is no one matching select first eppn, if there is no eppn at all use empty string
 	my $eppn = (grep /\@elixir-europe.org$/, @eppns)[0] || $eppns[0] || "";
 
-	if ($invalid_name_user == $INVALID_USER_NAMES) {
-			$invalidNamesUserStruc->{$uid}->{$uLogin} = $login;
-			$invalidNamesUserStruc->{$uid}->{$uEmail} = $email;
-			$invalidNamesUserStruc->{$uid}->{$uFirstName} = $firstName;
-			$invalidNamesUserStruc->{$uid}->{$uLastName} = $lastName;
+	if ($user_name_validity eq $USER_NAME_INVALID) {
+		$invalidNamesUserStruc->{$uid}->{$uLogin} = $login;
+		$invalidNamesUserStruc->{$uid}->{$uEmail} = $email;
+		$invalidNamesUserStruc->{$uid}->{$uFirstName} = $firstName;
+		$invalidNamesUserStruc->{$uid}->{$uLastName} = $lastName;
+		$invalidNamesUserStruc->{$uid}->{$uName} = $displayName;
+		return;
 	}
 
 	if (exists $userStruc->{$uid}) {
@@ -210,7 +220,7 @@ sub processUsers {
 			$userStruc->{$uid}->{$uLogin} = $login;
 			$userStruc->{$uid}->{$uStatus} = $status;
 			$userStruc->{$uid}->{$uEmail} = $email;
-			$userStruc->{$uid}->{$uName} = $uName;
+			$userStruc->{$uid}->{$uName} = $displayName;
 			$userStruc->{$uid}->{$uFirstName} = $firstName;
 			$userStruc->{$uid}->{$uLastName} = $lastName;
 			$userStruc->{$uid}->{$uEppn} = $eppn;

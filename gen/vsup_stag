@@ -8,7 +8,7 @@ sub resolveExpiration;
 
 local $::SERVICE_NAME = "vsup_stag";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -32,6 +32,7 @@ our $A_BIRTH_LAST_NAME;  *A_BIRTH_LAST_NAME = \'urn:perun:user:attribute-def:def
 our $A_BIRTH_NUMBER;  *A_BIRTH_NUMBER = \'urn:perun:user:attribute-def:def:birthNumber';
 our $A_GENDER;  *A_GENDER = \'urn:perun:user:attribute-def:def:gender';
 our $A_JOB;  *A_JOB = \'urn:perun:user:attribute-def:def:job';
+our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:expirationKos';
 our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
 our $A_EXPIRATION_MANUAL;  *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
 
@@ -87,6 +88,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 		my $birthNumber = $data->getUserAttributeValue(member => $memberId, attrName => $A_BIRTH_NUMBER);
 		my $gender = $data->getUserAttributeValue(member => $memberId, attrName => $A_GENDER);
 		my $job = $data->getUserAttributeValue(member => $memberId, attrName => $A_JOB);
+		my $expirationKos = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_KOS);
 		my $expirationDC2 = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_DC2);
 		my $expirationManual = $data->getUserAttributeValue(member => $memberId, attrName => $A_EXPIRATION_MANUAL);
 		my $phone = $data->getUserAttributeValue(member => $memberId, attrName => $A_PHONE);
@@ -110,7 +112,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 		$users->{$key}->{$A_BIRTH_NUMBER} = $birthNumber || '';
 		$users->{$key}->{$A_GENDER} = $gender || '';
 		$users->{$key}->{$A_JOB} = $job || '';
-		$users->{$key}->{$A_EXPIRATION_DC2} = resolveExpiration($expirationDC2, $expirationManual);
+		$users->{$key}->{$A_EXPIRATION_DC2} = resolveExpiration($expirationKos, $expirationDC2, $expirationManual);
 
 		$users->{$key}->{$A_PHONE} = $phone || '';
 		$users->{$key}->{$A_EMAIL_PRIV} = $emailPriv || ($emailPrivKOS || '');
@@ -149,18 +151,21 @@ close(FILE);
 perunServicesInit::finalize;
 
 #
-# Return latest of two expiration dates (DC2 / Manual)
+# Return latest of expiration dates (KOS / DC2 / Manual)
 #
 sub resolveExpiration() {
 
 	# read input
+	my $expirationKos = shift;
 	my $expirationDc2 = shift;
 	my $expirationMan = shift;
 	# parse to time or undef
+	my $expirationKosTime = (defined $expirationKos and length($expirationKos) > 0) ? Time::Piece->strptime($expirationKos,"%Y-%m-%d") : undef;
 	my $expirationDc2Time = (defined $expirationDc2 and length($expirationDc2) > 0) ? Time::Piece->strptime($expirationDc2,"%Y-%m-%d") : undef;
 	my $expirationManTime = (defined $expirationMan and length($expirationMan) > 0) ? Time::Piece->strptime($expirationMan,"%Y-%m-%d") : undef;
 
 	my @expirations = ();
+	if (defined $expirationKosTime) { push(@expirations, $expirationKosTime->epoch); }
 	if (defined $expirationDc2Time) { push(@expirations, $expirationDc2Time->epoch); }
 	if (defined $expirationManTime) { push(@expirations, $expirationManTime->epoch); }
 
@@ -169,6 +174,9 @@ sub resolveExpiration() {
 	my $latest_expiration = $sorted_expirations[$#sorted_expirations];
 
 	if (defined $latest_expiration) {
+		if (defined $expirationKosTime and ($latest_expiration == $expirationKosTime->epoch)) {
+			return $expirationKos;
+		}
 		if (defined $expirationDc2Time and ($latest_expiration == $expirationDc2Time->epoch)) {
 			return $expirationDc2;
 		}
