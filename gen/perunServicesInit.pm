@@ -142,14 +142,14 @@ sub getFacility {
 
 sub getHashedHierarchicalData {
 	if(defined $local_data) { return $local_data; }
-  my $data = $servicesAgent->getHashedHierarchicalData(service => $service->getId, facility => $facility->getId, consentEval => $CONSENT_EVAL);
+  my $data = $servicesAgent->getHashedHierarchicalData(service => $service->getId, facility => $facility->getId, consentEval => $CONSENT_EVAL, taskRun => $taskRunId);
   logData $data, 'hashedHierarchicalData';
   return $data;
 }
 
 sub getHashedDataWithGroups {
 	if(defined $local_data) { return $local_data; }
-	my $data = $servicesAgent->getHashedDataWithGroups(service => $service->getId, facility => $facility->getId, consentEval => $CONSENT_EVAL);
+	my $data = $servicesAgent->getHashedDataWithGroups(service => $service->getId, facility => $facility->getId, consentEval => $CONSENT_EVAL, taskRun => $taskRunId);
 	logData $data, 'hashedDataWithGroups';
 	return $data;
 }
