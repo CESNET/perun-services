@@ -1,10 +1,12 @@
 import csv
+import datetime
 import fcntl
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 from typing import Optional
 
@@ -14,6 +16,7 @@ PERUN_CHAIN = "/etc/perun/ssl/perun-send.chain"
 MAIN_LOCK_DIR = "/var/lock"
 TEMPORARY_DIR = "/tmp"
 SERVICES_DIR = "/etc/perun/services"
+LOG_DIR = "/var/log/perun/spool_tmp"
 
 # predefined different types of destination
 DESTINATION_TYPE_URL = "url"
@@ -92,7 +95,8 @@ def check_input_fields(
         if len(args) != 5:
             # Destination type gets passed by the engine every time so this shouldn't be an issue
             die_with_error(
-                "Error: Expected number of arguments is 4 (FACILITY_NAME, DESTINATION, DESTINATION_TYPE and SERVICE_NAME)"
+                "Error: Expected number of arguments is 4 (FACILITY_NAME, DESTINATION, DESTINATION_TYPE"
+                " and SERVICE_NAME)"
             )
     elif len(args) != 4:
         if destination_type_required:
@@ -194,6 +198,67 @@ def check_windows_proxy_format(windows_proxy: str) -> None:
             + windows_proxy
             + "' is not in valid format user@host"
         )
+
+
+def archive_files(path: str, archive_name: str, directories: [str]):
+    """
+    Creates archive of content of directories (recursively) in the filepath
+    :param path: target directory to save archive to
+    :param archive_name: archive name
+    :param directories: directories to merge and archive
+    """
+    with tarfile.open(
+        path + f"/{archive_name}.tar.gz", "w:gz", format=tarfile.GNU_FORMAT
+    ) as archive:
+        for directory in directories:
+            archive.add(directory, arcname=".")
+
+
+def persist_spool_files(facility_name: str, service_name: str, directories: [str]):
+    """
+    Persists spool files recursively as archive in the log folder
+    :param facility_name: name of the facility
+    :param service_name: name of the service
+    :param directories: directories to include in the archive
+    """
+    # temporary way to locally disable logging -> manually pass -1 as task run id to the send script
+    # ideally change when send scripts can take named parameters
+    task_run_id = get_run_id(get_gen_folder(facility_name, service_name) + "/RUN_ID")
+    if int(task_run_id) == -1:
+        return
+    archive_enabled = is_archive_enabled()
+    if archive_enabled:
+        archive_spool_folder = f"{LOG_DIR}/{facility_name}/{service_name}"
+        if not os.path.exists(archive_spool_folder):
+            os.makedirs(archive_spool_folder)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        archive_name = f"spooldata_{task_run_id}_{timestamp}"
+        archive_files(archive_spool_folder, archive_name, directories)
+
+
+def is_archive_enabled() -> bool:
+    service_files_base_dir = (
+        os.path.dirname(os.path.realpath(sys.argv[0])) + "/../gen/spool"
+    )
+    archive_file_path = service_files_base_dir + "/ARCHIVE"
+    if not os.path.exists(archive_file_path):
+        return False
+    with open(archive_file_path) as archive_file:
+        archive_enabled = int(archive_file.readline())
+    return bool(archive_enabled)
+
+
+def get_run_id(run_id_filepath: str) -> int:
+    """
+    Retrieves run id from the passed filepath. Checks whether file exists and extracts the id
+    :param run_id_filepath: filepath
+    :return: run id
+    """
+    if not os.path.exists(run_id_filepath):
+        return -1
+    with open(run_id_filepath) as run_id_file:
+        run_id = int(run_id_file.readline())
+    return run_id
 
 
 def prepare_temporary_directory() -> tempfile.TemporaryDirectory:

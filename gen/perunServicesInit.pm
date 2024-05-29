@@ -30,7 +30,7 @@ our $DIE_AT_END=0;
 $SIG{__WARN__} = sub { $DIE_AT_END=1; warn @_; };
 END { if($DIE_AT_END) { die "Died because of warning(s) occur during processing.\n"; } };
 
-my ($agent, $service, $facility, $servicesAgent, $directory, $tmp_directory, $tmp_directory_destination, $getData_directory, $local_data);
+my ($agent, $service, $facility, $archiveEnabled, $taskRunId, $servicesAgent, $configAgent, $directory, $tmp_directory, $tmp_directory_destination, $getData_directory, $local_data);
 
 # Parameter that enforces consent evaluation
 our $CONSENT_EVAL = 0;
@@ -45,9 +45,11 @@ our $CONSENT_EVAL = 0;
 sub init {
 
 	my ($facilityId, $facilityName, $local_data_file, $serviceName, $getDataType);
-	GetOptions ("consentEval|c"=>\$CONSENT_EVAL,"facilityId|f=i" => \$facilityId, "facilityName|F=s" => \$facilityName, "data|d=s" => \$local_data_file, "serviceName|s=s" => \$serviceName, "getDataType|t=s" => \$getDataType) or die;
+	GetOptions ("consentEval|c"=>\$CONSENT_EVAL,"facilityId|f=i" => \$facilityId, "facilityName|F=s" => \$facilityName,
+		"data|d=s" => \$local_data_file, "serviceName|s=s" => \$serviceName, "getDataType|t=s" => \$getDataType, "taskRunId|r=i" => \$taskRunId) or die;
 	# serviceName is way how to specify service from argument, use it instead local SERVICE_NAME if set
 	if(defined $serviceName) { $::SERVICE_NAME = $serviceName; }
+	unless(defined $taskRunId) {$taskRunId = -1};
 
 	unless(defined $::SERVICE_NAME) { die; }
 	unless(defined $::PROTOCOL_VERSION) {die;}
@@ -77,10 +79,12 @@ sub init {
 
  		$agent = Perun::Agent->new($jsonFormat);
 		$servicesAgent = $agent->getServicesAgent;
+		$configAgent = $agent->getConfigAgent;
 		my $facilitiesAgent = $agent->getFacilitiesAgent;
 		$service = $servicesAgent->getServiceByName( name => $::SERVICE_NAME);
 		$facility = $facilitiesAgent->getFacilityById( id => $facilityId);
 		$facilityName = $facility->getName;
+		$archiveEnabled = $configAgent->isArchiveSpoolEnabled();
 	}
 
 	$directory = "spool/" . $facilityName . "/" . $::SERVICE_NAME."/";
@@ -97,7 +101,9 @@ sub init {
 	if(@$err) { die "Can't mkpath( $tmp_directory_destination  )" };
 	createVersionFile();
 	createServicesFile();
+	createArchiveEnabledFile();
 	createFacilityNameFile($facilityName);
+	createTaskRunIdFile();
 
 	rmtree($getData_directory);
 	if(@$err) { die "Can't rmtree( $getData_directory  )" };
@@ -180,6 +186,22 @@ sub createFacilityNameFile($) {
 	open FACILITY_NAME_FILE, ">$tmp_directory" . "/FACILITY";
 	print FACILITY_NAME_FILE $_[0], "\n";
 	close FACILITY_NAME_FILE;
+}
+
+sub createTaskRunIdFile() {
+	open TASK_RUN_ID_FILE , ">$tmp_directory" . "/RUN_ID";
+	print TASK_RUN_ID_FILE $taskRunId;
+	close TASK_RUN_ID_FILE;
+}
+
+# creates a text file in the spool folder than holds information about logging of generated files. This information
+# is retrieved via a call to backend RPC and updates on every propagation.
+# Contains 1 if enabled, contains 0 if logging disabled. If the file is not found, logging is disabled by default
+sub createArchiveEnabledFile {
+	my $fileName = "spool/ARCHIVE";
+	open ARCHIVE_FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
+	print ARCHIVE_FILE $archiveEnabled;
+	close ARCHIVE_FILE
 }
 
 sub updateGenericJsonLookup {
