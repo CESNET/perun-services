@@ -8,8 +8,8 @@ use JSON::XS;
 use Tie::IxHash;
 
 our $SERVICE_NAME = "du_info_export";
-our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.4";
+our $PROTOCOL_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.5";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -34,12 +34,16 @@ our $A_R_FS_HOME_MOUNT_POINT;    *A_R_FS_HOME_MOUNT_POINT =    \'urn:perun:resou
 #new attributes for quotas
 our $A_MR_DATAQUOTAS;            *A_MR_DATAQUOTAS =            \'urn:perun:member_resource:attribute-def:virt:dataQuotas';
 our $A_MR_FILEQUOTAS;            *A_MR_FILEQUOTAS =            \'urn:perun:member_resource:attribute-def:virt:fileQuotas';
+our $A_MR_BUCKETQUOTA;           *A_MR_BUCKETQUOTA =           \'urn:perun:member_resource:attribute-def:virt:bucketQuota';
 our $A_MR_DATA_QUOTAS_OVERRIDE;  *A_MR_DATA_QUOTAS_OVERRIDE =  \'urn:perun:member_resource:attribute-def:def:dataQuotasOverride';
 our $A_MR_FILE_QUOTAS_OVERRIDE;  *A_MR_FILE_QUOTAS_OVERRIDE =  \'urn:perun:member_resource:attribute-def:def:fileQuotasOverride';
+our $A_MR_BUCKET_QUOTA_OVERRIDE; *A_MR_BUCKET_QUOTA_OVERRIDE = \'urn:perun:member_resource:attribute-def:def:bucketQuotaOverride';
 our $A_R_DEFAULT_DATA_QUOTAS;    *A_R_DEFAULT_DATA_QUOTAS =    \'urn:perun:resource:attribute-def:def:defaultDataQuotas';
 our $A_R_DEFAULT_FILE_QUOTAS;    *A_R_DEFAULT_FILE_QUOTAS =    \'urn:perun:resource:attribute-def:def:defaultFileQuotas';
+our $A_R_DEFAULT_BUCKET_QUOTA;   *A_R_DEFAULT_BUCKET_QUOTA =   \'urn:perun:resource:attribute-def:def:defaultBucketQuota';
 our $A_R_MAX_DATA_QUOTAS;        *A_R_MAX_DATA_QUOTAS =        \'urn:perun:resource:attribute-def:def:maxUserDataQuotas';
 our $A_R_MAX_FILE_QUOTAS;        *A_R_MAX_FILE_QUOTAS =        \'urn:perun:resource:attribute-def:def:maxUserFileQuotas';
+our $A_R_MAX_BUCKET_QUOTA;       *A_R_MAX_BUCKET_QUOTA =       \'urn:perun:resource:attribute-def:def:maxUserBucketQuota';
 
 our $A_U_KERBEROS_LOGINS;        *A_U_KERBEROS_LOGINS =        \'urn:perun:user:attribute-def:virt:kerberosLogins';
 our $A_U_SHIBBOLETH_EXT_SOURCES; *A_U_SHIBBOLETH_EXT_SOURCES = \'urn:perun:user:attribute-def:virt:shibbolethExtSources';
@@ -180,8 +184,10 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 		my $dataQuotas = $data->getMemberResourceAttributeValue(attrName => $A_MR_DATAQUOTAS, member => $memberId, resource => $resourceId);
 		my $fileQuotas = $data->getMemberResourceAttributeValue(attrName => $A_MR_FILEQUOTAS, member => $memberId, resource => $resourceId);
+		my $bucketQuota = $data->getMemberResourceAttributeValue(attrName => $A_MR_BUCKETQUOTA, member => $memberId, resource => $resourceId);
 		my $dataQuotasOverride = $data->getMemberResourceAttributeValue(attrName => $A_MR_DATA_QUOTAS_OVERRIDE, member => $memberId, resource => $resourceId);
 		my $fileQuotasOverride = $data->getMemberResourceAttributeValue(attrName => $A_MR_FILE_QUOTAS_OVERRIDE, member => $memberId, resource => $resourceId);
+		my $bucketQuotaOverride = $data->getMemberResourceAttributeValue(attrName => $A_MR_BUCKET_QUOTA_OVERRIDE, member => $memberId, resource => $resourceId);
 		push @{$attributesByUUID{$uuid}->{"Resources"}},
 							{
 								"Name"               => $resourceName,
@@ -191,8 +197,10 @@ foreach my $resourceId ($data->getResourceIds()) {
 								"UUID"               => $uuid,
 								"DataQuotas"         => defined $dataQuotas ? $dataQuotas : {},
 								"FilesQuotas"        => defined $fileQuotas ? $fileQuotas : {},
+								"BucketQuota"        => defined $bucketQuota ? $bucketQuota : undef,
 								"DataQuotasOverride" => defined $dataQuotasOverride ? $dataQuotasOverride : {},
 								"FileQuotasOverride" => defined $fileQuotasOverride ? $fileQuotasOverride : {},
+								"BucketQuotaOverride" => defined $bucketQuotaOverride ? $bucketQuotaOverride : undef,
 								"Status"             => $data->getMemberAttributeValue(attrName => $A_M_STATUS, member => $memberId),
 							};
 	}
@@ -252,8 +260,10 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 	my $maxDataQuotas = $data->getResourceAttributeValue(attrName => $A_R_MAX_DATA_QUOTAS, resource => $resourceId);
 	my $maxFileQuotas = $data->getResourceAttributeValue(attrName => $A_R_MAX_FILE_QUOTAS, resource => $resourceId);
+	my $maxBucketQuota = $data->getResourceAttributeValue(attrName => $A_R_MAX_BUCKET_QUOTA, resource => $resourceId);
 	my $defaultDataQuotas = $data->getResourceAttributeValue(attrName => $A_R_DEFAULT_DATA_QUOTAS, resource => $resourceId);
 	my $defaultFileQuotas = $data->getResourceAttributeValue(attrName => $A_R_DEFAULT_FILE_QUOTAS, resource => $resourceId);
+	my $defaultBucketQuota = $data->getResourceAttributeValue(attrName => $A_R_DEFAULT_BUCKET_QUOTA, resource => $resourceId);
 	my $resourceUUID = $data->getResourceAttributeValue(attrName => $A_RESOURCE_UUID, resource => $resourceId);
 	push @{$attributesByVo{$voName}->{"Resources"}},
 					{
@@ -263,8 +273,10 @@ foreach my $resourceId ($data->getResourceIds()) {
 						"PerunResourceID"    => int($resourceId),
 						"MaxUserDataQuotas"  => defined $maxDataQuotas ? $maxDataQuotas : {},
 						"MaxUserFileQuotas"  => defined $maxFileQuotas ? $maxFileQuotas : {},
+						"MaxUserBucketQuota" => defined $maxBucketQuota ? $maxBucketQuota : undef,
 						"DefaultDataQuotas"  => defined $defaultDataQuotas ? $defaultDataQuotas : {},
 						"DefaultFilesQuotas" => defined $defaultFileQuotas ? $defaultFileQuotas : {},
+						"DefaultBucketQuota" => defined $defaultBucketQuota ? $defaultBucketQuota : undef,
 						"UnixGroups"         => \@unixGroups,
 						"UUID"               => defined $resourceUUID ? $resourceUUID : undef,
 					};
@@ -280,7 +292,7 @@ mkdir $dirName or die "Cannot create $dirName";
 
 my $fileName = "$DIRECTORY/data/$facilityName-$SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
-print FILE JSON::XS->new->utf8->pretty->encode($struc);
+print FILE JSON::XS->new->utf8->pretty->canonical->encode($struc);
 close FILE;
 
 for my $vo (keys %attributesByVo) {
@@ -362,7 +374,7 @@ for my $vo (keys %attributesByVo) {
 
 	my $fileName = "$DIRECTORY/data/$facilityName-$vo";
 	open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
-	print FILE JSON::XS->new->utf8->pretty->encode($voStruc);
+	print FILE JSON::XS->new->utf8->pretty->canonical->encode($voStruc);
 	close FILE;
 }
 
