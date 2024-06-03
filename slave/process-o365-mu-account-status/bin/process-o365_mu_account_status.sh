@@ -11,7 +11,7 @@ function process {
 
 	FROM_PERUN="${WORK_DIR}/o365_mu_account_status"
 
-	if [ -z ${DST_FILE} ]; then
+	if [ -z "${DST_FILE}" ]; then
 		log_msg E_MISSING_DST
 	fi
 
