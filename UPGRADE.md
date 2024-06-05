@@ -1,5 +1,29 @@
 Upgrade notes
 
+## [13.2.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v13.1.0...v13.2.0) (2024-06-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **ad_safeq6_mu:** new config file needed with LDAP address, username and password
+* **du_info_export:** Add new bucket quota attributes and mark them required for du_info_export service.
+* LOG_DIR has to be configured and the directory has to exist on the engine machine, send scripts now expect another argument (always sent by engine)
+
+### Features
+
+* **ad_safeq6_mu:** new service ad_safeq6_mu ([03a8977](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/03a89773abfcfd62fd3e5a6afbecfc26f69c0de8))
+* archive spool files ([b28bef8](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/b28bef8113f5b36e9de9f2ead5eb2e977919c41f))
+* **du_info_export:** add bucket quota attributes to export ([6bab380](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/6bab380866573775050966d7a7b1061f3608d57d))
+* update hashed data method calls ([ef7f9d5](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/ef7f9d50d5238f53f90090ceadd0cddd93049946))
+
+
+### Bug Fixes
+
+* **ad_group_mu_ucn:** remove obsolete hack for L- and Guest- accounts ([723e290](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/723e290e2c8d1e46a93c2dc51deeefad2c617976))
+* **crm_ceitec:** make sure we use proper muni identity ([0622fc7](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/0622fc7937a0d9179d9640aa04f0ec8616213660))
+* **o365_mu_account_status:** add missing quotes ([55a70f4](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/55a70f4a7d46dc7aeae85077a730f7f3a8d9deaa))
+* **o365_mu_ukb_forward_status:** add missing quotes ([5903599](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/59035992a65d0fac544d2d89c8610a04a2d28ac4))
+
 ## [13.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v13.0.0...v13.1.0) (2024-05-23)
 
 
