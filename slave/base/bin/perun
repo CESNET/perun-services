@@ -410,9 +410,10 @@ add_on_exit "rm -rf ${WORK_DIR}"
 ### Receive and process data
 catch_error E_TAR_FILES tar --no-same-owner --no-same-permissions --warning=no-timestamp -x -C "${WORK_DIR}" <&0
 SERVICE=`head -n 1 "${WORK_DIR}/SERVICE"`
+SCRIPT_NAME="$SERVICE"
 if [[ -f "${WORK_DIR}/GEN_LOOKUP" ]] && grep -Fxq "$SERVICE" "${WORK_DIR}/GEN_LOOKUP"; then
 	ORIGINAL_SERVICE="$SERVICE"
-	SERVICE="generic_json_gen"
+	SCRIPT_NAME="generic_json_gen"
 fi
 SEND_TO_HOSTNAME=`head -n 1 "${WORK_DIR}/HOSTNAME"`
 FACILITY=`head -n 1 "${WORK_DIR}/FACILITY"`
@@ -466,7 +467,7 @@ if [ "${#SERVICE_BLACKLIST[@]}" -gt 0  ]; then
 	fi
 fi
 
-SERVICE_PROCESS_FILE="${SCRIPTS_DIR}/process-${SERVICE}.sh";
+SERVICE_PROCESS_FILE="${SCRIPTS_DIR}/process-${SCRIPT_NAME}.sh";
 catch_error E_UNSUPPORTED_SERVICE [ -r "$SERVICE_PROCESS_FILE" ]
 
 . "$SERVICE_PROCESS_FILE"
