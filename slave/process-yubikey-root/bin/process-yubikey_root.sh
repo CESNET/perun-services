@@ -26,13 +26,13 @@ function process {
 	create_lock
 
     # Check for /etc/yubico directory
-    if [ ! -d ${DST_DIR} ]; then
-        catch_error E_MKDIR mkdir -p ${DST_DIR}
+    if [ ! -d "${DST_DIR}" ]; then
+        catch_error E_MKDIR mkdir -p "${DST_DIR}"
     fi
 
 
 	# Destination file doesn't exist
-	if [ ! -f ${DST_FILE} ]; then
+	if [ ! -f "${DST_FILE}" ]; then
 		catch_error E_CHOWN chown root:root $FROM_PERUN
 		catch_error E_CHMOD chmod 0644 $FROM_PERUN
 	fi
