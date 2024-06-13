@@ -1,0 +1,195 @@
+#!/usr/bin/perl
+use feature "switch";
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Text::Unidecode;
+use Data::Dumper;
+
+
+local $::SERVICE_NAME = "ldap_lsaai";
+local $::PROTOCOL_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.0";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName_users = "$DIRECTORY/$::SERVICE_NAME"."_users".".ldif";
+my $fileName_groups = "$DIRECTORY/$::SERVICE_NAME"."_groups".".ldif";
+my $baseDnFileName = "$DIRECTORY/baseDN";
+
+my $data = perunServicesInit::getHashedDataWithGroups;
+
+#Constants
+our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDN';
+our $A_G_DESCRIPTION;  *A_G_DESCRIPTION = \'urn:perun:group:attribute-def:core:description';
+our $A_G_R_NAME;  *A_G_R_NAME = \'urn:perun:group_resource:attribute-def:virt:unixGroupName';
+our $A_G_R_GID;  *A_G_R_GID = \'urn:perun:group_resource:attribute-def:virt:unixGID';
+
+# User attributes
+our $A_U_LOGIN; *A_U_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_U_FIRST_NAME;  *A_U_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
+our $A_U_LAST_NAME;  *A_U_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
+our $A_U_MAIL;  *A_U_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_U_DISPLAY_NAME;  *A_U_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
+our $A_U_SSH_KEYS;  *A_U_SSH_KEYS = \'urn:perun:user:attribute-def:def:sshPublicKey';
+our $A_U_F_UID;  *A_U_F_UID = \'urn:perun:user_facility:attribute-def:virt:UID';
+
+# CHECK ON FACILITY ATTRIBUTES
+my $ldapBaseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+if (!defined($ldapBaseDN)) {
+        exit 1;
+}
+
+# PREPARE DATA
+my $users;  # $users->{$login}->{ATTR} = $attrValue;
+my $groups; # $groups->{$name}->{ATTR} = $attrValue;
+my $userByGroup = {};  # $userByGroup->{$groupName}->{$login} = 1;
+my $groupByUser = {};  # $groupByUser->{$login}->{$groupName} = 1;
+
+
+foreach my $resourceId ( $data->getResourceIds() ) {
+
+	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
+
+		my $groupName = $data->getGroupResourceAttributeValue(group => $groupId, resource => $resourceId, attrName => $A_G_R_NAME);
+		my $groupDescription = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_DESCRIPTION );
+		my $unixGid = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_G_R_GID );
+
+		# GROUPS FLAT STRUCTURE
+		$groups->{$groupName}->{$A_G_DESCRIPTION} = $groupDescription;
+		$groups->{$groupName}->{$A_G_R_GID} = $unixGid;
+
+		# FOR EACH MEMBER IN GROUP
+		foreach my $memberId ($data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId)) {
+			my $login = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_U_LOGIN);
+			my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_LAST_NAME);
+			my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_FIRST_NAME);
+			my $displayName = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_DISPLAY_NAME);
+			my $mail = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_MAIL);
+			my $sshKeys = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_SSH_KEYS);
+			my $unixUid = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_U_F_UID);
+
+			# USERS FLAT STRUCTURE
+			$users->{$login}->{$A_U_MAIL} = $mail;
+			$users->{$login}->{$A_U_SSH_KEYS} = $sshKeys;
+			$users->{$login}->{$A_U_F_UID} = $unixUid;
+			$users->{$login}->{$A_U_FIRST_NAME} = $firstName;
+			# FirstName can be undefined, display_name and last_name not (so set them to string null) to avoid it
+			$users->{$login}->{$A_U_LAST_NAME} = $lastName || "null";
+			$users->{$login}->{$A_U_DISPLAY_NAME} = $displayName || "null";
+
+			# Store users in Groups structure
+			$userByGroup->{$groupName}->{$login} = 1;
+			$groupByUser->{$login}->{$groupName} = 1;
+		}
+	}
+}
+
+#
+# PRINT BASE_DN FILE
+#
+open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
+print FILE $ldapBaseDN;
+close(FILE);
+
+#
+# PRINT USERS LDIF FILE
+#
+open FILE,">:encoding(UTF-8)","$fileName_users" or die "Cannot open $fileName_users: $! \n";
+
+# FLAT structure is stored in ou=perun,ou=users + base DN
+for my $login (sort keys %$users) {
+
+	# print attributes, which are never empty
+	print FILE "dn: cn=" . $login . ",ou=perun,ou=users," . $ldapBaseDN . "\n";
+	print FILE "uid: " . $login . "\n";
+	print FILE "cn: " . $login . "\n";
+	print FILE "sn: " . $users->{$login}->{$A_U_LAST_NAME} . "\n";
+	print FILE "uidNumber: " . $users->{$login}->{$A_U_F_UID} . "\n";
+	# for now fill primary GID with UID
+	print FILE "gidNumber: " . $users->{$login}->{$A_U_F_UID} . "\n";
+	print FILE "homeDirectory: /home/" . $login . "\n";
+
+	my $givenName = $users->{$login}->{$A_U_FIRST_NAME};
+	my $mail = $users->{$login}->{$A_U_MAIL};
+	my $displayName = $users->{$login}->{$A_U_DISPLAY_NAME};
+
+	print FILE "displayName: " . $displayName . "\n";
+
+	# skip attributes which are empty and LDAP can't handle it (FIRST_NAME, EMAIL)
+	if (defined $givenName and length $givenName) {
+			print FILE "givenName: " . $givenName . "\n";
+	}
+	if (defined $mail and length $mail) {
+			print FILE "mail: " . $mail . "\n";
+			print FILE "gecos: " . $displayName . " <" . $mail . ">\n"
+	}
+	my $sshKeys = $users->{$login}->{$A_U_SSH_KEYS};
+	if (defined $sshKeys and length $sshKeys) {
+		# make sure SSH keys are unique
+		foreach my $sshKey (sort keys %{{ map { $_ => 1 } @$sshKeys }}) {
+			print FILE "sshPublicKey: " . $sshKey . "\n";
+		}
+	}
+
+	# print GROUP membership information
+	# my @groups = keys %{$groupByUser->{$login}};
+	# for my $groupName (@groups) {
+	# 	print FILE "groupMembership: cn=$groupName,ou=perun,ou=groups,$ldapBaseDN\n";
+	# }
+
+	# print classes
+	print FILE "objectclass: top\n";
+	print FILE "objectclass: person\n";
+	print FILE "objectclass: inetOrgPerson\n";
+	print FILE "objectclass: posixAccount\n";
+	print FILE "objectclass: ldapPublicKey\n";
+
+	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
+	print FILE "\n";
+
+}
+
+#
+# PRINT GROUPS LDIF FILE
+#
+open FILE,">:encoding(UTF-8)","$fileName_groups" or die "Cannot open $fileName_groups: $! \n";
+
+# PRINT ALL GROUPS
+my @groups = sort keys %{$groups};
+for my $groupName (@groups) {
+
+	my @usrs = sort keys %{$userByGroup->{$groupName}};
+
+	# skip printing group and it's users, if there are no users (as member is mandatory attribute)
+	unless (@usrs) {
+		next;
+	}
+
+	# PRINT GROUP
+	print FILE "dn: cn=" . $groupName . ",ou=perun,ou=groups," . $ldapBaseDN . "\n";
+	print FILE "cn: $groupName\n";
+	print FILE "gidNumber: " . $groups->{$groupName}->{$A_G_R_GID} . "\n";
+	print FILE "objectclass: top\n";
+	print FILE "objectclass: posixGroup\n";
+	print FILE "objectClass: groupOfNames\n";
+
+    my $groupDescription = $groups->{$groupName}->{$A_G_DESCRIPTION};
+	if (defined $groupDescription and length $groupDescription) {
+		print FILE "description: " . $groupDescription . "\n";
+	}
+
+	# PRINT ALL USERS FROM GROUP
+	for my $u (@usrs) {
+		print FILE "member: cn=" . $u . ",ou=perun,ou=users," . $ldapBaseDN . "\n";
+	}
+
+	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
+	print FILE "\n";
+
+}
+
+close(FILE);
+
+perunServicesInit::finalize;

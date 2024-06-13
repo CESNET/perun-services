@@ -1,0 +1,5 @@
+perun-slave-process-ldap-lsaai (3.0.0) stable; urgency=low
+
+  * Added new service ldap_lsaai
+
+ -- Johana Supikova <supikova@ics.muni.cz>  Tue, 07 May 2024 10:44:00 +0200
