@@ -95,6 +95,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 binmode FILE, ":utf8";
 
+my %allChipNumbers;  #used for consistency check - each chip number should belong to only one user
 my @logins = sort keys %$users;
 for my $loginId (@logins) {
 
@@ -107,8 +108,14 @@ for my $loginId (@logins) {
 	print FILE "sn: $users->{$loginId}->{$A_USER_LAST_NAME}\n" if defined $users->{$loginId}->{$A_USER_LAST_NAME};
 	print FILE "mail: $users->{$loginId}->{$A_USER_PREFERRED_MAIL}\n" if defined $users->{$loginId}->{$A_USER_PREFERRED_MAIL};
 	print FILE "displayName: $users->{$loginId}->{$A_USER_DISPLAY_NAME}\n" if defined $users->{$loginId}->{$A_USER_DISPLAY_NAME};
-	foreach my $pager (@{$users->{$loginId}->{$A_USER_CHIP_NUMBERS}}) {
-		print FILE "otherPager: $pager\n";
+	if (defined $users->{$loginId}->{$A_USER_CHIP_NUMBERS}) {
+		foreach my $chipNumber (sort @{$users->{$loginId}->{$A_USER_CHIP_NUMBERS}}) {
+			if ($allChipNumbers{$chipNumber}) {
+				die "Same chip number shared by more users. Logins of users: " . $login . ", " . $allChipNumbers{$chipNumber} . "\n";
+			}
+			$allChipNumbers{$chipNumber} = $login;
+			print FILE "otherPager: $chipNumber\n";
+		}
 	}
 	print FILE "postalAddress: $users->{$loginId}->{$A_USER_ADDRESS}\n" if defined $users->{$loginId}->{$A_USER_ADDRESS};
 	print FILE "objectClass: top\n";
