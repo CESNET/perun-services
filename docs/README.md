@@ -27,3 +27,4 @@ Table of services
 - [slack](services/slack.md)
 - [vsup_google_groups](services/vsup_google_groups.md)
 - [webcentrum_eosc](services/webcentrum_eosc.md)
+- [fs_scratchdirs](services/fs_scratchdirs.md)
