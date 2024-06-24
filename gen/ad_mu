@@ -11,7 +11,7 @@ sub processGroups;
 
 local $::SERVICE_NAME = "ad_mu";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.1";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -43,6 +43,9 @@ our $A_G_AD_DISPLAY_NAME;  *A_G_AD_DISPLAY_NAME = \'urn:perun:group:attribute-de
 
 our $A_G_R_msExchRequireAuthToSendTo;  *A_G_R_msExchRequireAuthToSendTo = \'urn:perun:group_resource:attribute-def:def:adRequireSenderAuthenticationEnabled';
 our $A_G_AD_EMAIL_ADDRESSES;  *A_G_AD_EMAIL_ADDRESSES = \'urn:perun:group:attribute-def:def:o365EmailAddresses:o365mu';
+our $A_G_AD_IS_CENTRALLY_MANAGED;  *A_G_AD_IS_CENTRALLY_MANAGED = \'urn:perun:group:attribute-def:def:isCentrallyManaged';
+our $A_G_AD_IS_SYNCED;  *A_G_AD_IS_SYNCED = \'urn:perun:group:attribute-def:def:synchronizationEnabled';
+our $A_G_AD_GROUP_URL;  *A_G_AD_GROUP_URL = \'urn:perun:group:attribute-def:virt:groupDetailUrl';
 
 # User/member attributes
 our $A_FIRST_NAME;  *A_FIRST_NAME = \'urn:perun:user:attribute-def:core:firstName';
@@ -211,6 +214,19 @@ sub processGroups {
 			$groups->{$ouName}->{$key}->{$A_G_AD_DISPLAY_NAME} = $finalDisplayName;
 			$groups->{$ouName}->{$key}->{$A_G_R_msExchRequireAuthToSendTo} = $data->getGroupResourceAttributeValue( group => $groupId, resource => $resourceId, attrName => $A_G_R_msExchRequireAuthToSendTo );
 			$groups->{$ouName}->{$key}->{$A_G_AD_EMAIL_ADDRESSES} = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_AD_EMAIL_ADDRESSES );
+			my $isCentrallyManaged = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_AD_IS_CENTRALLY_MANAGED ) || 0;
+			if ($isCentrallyManaged eq 1) {
+				$groups->{$ouName}->{$key}->{$A_G_AD_IS_CENTRALLY_MANAGED} = "TRUE";
+			} else {
+				$groups->{$ouName}->{$key}->{$A_G_AD_IS_CENTRALLY_MANAGED} = "FALSE";
+			}
+			my $isGroupSynced = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_AD_IS_SYNCED ) || "FALSE";
+			if ($isGroupSynced eq "true") {
+				$groups->{$ouName}->{$key}->{$A_G_AD_IS_SYNCED} = "TRUE";
+			} else {
+				$groups->{$ouName}->{$key}->{$A_G_AD_IS_SYNCED} = "FALSE";
+			}
+			$groups->{$ouName}->{$key}->{$A_G_AD_GROUP_URL} = $data->getGroupAttributeValue( group => $groupId, attrName => $A_G_AD_GROUP_URL );
 			# resolve groups members
 			for my $memberId ( $data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
 				my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_LOGIN );
@@ -318,6 +334,9 @@ for my $ouKey (@groupOus) {
 			print FILE "displayName: " . $groups->{$ouKey}->{$key}->{$A_G_AD_DISPLAY_NAME} . "\n";
 			print FILE "MailNickName: " . $groups->{$ouKey}->{$key}->{$A_G_AD_NAME} . "\n";
 			print FILE "extensionAttribute1: TRUE\n";  # group exists (set to false by send script instead of deletion, hence we must set it, if group is recreated with same name).
+			print FILE "extensionAttribute3: " . $groups->{$ouKey}->{$key}->{$A_G_AD_IS_CENTRALLY_MANAGED} . "\n" if defined $groups->{$ouKey}->{$key}->{$A_G_AD_IS_CENTRALLY_MANAGED};
+			print FILE "extensionAttribute4: " . $groups->{$ouKey}->{$key}->{$A_G_AD_IS_SYNCED} . "\n" if defined $groups->{$ouKey}->{$key}->{$A_G_AD_IS_SYNCED};
+			print FILE "extensionAttribute5: " . $groups->{$ouKey}->{$key}->{$A_G_AD_GROUP_URL} . "\n" if defined $groups->{$ouKey}->{$key}->{$A_G_AD_GROUP_URL};
 			my $msExchVal = $groups->{$ouKey}->{$key}->{$A_G_R_msExchRequireAuthToSendTo};
 			print FILE "msExchRequireAuthToSendTo: " . ((defined $msExchVal and $msExchVal == 1) ? 'TRUE' : 'FALSE') . "\n";
 

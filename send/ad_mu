@@ -136,6 +136,17 @@ my $extension_attr_one = 'extensionAttribute1';
 # When such group is recreated in Perun, this attribute is set to undef in the update process.
 my $extension_attr_two = 'extensionAttribute2';
 
+# This attribute can be 'TRUE' or 'FALSE'. The first one means that a group is centrally managed (i.e. group in Perun
+# contains 'urn:perun:group:attribute-def:def:isCentrallyManaged' attribute and its value is 'true'). 'FALSE' is set otherwise.
+my $extension_attr_three = 'extensionAttribute3';
+
+# This attribute can be 'TRUE' or 'FALSE'. The first one means that a group is a synchronized group (i.e. group in Perun
+# contains 'urn:perun:group:attribute-def:def:synchronizationEnabled' attribute and its value is 'true'). 'FALSE' is set otherwise.
+my $extension_attr_four = 'extensionAttribute4';
+
+# This attribute contains URL of the group's details in Perun GUI.
+my $extension_attr_five = 'extensionAttribute5';
+
 # log counters
 my $counter_add = 0;
 my $counter_updated = 0;
@@ -409,7 +420,7 @@ sub process_groups() {
 
 	my @perun_entries_groups = load_perun($service_files_dir."/".$service_name."_groups_".$ouName.".ldif");
 	my @ad_entries_groups = load_ad($ldap, "OU=".$ouName.",".$base_dn_groups, $filter_groups,
-		[ 'cn', 'samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates' , 'ProxyAddresses', 'mail', $extension_attr_one, $extension_attr_two]);
+		[ 'cn', 'samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates' , 'ProxyAddresses', 'mail', $extension_attr_one, $extension_attr_two, $extension_attr_three, $extension_attr_four, $extension_attr_five]);
 
 	my %ad_entries_group_map = ();
 	my %perun_entries_group_map = ();
@@ -429,7 +440,7 @@ sub process_groups() {
 		my $cn = $perun_entry->get_value('cn');
 		unless (exists $ad_entries_group_map{$cn}) {
 
-			my @attrs_to_add = ('cn', 'samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', $extension_attr_one, 'objectClass');
+			my @attrs_to_add = ('cn', 'samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', $extension_attr_one, $extension_attr_three, $extension_attr_four, $extension_attr_five, 'objectClass');
 			my $new_ad_entry = clone_entry_with_specific_attributes($perun_entry, \@attrs_to_add);
 			# Add new entry to AD
 			my $response = $new_ad_entry->update($ldap);
@@ -462,7 +473,7 @@ sub process_groups() {
 			my $perun_entry = $perun_entries_group_map{$cn};
 
 			# attrs without cn!
-			my @attrs = ('samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates', 'ProxyAddresses', 'mail', $extension_attr_one, $extension_attr_two);
+			my @attrs = ('samAccountName', 'displayName', 'MailNickName', 'msExchRequireAuthToSendTo', 'publicDelegates', 'ProxyAddresses', 'mail', $extension_attr_one, $extension_attr_two, $extension_attr_three, $extension_attr_four, $extension_attr_five);
 			# stored log messages to check if entry should be updated
 			my @entry_changed = ();
 
