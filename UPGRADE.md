@@ -1,5 +1,30 @@
 Upgrade notes
 
+## [14.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v13.2.0...v14.0.0) (2024-06-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* **ad_safeq6_mu:** groups in ad_safeq6_mu have different name format
+* Release packages for affiliations_mapping(_mu), k5login_root, yubikey_root, sshkeys_root, puppet_dashboard, oidc_with_groups_einfra.
+
+### Features
+
+* **fs_scratchdirs:** new service fs_scratchdirs ([1ca25da](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/1ca25da672b44ceb32355d4e597a38e1420a865b))
+* **ldap_lsaai:** ldap script for provisioning LSAAI users ([5e8d888](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/5e8d888a378aa9a17a9e736e637b59f03251fd45))
+
+
+### Bug Fixes
+
+* **ad_safeq6_mu:** use shorter group CN (names) ([967fe53](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/967fe5330f4e87d937dbf6d65f77add6cb855424))
+* double quote DST_FILE in some slave scripts ([212aee3](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/212aee3994344c557d4334e955c64100a53f0aba))
+* **safeq:** new storage server ([1e65848](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/1e658483cb0cd7412bb347e7ff24bb61b78ff282))
+
+
+### Reverts
+
+* revert remove obsolete hack for L- and Guest- accounts ([52e0dc0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/52e0dc0a90222f3731b2bcfdf13107888a2c8da6))
+
 ## [13.2.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v13.1.0...v13.2.0) (2024-06-05)
 
 
