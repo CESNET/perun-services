@@ -1,0 +1,113 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use Cwd 'realpath';
+
+our $SERVICE_NAME = "fs_scratchdirs";
+our $PROTOCOL_VERSION = "3.0.0";
+our $SCRIPT_VERSION = "3.0.0";
+
+sub mergeStatuses {
+    my ($finalStatus, $memberStatus) = @_;
+    unless(defined $finalStatus) { return $memberStatus; }
+
+    # SUSPENDED state has priority, then it is enough to have at least one member status == VALID
+    if ($memberStatus eq "SUSPENDED" || $finalStatus eq "SUSPENDED") {
+        return "SUSPENDED";
+    } elsif ($memberStatus eq "VALID" || $finalStatus eq "VALID") {
+        return "VALID";
+    } elsif ($memberStatus eq "EXPIRED" || $finalStatus eq "EXPIRED") {
+        return "EXPIRED";
+    }
+}
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $data = perunServicesInit::getHashedHierarchicalData;
+
+#Constants
+our $A_UF_LOGIN;                  *A_UF_LOGIN =                  \'urn:perun:user_facility:attribute-def:virt:login';
+our $A_UF_GID;                    *A_UF_GID =                    \'urn:perun:user_facility:attribute-def:virt:defaultUnixGID';
+our $A_UF_UID;                    *A_UF_UID =                    \'urn:perun:user_facility:attribute-def:virt:UID';
+our $A_MEMBER_STATUS;             *A_MEMBER_STATUS =             \'urn:perun:member:attribute-def:core:status';
+our $A_MEMBER_IS_SUSPENDED;       *A_MEMBER_IS_SUSPENDED =       \'urn:perun:member:attribute-def:virt:isSuspended';
+our $A_F_SCRATCH_DIRS;            *A_F_SCRATCH_DIRS =            \'urn:perun:facility:attribute-def:def:fsScratchDirs';
+our $A_R_SCRATCH_DIRS;            *A_R_SCRATCH_DIRS =            \'urn:perun:resource:attribute-def:def:fsScratchDirs';
+
+
+my $memberAttributesByLogin = {};
+# structure to check for resource scratch duplicates
+my %seenScratchDirs;
+
+
+my $PERM = 'PERMISSIONS';
+my %facilityScratchDirs = %{$data->getFacilityAttributeValue( attrName => $A_F_SCRATCH_DIRS )};
+
+foreach my $resourceId ( $data->getResourceIds() ) {
+    my $resScratchAttr = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_R_SCRATCH_DIRS );
+    # Resource attribute might be null
+    my %resourceScratchDirs;
+    if (defined $resScratchAttr) {
+        %resourceScratchDirs = %{$resScratchAttr};
+    }
+    # check for duplicate scratch dirs on resource just to be sure
+    foreach my $resScratchDir (keys %resourceScratchDirs) {
+        my $normalized_scratch = realpath($resScratchDir);
+        if (exists $seenScratchDirs{$normalized_scratch}) {
+            die "Duplicate scratch directory '$resScratchDir' detected on resources '$resourceId' and '$seenScratchDirs{$normalized_scratch}'"
+        }
+        $seenScratchDirs{$normalized_scratch} = $resourceId;
+    }
+    foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
+        my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
+        my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
+        my $memberIsSuspended = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_IS_SUSPENDED );
+        if($memberIsSuspended) { $status = "SUSPENDED"; }
+        foreach my $resScratchDir (keys %resourceScratchDirs) {
+            unless (defined($memberAttributesByLogin->{$login}->{$resScratchDir})) {
+                my $gid = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_GID );
+                my $uid = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_UID );
+                $memberAttributesByLogin->{$login}->{$resScratchDir}->{$A_UF_GID} = $gid;
+                $memberAttributesByLogin->{$login}->{$resScratchDir}->{$A_UF_UID} = $uid;
+                $memberAttributesByLogin->{$login}->{$resScratchDir}->{$A_MEMBER_STATUS} = $status;
+
+            } else {
+                $memberAttributesByLogin->{$login}->{$resScratchDir}->{$A_MEMBER_STATUS} = mergeStatuses $memberAttributesByLogin->{$login}->{$resScratchDir}->{$A_MEMBER_STATUS}, $status;
+
+            }
+            # Override permission in every case (can already exist only from facility attr)
+            $memberAttributesByLogin->{$login}->{$resScratchDir}->{$PERM} = $resourceScratchDirs{$resScratchDir};
+        }
+        foreach my $facScratchDir (keys %facilityScratchDirs) {
+            unless(defined($memberAttributesByLogin->{$login}->{$facScratchDir})) {
+                my $gid = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_GID );
+                my $uid = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_UID );
+                $memberAttributesByLogin->{$login}->{$facScratchDir}->{$A_UF_GID} = $gid;
+                $memberAttributesByLogin->{$login}->{$facScratchDir}->{$A_UF_UID} = $uid;
+                $memberAttributesByLogin->{$login}->{$facScratchDir}->{$A_MEMBER_STATUS} = $status;
+                $memberAttributesByLogin->{$login}->{$facScratchDir}->{$PERM} = $facilityScratchDirs{$facScratchDir}
+
+            } else {
+                $memberAttributesByLogin->{$login}->{$facScratchDir}->{$A_MEMBER_STATUS} = mergeStatuses $memberAttributesByLogin->{$login}->{$facScratchDir}->{$A_MEMBER_STATUS}, $status;
+            }
+        }
+    }
+}
+my $service_file_name = "$DIRECTORY/$::SERVICE_NAME";
+
+open SERVICE_FILE,">$service_file_name" or die "Cannot open $service_file_name: $! \n";
+for my $login (sort keys %$memberAttributesByLogin) {
+    for my $scratchDir (sort keys %{$memberAttributesByLogin->{$login}}) {
+        print SERVICE_FILE $scratchDir . "\t";
+        print SERVICE_FILE $login . "\t";
+        print SERVICE_FILE $memberAttributesByLogin->{$login}->{$scratchDir}->{$A_UF_UID} . "\t";
+        print SERVICE_FILE $memberAttributesByLogin->{$login}->{$scratchDir}->{$A_UF_GID} . "\t";
+        print SERVICE_FILE $memberAttributesByLogin->{$login}->{$scratchDir}->{$A_MEMBER_STATUS} . "\t";
+        print SERVICE_FILE $memberAttributesByLogin->{$login}->{$scratchDir}->{$PERM} . "\n";
+    }
+}
+close(SERVICE_FILE);
+perunServicesInit::finalize;

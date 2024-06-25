@@ -75,10 +75,18 @@ foreach my $resourceId ($data->getResourceIds()) {
 		$users->{$id}->{$A_USER_CHIP_NUMBERS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_CHIP_NUMBERS);
 		$users->{$id}->{$A_USER_ADDRESS} = $data->getUserAttributeValue(member => $memberId, attrName => $A_USER_ADDRESS);
 	}
-	
+
+	my %seen;
 	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
 		$groups->{$groupId}->{"resourceId"} = $resourceId;
-		$groups->{$groupId}->{"name"} = $data->getGroupAttributeValue(group=>$groupId, attrName=>$G_NAME);
+		my $groupName = substr((split /:/, $data->getGroupAttributeValue(group=>$groupId, attrName=>$G_NAME))[-1], 0, 64);
+		if (exists $seen{$groupName}) {
+			print("Duplicate group name after trimming found: $groupName\n");
+			exit 1;
+		} else {
+			$seen{$groupName} = 1;
+		}
+		$groups->{$groupId}->{"name"} = $groupName;
 		my @membersIds = sort $data->getMemberIdsForResourceAndGroup(resource=> $resourceId, group=> $groupId);
 		my @userIds;
 		foreach my $memberId (@membersIds) {

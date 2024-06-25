@@ -1,3 +1,9 @@
+perun-slave-process-sshkeys-root (3.1.8) stable; urgency=low
+
+  * Double quote DST_FILE to prevent globbing and word splitting.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Fri, 07 Jun 2024 08:20:00 +0200
+
 perun-slave-process-sshkeys-root (3.1.7) stable; urgency=low
 
   * Fixed package priority from 'extra' to 'optional'.
