@@ -78,6 +78,7 @@ binmode FILE, ":utf8";
 print FILE '"FULLNAME";"USERNAME_ALIASES";"EMAIL";"CARDS";"GROUPS";"CODE";"SCANSTORAGE";"PIN";"MANAGED_GROUPS";"AUTHSERVER";"PHONE";"LANG";"PWD";"EXTID";"DELEGATES"' . "\n";
 
 # FOR EACH USER ON FACILITY
+my %allChipNumbers;  #used for consistency check - each chip number should belong to only one user
 my @logins = sort keys %{$users};
 for my $login (@logins) {
 
@@ -90,6 +91,12 @@ for my $login (@logins) {
     print FILE '"' . $mail . '";';
     # CARDS
     my @cards = grep {!($_ =~ s/^\s+|\s+$//g)} map {checkBase64($_)} @{$users->{$login}->{$A_CHIPNUMBERS}};
+	foreach my $chipNumber (sort @cards) {
+		if ($allChipNumbers{$chipNumber}) {
+			die "Same chip number shared by more users. Logins of users: " . $login . ", " . $allChipNumbers{$chipNumber} . "\n";
+		}
+		$allChipNumbers{$chipNumber} = $login;
+	}
     @cards = map {reverseCardBits($_)} @cards;
 	my $cards_str = join ",",@cards;
     print FILE '"' . $cards_str . '";';

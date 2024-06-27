@@ -95,6 +95,7 @@ foreach my $resourceId ( $data->getResourceIds() ){
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
 binmode FILE, ":utf8";
 
+my %allChipNumbers;  #used for consistency check - each chip number should belong to only one user
 # FOR EACH USER ON FACILITY
 my @logins = sort keys %{$users};
 for my $login (@logins) {
@@ -137,9 +138,15 @@ for my $login (@logins) {
 	if (defined $mail and length $mail) {
 		print FILE "mail: " . $mail . "\n";
 	}
-	foreach (@{$users->{$login}->{$A_CHIPNUMBERS}}){
-		next if ($_ eq "");
-		print FILE "houseIdentifier: " . $_ . "\n";
+	if (defined $users->{$login}->{$A_CHIPNUMBERS}) {
+		foreach my $chipNumber (sort @{$users->{$login}->{$A_CHIPNUMBERS}}) {
+			next if ($chipNumber eq "");
+			if ($allChipNumbers{$chipNumber}) {
+				die "Same chip number shared by more users. Logins of users: " . $login . ", " . $allChipNumbers{$chipNumber} . "\n";
+			}
+			$allChipNumbers{$chipNumber} = $login;
+			print FILE "houseIdentifier: " . $chipNumber . "\n";
+		}
 	}
 
 	# print classes
