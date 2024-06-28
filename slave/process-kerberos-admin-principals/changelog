@@ -1,3 +1,9 @@
+perun-slave-process-kerberos-admin-principals (3.0.2) stable; urgency=medium
+
+  * added delete differences from kerberos database
+
+ -- Jakub Havrila <havrila@cesnet.cz>  Fri, 28 Jun 2024 11:40:00 +0100
+
 perun-slave-process-kerberos-admin-principals (3.0.1) stable; urgency=medium
 
   * fixed bash reference in main script
