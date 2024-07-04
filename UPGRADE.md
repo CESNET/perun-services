@@ -1,5 +1,28 @@
 Upgrade notes
 
+## [14.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.0.0...v14.1.0) (2024-07-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* **bbmri_negotiator:** Add following attributes as required by the service
+- `urn:perun:group:attribute-def:def:serviceID`
+- `urn:perun:group:attribute-def:def:admServiceID`
+- `urn:perun:group:attribute-def:def:serviceProviderID`
+- `urn:perun:group:attribute-def:def:admServiceProviderID`
+
+### Features
+
+* **ad_group_vsup_o365:** optionally allow expired members in o365 ([3f9828c](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/3f9828c9ba50ac5e1cda2985d558c9e0ab14e08c))
+* **ad_mu:** added extension attributes ([561be47](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/561be47b23cd42cf229e3ac1c9d65cc5f053fa96))
+* **bbmri_negotiator:** 🎸 Extend with service and service_provider mappings ([efa1911](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/efa1911fb91468647aedd9611c8cd1014f61cf9b))
+* **kerberos_admin_principals:** delete missing principals from KDC ([9ba46a7](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/9ba46a7a2d8ce5c985b5435ce042ab3c76ee2502))
+
+
+### Bug Fixes
+
+* check for duplicated chip numbers in relevant services ([4fe1eb1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/4fe1eb1382a81bf038654ec2fddf0fe46cb509f3))
+
 ## [14.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v13.2.0...v14.0.0) (2024-06-25)
 
 
