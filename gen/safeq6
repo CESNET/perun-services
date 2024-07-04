@@ -106,7 +106,7 @@ foreach my $login (sort keys %$usersByLogin) {
 	if (defined $attributes->{$A_USER_CHIP_NUM}) {
 		foreach my $chipNumber (sort @{$attributes->{$A_USER_CHIP_NUM}}) {
 			if ($allChipNumbers{$chipNumber}) {
-				warn "Same chip number shared by more users. Logins of users: " . $login . ", " . $allChipNumbers{$chipNumber} . "\n";
+				die "Same chip number shared by more users. Logins of users: " . $login . ", " . $allChipNumbers{$chipNumber} . "\n";
 			}
 			$allChipNumbers{$chipNumber} = $login;
 			print FILE "card:", checkBase64($chipNumber), "\n";

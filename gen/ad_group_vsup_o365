@@ -10,7 +10,7 @@ sub isActive;
 
 local $::SERVICE_NAME = "ad_group_vsup_o365";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.1";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -26,6 +26,7 @@ our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:adBaseD
 our $A_F_SERV_BASE_DN;  *A_F_SERV_BASE_DN = \'urn:perun:facility:attribute-def:def:adServiceBaseDN';
 our $A_F_GROUP_BASE_DN;  *A_F_GROUP_BASE_DN = \'urn:perun:facility:attribute-def:def:adGroupBaseDN';
 our $A_R_GROUP_NAME;  *A_R_GROUP_NAME = \'urn:perun:resource:attribute-def:def:adGroupName';
+our $A_R_ALLOW_INACTIVE; *A_R_ALLOW_INACTIVE = \'urn:perun:resource:attribute-def:def:allowInactiveMembers';
 our $A_EXPIRATION_KOS;  *A_EXPIRATION_KOS = \'urn:perun:user:attribute-def:def:expirationKos';
 our $A_EXPIRATION_DC2;  *A_EXPIRATION_DC2 = \'urn:perun:user:attribute-def:def:expirationDc2';
 our $A_EXPIRATION_MANUAL; *A_EXPIRATION_MANUAL = \'urn:perun:user:attribute-def:def:expirationManual';
@@ -58,6 +59,8 @@ my $usersByResource = {};
 # FOR EACH RESOURCE
 foreach my $resourceId ($data->getResourceIds()) {
 
+	my $allowInactive = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_ALLOW_INACTIVE ) || 0;
+
 	my $group = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_R_GROUP_NAME );
 	$groups->{$group} = 1;
 
@@ -78,7 +81,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 		my $isActive = isActive($expirationKOS, $expirationDC2, $expirationManual);
 
 		# skip "vsup expired" members
-		next unless ($isActive);
+		next unless ($isActive or $allowInactive);
 
 		my $serviceUser = $data->getUserAttributeValue( member => $memberId, attrName => $A_IS_SERVICE );
 
