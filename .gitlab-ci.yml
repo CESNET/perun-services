@@ -45,3 +45,13 @@ shellcheck:
     - |
       find . -name .git -type d -prune -o -type f -regex '.*/[^.]*$' -print0 |
       xargs -0 -P $(nproc) -r -n1 sh -c 'FILE="$0"; if head -n1 "$FILE" |grep -q "^#\\! \?/.\+\(ba|d|k\)\?sh" ; then shellcheck -S error "$FILE" ; else /bin/true ; fi '
+
+check_deprecated_modules:
+  when: manual
+  image: python:3.11-slim
+  script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -r .gitlab/ci/requirements.txt
+    - python .gitlab/ci/check_deprecated_modules.py
+  allow_failure: true
