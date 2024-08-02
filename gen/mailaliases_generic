@@ -42,7 +42,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 foreach my $login (sort keys %mailByLogin) {
 	print FILE $login . ": ";
-	print FILE join ',', keys %{$mailByLogin{$login}};
+	print FILE join ',', sort keys %{$mailByLogin{$login}};
 	print FILE "\n";
 }
 
