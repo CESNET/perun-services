@@ -1,5 +1,17 @@
 Upgrade notes
 
+## [14.2.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.1.0...v14.2.0) (2024-08-02)
+
+
+### Features
+
+* added optional job which checks deprecated modules for python ([c552197](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/c5521978aeb8114d8fb52e93f3476d9695f5fe94))
+
+
+### Bug Fixes
+
+* **mailaliases_generic:** sort mail aliases for each user ([c49727d](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/c49727d97c3ad5b915a8fcb11c9d0f489c060486))
+
 ## [14.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.0.0...v14.1.0) (2024-07-04)
 
 
