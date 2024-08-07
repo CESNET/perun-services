@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [14.2.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.2.0...v14.2.1) (2024-08-07)
+
+
+### Bug Fixes
+
+* **generic_json:** correctly append data when one user in multiple vos ([c292772](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/c2927728f37dce58e05ec6436be60a938e146317))
+
 ## [14.2.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.1.0...v14.2.0) (2024-08-02)
 
 
