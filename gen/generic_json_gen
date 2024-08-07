@@ -370,8 +370,6 @@ if (exists($requiredAttributes->{"user"}->{$A_U_UUID})) {
 		my $userId = $data->getUserIdForMember(member => $memberId);
 		my $userUUID = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_UUID);
 
-		next if (exists($output->{users}->{$userUUID}));
-
 		# Lookup update
 		$lookup->{uuids}->{$userUUID} = $userId;
 		$lookup->{ids}->{user}->{$userId} = $userUUID;
@@ -387,14 +385,16 @@ if (exists($requiredAttributes->{"user"}->{$A_U_UUID})) {
 			$other_attributes{$attr} = $user_facility_attributes->{$attr};
 		}
 
-		my $userobj = {
-			"attributes" => \%other_attributes || {},
-		};
+		unless (exists($output->{users}->{$userUUID})) {
+			$output->{users}->{$userUUID} = {
+				"attributes" => \%other_attributes || {},
+			};
+		}
 
 		if (exists($requiredAttributes->{"vo"}->{$A_V_UUID})) {
 			my $voId = $data->getVoIdForMember(member => $memberId);
 			my $voUUID = $lookup->{ids}->{vo}->{$voId};
-			$userobj->{"allowed_vos"}->{$voUUID} = {
+			$output->{users}->{$userUUID}->{"allowed_vos"}->{$voUUID} = {
 				"attributes" => $data->getAllMemberAttributes(member => $memberId, vo => $voId) || {},
 			};
 		}
@@ -406,11 +406,10 @@ if (exists($requiredAttributes->{"user"}->{$A_U_UUID})) {
 				my $groupUUID = $lookup->{ids}->{group}->{$groupId};
 				# Fill Group attributes
 				my $attrs = $data->getAllMemberGroupAttributes(member => $memberId, group => $groupId);
-				$group_attributes{$groupUUID} = {
+				$output->{users}->{$userUUID}->{"allowed_groups"}->{$groupUUID} = {
 					"attributes" => $attrs || {}
 				};
 			}
-			$userobj->{"allowed_groups"} = \%group_attributes;
 		}
 
 		if (exists($requiredAttributes->{"resource"}->{$A_R_UUID})) {
@@ -419,13 +418,11 @@ if (exists($requiredAttributes->{"user"}->{$A_U_UUID})) {
 				my $resourceUUID = $lookup->{ids}->{resource}->{$resourceId};
 				# Fill Resource attributes
 				my $r_attrs = $data->getAllMemberResourceAttributes(member => $memberId, resource => $resourceId);
-				$resource_attributes{$resourceUUID} = {
+				$output->{users}->{$userUUID}->{"allowed_resources"}->{$resourceUUID} = {
 					"attributes" => $r_attrs || {}
 				};
 			}
-			$userobj->{"allowed_resources"} = \%resource_attributes;
 		}
-		$output->{users}->{$userUUID} = $userobj;
 	}
 }
 
