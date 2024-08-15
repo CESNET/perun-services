@@ -4,8 +4,8 @@ use warnings;
 use perunServicesInit;
 
 local $::SERVICE_NAME = "vsup_web_apps";
-local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+local $::PROTOCOL_VERSION = "3.1.0";
+my $SCRIPT_VERSION = "3.1.0";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -57,18 +57,9 @@ foreach my $memberId ($data->getMemberIdsForFacility) {
 	my $phone = $data->getUserAttributeValue(member => $memberId , attrName => $A_PHONE);
 	my $phonePriv = $data->getUserAttributeValue(member => $memberId , attrName => $A_PHONE_PRIV);
 	my $mobile = $data->getUserAttributeValue(member => $memberId , attrName => $A_MOBILE);
-	my $foto = $data->getUserAttributeValue(member => $memberId , attrName => $A_FOTO);
-
 	my $bankAccountDC2 = $data->getUserAttributeValue(member => $memberId, attrName => $A_BANK_ACCOUNT_DC2);
 	my $bankAccountKOS = $data->getUserAttributeValue(member => $memberId, attrName => $A_BANK_ACCOUNT_KOS);
-
-	if (defined $bankAccountDC2) {
-		$users->{$uco}->{'BANK_ACCOUNT'} = $bankAccountDC2;
-	} elsif (defined $bankAccountKOS) {
-		$users->{$uco}->{'BANK_ACCOUNT'} = $bankAccountKOS;
-	} else {
-		$users->{$uco}->{'BANK_ACCOUNT'} = '';
-	}
+	my $foto = $data->getUserAttributeValue(member => $memberId , attrName => $A_FOTO);
 
 	$users->{$uco}->{$A_LOGIN} = $login;
 	$users->{$uco}->{$A_VSUP_MAIL} = $vsupPrefMail || ($vsupMail || $vsupBackupMail);
@@ -80,13 +71,8 @@ foreach my $memberId ($data->getMemberIdsForFacility) {
 	$users->{$uco}->{$A_PHONE} = $phone || '';
 	$users->{$uco}->{$A_PHONE_PRIV} = $phonePriv || '';
 	$users->{$uco}->{$A_MOBILE} = $mobile || '';
-	if (defined $bankAccountDC2) {
-		$users->{$uco}->{'BANK_ACCOUNT'} = $bankAccountDC2;
-	} elsif (defined $bankAccountKOS) {
-		$users->{$uco}->{'BANK_ACCOUNT'} = $bankAccountKOS;
-	} else {
-		$users->{$uco}->{'BANK_ACCOUNT'} = '';
-	}
+	$users->{$uco}->{'BANK_ACCOUNT'} = $bankAccountDC2 || '';
+	$users->{$uco}->{'BANK_ACCOUNT_SIS'} = $bankAccountKOS || '';
 	$users->{$uco}->{$A_FOTO} = $foto || '';
 
 }
@@ -102,7 +88,7 @@ for my $uco (@keys) {
 	print FILE $uco . "\t" . $users->{$uco}->{$A_LOGIN} . "\t" . $users->{$uco}->{$A_VSUP_MAIL} . "\t" . $users->{$uco}->{$A_FIRST_NAME}
 		. "\t" . $users->{$uco}->{$A_LAST_NAME} . "\t" . $users->{$uco}->{$A_TITLE_BEFORE} . "\t" . $users->{$uco}->{$A_TITLE_AFTER}
 		. "\t" . $users->{$uco}->{$A_EMAIL_PRIV} . "\t" . $users->{$uco}->{$A_PHONE}. "\t" . $users->{$uco}->{$A_PHONE_PRIV}. "\t" . $users->{$uco}->{$A_MOBILE}
-		. "\t" . $users->{$uco}->{'BANK_ACCOUNT'} . "\t" . $users->{$uco}->{$A_FOTO} ."\n";
+		. "\t" . $users->{$uco}->{'BANK_ACCOUNT'} . "\t" . $users->{$uco}->{'BANK_ACCOUNT_SIS'} . "\t" . $users->{$uco}->{$A_FOTO} ."\n";
 }
 
 close(FILE);
