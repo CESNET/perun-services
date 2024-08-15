@@ -1,5 +1,18 @@
 Upgrade notes
 
+## [14.3.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.2.1...v14.3.0) (2024-08-15)
+
+
+### Features
+
+* **vsup_web_apps:** include bank accounts from SIS in export ([65ec8ba](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/65ec8ba47cc2d13086afe4c95b5ebeb5dd3eeb6e))
+
+
+### Bug Fixes
+
+* do not use switch feature of perl in perunServicesUtils.pm ([11d05d0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/11d05d0a0ece444d2cdf279b9b6ae08e0373217b))
+* **generic_json:** correctly append data when one user in multiple vos ([1561eb7](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/1561eb7f6ed55b5fae063e0b40cfcfcab8faa5ac))
+
 ## [14.2.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.2.0...v14.2.1) (2024-08-07)
 
 
