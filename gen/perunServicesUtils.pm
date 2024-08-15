@@ -7,10 +7,6 @@ use Exporter;
 use strict;
 use warnings;
 use Getopt::Long qw(:config no_ignore_case);
-use feature qw(switch);
-no if $] >= 5.018, warnings => "experimental"; #supress warnings on experimetal features like "switch"
-
-#use Perun::Agent;
 
 # Return sorting function which can be used as parameter for sort
 # This function can sort hashREF.
@@ -92,15 +88,23 @@ sub quotaToKb($) {
 
 	unless(defined $quota) { die "quota not specified"; }
 	$units = lc(substr($units, 0, 1));
-	given($units) {
-		when("")  { $quota *= 1024**2 } #giga is default
-		when("k") { }
-		when("m") { $quota *= 1024 }
-		when("g") { $quota *= 1024**2 }
-		when("t") { $quota *= 1024**3 }
-		when("p") { $quota *= 1024**4 }
-		when("e") { $quota *= 1024**5 }
-		default { die "Unknown units in quota. Units= $units"; }
+
+	if ($units eq "") {
+		$quota *= 1024**2 #giga is default
+	} elsif ($units eq "k") {
+		# already correct
+	} elsif ($units eq "m") {
+		$quota *= 1024
+	} elsif ($units eq "g") {
+		$quota *= 1024**2
+	} elsif ($units eq "t") {
+		$quota *= 1024**3
+	} elsif ($units eq "p") {
+		$quota *= 1024**4
+	} elsif ($units eq "e") {
+		$quota *= 1024**5
+	} else {
+		die "Unknown units in quota. Units= $units";
 	}
 
 	$quota =~ s/[.].*$//;
