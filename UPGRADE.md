@@ -1,5 +1,24 @@
 Upgrade notes
 
+## [14.4.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.3.0...v14.4.0) (2024-08-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **umbraco_mu:** added
+urn:perun:member:attribute-def:core:status
+to required attributes of umbraco_mu
+
+### Features
+
+* modified and removed several services ([c72fe59](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/c72fe593cdede1d40246cbcd8782b5ad1d0f7104))
+
+
+### Bug Fixes
+
+* **perun-slave-full:** update list of dependant packages ([2e65e1b](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/2e65e1b53ebd59133af63ea73d117d3e30184d70))
+* **umbraco_mu:** skip expired vo members ([3bdf7a7](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/3bdf7a7854fa13d6d4066aebfe0e9c16681e008f))
+
 ## [14.3.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.2.1...v14.3.0) (2024-08-15)
 
 
