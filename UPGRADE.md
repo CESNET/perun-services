@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [14.5.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.4.0...v14.5.0) (2024-09-20)
+
+
+### Features
+
+* **drupal_elixir:** users-duplicities.txt users-invalid-names.txt to home directory ([9d5c39a](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/9d5c39a5302b4d7d201c1201653d79e9fd4c56a4))
+
 ## [14.4.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.3.0...v14.4.0) (2024-08-28)
 
 
