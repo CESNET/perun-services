@@ -1,4 +1,4 @@
-#!/usr/bin/perl                                                                                                                     
+#!/usr/bin/perl
 #
 # Generates members of a mailing list
 #
@@ -7,7 +7,7 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 use Text::Unidecode;
-use POSIX qw/strftime/; 
+use POSIX qw/strftime/;
 
 local $::SERVICE_NAME = "mailman";
 local $::PROTOCOL_VERSION = "3.1.0";
@@ -27,8 +27,8 @@ our $A_RESOURCE_MAILING_LIST_MANAGER_MAIL;       *A_RESOURCE_MAILING_LIST_MANAGE
 
 
 
-my $mailinglistStruc = {};  # $mailinglistStruc->{"mailing list name"}->{"user's e-mail"}->{A_USER_*} 
-my $mailinglistAdminMailStruc = {};  # $mailinglistAdminMailStruc->{"mailing list name"}->{"admin's e-mail"} 
+my $mailinglistStruc = {};  # $mailinglistStruc->{"mailing list name"}->{"user's e-mail"}->{A_USER_*}
+my $mailinglistAdminMailStruc = {};  # $mailinglistAdminMailStruc->{"mailing list name"}->{"admin's e-mail"}
 
 
 my $mailinglistsDirectory = "$DIRECTORY/mailinglists";
