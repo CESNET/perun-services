@@ -1,5 +1,13 @@
 Upgrade notes
 
+## [15.0.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v15.0.0...v15.0.1) (2024-10-01)
+
+
+### Bug Fixes
+
+* bump package version for perun-slave-base ([a98bc88](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/a98bc882183de00cfa00db9391583331658ec2bf))
+* **drupal_elixir:** bump package version ([1ca4cc5](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/1ca4cc548e8aa1c204dfcc63593ba44b28b05c00))
+
 ## [15.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.5.0...v15.0.0) (2024-10-01)
 
 
