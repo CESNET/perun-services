@@ -23,6 +23,9 @@ class Destination:
     EMAIL_PATTERN = re.compile(
         r"([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+"
     )
+    S3_PATTERN = re.compile(
+        r"^(https?://[-a-zA-Z0-9+&@#/%?=~_|!:,.;()*$']+)/([-a-zA-Z0-9+&@#%?=~_|!:,.;()*$'']+)$"
+    )
 
     def __init__(self, destination: str, service_name: str, facility_name: str):
         self.destination = destination
@@ -195,6 +198,20 @@ class ServiceSpecificDestination(Destination):
         pass
 
 
+class S3Destination(Destination):
+    def __init__(self, destination: str, service_name: str, facility_name: str):
+        super().__init__(destination, service_name, facility_name)
+        self.check_destination_pattern = Destination.S3_PATTERN
+        self.check_destination_format()
+        self.prepare_destination()
+
+    def prepare_destination(self):
+        match = Destination.S3_PATTERN.match(self.destination)
+        self.host = self.destination
+        self.endpoint = match.group(1)
+        self.hostname = match.group(2)
+
+
 class DestinationFactory:
     DESTINATION_TYPE_URL = "url"
     DESTINATION_TYPE_EMAIL = "email"
@@ -204,6 +221,7 @@ class DestinationFactory:
     DESTINATION_TYPE_USER_HOST_WINDOWS = "user@host-windows"
     DESTINATION_TYPE_USER_HOST_WINDOWS_PROXY = "host-windows-proxy"
     DESTINATION_TYPE_SERVICE_SPECIFIC = "service-specific"
+    DESTINATION_TYPE_S3 = "s3"
 
     @staticmethod
     def create_destination(
@@ -228,6 +246,8 @@ class DestinationFactory:
             return UserHostPortDestination(destination, service_name, facility_name)
         elif destination_type == DestinationFactory.DESTINATION_TYPE_USER_HOST_WINDOWS:
             return WindowsDestination(destination, service_name, facility_name)
+        elif destination_type == DestinationFactory.DESTINATION_TYPE_S3:
+            return S3Destination(destination, service_name, facility_name)
         elif (
             destination_type
             == DestinationFactory.DESTINATION_TYPE_USER_HOST_WINDOWS_PROXY
