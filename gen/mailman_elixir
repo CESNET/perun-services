@@ -11,7 +11,7 @@ use POSIX qw/strftime/;
 
 local $::SERVICE_NAME = "mailman_elixir";
 local $::PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.2.1";
+my $SCRIPT_VERSION = "3.2.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -35,7 +35,6 @@ my $mailinglistsDirectory = "$DIRECTORY/mailinglists";
 mkdir $mailinglistsDirectory or die "Can't mkdir $mailinglistsDirectory: $!";
 
 
-my @membersAttributes;
 foreach my $resourceId ($data->getResourceIds()) {
 
 	my $listName = $data->getResourceAttributeValue(resource => $resourceId, attrName => $A_RESOURCE_MAILING_LIST_NAME);
