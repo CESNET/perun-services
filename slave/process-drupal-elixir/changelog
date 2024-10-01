@@ -1,3 +1,9 @@
+perun-slave-process-drupal-elixir (3.1.10) stable; urgency=low
+
+  * Move also duplicities and invalid users files.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Tue, 01 Oct 2024 13:20:00 +0200
+
 perun-slave-process-drupal-elixir (3.1.9) stable; urgency=low
 
   * Remove spaces around assignment
