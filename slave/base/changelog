@@ -1,12 +1,18 @@
+perun-slave-base (3.1.21) stable; urgency=low
+
+  * Support receiving multiple of generic_json_gen like services.
+
+ -- Pavel Zlamal <zlamal@cesnet.cz>  Tue, 01 Oct 2024 14:05:00 +0200
+
 perun-slave-base (3.1.20) stable; urgency=low
 
-  * Handle filenames with spaces correctly
+  * Handle filenames with spaces correctly.
 
  -- Pavel Brousek <brousek@cesnet.cz>  Fri, 29 Mar 2024 9:54:00 +0100
 
 perun-slave-base (3.1.19) stable; urgency=medium
 
-  * Support "generic_json_gen" services
+  * Support "generic_json_gen" services.
 
  -- Pavel Zlamal <zlamal@cesnet.cz>  Mon, 22 Jan 2024 14:10:00 +0100
 
