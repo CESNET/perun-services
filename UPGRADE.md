@@ -1,5 +1,17 @@
 Upgrade notes
 
+## [15.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.5.0...v15.0.0) (2024-10-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* ALL services using generic json gen in combination with slave script need to
+rename their PRESCRIPT/POSTSCRIPT to match the PERUN service name
+
+### Features
+
+* allow multiple source services for generic propagation ([494183d](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/494183d81b3bc568c34ddc4f00fe64e6d7e7e9c6))
+
 ## [14.5.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v14.4.0...v14.5.0) (2024-09-20)
 
 
