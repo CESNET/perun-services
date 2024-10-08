@@ -1,4 +1,0 @@
-#!/bin/bash
-export SERVICE_NAME="apache_ssl"
-
-python3 generic_send.py "$1" "$2" "$3"
