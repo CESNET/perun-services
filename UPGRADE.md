@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [15.0.2](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v15.0.1...v15.0.2) (2024-10-17)
+
+
+### Bug Fixes
+
+* fix imports and regex strings ([19ec634](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/19ec6341d2372716d8768c0350ce3862fea02312))
+
 ## [15.0.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v15.0.0...v15.0.1) (2024-10-01)
 
 
