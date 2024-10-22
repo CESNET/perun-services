@@ -54,13 +54,13 @@ class SysOperation:
             # this means that config file does not exist or property is not set
             return None
 
-    @staticmethod
-    def get_temporary_file() -> tempfile.NamedTemporaryFile:
-        """
-        Returns temporary file.
-        :return: temporary file
-        """
-        return tempfile.NamedTemporaryFile(mode="w+")
+    # @staticmethod
+    # def get_temporary_file() -> tempfile.NamedTemporaryFile:
+    #     """
+    #     Returns temporary file.
+    #     :return: temporary file
+    #     """
+    #     return tempfile.NamedTemporaryFile(mode="w+")
 
     @staticmethod
     def get_auth_credentials_from_service_file(service_name: str, destination: str):
