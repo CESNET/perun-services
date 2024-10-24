@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 from destination_classes import Destination, DestinationFactory, UrlDestination
 from sys_operation_classes import SysOperation
@@ -516,3 +517,4 @@ def check_destination_type_allowed(destination_type: str, allowed_destination):
             + allowed_destination
             + "'"
         )
+
