@@ -517,4 +517,3 @@ def check_destination_type_allowed(destination_type: str, allowed_destination):
             + allowed_destination
             + "'"
         )
-
