@@ -1,5 +1,24 @@
 Upgrade notes
 
+## [16.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v15.0.2...v16.0.0) (2024-10-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **apache_ssl:** Removed `apache_ssl` service.
+* **apache_ssl:** Remove `apache_ssl` service from perun instance.
+
+### Bug Fixes
+
+* add missing import ([41e50ba](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/41e50bab57f4fcdd9bb22a1ee2e5957b66670168))
+* fix imports and regex strings ([4490e4d](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/4490e4d0a630f4ce3e3bb69bd0826e03cb9b7960))
+* use context managers for opened files ([a8301f3](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/a8301f32c7dd7d53ca1263fd1c8a2e808874281e))
+
+
+### Others
+
+* **apache_ssl:** remove unused service ([ae450bb](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/ae450bb14ea2e8562071d19d7f2aa6940a44f491))
+
 ## [15.0.2](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v15.0.1...v15.0.2) (2024-10-17)
 
 
