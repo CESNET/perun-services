@@ -1,4 +1,4 @@
 #!/bin/bash
 export SERVICE_NAME="group"
 
-python3 generic_send.py "$1" "$2" "$3"
+python3 generic_sender.py "$1" "$2" "$3"

@@ -11,8 +11,9 @@ class Transport:
     TIMEOUT = 9000  # 150 * 60 sec = 2.5h
     TIMEOUT_KILL = 60  # 60 sec to kill after timeout
 
-    def __init__(self, destination: Destination):
+    def __init__(self, destination: Destination, temp: tempfile.NamedTemporaryFile):
         self.destination_class_obj = destination
+        self.temp = temp
 
     def prepare_transport(self, opts: str):
         """
@@ -239,7 +240,6 @@ class UrlTransport(Transport):
                 ]
             )
         # errors will be saved to temp file
-        self.temp = SysOperation.get_temporary_file()
 
         # add standard CURL params
         transport_command.extend(
@@ -280,17 +280,20 @@ class UrlTransport(Transport):
 
 class TransportFactory:
     @staticmethod
-    def create_transport(destination: Destination) -> Transport:
+    def create_transport(
+        destination: Destination, temp: tempfile.NamedTemporaryFile
+    ) -> Transport:
         """
         Creates transport based on destination type.
 
+        :param temp: temporary file for logs
         :param destination: destination object
         :return: transport object
         """
         if isinstance(destination, UrlDestination):
-            return UrlTransport(destination)
+            return UrlTransport(destination, temp)
         elif isinstance(destination, Destination):
-            return SshTransport(destination)
+            return SshTransport(destination, temp)
         else:
             raise ValueError(
                 f"Unsupported destination type: {type(destination).__name__}"
@@ -320,9 +323,10 @@ def send(
         destination, service_name, facility_name, destination_type
     )
 
-    transport = TransportFactory.create_transport(destination)
-    transport.prepare_transport(opts)
-    transport.send()
+    with tempfile.NamedTemporaryFile(mode="w+") as temp:
+        transport = TransportFactory.create_transport(destination, temp)
+        transport.prepare_transport(opts)
+        transport.send()
 
 
 def check_input_fields(
