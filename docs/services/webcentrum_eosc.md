@@ -8,7 +8,7 @@ members are filtered out. The generated JSON data is stored in the` _webcentrum_
 
 ### [SEND](../concepts/send.md)
 
-The script uses [generic_send.py](../modules/generic_sender.md) to archive and send data to the API (using PUT method).
+The script uses [generic_sender.py](../modules/generic_sender.md) to archive and send data to the API (using PUT method).
 Uses Basic Auth credentials (if configured - see [example_configuration](../configurations/example_credentials.py)).
 
 ### [SLAVE](../concepts/slave.md)

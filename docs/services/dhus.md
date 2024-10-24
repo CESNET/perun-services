@@ -8,7 +8,7 @@ members are filtered out.
 
 ### [SEND](../concepts/send.md)
 
-The script uses [generic_send.py](../modules/generic_sender.md) to send data to the API.
+The script uses [generic_sender.py](../modules/generic_sender.md) to send data to the API.
 
 ### [SLAVE](../concepts/slave.md)
 
