@@ -41,8 +41,8 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 	my $assignedLicense = $data->getResourceAttributeValue( resource => $resourceId, attrName => $A_RESOURCE_ASSIGNED_LICENSE );
 	my $facilityDomain = $data->getFacilityAttributeValue( attrName => $A_FACILITY_DOMAIN_NAME );
-	my @memberIds = $data->getMemberIdsForResource( resource => $resourceId ); 
-	
+	my @memberIds = $data->getMemberIdsForResource( resource => $resourceId );
+
 	processMembers(\@memberIds, $assignedLicense, $facilityDomain );
 }
 

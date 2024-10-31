@@ -37,7 +37,7 @@ my $dataByGroupId = {};
 foreach my $resourceId ( $data->getResourceIds() ) {
 
 	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
-		
+
 		my $groupNameAttributeValue = $data->getGroupAttributeValue(attrName => $A_GROUP_NAME, group => $groupId);
 		my $groupDescAttributeValue = $data->getGroupAttributeValue(attrName => $A_GROUP_DESCRIPTION, group => $groupId);
 		#prevent description to contain '\t' and '\n' characters and replace them by empty spaces instead
@@ -56,7 +56,7 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 				$dataByGroupId->{$groupId}->{$GROUP_ID} = $groupId;
 				$dataByGroupId->{$groupId}->{$GROUP_NAME} = $groupNameAttributeValue;
 				$dataByGroupId->{$groupId}->{$GROUP_DESCRIPTION} = $groupDescAttributeValue;
-			} 
+			}
 			$dataByGroupId->{$groupId}->{$GROUP_MEMBERS}->{$uco} = 1;
 		}
 	}
