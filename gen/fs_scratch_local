@@ -34,7 +34,7 @@ print SCRATCH_MOUNTPOINT_FILE $scratchMountPoint;
 close SCRATCH_MOUNTPOINT_FILE;
 
 foreach my $resourceId ( $data->getResourceIds() ) {
-	
+
 	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
 
 		# Print attributes

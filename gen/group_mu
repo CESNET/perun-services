@@ -12,8 +12,8 @@ use perunServicesInit;
 use perunServicesUtils;
 
 #forward declaration
-sub processGroupData; 
-sub processMembersData; 
+sub processGroupData;
+sub processMembersData;
 sub processResourceData;
 
 our $SERVICE_NAME = "group_mu";
@@ -122,7 +122,7 @@ sub processGroupData {
 		my $groupName = $unixGroupName;
 		my $gid = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_RESOURCE_UNIX_GID, resource => $resourceId, group => $groupId);
 
-		if(exists $groupStruc->{$groupName}) { 
+		if(exists $groupStruc->{$groupName}) {
 			if($groupStruc->{$groupName}->{$STRUC_SYSTEM}) {
 				die "Error: System group and regular group (or resource) have the same name. Name= $groupName";
 			} elsif($groupStruc->{$groupName}->{$STRUC_GID} != $gid) {
@@ -138,7 +138,7 @@ sub processGroupData {
 		my $groupName = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_RESOURCE_SYSTEM_UNIX_GROUP_NAME, resource => $resourceId, group => $groupId);
 		my $gid = $data->getGroupResourceAttributeValue(attrName => $A_GROUP_RESOURCE_SYSTEM_UNIX_GID, resource => $resourceId, group => $groupId);
 
-		if(exists $groupStruc->{$groupName}) { 
+		if(exists $groupStruc->{$groupName}) {
 			if(!$groupStruc->{$groupName}->{$STRUC_SYSTEM}) {
 				die "Error: System group and regular group (or resource) have the same name. Name= $groupName";
 			} elsif($groupStruc->{$groupName}->{$STRUC_GID} != $gid) {

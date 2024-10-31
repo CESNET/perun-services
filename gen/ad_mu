@@ -174,7 +174,7 @@ sub processMembers() {
 				my $mainLicenceKey = "CN=O365Lic_" . $userLicence . "_group.muni.cz,OU=licenses," . $baseDNGroups;
 				my $mainStudent2LicenceKey = "CN=O365Lic_A3s-2_group.muni.cz,OU=licenses," . $baseDNGroups;
 
-				# In case group for student licenses exeed maximum capacity (49999), rest of the users need to be added to A3s-2 group. 
+				# In case group for student licenses exeed maximum capacity (49999), rest of the users need to be added to A3s-2 group.
 				if ($userLicence eq "A3s" and keys %{$groups->{"licenses"}->{$mainLicenceKey}->{$MEMBERS}} >= 49999) {
 					$groups->{"licenses"}->{$mainStudent2LicenceKey}->{$MEMBERS}->{"CN=".$login.",".$baseDNUsers} = 1;
 				} else {
@@ -239,7 +239,7 @@ sub processGroups {
 						#FIXME ukladat DN
 						#$groups->{$ouName}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}->{$login."\@muni.cz"} = 1;
 						$groups->{$ouName}->{$key}->{$A_M_G_O365_SEND_ON_BEHALF}->{"CN=".$login.",".$baseDNUsers} = 1;
-						
+
 					}
 				}
 			}
