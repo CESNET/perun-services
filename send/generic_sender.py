@@ -1,11 +1,22 @@
+import importlib
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 
-from destination_classes import Destination, DestinationFactory, UrlDestination
+import boto3
+import requests
+from destination_classes import (
+    Destination,
+    DestinationFactory,
+    S3Destination,
+    UrlDestination,
+)
 from sys_operation_classes import SysOperation
+
+SERVICES_DIR = "/etc/perun/services"
 
 
 class Transport:
@@ -80,17 +91,9 @@ class Transport:
         """
         raise NotImplementedError
 
-    def send(self):
-        """
-        The actual sending is done here.
-        handle_transport_return_code must be implemented for this.
-        """
-        with (
-            SysOperation.get_temp_dir() as hostname_dir,
-            open(os.path.join(hostname_dir, "HOSTNAME"), mode="w+") as hostfile,
-        ):
-            # prepare hostfile
-
+    def prepare_directories_and_files(self):
+        hostname_dir = SysOperation.get_temp_dir()
+        with open(os.path.join(hostname_dir.name, "HOSTNAME"), mode="w+") as hostfile:
             hostfile.write(self.destination_class_obj.hostname)
             hostfile.flush()
 
@@ -103,45 +106,56 @@ class Transport:
                 self.destination_class_obj.service_name,
                 [hostname_dir, generated_files_dir],
             )
-            tar_command = SysOperation.prepare_tar_command(
-                self.tar_mode,
-                hostname_dir,
-                generated_files_dir,
-                self.destination_class_obj.destination,
+            return hostname_dir, generated_files_dir
+
+    def prepare_tar_command(self, hostname_dir, generated_files_dir):
+        return SysOperation.prepare_tar_command(
+            self.tar_mode,
+            hostname_dir,
+            generated_files_dir,
+            self.destination_class_obj.destination,
+        )
+
+    def send(self):
+        """
+        The actual sending is done here.
+        handle_transport_return_code must be implemented for this.
+        """
+        hostname_dir, generated_files_dir = self.prepare_directories_and_files()
+        tar_command = self.prepare_tar_command(hostname_dir.name, generated_files_dir)
+        # prepend timeout command
+        timeout_command = [
+            "timeout",
+            "-k",
+            str(Transport.TIMEOUT_KILL),
+            str(Transport.TIMEOUT),
+        ]
+        timeout_command.extend(self.transport_command)
+        self.transport_command = timeout_command
+
+        return_code, stdout, stderr = self.process_data(tar_command)
+
+        if return_code == 124:
+            # special situation when error code 124 has been thrown. That means - timeout and terminated from our side
+            print(stdout.decode("utf-8"), end="")
+            print(stderr.decode("utf-8"), file=sys.stderr, end="")
+            print(
+                "Communication with slave script was timed out with return code: "
+                + str(return_code)
+                + " (Warning: this error can mask original error 124 from peer!)",
+                file=sys.stderr,
+                end="",
             )
-            # prepend timeout command
-            timeout_command = [
-                "timeout",
-                "-k",
-                str(Transport.TIMEOUT_KILL),
-                str(Transport.TIMEOUT),
-            ]
-            timeout_command.extend(self.transport_command)
-            self.transport_command = timeout_command
-
-            return_code, stdout, stderr = self.process_data(tar_command)
-
-            if return_code == 124:
-                # special situation when error code 124 has been thrown. That means - timeout and terminated from our side
-                print(stdout.decode("utf-8"), end="")
-                print(stderr.decode("utf-8"), file=sys.stderr, end="")
+        else:
+            self.handle_transport_return_code(return_code, stdout, stderr)
+            if return_code != 0:
                 print(
-                    "Communication with slave script was timed out with return code: "
-                    + str(return_code)
-                    + " (Warning: this error can mask original error 124 from peer!)",
+                    "Communication with slave script ends with return code: "
+                    + str(return_code),
                     file=sys.stderr,
                     end="",
                 )
-            else:
-                self.handle_transport_return_code(return_code, stdout, stderr)
-                if return_code != 0:
-                    print(
-                        "Communication with slave script ends with return code: "
-                        + str(return_code),
-                        file=sys.stderr,
-                        end="",
-                    )
-            exit(return_code)
+        exit(return_code)
 
 
 class SshTransport(Transport):
@@ -279,6 +293,97 @@ class UrlTransport(Transport):
                 exit(0)
 
 
+class S3Transport(Transport):
+    tar_mode = "-cz"
+
+    def __init__(self, destination: Destination, temp: tempfile.NamedTemporaryFile):
+        super().__init__(destination, temp)
+        access_key, secret_key = get_custom_config_properties(
+            destination.service_name,
+            destination.destination,
+            ["access_key", "secret_key"],
+        )
+
+        if not (access_key and secret_key):
+            raise ValueError("""access key and secret key must be configured in the service 
+                             configuration in /etc/perun/services/{service_name}/{service_name}.py file.
+                             
+                             Example of such file:
+                             
+                             credentials = {
+                                "<S3-bucket-address>": { 'access_key': "<key>", 
+                                'secret_key': "<key>", 'url_endpoint': "<url>", 'auth_type': "basic", 
+                                'credentials': { 'username': "<ba-username>", 'password': "<ba-password>" } }
+                             }
+                             """)
+
+        self.bucket_name = destination.hostname
+        self.s3_client = boto3.client(
+            "s3",
+            endpoint_url=destination.endpoint,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+        )
+
+    def prepare_transport(selfself, opts: str):
+        # Not needed
+        pass
+
+    def send(self):
+        """
+        Custom send function, since we are not generating any command here, but rather using boto3.
+        """
+        hostname_dir, generated_files_dir = self.prepare_directories_and_files()
+        tar_command = self.prepare_tar_command(hostname_dir.name, generated_files_dir)
+        process_tar = subprocess.Popen(tar_command, stdout=subprocess.PIPE)
+        tar_output_path = os.path.join(
+            hostname_dir.name, f"{self.destination_class_obj.service_name}.tar.gz"
+        )
+
+        with open(tar_output_path, "wb") as tar_output_file:
+            shutil.copyfileobj(process_tar.stdout, tar_output_file)
+
+        key_name = f"{self.destination_class_obj.facility_name}/{os.path.basename(tar_output_path)}"
+        self.s3_client.upload_file(tar_output_path, self.bucket_name, key_name)
+
+        print(f"Upload to S3 bucket ({self.bucket_name}) successful.")
+
+        # Call configured URL endpoint
+        self.call_url_endpoint()
+
+    def call_url_endpoint(self):
+        # Make the URL call if endpoint and auth configuration are present
+        url, auth_type, credentials = get_custom_config_properties(
+            self.destination_class_obj.service_name,
+            self.destination_class_obj.destination,
+            ["url_endpoint", "auth_type", "credentials"],
+        )
+
+        if url:
+            headers = {}
+            auth = None
+            if auth_type == "basic":
+                auth = (credentials.get("username"), credentials.get("password"))
+            elif auth_type == "bearer":
+                headers["Authorization"] = f"Bearer {credentials.get("token")}"
+
+            response = requests.post(url, headers=headers, auth=auth)
+            if response.status_code not in range(200, 300):
+                print(
+                    f"Call to URL endpoint ({url}) failed. Status code: {response.status_code}",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    f"Successfully called URL endpoint ({url}). Status code: {response.status_code}"
+                )
+        else:
+            print(
+                f"No URL endpoint set. If any is to be called, it must be configured in /etc/perun/services/"
+                f"{service_name}/{service_name}.py file."
+            )
+
+
 class TransportFactory:
     @staticmethod
     def create_transport(
@@ -293,6 +398,8 @@ class TransportFactory:
         """
         if isinstance(destination, UrlDestination):
             return UrlTransport(destination, temp)
+        elif isinstance(destination, S3Destination):
+            return S3Transport(destination, temp)
         elif isinstance(destination, Destination):
             return SshTransport(destination, temp)
         else:
@@ -361,6 +468,39 @@ def check_input_fields(
             )
 
 
+def get_custom_config_properties(
+    service_name: str, destination: str, properties: list[str]
+):
+    """
+    Retrieves custom properties from config file in /etc/perun/services/{service_name}/{service_name}.py file.
+
+    Example of such file - supplement $ variables with destination, property names and values
+    credentials = {
+                    "$url1": { '$property_1': "$our_token", '$property_2': "$our_secret" },
+                    "$url2": { '$property_1': "$our_other_token", '$property_2': "$our_other_secret" }
+    }
+
+    :param service_name: name of the service
+        (used both as the folder name and the credentials python file name)
+    :param destination: key used to search in the credentials map
+    :param properties: list of properties to be retrieved
+    :return: list of values in the same order as provided properties,
+                             None if file does not exist or any property is missing
+    """
+    try:
+        sys.path.insert(1, f"{SERVICES_DIR}/{service_name}/")
+        credentials = importlib.import_module(service_name).credentials
+        result = []
+        if destination in credentials:
+            for p in properties:
+                result.append(credentials.get(destination).get(p))
+
+        return result
+    except Exception:
+        # this means that config file does not exist or properties are not set
+        return None
+
+
 if __name__ == "__main__":
     check_input_fields(sys.argv)
     service_name = SysOperation.get_global_service_name()
@@ -378,7 +518,6 @@ if __name__ == "__main__":
 # These are just copies of the old functions - they are not used in the script.
 #############################################################################################################################
 
-SERVICES_DIR = "/etc/perun/services"
 # predefined different types of destination
 DESTINATION_TYPE_URL = "url"
 DESTINATION_TYPE_EMAIL = "email"
@@ -410,38 +549,6 @@ EMAIL_PATTERN = re.compile(
     r"([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+"
 )
 SIMPLE_PATTERN = re.compile(r"\w+")
-
-
-def get_custom_config_properties(
-    service_name: str, destination: str, properties: list[str]
-):
-    """
-    Retrieves custom properties from config file in /etc/perun/services/{service_name}/{service_name}.py file.
-
-    Example of such file - supplement $ variables with destination, property names and values
-    credentials = {
-                    "$url1": { '$property_1': "$our_token", '$property_2': "$our_secret" },
-                    "$url2": { '$property_1': "$our_other_token", '$property_2': "$our_other_secret" }
-    }
-
-    :param service_name: name of the service
-        (used both as the folder name and the credentials python file name)
-    :param destination: key used to search in the credentials map
-    :param properties: list of properties to be retrieved
-    :return: list of values in the same order as provided properties,
-                             None if file does not exist or any property is missing
-    """
-    try:
-        sys.path.insert(1, f"{SERVICES_DIR}/{service_name}/")
-        credentials = __import__(service_name).credentials
-        result = []
-        if destination in credentials:
-            for p in properties:
-                result.append(credentials.get(destination).get(p))
-        return result
-    except Exception:
-        # this means that config file does not exist or properties are not set
-        return None
 
 
 def check_destination_format(
