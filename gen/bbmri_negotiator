@@ -235,7 +235,7 @@ sub processUsers {
 
 	my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_LSRI_USER_ID );
 	unless(exists $userStruc->{$uid}) {
-		initializeUser $uid, $memberId; 
+		initializeUser $uid, $memberId;
 	}
 
 	push @{$userStruc->{$uid}->{$groupRole}}, $roleIdValue;

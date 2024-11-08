@@ -68,7 +68,7 @@ sub processGroupData {
 	for my $memberId ($data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
 
 		my $userLogin = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_USER_LOGIN);
-		
+
 		unless($attributesByLogin->{$userLogin}) {
 			$attributesByLogin->{$userLogin}->{"logname"} = $userLogin;
 			$attributesByLogin->{$userLogin}->{"name"} = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_NAME);

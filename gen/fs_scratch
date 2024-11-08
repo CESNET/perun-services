@@ -1,5 +1,5 @@
 #!/usr/bin/perl
- 
+
 use strict;
 use warnings;
 use perunServicesInit;
@@ -16,15 +16,15 @@ sub mergeStatuses {
 	unless(defined $finalStatus) { return $memberStatus; }
 
 	# SUSPENDED state has priority, then it is enough to have at least one member status == VALID
-	if ($memberStatus eq "SUSPENDED" || $finalStatus eq "SUSPENDED") { 
+	if ($memberStatus eq "SUSPENDED" || $finalStatus eq "SUSPENDED") {
 		return "SUSPENDED";
-	} elsif ($memberStatus eq "VALID" || $finalStatus eq "VALID") { 
+	} elsif ($memberStatus eq "VALID" || $finalStatus eq "VALID") {
 		return "VALID";
-	} elsif ($memberStatus eq "EXPIRED" || $finalStatus eq "EXPIRED") { 
+	} elsif ($memberStatus eq "EXPIRED" || $finalStatus eq "EXPIRED") {
 		return "EXPIRED";
-	} elsif ($memberStatus eq "DISABLED" || $finalStatus eq "DISABLED") { 
+	} elsif ($memberStatus eq "DISABLED" || $finalStatus eq "DISABLED") {
 		return "DISABLED";
-	} 
+	}
 }
 
 perunServicesInit::init;
@@ -52,7 +52,7 @@ my $scratchMountPoint = $data->getFacilityAttributeValue( attrName => $A_F_SCRAT
 foreach my $resourceId ( $data->getResourceIds() ) {
 
 	foreach my $memberId ( $data->getMemberIdsForResource( resource => $resourceId ) ) {
-		
+
 		my $login = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_UF_LOGIN );
 		my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_STATUS );
 		my $memberIsSuspended = $data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_IS_SUSPENDED );

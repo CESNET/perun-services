@@ -16,6 +16,21 @@ This destination type sends the data to the target machine using the ssh command
 
 #### HOST-WINDOWS-PROXY
 
+### S3
+This destination type sends the data to target S3 bucket using boto3 library. The data is g-zipped and then sent to 
+the bucket as <facility-name>/<g-zipped archive>.
+
+Access key and secret key must be configured in the service configuration file at
+`/etc/perun/services/{service_name}/{service_name}.py` file.
+
+Example of such file, where `<S3-bucket-address>` is in the format of `{endpoint_url}/{bucket_name}`:
+
+    credentials = {
+    "<S3-bucket-address>": { 'access_key': "<key>", 
+    'secret_key': "<key>", 'url_endpoint': "<url>", 'auth_type': "basic", 
+    'credentials': { 'username': "<ba-username>", 'password': "<ba-password>" } }
+    }
+
 
 ### Unsupported destination types
 The following destination types are not supported yet:

@@ -52,7 +52,7 @@ my $users;  # $users->{$login}->{ATTR} = $attrValue;
 #
 # FOR EACH RESOURCE
 foreach my $resourceId ( $data->getResourceIds() ){
-        
+
 	# EACH USER ON RESOURCE
 	foreach my $memberId ($data->getMemberIdsForResource( resource => $resourceId )) {
 

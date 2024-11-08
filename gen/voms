@@ -37,11 +37,11 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 	#create info about existing vo (even if it is empty)
 	if(!defined($struc->{$vomsVoName})) { $struc->{$vomsVoName}->{'name'} = $vomsVoName; }
-	
+
 	my @rolesInVoForResource = ();
 	my $resourceRoles = $data->getResourceAttributeValue(attrName => $A_R_VOMS_ROLES, resource => $resourceId);
 	if(defined($resourceRoles)) { @rolesInVoForResource = @$resourceRoles; }
-	
+
 	#groups of resource one by one
 	foreach my $groupId ($data->getGroupIdsForResource(resource => $resourceId)) {
 		#get vomsGroupNameIfExists
@@ -86,13 +86,13 @@ foreach my $resourceId ($data->getResourceIds()) {
 				#create new member if not exists in VO yet
 				if(!defined($struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser})) {
 					$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'email'} = $email;
-					$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'roles'} = {};	
+					$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'roles'} = {};
 					$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'groups'} = {};
 				}
 				#use the last record of DN and CA we get (it is probably the newest one)
 				$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'CA'} = $CADN;
 				$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'DN'} = $subjectDNWithoutPrefix;
-				
+
 				#fill vo roles
 				foreach my $role (@rolesInVoForResource) {
 					$struc->{$vomsVoName}->{'users'}->{$uniqueVomsUser}->{'roles'}->{$role} = 1;

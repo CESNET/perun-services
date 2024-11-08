@@ -16,7 +16,7 @@ local $::PROTOCOL_VERSION = "1.2.0";
 my $SCRIPT_VERSION = "1.2.1";
 
 #get system time in miliseconds before starting getting data
-my $systemTimeInMillis = int (gettimeofday * 1000); 
+my $systemTimeInMillis = int (gettimeofday * 1000);
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -73,7 +73,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 
 	#for each group assigned to the resource
 	foreach my $groupId ($data->getGroupIdsForResource( resource => $resourceId )) {
-		
+
 		#and every member in such group
 		foreach my $memberId ($data->getMemberIdsForResourceAndGroup( resource => $resourceId, group => $groupId )) {
 			my $userId = $data->getUserIdForMember( member => $memberId );
@@ -83,7 +83,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 			my $expirationInGroup = $data->getMemberGroupAttributeValue( member => $memberId, group => $groupId, attrName => $A_GROUP_MEMBERSHIP_EXPIRATION );
 
 			#process every member|group|resource combination one by one
-			processUsers $affiliation, $expirationInGroup, $memberId;	
+			processUsers $affiliation, $expirationInGroup, $memberId;
 		}
 	}
 }

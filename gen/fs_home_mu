@@ -4,23 +4,10 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 use File::Basename;
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.1.0";
-my $SCRIPT_VERSION = "3.0.3";
-
-sub mergeQuotas {
-	my ($sumQuota, $resourceQuota, $memberQuota) = @_;
-	{
-		no warnings qw(uninitialized);
-		if($sumQuota ~~ 0 || $resourceQuota == 0 || $memberQuota ~~ 0) { return 0; } #note operator == at $resourceQuota
-	}
-
-	if(!defined $memberQuota) { $memberQuota = 0; }
-
-	return ($sumQuota || 0) + ($memberQuota > $resourceQuota ? $memberQuota : $resourceQuota);
-}
+my $SCRIPT_VERSION = "3.0.4";
 
 sub mergeStatuses {
 	my ($finalStatus, $memberStatus) = @_;

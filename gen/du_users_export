@@ -91,7 +91,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 				my $idpIdentifierWithoutPrefix = $idpIdentifier;
 				$idpIdentifierWithoutPrefix =~ s/^\d+[:]//;
 				push @shibbolethLogins, { "src" => $idpIdentifierWithoutPrefix, "id" => $shibbolethExtSources->{$idpIdentifier}};
-			}			
+			}
 
 			#prepare all associated users (TODO)
 			my @associatedUsers = ();
@@ -105,7 +105,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 				}
 				my @richAssocUsersWithAttributes = $usersAgent->getRichUsersWithAttributesByIds(ids => \@specificUsersIds);
 				foreach my $richUser (@richAssocUsersWithAttributes) {
-				
+
 					#prepare attributes to hash
 					my $assocUserAttrs = {};
 					foreach my $attribute (@{$richUser->{'_userAttributes'}}) {
@@ -117,8 +117,8 @@ foreach my $resourceId ($data->getResourceIds()) {
 					for my $assocUserKerberosLogin (@{$assocUserAttrs->{$A_U_KERBEROS_LOGINS}}) {
 						my $realm = $assocUserKerberosLogin;
 						$realm =~ s/^.*@//;
-						push @assocUserKerberosLogins, { "src" => $realm, 
-						                                 "id"  => $assocUserKerberosLogin, 
+						push @assocUserKerberosLogins, { "src" => $realm,
+						                                 "id"  => $assocUserKerberosLogin,
 						                               };
 					}
 
@@ -127,12 +127,12 @@ foreach my $resourceId ($data->getResourceIds()) {
 						#strip prefix from the identifier
 						my $idpIdentifierWithoutPrefix = $idpIdentifier;
 						$idpIdentifierWithoutPrefix =~ s/^\d+[:]//;
-						push @assocUserShibbolethLogins, { "src" => $idpIdentifierWithoutPrefix, 
+						push @assocUserShibbolethLogins, { "src" => $idpIdentifierWithoutPrefix,
 						                                   "id"  => $assocUserAttrs->{$A_U_SHIBBOLETH_EXT_SOURCES}->{$idpIdentifier},
 						                                 };
 					}
 
-					push @associatedUsers, 
+					push @associatedUsers,
 										{
 											"PerunUserID" => $richUser->{'_id'},
 											"FirstName" => $richUser->{'_firstName'} || "",
@@ -169,7 +169,7 @@ foreach my $resourceId ($data->getResourceIds()) {
 		my $dataQuotasOverride = $data->getMemberResourceAttributeValue(attrName => $A_MR_DATA_QUOTAS_OVERRIDE, member => $memberId, resource => $resourceId);
 		my $fileQuotasOverride = $data->getMemberResourceAttributeValue(attrName => $A_MR_FILE_QUOTAS_OVERRIDE, member => $memberId, resource => $resourceId);
 		push @{$attributesByLogin{$einfraLogin}->{"Resources"}},
-							{ 
+							{
 								"Name"               => $resourceName,
 								"PerunResourceID"    => int($resourceId),
 								"UID"                => $data->getUserFacilityAttributeValue(attrName => $A_USER_FACILITY_UID, member => $memberId),
@@ -192,8 +192,8 @@ foreach my $resourceId ($data->getResourceIds()) {
 		my $groupName = $data->getGroupAttributeValue(attrName => $A_GROUP_NAME, group => $groupId);
 		my $unixGroupName = $data->getGroupResourceAttributeValue(attrName => $A_G_R_UNIX_GROUP_NAME, group => $groupId, resource => $resourceId);
 		if($unixGroupName) {
-			push @unixGroups, 
-						{ 
+			push @unixGroups,
+						{
 							"UnixGroupName" => $unixGroupName,
 							"UnixGID"       => $data->getGroupResourceAttributeValue(attrName => $A_G_R_UNIX_GID, group => $groupId, resource => $resourceId),
 						};
@@ -269,8 +269,8 @@ for my $vo (keys %attributesByVo) {
 	for my $kerberosLogin (@{$adminAttributes->{$A_U_KERBEROS_LOGINS}}) {
 		my $realm = $kerberosLogin;
 		$realm =~ s/^.*@//;
-		push @kerberosLogins, { "src" => $realm, 
-	                          "id"  => $kerberosLogin, 
+		push @kerberosLogins, { "src" => $realm,
+	                          "id"  => $kerberosLogin,
 	                        };
 	}
 
@@ -279,12 +279,12 @@ for my $vo (keys %attributesByVo) {
 		#strip prefix from the identifier
 		my $idpIdentifierWithoutPrefix = $idpIdentifier;
 		$idpIdentifierWithoutPrefix =~ s/^\d+[:]//;
-		push @shibbolethLogins, { "src" => $idpIdentifierWithoutPrefix, 
+		push @shibbolethLogins, { "src" => $idpIdentifierWithoutPrefix,
 	                            "id"  => $adminAttributes->{$A_U_SHIBBOLETH_EXT_SOURCES}->{$idpIdentifier},
 	                          };
 	}
 
-			push @voAdmins, 
+			push @voAdmins,
 					{
 						"PerunUserID" => $richAdmin->{'_id'},
 						"FirstName" => $richAdmin->{'_firstName'} || "",
@@ -296,11 +296,11 @@ for my $vo (keys %attributesByVo) {
 					};
 	}
 	#End of structure of VO Admins
-	
+
 	my @groups = ();
 	for my $groupName (keys %{$attributesByVo{$vo}->{"Groups"}}) {
 		push @groups,
-			 { 
+			 {
 				 "Name"      => $groupName,
 				 "Members"   => $attributesByVo{$vo}->{"Groups"}->{$groupName}->{"Members"},
 				 #"Resources" => \@resources,

@@ -40,8 +40,8 @@ foreach my $replicaDestinationPath (sort keys %$struc) {
 			foreach my $login (sort keys %{$struc->{$replicaDestinationPath}->{$replicaSourcePath}->{$replicaDestination}}) {
 				#use delimiter / if needed, or space if not needed
 				my $delimiter;
-				if($login eq "") { 
-					$delimiter = " "; 
+				if($login eq "") {
+					$delimiter = " ";
 				} else {
 					$delimiter = "/ ";
 				}
@@ -58,7 +58,7 @@ close(FILE) or die "Cannot close $fileName: $! \n";
 ##############################################################################
 
 # INPUT: replica's destination name, replica's destination path, replica's source path, member's id
-# stores replica's destination name, replica's destination path, replica's source path 
+# stores replica's destination name, replica's destination path, replica's source path
 # and user's login into $struc structure
 sub processMemberData {
 	my $replicaDestination = shift;
@@ -81,7 +81,7 @@ sub processMemberData {
 }
 
 # INPUT: resource's id
-# calls processMemberData to assign REPLICA_DESTINATION, REPLICA_DESTINATION_PATH 
+# calls processMemberData to assign REPLICA_DESTINATION, REPLICA_DESTINATION_PATH
 # and REPLICA_SOURCE_PATH to the member of resource in $struc structure
 sub processResourceData {
 	my $resourceId = shift;
