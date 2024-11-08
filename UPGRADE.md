@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [16.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.0.0...v16.1.0) (2024-11-08)
+
+
+### Features
+
+* **generic_sender:** add s3 transport to generic_sender ([da61936](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/da619367042f81125e8f88b7d45bb601ecaeacb7))
+
 ## [16.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v15.0.2...v16.0.0) (2024-10-24)
 
 
