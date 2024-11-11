@@ -6,13 +6,20 @@ use ScriptLock;
 use Data::Dumper;
 use Time::Piece;
 use File::Path;
+use LWP::UserAgent;
+use HTTP::Request::Common;
+use JSON::XS;
+use Encode;
+use open ':std', ':encoding(utf8)';
+binmode STDOUT;
 
 sub diffCSV;
 sub logCRM;
+sub makeJsonCall;
 
 my $service_name = "crm_ceitec";
-my $protocol_version = "3.1.0";
-my $script_version = "3.0.6";
+my $protocol_version = "4.0.0";
+my $script_version = "4.0.0";
 
 my $facility_name = $ARGV[0];
 chomp($facility_name);
@@ -25,70 +32,12 @@ my $lock = ScriptLock->new($facility_name . "_" . $service_name);
 my $sendSpoolPath = "./spool/$facility_name/$service_name";
 mkpath($sendSpoolPath) or die "Error creating $sendSpoolPath\n" unless -d $sendSpoolPath;
 
-my @diff = diffCSV();
-
 my $error = 0;
 
 # READ FILE AND PROCESS IT
+my @diff = diffCSV();
 foreach my $line (@diff) {
-
-	chomp($line);
-	my @array = split(";",$line);
-
-	my $command = "php $service_name.php";
-
-	if (scalar(@array) < 4) {
-		# Entry is probably missing login/firstName/lastName/email
-		$error = 1;
-		# log to stderr which is read by engine and stored in task result
-		print STDERR "Not enough parameters: @array \n";
-		logCRM("ERROR: Not enough parameters: @array");
-		$lock->unlock();
-		exit 1;
-	}
-
-	$command = $command . " --userName \"$array[0]\" --lastName \"$array[2]\" --firstName \"$array[1]\" --email \"$array[3]\"";
-
-	if ($array[4]) {
-		$command = $command . " --orgUnit \"$array[4]\"";
-	} else {
-		$command = $command . " --orgUnit \"\"";
-	}
-
-	if ($array[5]) {
-		$command = $command . " --universityId \"$array[5]\"";
-	} else {
-		$command = $command . " --universityId \"\"";
-	}
-
-	if ($array[6]) {
-		$command = $command . " --eppn \"$array[6]\"";
-	} else {
-		$command = $command . " --eppn \"\"";
-	}
-
-	if ($array[7]) {
-		$command = $command . " --rgs \"$array[7]\"";
-	} else {
-		$command = $command . " --rgs \"\"";
-	}
-
-	if ($array[8]) {
-		$command = $command . " --alternativeLoginNames \"$array[8]\"";
-	} else {
-		$command = $command . " --alternativeLoginNames \"\"";
-	}
-
-	my $result = `$command`;
-	if ($result =~ /^ERROR/ or $result =~ /^PHP Fatal error/) {
-		$error = 1;
-		# log to stderr which is read by engine and stored in task result
-		print STDERR $array[0] . " " . $result . "\n";
-		logCRM("ERROR: " . $line);
-	} else {
-		logCRM("SUCCESS: " . $line);
-	}
-
+	makeJsonCall($line);
 }
 
 if ($error == 1) {
@@ -107,6 +56,65 @@ if ($error == 1) {
 	copy("../gen/spool/$facility_name/$service_name/$service_name","$sendSpoolPath/$service_name.last") or die "Move new state failed: $!";
 	$lock->unlock();
 }
+
+#
+# Process single line and make JSON call
+# Sets error flag on fail
+#
+sub makeJsonCall() {
+
+	my $line = shift;
+	chomp($line);
+	my @array = split(";",$line);
+
+	if (scalar(@array) < 4) {
+		# Entry is probably missing login/firstName/lastName/email
+		$error = 1;
+		# log to stderr which is read by engine and stored in task result
+		print STDERR "Not enough parameters: @array \n";
+		logCRM("ERROR: Not enough parameters: @array");
+		$lock->unlock();
+		exit 1;
+	}
+
+	# Load URL JSON API Authentication
+	my $service_config="/etc/perun/services/crm_ceitec/crm_ceitec_json_api";
+	open FILE, '<', "$service_config";
+	my @authz = <FILE>;
+	chomp(@authz);
+	close FILE;
+
+	# make HTTP call
+	my $ua = LWP::UserAgent->new;
+	my $req = HTTP::Request->new(POST => $authz[0]);
+	$req->header('Content-Type' => 'application/json;charset=utf-8');
+	$req->authorization_basic($authz[1], $authz[2]);
+
+	my %post_data = (
+		userName              => $array[0],
+		firstName             => $array[1],
+		lastName              => $array[2],
+		email                 => $array[3],
+		orgUnit               => $array[4] || "",
+		universityId          => $array[5] || "",
+		eppn                  => $array[6] || "",
+		RGs                   => $array[7] || "",
+		alternativeLoginNames => $array[8] || ""
+	);
+	my $json = encode("UTF-8", JSON::XS->new->pretty->canonical->encode(\%post_data));
+	$req->content($json);
+	my $resp = $ua->request($req);
+	unless ($resp->is_success) {
+		$error = 1;
+		# log to stderr which is read by engine and stored in task result
+		print STDERR $array[0] . " " . $resp->code . ": " . $resp->message . "\n";
+		logCRM("ERROR: " . $line);
+	} else {
+		logCRM("SUCCESS: " . $line);
+	}
+
+}
+
 #
 # DIFF previous and new state of CRM
 #
