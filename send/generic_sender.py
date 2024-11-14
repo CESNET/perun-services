@@ -365,7 +365,7 @@ class S3Transport(Transport):
             if auth_type == "basic":
                 auth = (credentials.get("username"), credentials.get("password"))
             elif auth_type == "bearer":
-                headers["Authorization"] = f"Bearer {credentials.get("token")}"
+                headers["Authorization"] = f"Bearer {credentials.get('token')}"
 
             response = requests.post(url, headers=headers, auth=auth)
             if response.status_code not in range(200, 300):
