@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [16.1.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.1.0...v16.1.1) (2024-11-14)
+
+
+### Bug Fixes
+
+* **generic_sender:** fix syntaxError caused by nested quotation marks ([9f91fd5](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/9f91fd50d82807912633d2dca00d9692de628bc0))
+
 ## [16.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.0.0...v16.1.0) (2024-11-08)
 
 
