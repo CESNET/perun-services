@@ -13,6 +13,7 @@ from destination_classes import (
     DestinationFactory,
     S3Destination,
     UrlDestination,
+    UrlJsonDestination,
 )
 from sys_operation_classes import SysOperation
 
@@ -47,28 +48,39 @@ class Transport:
         """
         raise NotImplementedError
 
+    def execute_transport(self, command, input_stream):
+        """
+        Helper method to execute a transport command using the provided input stream.
+        Manages the communication with the subprocess and returns the output.
+
+        :param command: The transport command to execute (e.g., curl, ssh).
+        :param input_stream: The input stream for the transport process.
+        :return: (return_code, stdout, stderr)
+        """
+        process = subprocess.Popen(
+            command,
+            stdin=input_stream,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        input_stream.close()
+
+        stdout, stderr = process.communicate()
+        return process.returncode, stdout, stderr
+
     def process_data(self, tar_command):
         """
         Process data. Extract files and convert to base64 for host windows destination types.
         :param tar_command:
-        :param transport_command:
-        :param destination:
-        :param destination_type:
         :return: (returncode, stdout, stderr)
         """
         process_tar = subprocess.Popen(tar_command, stdout=subprocess.PIPE)
         transformation_process = self.destination_class_obj.process_data(process_tar)
         process_tar.stdout.close()
 
-        the_process = subprocess.Popen(
-            self.transport_command,
-            stdin=transformation_process.stdout,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        return self.execute_transport(
+            self.transport_command, transformation_process.stdout
         )
-        transformation_process.stdout.close()
-        (stdout, stderr) = the_process.communicate()
-        return the_process.returncode, stdout, stderr
 
     def extend_transport_command(self, opts: str):
         """
@@ -116,6 +128,16 @@ class Transport:
             self.destination_class_obj.destination,
         )
 
+    def prepend_timeout_command(self, transport_command):
+        timeout_command = [
+            "timeout",
+            "-k",
+            str(Transport.TIMEOUT_KILL),
+            str(Transport.TIMEOUT),
+        ]
+        timeout_command.extend(transport_command)
+        return timeout_command
+
     def send(self):
         """
         The actual sending is done here.
@@ -124,14 +146,7 @@ class Transport:
         hostname_dir, generated_files_dir = self.prepare_directories_and_files()
         tar_command = self.prepare_tar_command(hostname_dir.name, generated_files_dir)
         # prepend timeout command
-        timeout_command = [
-            "timeout",
-            "-k",
-            str(Transport.TIMEOUT_KILL),
-            str(Transport.TIMEOUT),
-        ]
-        timeout_command.extend(self.transport_command)
-        self.transport_command = timeout_command
+        self.transport_command = self.prepend_timeout_command(self.transport_command)
 
         return_code, stdout, stderr = self.process_data(tar_command)
 
@@ -234,7 +249,7 @@ class UrlTransport(Transport):
         Prepares base transport command for CURL connection.
         If available, adds common perun certificate.
         :param temp:
-        :param content_type: for example 'application/json'
+        :param content_type: for example 'application/json
         :return: transport command
         """
         transport_command = ["curl"]
@@ -384,6 +399,44 @@ class S3Transport(Transport):
             )
 
 
+class UrlJsonTransport(UrlTransport):
+    def init_transport_command(
+        self, content_type: str = "application/json", method: str = "PUT"
+    ):
+        return super().init_transport_command(content_type, method)
+
+    def get_generated_json_file_path(self):
+        generated_files_dir = SysOperation.get_gen_folder(
+            self.destination_class_obj.facility_name,
+            self.destination_class_obj.service_name,
+        )
+
+        json_files = [f for f in os.listdir(generated_files_dir) if f.endswith(".json")]
+        if len(json_files) != 1:
+            raise FileNotFoundError(
+                "Expected one generated JSON file, found " + str(len(json_files))
+            )
+
+        json_file_path = os.path.join(generated_files_dir, json_files[0])
+        return json_file_path
+
+    def send(self):
+        """
+        Send JSON data to the destination. Prepares transport command, processes JSON data, and executes the transport.
+        """
+        json_file_path = self.get_generated_json_file_path()
+
+        with open(json_file_path, "rb") as json_file:
+            self.transport_command = self.prepend_timeout_command(
+                self.transport_command
+            )
+            return_code, stdout, stderr = self.execute_transport(
+                self.transport_command, json_file
+            )
+
+        self.handle_transport_return_code(return_code, stdout, stderr)
+
+
 class TransportFactory:
     @staticmethod
     def create_transport(
@@ -400,6 +453,8 @@ class TransportFactory:
             return UrlTransport(destination, temp)
         elif isinstance(destination, S3Destination):
             return S3Transport(destination, temp)
+        elif isinstance(destination, UrlJsonDestination):
+            return UrlJsonTransport(destination, temp)
         elif isinstance(destination, Destination):
             return SshTransport(destination, temp)
         else:

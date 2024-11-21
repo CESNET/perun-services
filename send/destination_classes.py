@@ -26,6 +26,7 @@ class Destination:
     S3_PATTERN = re.compile(
         r"^(https?://[-a-zA-Z0-9+&@#/%?=~_|!:,.;()*$']+)/([-a-zA-Z0-9+&@#%?=~_|!:,.;()*$'']+)$"
     )
+    URL_JSON_PATTERN = URL_PATTERN
 
     def __init__(self, destination: str, service_name: str, facility_name: str):
         self.destination = destination
@@ -212,6 +213,22 @@ class S3Destination(Destination):
         self.hostname = match.group(2)
 
 
+class UrlJsonDestination(Destination):
+    def __init__(self, destination: str, service_name: str, facility_name: str):
+        if service_name != "generic_json_gen":
+            raise ValueError(
+                "UrlJsonTransport only supports 'generic_json_gen' service."
+            )
+        super().__init__(destination, service_name, facility_name)
+        self.check_destination_pattern = Destination.URL_JSON_PATTERN
+        self.check_destination_format()
+        self.prepare_destination()
+
+    def prepare_destination(self):
+        self.host = self.destination
+        self.hostname = self.destination
+
+
 class DestinationFactory:
     DESTINATION_TYPE_URL = "url"
     DESTINATION_TYPE_EMAIL = "email"
@@ -222,6 +239,7 @@ class DestinationFactory:
     DESTINATION_TYPE_USER_HOST_WINDOWS_PROXY = "host-windows-proxy"
     DESTINATION_TYPE_SERVICE_SPECIFIC = "service-specific"
     DESTINATION_TYPE_S3 = "s3"
+    DESTINATION_TYPE_URL_JSON = "url-json"
 
     @staticmethod
     def create_destination(
@@ -248,6 +266,8 @@ class DestinationFactory:
             return WindowsDestination(destination, service_name, facility_name)
         elif destination_type == DestinationFactory.DESTINATION_TYPE_S3:
             return S3Destination(destination, service_name, facility_name)
+        elif destination_type == DestinationFactory.DESTINATION_TYPE_URL_JSON:
+            return UrlJsonDestination(destination, service_name, facility_name)
         elif (
             destination_type
             == DestinationFactory.DESTINATION_TYPE_USER_HOST_WINDOWS_PROXY
