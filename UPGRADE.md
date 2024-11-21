@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [16.2.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.1.1...v16.2.0) (2024-11-21)
+
+
+### Features
+
+* **generic_sender:** add url-json transport to generic_sender ([7341009](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/7341009f6517f910dd8a7250405d419cc96d9548))
+
 ## [16.1.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.1.0...v16.1.1) (2024-11-14)
 
 
