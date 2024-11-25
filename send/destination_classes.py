@@ -62,6 +62,7 @@ class Destination:
     def process_data(self, process_tar):
         """
         Transforms data for format of given destination.
+        Make sure to correctly terminate the returned subprocess!
 
         :param process_tar: process object with data to be transformed
         :return: process object with transformed data
@@ -170,6 +171,8 @@ class WindowsProxyDestination(Destination):
         transformation_process = subprocess.Popen(
             sed_command, stdin=transformation_process_1.stdout, stdout=subprocess.PIPE
         )
+        # this MIGHT be insufficient to correctly close the process (however no instances of base64 zombie processes
+        # were reported)
         transformation_process_1.stdout.close()
         return transformation_process
 
