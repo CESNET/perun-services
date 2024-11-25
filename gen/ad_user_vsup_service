@@ -7,7 +7,7 @@ use perunServicesUtils;
 
 local $::SERVICE_NAME = "ad_user_vsup_service";
 local $::PROTOCOL_VERSION = "3.0.1";
-my $SCRIPT_VERSION = "3.0.6";
+my $SCRIPT_VERSION = "3.0.7";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -26,7 +26,6 @@ our $A_LAST_NAME;  *A_LAST_NAME = \'urn:perun:user:attribute-def:core:lastName';
 our $A_ARTISTIC_FIRST_NAME; *A_ARTISTIC_FIRST_NAME = \'urn:perun:user:attribute-def:def:artisticFirstName';
 our $A_ARTISTIC_LAST_NAME; *A_ARTISTIC_LAST_NAME = \'urn:perun:user:attribute-def:def:artisticLastName';
 our $A_LOGIN; *A_LOGIN = \'urn:perun:user_facility:attribute-def:virt:login';
-our $A_BLACKLISTED;  *A_BLACKLISTED = \'urn:perun:user_facility:attribute-def:virt:blacklisted';
 our $A_IS_SERVICE; *A_IS_SERVICE = \'urn:perun:user:attribute-def:core:serviceUser';
 our $A_UCO; *A_UCO= \'urn:perun:user:attribute-def:def:ucoVsup';
 our $A_TITLE_BEFORE;  *A_TITLE_BEFORE = \'urn:perun:user:attribute-def:core:titleBefore';
@@ -77,13 +76,6 @@ close(FILE);
 #
 # FOR EACH USER
 foreach my $memberId ($data->getMemberIdsForFacility()) {
-
-	my $blacklisted = $data->getUserFacilityAttributeValue( member => $memberId, attrName => $A_BLACKLISTED );
-
-	if (defined $blacklisted and ($blacklisted == 1)) {
-		# skip blacklisted users !security ban!
-		next;
-	}
 
 	my $serviceUser = $data->getUserAttributeValue( member => $memberId, attrName => $A_IS_SERVICE );
 
