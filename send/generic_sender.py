@@ -48,26 +48,6 @@ class Transport:
         """
         raise NotImplementedError
 
-    def execute_transport(self, command, input_stream):
-        """
-        Helper method to execute a transport command using the provided input stream.
-        Manages the communication with the subprocess and returns the output.
-
-        :param command: The transport command to execute (e.g., curl, ssh).
-        :param input_stream: The input stream for the transport process.
-        :return: (return_code, stdout, stderr)
-        """
-        process = subprocess.Popen(
-            command,
-            stdin=input_stream,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        input_stream.close()
-
-        stdout, stderr = process.communicate()
-        return process.returncode, stdout, stderr
-
     def process_data(self, tar_command):
         """
         Process data. Extract files and convert to base64 for host windows destination types.
@@ -76,11 +56,26 @@ class Transport:
         """
         process_tar = subprocess.Popen(tar_command, stdout=subprocess.PIPE)
         transformation_process = self.destination_class_obj.process_data(process_tar)
-        process_tar.stdout.close()
-
-        return self.execute_transport(
-            self.transport_command, transformation_process.stdout
+        # the code below does not raise any exceptions, so try block (or context manager) should not be necessary
+        # however if the issue persists / arises again, look into context managers / try blocks to
+        # handle interruptions, etc.
+        the_process = subprocess.Popen(
+            self.transport_command,
+            stdin=transformation_process.stdout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
+        (stdout, stderr) = the_process.communicate()
+
+        (stdout_temp, stderr_temp) = transformation_process.communicate()
+        if transformation_process.returncode != 0:
+            print(stderr_temp.decode("utf-8"), file=sys.stderr, end="")
+
+        (stdout_temp, stderr_temp) = process_tar.communicate()
+        if process_tar.returncode != 0:
+            print(stderr_temp.decode("utf-8"), file=sys.stderr, end="")
+
+        return the_process.returncode, stdout, stderr
 
     def extend_transport_command(self, opts: str):
         """
@@ -358,6 +353,10 @@ class S3Transport(Transport):
         with open(tar_output_path, "wb") as tar_output_file:
             shutil.copyfileobj(process_tar.stdout, tar_output_file)
 
+        (stdout, stderr) = process_tar.communicate()
+        if process_tar.returncode != 0:
+            print(stderr.decode("utf-8"), file=sys.stderr, end="")
+
         key_name = f"{self.destination_class_obj.facility_name}/{os.path.basename(tar_output_path)}"
         self.s3_client.upload_file(tar_output_path, self.bucket_name, key_name)
 
@@ -430,11 +429,15 @@ class UrlJsonTransport(UrlTransport):
             self.transport_command = self.prepend_timeout_command(
                 self.transport_command
             )
-            return_code, stdout, stderr = self.execute_transport(
-                self.transport_command, json_file
+            process = subprocess.Popen(
+                self.transport_command,
+                stdin=json_file,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
+            (stdout, stderr) = process.communicate()
 
-        self.handle_transport_return_code(return_code, stdout, stderr)
+        self.handle_transport_return_code(process.returncode, stdout, stderr)
 
 
 class TransportFactory:
