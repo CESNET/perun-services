@@ -1,5 +1,21 @@
 Upgrade notes
 
+## [16.2.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.2.0...v16.2.1) (2024-12-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* Remove user_facility:virt:blacklisted attribute from all services. Attribute definition can be deleted.
+
+### Bug Fixes
+
+* close subprocesses in senders ([310d68e](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/310d68e629950c5f356561f1c001665fb7ad950d))
+
+
+### Refactoring
+
+* removed usage of uf:v:blacklisted attribute ([f992605](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/f99260501e8bcf218ca142085f96f5ae29ac38b1))
+
 ## [16.2.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.1.1...v16.2.0) (2024-11-21)
 
 
