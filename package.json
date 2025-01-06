@@ -2,16 +2,16 @@
 	"name": "perun-services",
 	"version": "0.0.0-development",
 	"devDependencies": {
-		"@commitlint/cli": "^17.6.6",
-		"@commitlint/config-conventional": "^17.6.6",
-		"@commitlint/cz-commitlint": "^17.5.0",
+		"@commitlint/cli": "^19.6.1",
+		"@commitlint/config-conventional": "^19.6.0",
+		"@commitlint/cz-commitlint": "^19.6.1",
 		"@semantic-release/changelog": "^6.0.3",
 		"@semantic-release/git": "^10.0.1",
 		"@semantic-release/gitlab": "^12.0.6",
 		"@semantic-release/gitlab-config": "^13.0.0",
-		"commitizen": "^4.3.0",
+		"commitizen": "^4.3.1",
 		"conventional-changelog-conventionalcommits": "^5.0.0",
-		"inquirer": "^8.2.5",
+		"inquirer": "^9.3.7",
 		"semantic-release": "21.1.2"
 	},
 	"config": {
