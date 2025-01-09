@@ -1,5 +1,21 @@
 Upgrade notes
 
+## [16.3.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.2.1...v16.3.0) (2025-01-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **generic_send:** removed generic_send.py
+
+### Features
+
+* new regex for mail validation ([ecebefc](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/ecebefc339ec1ad95dce9b1d5cc3bc121195e15e))
+
+
+### Others
+
+* **generic_send:** delete generic_send.py ([829b0ee](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/829b0ee2e2054dd774274963b53d3c139c0c2bdb))
+
 ## [16.2.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.2.0...v16.2.1) (2024-12-16)
 
 
