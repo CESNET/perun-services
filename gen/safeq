@@ -101,7 +101,7 @@ foreach my $login (sort keys %$usersByLogin) {
 	print FILE "lastname:", checkBase64($attributes->{$A_USER_LAST_NAME} || '(N/A)'), "\n";
 	print FILE "costcenter:", checkBase64("costcenterno=" . ($attributes->{$A_USER_WORKPLACE_ID} || 100) . ", ou=costcenters, o=ysoftsafeq"), "\n";
 	print FILE "email:", checkBase64($attributes->{$A_USER_MAIL}), "\n";
-	print FILE "homedir:: ", encode_base64('\\\\ces-hsm.cerit-sc.cz\\profiles\\' . $login);
+	print FILE "homedir:: ", encode_base64('\\\\ha-bay.ics.muni.cz\\safeq\\' . $login . '\\SafeQ-Scan');
 
 	if (defined $attributes->{$A_USER_CHIP_NUM}) {
 		foreach my $chipNumber (sort @{$attributes->{$A_USER_CHIP_NUM}}) {
