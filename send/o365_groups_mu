@@ -172,7 +172,7 @@ def prepare_user_ids(our_group, their_members):
     Saves fetched member's names and ids to users mapping. Fetches missing user's ids.
     If user does not exist, it will be silently skipped and mapping won't exist for him.
     """
-    print_debug(f'Preparing user ids for group {our_group["groupId"]}')
+    print_debug(f"Preparing user ids for group {our_group['groupId']}")
     # update mapping
     for their_member in their_members:
         users_mapping[their_member["userPrincipalName"]] = their_member["id"]
@@ -255,8 +255,8 @@ def remove_their_members(our_group, their_members, scope):
             filter(lambda mmbr: mmbr.endswith(scope), our_missing_members)
         )
     for missing_member in our_missing_members:
-        print_debug(f'Removing user {missing_member} from group {our_group["groupId"]}')
-        url = f'{BASE_URL}/groups/{our_group["groupId"]}/members/{users_mapping[missing_member]}/$ref'
+        print_debug(f"Removing user {missing_member} from group {our_group['groupId']}")
+        url = f"{BASE_URL}/groups/{our_group['groupId']}/members/{users_mapping[missing_member]}/$ref"
         call_api(url, None, "DELETE")
         global members_removed
         members_removed += (
@@ -281,7 +281,7 @@ def add_our_members(our_group, their_members):
             users_not_found.add(missing_member)
 
     print_debug(
-        f'{len(names)} members to be added to group {our_group["groupId"]}'
+        f"{len(names)} members to be added to group {our_group['groupId']}"
     ) if len(names) > 0 else None
     for i in range(0, len(names), ADD_MEMBERS_CHUNK_SIZE):
         print_debug(f"Adding members of chunk #{i // ADD_MEMBERS_CHUNK_SIZE + 1}")

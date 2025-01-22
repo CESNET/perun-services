@@ -743,7 +743,7 @@ def patch_group(group_id, params):
 def add_members_to_group(their_group, member_ids):
     """Adds missing members to group in m365"""
     print_debug(
-        f'{len(member_ids)} members to be added to group {their_group["displayName"]}'
+        f"{len(member_ids)} members to be added to group {their_group['displayName']}"
     ) if len(member_ids) > 0 else None
     member_links = list(map(lambda m_id: f"{BASE_URL}/users/{m_id}", member_ids))
     for i in range(0, len(member_links), ADD_MEMBERS_CHUNK_SIZE):
@@ -756,9 +756,9 @@ def remove_members_from_group(their_group, member_ids):
     """Removes members that are not present in Perun."""
     for member_id in member_ids:
         print_debug(
-            f'Removing user {member_id} from group {their_group["displayName"]}'
+            f"Removing user {member_id} from group {their_group['displayName']}"
         )
-        url = f'{BASE_URL}/groups/{their_group["id"]}/members/{member_id}/$ref'
+        url = f"{BASE_URL}/groups/{their_group['id']}/members/{member_id}/$ref"
         call_api(url, None, "DELETE")
 
 
