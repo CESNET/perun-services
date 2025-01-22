@@ -1,5 +1,13 @@
 Upgrade notes
 
+## [16.3.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.3.0...v16.3.1) (2025-01-22)
+
+
+### Bug Fixes
+
+* formatted code that caused pipeline format check to fail ([1757344](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/17573445bf9e2a6420c310df8ba0e1c10fb3ee1c))
+* **safeq:** use new storage in homedir path ([cd103bd](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/cd103bd4b6294fadd50f4c61902e717555028033))
+
 ## [16.3.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.2.1...v16.3.0) (2025-01-09)
 
 
