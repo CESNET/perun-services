@@ -20,11 +20,6 @@ class Destination:
     URL_PATTERN = re.compile(
         r"^(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;()*$']*[-a-zA-Z0-9+&@#/%=~_|()*$']"
     )
-    EMAIL_PATTERN = re.compile(
-        r"^(?:[a-zA-Z0-9!#$%&'*+\/=?^_{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+\/=?^_{|}~-]+)*|"
-        r'"(?:[!#$%&\'*+\/=?^_{|}~\-\x20-\x7E]|\\[!#$%&\'*+\/=?^_{|}~\-\x20-\x7E])*")@'
-        r"(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$"
-    )
     S3_PATTERN = re.compile(
         r"^(https?://[-a-zA-Z0-9+&@#/%?=~_|!:,.;()*$']+)/([-a-zA-Z0-9+&@#%?=~_|!:,.;()*$'']+)$"
     )
@@ -179,17 +174,6 @@ class WindowsProxyDestination(Destination):
         return transformation_process
 
 
-class EmailDestination(Destination):
-    def __init__(self, destination: str, service_name: str, facility_name: str):
-        super().__init__(destination, service_name, facility_name)
-        self.check_destination_pattern = Destination.EMAIL_PATTERN
-        self.check_destination_format()
-        self.prepare_destination()
-
-    def prepare_destination(self):
-        pass
-
-
 class ServiceSpecificDestination(Destination):
     def __init__(self, destination: str, service_name: str, facility_name: str):
         super().__init__(destination, service_name, facility_name)
@@ -236,7 +220,6 @@ class UrlJsonDestination(Destination):
 
 class DestinationFactory:
     DESTINATION_TYPE_URL = "url"
-    DESTINATION_TYPE_EMAIL = "email"
     DESTINATION_TYPE_HOST = "host"
     DESTINATION_TYPE_USER_HOST = "user@host"
     DESTINATION_TYPE_USER_HOST_PORT = "user@host:port"
@@ -278,10 +261,7 @@ class DestinationFactory:
             == DestinationFactory.DESTINATION_TYPE_USER_HOST_WINDOWS_PROXY
         ):
             return WindowsProxyDestination(destination, service_name, facility_name)
-        elif (
-            destination_type == DestinationFactory.DESTINATION_TYPE_EMAIL
-            or destination_type == DestinationFactory.DESTINATION_TYPE_SERVICE_SPECIFIC
-        ):
+        elif destination_type == DestinationFactory.DESTINATION_TYPE_SERVICE_SPECIFIC:
             SysOperation.die_with_error(
                 f"Destination type {destination_type} is not supported yet."
             )

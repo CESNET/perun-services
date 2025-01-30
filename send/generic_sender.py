@@ -578,7 +578,6 @@ if __name__ == "__main__":
 
 # predefined different types of destination
 DESTINATION_TYPE_URL = "url"
-DESTINATION_TYPE_EMAIL = "email"
 DESTINATION_TYPE_HOST = "host"
 DESTINATION_TYPE_USER_HOST = "user@host"
 DESTINATION_TYPE_USER_HOST_PORT = "user@host:port"
@@ -602,11 +601,6 @@ USER_AT_HOST_PORT_PATTERN = re.compile(
 )
 URL_PATTERN = re.compile(
     r"^(https?|ftp|file)://[-a-zA-Z0-9+&@#/%?=~_|!:,.;()*$']*[-a-zA-Z0-9+&@#/%=~_|()*$']"
-)
-EMAIL_PATTERN = re.compile(
-    r"^(?:[a-zA-Z0-9!#$%&'*+\/=?^_{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+\/=?^_{|}~-]+)*|"
-    r'"(?:[!#$%&\'*+\/=?^_{|}~\-\x20-\x7E]|\\[!#$%&\'*+\/=?^_{|}~\-\x20-\x7E])*")@'
-    r"(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$"
 )
 SIMPLE_PATTERN = re.compile(r"\w+")
 
@@ -656,11 +650,6 @@ def check_destination_format(
         if not (re.fullmatch(USER_AT_HOST_PATTERN, destination)):
             SysOperation.die_with_error(
                 "Destination '" + destination + "' is not in valid format user@host"
-            )
-    elif destination_type == DESTINATION_TYPE_EMAIL:
-        if not (re.fullmatch(EMAIL_PATTERN, destination)):
-            SysOperation.die_with_error(
-                "Destination '" + destination + "'  is not in a valid format for email"
             )
     elif destination_type == DESTINATION_TYPE_SERVICE_SPECIFIC:
         pass
