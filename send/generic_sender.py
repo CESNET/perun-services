@@ -7,7 +7,9 @@ import sys
 import tempfile
 
 import boto3
+import botocore.handlers
 import requests
+from botocore.config import Config
 from destination_classes import (
     Destination,
     DestinationFactory,
@@ -308,6 +310,8 @@ class S3Transport(Transport):
 
     def __init__(self, destination: Destination, temp: tempfile.NamedTemporaryFile):
         super().__init__(destination, temp)
+        # Allow ':' in bucket name; ':' separate tenant and bucket in '<S3-bucket-address>'
+        botocore.handlers.VALID_BUCKET = re.compile(r"^[a-zA-Z0-9.\-_:]{1,255}$")
         access_key, secret_key = get_custom_config_properties(
             destination.service_name,
             destination.destination,
@@ -333,6 +337,10 @@ class S3Transport(Transport):
             endpoint_url=destination.endpoint,
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
+            config=Config(
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            ),
         )
 
     def prepare_transport(selfself, opts: str):
