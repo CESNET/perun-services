@@ -23,12 +23,28 @@ the bucket as <facility-name>/<g-zipped archive>.
 Access key and secret key must be configured in the service configuration file at
 `/etc/perun/services/{service_name}/{service_name}.py` file.
 
+Additionally, the following can also be specified in this file:
+
+- filename_extension
+  - if `True`, the uploaded file's name will be extended by date&time
+- url_endpoint
+  - url endpoint to be called after the upload to S3 has been completed
+- auth_type
+  - selects authentication type for the url_endpoint, if needed
+  - accepts `basic` or `bearer`, any other value behaves as if there was no auth_type
+- credentials
+  - credentials for the selected `auth_type`
+  - expected format for `basic`:
+    - `'credentials': { 'username': "<ba-username>", 'password': "<ba-password>" }`
+  - expected format for `bearer`:
+    - `'credentials': { 'token': "<bearer-token>" }`
+
 Example of such file, where `<S3-bucket-address>` is in the format of `{endpoint_url}/{bucket_name}`:
 
     credentials = {
-    "<S3-bucket-address>": { 'access_key': "<key>", 
-    'secret_key': "<key>", 'url_endpoint': "<url>", 'auth_type': "basic", 
-    'credentials': { 'username': "<ba-username>", 'password': "<ba-password>" } }
+    "<S3-bucket-address>": { 'access_key': "<key>", 'secret_key': "<key>",
+    'filename_extension': True/False, 'url_endpoint': "<url>", 
+    'auth_type': "basic", 'credentials': { 'username': "<ba-username>", 'password': "<ba-password>" } }
     }
 
 ### URL-JSON

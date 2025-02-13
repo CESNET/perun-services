@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 
 import boto3
 import botocore.handlers
@@ -312,10 +313,10 @@ class S3Transport(Transport):
         super().__init__(destination, temp)
         # Allow ':' in bucket name; ':' separate tenant and bucket in '<S3-bucket-address>'
         botocore.handlers.VALID_BUCKET = re.compile(r"^[a-zA-Z0-9.\-_:]{1,255}$")
-        access_key, secret_key = get_custom_config_properties(
+        access_key, secret_key, filename_extension = get_custom_config_properties(
             destination.service_name,
             destination.destination,
-            ["access_key", "secret_key"],
+            ["access_key", "secret_key", "filename_extension"],
         )
 
         if not (access_key and secret_key):
@@ -326,12 +327,15 @@ class S3Transport(Transport):
                              
                              credentials = {
                                 "<S3-bucket-address>": { 'access_key': "<key>", 
-                                'secret_key': "<key>", 'url_endpoint': "<url>", 'auth_type': "basic", 
-                                'credentials': { 'username': "<ba-username>", 'password': "<ba-password>" } }
+                                'secret_key': "<key>", 'filename_extension': True/False, 'url_endpoint': "<url>",
+                                'auth_type': "basic", 'credentials': { 'username': "<ba-username>", 'password': "<ba-password>" } }
                              }
                              """)
 
         self.bucket_name = destination.hostname
+        self.filename_extension = (
+            filename_extension if isinstance(filename_extension, bool) else False
+        )
         self.s3_client = boto3.client(
             "s3",
             endpoint_url=destination.endpoint,
@@ -365,15 +369,25 @@ class S3Transport(Transport):
         if process_tar.returncode != 0:
             print(stderr.decode("utf-8"), file=sys.stderr, end="")
 
-        key_name = f"{self.destination_class_obj.facility_name}/{os.path.basename(tar_output_path)}"
-        self.s3_client.upload_file(tar_output_path, self.bucket_name, key_name)
+        filename_extension_string = ""
 
-        print(f"Upload to S3 bucket ({self.bucket_name}) successful.")
+        if self.filename_extension:
+            filename_extension_string = (
+                f"_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}"
+            )
+
+        dst_filename = f"{self.destination_class_obj.facility_name}/{self.destination_class_obj.service_name}{filename_extension_string}.tar.gz"
+        s3_dst_filename_url = f"{self.destination_class_obj.destination}/{dst_filename}"
+        self.s3_client.upload_file(tar_output_path, self.bucket_name, dst_filename)
+
+        print(
+            f"Upload file ({dst_filename}) to S3 bucket ({self.bucket_name}) successful."
+        )
 
         # Call configured URL endpoint
-        self.call_url_endpoint()
+        self.call_url_endpoint(s3_dst_filename_url)
 
-    def call_url_endpoint(self):
+    def call_url_endpoint(self, s3_dst_filename_url):
         # Make the URL call if endpoint and auth configuration are present
         url, auth_type, credentials = get_custom_config_properties(
             self.destination_class_obj.service_name,
@@ -389,15 +403,21 @@ class S3Transport(Transport):
             elif auth_type == "bearer":
                 headers["Authorization"] = f"Bearer {credentials.get('token')}"
 
-            response = requests.post(url, headers=headers, auth=auth)
+            data = {"uploaded_filename": s3_dst_filename_url}
+            response = requests.post(
+                url,
+                headers=headers,
+                auth=auth,
+                json=data,
+            )
             if response.status_code not in range(200, 300):
                 print(
-                    f"Call to URL endpoint ({url}) failed. Status code: {response.status_code}",
+                    f"Call to URL endpoint ({url}) with data ({data}) failed. Status code: {response.status_code}",
                     file=sys.stderr,
                 )
             else:
                 print(
-                    f"Successfully called URL endpoint ({url}). Status code: {response.status_code}"
+                    f"Successfully called URL endpoint ({url}) with data ({data}). Status code: {response.status_code}"
                 )
         else:
             print(
