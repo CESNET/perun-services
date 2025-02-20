@@ -18,7 +18,6 @@ PERUN_CHAIN="/etc/perun/ssl/perun-send.chain"
 
 #predefined different types of destination
 DESTINATION_TYPE_URL="url"
-DESTINATION_TYPE_EMAIL="email"
 DESTINATION_TYPE_HOST="host"
 DESTINATION_TYPE_USER_HOST="user@host"
 DESTINATION_TYPE_USER_HOST_PORT="user@host:port"
@@ -115,10 +114,6 @@ case $DESTINATION_TYPE in
 	${DESTINATION_TYPE_HOST_WINDOWS_PROXY})
 		if [ -z "${WINDOWS_PROXY}" ]; then echo 'Variable WINDOWS_PROXY is not defined. It is usually defined in /etc/perun/services/generic_send/generic_send.conf.' >&2 ; exit 1; fi
 		HOST=`echo $WINDOWS_PROXY | sed -e 's/^.*@//'`
-		;;
-	${DESTINATION_TYPE_EMAIL})
-		echo "Destination type '$DESTINATION_TYPE' is not supported yet." >&2
-		exit 1;
 		;;
 	*)
 		echo "Unknown destination type '$DESTINATION_TYPE'." >&2
