@@ -202,6 +202,10 @@ class S3Destination(Destination):
         self.hostname = match.group(2)
 
 
+class S3JsonDestination(S3Destination):
+    """This class currently behaves exactly the same as S3Destination"""
+
+
 class UrlJsonDestination(Destination):
     def __init__(self, destination: str, service_name: str, facility_name: str):
         if service_name != "generic_json_gen":
@@ -227,6 +231,7 @@ class DestinationFactory:
     DESTINATION_TYPE_USER_HOST_WINDOWS_PROXY = "host-windows-proxy"
     DESTINATION_TYPE_SERVICE_SPECIFIC = "service-specific"
     DESTINATION_TYPE_S3 = "s3"
+    DESTINATION_TYPE_S3_JSON = "s3-json"
     DESTINATION_TYPE_URL_JSON = "url-json"
 
     @staticmethod
@@ -254,6 +259,8 @@ class DestinationFactory:
             return WindowsDestination(destination, service_name, facility_name)
         elif destination_type == DestinationFactory.DESTINATION_TYPE_S3:
             return S3Destination(destination, service_name, facility_name)
+        elif destination_type == DestinationFactory.DESTINATION_TYPE_S3_JSON:
+            return S3JsonDestination(destination, service_name, facility_name)
         elif destination_type == DestinationFactory.DESTINATION_TYPE_URL_JSON:
             return UrlJsonDestination(destination, service_name, facility_name)
         elif (
