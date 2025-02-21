@@ -1,5 +1,13 @@
 Upgrade notes
 
+## [16.4.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.3.1...v16.4.0) (2025-02-21)
+
+
+### Features
+
+* allow specify tenant for S3 destination and change configuration for s3 checksum ([583020d](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/583020dbaf473b688dc10ea93ca8ea6558cd922e))
+* s3-allow to add date&time filename ext ([55931c5](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/55931c5160f8cb6f54bb4773474981b53972e1ce))
+
 ## [16.3.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.3.0...v16.3.1) (2025-01-22)
 
 
