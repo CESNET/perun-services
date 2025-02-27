@@ -9,7 +9,7 @@ use Tie::IxHash;
 
 our $SERVICE_NAME = "pbsmon_json";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -95,6 +95,7 @@ foreach my $facility (@facilities) {
 		push @facilityVosShortNames, $voShortName;
 	}
 
+	my $ownerAttr = $data->getFacilityAttributeValue(attrName => $A_FACILITY_OWNER);
 	@facilityVosShortNames = sort @facilityVosShortNames;
 	my %facilityStruc;
 	tie %facilityStruc, 'Tie::IxHash';
@@ -110,7 +111,7 @@ foreach my $facility (@facilities) {
 		disk => $data->getFacilityAttributeValue(attrName => $A_FACILITY_DISK),
 		network => $data->getFacilityAttributeValue(attrName => $A_FACILITY_NETWORK),
 		comment => $data->getFacilityAttributeValue(attrName => $A_FACILITY_COMMENT),
-		owner => $data->getFacilityAttributeValue(attrName => $A_FACILITY_OWNER),
+		owner => {cs => $ownerAttr->{"cs"}, en => (defined($ownerAttr->{"en"}) ? $ownerAttr->{"en"} : $ownerAttr->{"cs"})},
 		vos => \@facilityVosShortNames,
 	);
 
@@ -126,32 +127,24 @@ foreach my $facility (@facilities) {
 for my $item (sort { $b->{"facilityListingPriority"} <=> $a->{"facilityListingPriority"} } @facilitesAndAttrbutes) {
 	my $facility = $item->{"facility"};
 	my $facilityStruc = $item->{"facilityStruct"};
-	my @owners = $facilitiesAgent->getOwners(facility => $facility->getId);
 
-	my $mergedOwner = '';  # if facility have multiple owner merge their names into one, separeter by commas
-	for my $owner (@owners) {
-		if($owner->getType eq 'administrative') {
-			$mergedOwner .= ', ' if($mergedOwner);
-			$mergedOwner .= $owner->getName;
-		}
-	}
-	unless(defined $physicalMachinesStruc->{$mergedOwner}) {
-		my %ownerStruc = (  id => $mergedOwner,
-			name => { cs => $mergedOwner,
-				en => $mergedOwner,
+	unless(defined $physicalMachinesStruc->{$facilityStruc->{"owner"}->{"cs"}}) {
+		my %ownerStruc = (  id => $facilityStruc->{"owner"}->{"cs"},
+			name => { cs => $facilityStruc->{"owner"}->{"cs"},
+				en => $facilityStruc->{"owner"}->{"en"},
 			},
 			resources => [],
 			url =>  { cs => undef,
 				en => undef,
 			},
-			spec => { cs => $mergedOwner,
-				en => $mergedOwner,
+			spec => { cs => $facilityStruc->{"owner"}->{"cs"},
+				en => $facilityStruc->{"owner"}->{"en"},
 			}
 		);
-		$physicalMachinesStruc->{$mergedOwner} = \%ownerStruc;
+		$physicalMachinesStruc->{$facilityStruc->{"owner"}->{"cs"}} = \%ownerStruc;
 	}
 
-	push @{$physicalMachinesStruc->{$mergedOwner}->{'resources'}}, $facilityStruc;
+	push @{$physicalMachinesStruc->{$facilityStruc->{"owner"}->{"cs"}}->{'resources'}}, $facilityStruc;
 
 
 	my @hosts = $facilitiesAgent->getHosts(facility => $facility->getId);
