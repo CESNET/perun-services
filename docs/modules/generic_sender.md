@@ -56,6 +56,15 @@ If there is no JSON file or more than one, the script raises an error.
 
 For now, this destination type can only be used with `generic_json_gen` script
 
+### S3-JSON
+Extension of the S3 destination type.
+
+This destination type sends a single JSON file to target S3 bucket instead of g-zipped archive of the entire
+generated data.
+
+Configuration is the same as with the S3 destination type. Access key and secret key must be configured, while all
+the other optional parameters can also be set. Path to the configuration file is the same: `/etc/perun/services/{service_name}/{service_name}.py`
+
 
 ### Unsupported destination types
 The following destination types are not supported yet:

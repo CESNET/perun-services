@@ -1,4 +1,3 @@
-import importlib
 import os
 import re
 import shutil
@@ -15,12 +14,11 @@ from destination_classes import (
     Destination,
     DestinationFactory,
     S3Destination,
+    S3JsonDestination,
     UrlDestination,
     UrlJsonDestination,
 )
 from sys_operation_classes import SysOperation
-
-SERVICES_DIR = "/etc/perun/services"
 
 
 class Transport:
@@ -313,10 +311,12 @@ class S3Transport(Transport):
         super().__init__(destination, temp)
         # Allow ':' in bucket name; ':' separate tenant and bucket in '<S3-bucket-address>'
         botocore.handlers.VALID_BUCKET = re.compile(r"^[a-zA-Z0-9.\-_:]{1,255}$")
-        access_key, secret_key, filename_extension = get_custom_config_properties(
-            destination.service_name,
-            destination.destination,
-            ["access_key", "secret_key", "filename_extension"],
+        access_key, secret_key, filename_extension = (
+            SysOperation.get_custom_config_properties(
+                destination.service_name,
+                destination.destination,
+                ["access_key", "secret_key", "filename_extension"],
+            )
         )
 
         if not (access_key and secret_key):
@@ -369,27 +369,42 @@ class S3Transport(Transport):
         if process_tar.returncode != 0:
             print(stderr.decode("utf-8"), file=sys.stderr, end="")
 
-        filename_extension_string = ""
+        dst_filename = self.prepare_dst_filename(
+            f"{self.destination_class_obj.facility_name}/{self.destination_class_obj.service_name}",
+            "tar.gz",
+        )
+        s3_dst_filename_url = self.upload_file_to_s3(tar_output_path, dst_filename)
 
+        # Call configured URL endpoint
+        self.call_url_endpoint(s3_dst_filename_url)
+
+    def prepare_dst_filename(self, filename_base, format):
+        filename_extension_string = ""
         if self.filename_extension:
             filename_extension_string = (
                 f"_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}"
             )
 
-        dst_filename = f"{self.destination_class_obj.facility_name}/{self.destination_class_obj.service_name}{filename_extension_string}.tar.gz"
+        return f"{filename_base}{filename_extension_string}.{format}"
+
+    def upload_file_to_s3(self, local_filepath, dst_filename):
+        """
+        Uploads file to S3 Bucket using boto3 library. Returns url of the uploaded file
+
+        :param local_filepath: Path to the local file being uploaded
+        :param dst_filename: Name the uploaded file should have in the S3 bucket
+        :return: url of the uploaded file
+        """
         s3_dst_filename_url = f"{self.destination_class_obj.destination}/{dst_filename}"
-        self.s3_client.upload_file(tar_output_path, self.bucket_name, dst_filename)
-
+        self.s3_client.upload_file(local_filepath, self.bucket_name, dst_filename)
         print(
-            f"Upload file ({dst_filename}) to S3 bucket ({self.bucket_name}) successful."
+            f"Upload of file ({dst_filename}) to S3 bucket ({self.bucket_name}) successful."
         )
-
-        # Call configured URL endpoint
-        self.call_url_endpoint(s3_dst_filename_url)
+        return s3_dst_filename_url
 
     def call_url_endpoint(self, s3_dst_filename_url):
         # Make the URL call if endpoint and auth configuration are present
-        url, auth_type, credentials = get_custom_config_properties(
+        url, auth_type, credentials = SysOperation.get_custom_config_properties(
             self.destination_class_obj.service_name,
             self.destination_class_obj.destination,
             ["url_endpoint", "auth_type", "credentials"],
@@ -426,32 +441,43 @@ class S3Transport(Transport):
             )
 
 
+class S3JsonTransport(S3Transport):
+    def send(self):
+        """
+        Custom send function, since we are not generating any command here, but rather using boto3.
+        """
+        json_file_path = SysOperation.get_generated_json_file_path(
+            self.destination_class_obj.facility_name,
+            self.destination_class_obj.service_name,
+        )
+
+        file_basename = os.path.splitext(os.path.basename(json_file_path))[0]
+
+        dst_filename = self.prepare_dst_filename(
+            f"{self.destination_class_obj.facility_name}/{file_basename}",
+            "json",
+        )
+
+        s3_dst_filename_url = self.upload_file_to_s3(json_file_path, dst_filename)
+
+        # Call configured URL endpoint
+        self.call_url_endpoint(s3_dst_filename_url)
+
+
 class UrlJsonTransport(UrlTransport):
     def init_transport_command(
         self, content_type: str = "application/json", method: str = "PUT"
     ):
         return super().init_transport_command(content_type, method)
 
-    def get_generated_json_file_path(self):
-        generated_files_dir = SysOperation.get_gen_folder(
-            self.destination_class_obj.facility_name,
-            self.destination_class_obj.service_name,
-        )
-
-        json_files = [f for f in os.listdir(generated_files_dir) if f.endswith(".json")]
-        if len(json_files) != 1:
-            raise FileNotFoundError(
-                "Expected one generated JSON file, found " + str(len(json_files))
-            )
-
-        json_file_path = os.path.join(generated_files_dir, json_files[0])
-        return json_file_path
-
     def send(self):
         """
         Send JSON data to the destination. Prepares transport command, processes JSON data, and executes the transport.
         """
-        json_file_path = self.get_generated_json_file_path()
+        json_file_path = SysOperation.get_generated_json_file_path(
+            self.destination_class_obj.facility_name,
+            self.destination_class_obj.service_name,
+        )
 
         with open(json_file_path, "rb") as json_file:
             self.transport_command = self.prepend_timeout_command(
@@ -482,6 +508,8 @@ class TransportFactory:
         """
         if isinstance(destination, UrlDestination):
             return UrlTransport(destination, temp)
+        elif isinstance(destination, S3JsonDestination):
+            return S3JsonTransport(destination, temp)
         elif isinstance(destination, S3Destination):
             return S3Transport(destination, temp)
         elif isinstance(destination, UrlJsonDestination):
@@ -552,39 +580,6 @@ def check_input_fields(
             SysOperation.die_with_error(
                 "Error: Expected number of arguments is 2 or 3 (FACILITY_NAME, DESTINATION and optional DESTINATION_TYPE)"
             )
-
-
-def get_custom_config_properties(
-    service_name: str, destination: str, properties: list[str]
-):
-    """
-    Retrieves custom properties from config file in /etc/perun/services/{service_name}/{service_name}.py file.
-
-    Example of such file - supplement $ variables with destination, property names and values
-    credentials = {
-                    "$url1": { '$property_1': "$our_token", '$property_2': "$our_secret" },
-                    "$url2": { '$property_1': "$our_other_token", '$property_2': "$our_other_secret" }
-    }
-
-    :param service_name: name of the service
-        (used both as the folder name and the credentials python file name)
-    :param destination: key used to search in the credentials map
-    :param properties: list of properties to be retrieved
-    :return: list of values in the same order as provided properties,
-                             None if file does not exist or any property is missing
-    """
-    try:
-        sys.path.insert(1, f"{SERVICES_DIR}/{service_name}/")
-        credentials = importlib.import_module(service_name).credentials
-        result = []
-        if destination in credentials:
-            for p in properties:
-                result.append(credentials.get(destination).get(p))
-
-        return result
-    except Exception:
-        # this means that config file does not exist or properties are not set
-        return None
 
 
 if __name__ == "__main__":
