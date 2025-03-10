@@ -1,5 +1,18 @@
 Upgrade notes
 
+## [16.5.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.4.0...v16.5.0) (2025-03-10)
+
+
+### Features
+
+* add new destination s3-json ([c2b9de2](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/c2b9de21bede3996c54465e542dfbb58b77f679a))
+
+
+### Bug Fixes
+
+* fix url-json improper service check ([531ae6d](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/531ae6d79f89f383884f03b7397f8fb5ca6b156d))
+* **pbsmon_json:** owner attr ([04572b0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/04572b0b0ff58c58fb959d09cfcc4f27daec694c))
+
 ## [16.4.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.3.1...v16.4.0) (2025-02-21)
 
 
