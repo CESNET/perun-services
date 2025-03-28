@@ -19,6 +19,7 @@ my $DIRECTORY = perunServicesInit::getDirectory;
 our $A_FACILITY_NAME;             *A_FACILITY_NAME =              \'urn:perun:facility:attribute-def:def:displayName';
 our $A_FACILITY_COMMENT;          *A_FACILITY_COMMENT =           \'urn:perun:facility:attribute-def:def:comment';
 our $A_FACILITY_CPU;              *A_FACILITY_CPU =               \'urn:perun:facility:attribute-def:def:cpu';
+our $A_FACILITY_GPU;              *A_FACILITY_GPU =               \'urn:perun:facility:attribute-def:def:gpu';
 our $A_FACILITY_DESC;             *A_FACILITY_DESC =              \'urn:perun:facility:attribute-def:def:desc';
 our $A_FACILITY_DISK;             *A_FACILITY_DISK =              \'urn:perun:facility:attribute-def:def:disk';
 our $A_FACILITY_MEMORY;           *A_FACILITY_MEMORY =            \'urn:perun:facility:attribute-def:def:memory';
@@ -105,6 +106,7 @@ foreach my $facility (@facilities) {
 		desc => $data->getFacilityAttributeValue(attrName => $A_FACILITY_DESC),
 		spec => $data->getFacilityAttributeValue(attrName => $A_FACILITY_SPEC),
 		cpudesc => $data->getFacilityAttributeValue(attrName => $A_FACILITY_CPU),
+		gpudesc => $data->getFacilityAttributeValue(attrName => $A_FACILITY_GPU),
 		photo => $data->getFacilityAttributeValue(attrName => $A_FACILITY_PHOTO),
 		thumbnail => $data->getFacilityAttributeValue(attrName => $A_FACILITY_THUMBNAIL),
 		memory => $data->getFacilityAttributeValue(attrName => $A_FACILITY_MEMORY),
