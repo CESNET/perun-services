@@ -1,3 +1,9 @@
+perun-slave-process-drupal-elixir (3.1.11) stable; urgency=low
+
+  * Fix swapped exit codes.
+
+ -- Jan Pavlíček <pavlicek@ics.muni.cz>  Mon, 31 Mar 2025 14:30:00 +0200
+
 perun-slave-process-drupal-elixir (3.1.10) stable; urgency=low
 
   * Move also duplicities and invalid users files.

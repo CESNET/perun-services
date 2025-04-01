@@ -38,13 +38,13 @@ function process {
 		fi
 	done
 
-  EXIT_CODE=1
+	EXIT_CODE=0
 	FILE_USER_DUPLICATES="${WORK_DIR}/${FILE_USERS_DUPLICITIES}"
 	#there are some duplicates between emails, need to end with warning
 	if [ -s "${FILE_USER_DUPLICATES}" ]; then
 		DUPLICATES=`cat $FILE_USER_DUPLICATES`
 		log_warn_to_err "Email duplicates: ${DUPLICATES}"
-		EXIT_CODE=0
+		EXIT_CODE=1
 	fi
 
 	FILE_USER_INVALID_NAMES="${WORK_DIR}/${FILE_USERS_INVALID_NAMES}"
@@ -52,7 +52,7 @@ function process {
 	if [ -s "${FILE_USER_INVALID_NAMES}" ]; then
 		INVALID_NAMES=`cat $FILE_USER_INVALID_NAMES`
 		log_warn_to_err "Invalid user names: ${INVALID_NAMES}"
-		EXIT_CODE=0
+		EXIT_CODE=1
 	fi
 
 	exit $EXIT_CODE
