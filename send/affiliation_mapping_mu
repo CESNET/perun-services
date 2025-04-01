@@ -1,4 +1,0 @@
-#!/bin/bash
-export SERVICE_NAME="affiliation_mapping_mu"
-
-python3 generic_sender.py "$1" "$2" "$3"

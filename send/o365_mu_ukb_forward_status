@@ -1,4 +1,0 @@
-#!/bin/bash
-SERVICE_NAME="o365_mu_ukb_forward_status"
-
-. generic_send
