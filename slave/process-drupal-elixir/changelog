@@ -7,7 +7,7 @@ perun-slave-process-drupal-elixir (3.1.12) stable; urgency=low
 
 perun-slave-process-drupal-elixir (3.1.11) stable; urgency=low
 
-  * Fix swapped exit codes.
+  * Fix always end with 0 exit code.
 
  -- Jan Pavlíček <pavlicek@ics.muni.cz>  Mon, 31 Mar 2025 14:30:00 +0200
 
