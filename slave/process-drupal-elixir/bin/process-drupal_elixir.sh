@@ -26,18 +26,6 @@ function process {
 
 	done
 
-	HOME_DIR=`eval echo ~`
-
-	for FILE in $FILE_USERS $FILE_GROUPS $FILE_MEMBERSHIPS $FILE_USERS_DUPLICITIES $FILE_USERS_INVALID_NAMES ; do
-		diff_mv_sync "$WORK_DIR/$FILE" "$HOME_DIR/$FILE"
-
-		if [ $? -eq 0 ]; then
-			log_msg I_CHANGED
-		else
-			log_msg I_NOT_CHANGED
-		fi
-	done
-
 	EXIT_CODE=0
 	FILE_USER_DUPLICATES="${WORK_DIR}/${FILE_USERS_DUPLICITIES}"
 	#there are some duplicates between emails, need to end with warning
@@ -54,6 +42,18 @@ function process {
 		log_warn_to_err "Invalid user names: ${INVALID_NAMES}"
 		EXIT_CODE=1
 	fi
+
+	HOME_DIR=`eval echo ~`
+
+	for FILE in $FILE_USERS $FILE_GROUPS $FILE_MEMBERSHIPS $FILE_USERS_DUPLICITIES $FILE_USERS_INVALID_NAMES ; do
+		diff_mv_sync "$WORK_DIR/$FILE" "$HOME_DIR/$FILE"
+
+		if [ $? -eq 0 ]; then
+			log_msg I_CHANGED
+		else
+			log_msg I_NOT_CHANGED
+		fi
+	done
 
 	exit $EXIT_CODE
 }
