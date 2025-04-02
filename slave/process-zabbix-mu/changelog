@@ -1,5 +1,0 @@
-perun-slave-process-zabbix-mu (3.0.0) stable; urgency=low
-
-  * New package for processing service zabbix for Masaryk University
-
- -- David Flor <493294@mail.muni.cz>  Tue, 28 Feb 2023 11:45:00 +0100
