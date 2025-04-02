@@ -1,5 +1,24 @@
 Upgrade notes
 
+## [16.6.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.5.0...v16.6.0) (2025-04-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **crm_ceitec:** Remove authz file for SOAP endpoint from instance configuration.
+
+### Features
+
+* **crm_ceitec:** support new json api endpoints ([9d1ec69](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/9d1ec6903c79190633135d024488c94cf8f618f8))
+* **pbsmon_json:** extend export with gpu attribute ([e8be012](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/e8be012571fbd7f61b9da1c321b4ce713130b229))
+
+
+### Bug Fixes
+
+* **drupal_elixir:** check duplicates and invalid names before moving files ([00167b3](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/00167b3ea8c1ff823af25d8bd3b0d0cdc9c10f1c))
+* **drupal_elixir:** script always ends with 0 ([deb67dc](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/deb67dca7282c07756b8ed45dc7ffe7d72a21955))
+* **drupal_elixir:** swapped exit codes ([5b353e3](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/5b353e3c33cf7eaaeac5e6eba31706301277b4d4))
+
 ## [16.5.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.4.0...v16.5.0) (2025-03-10)
 
 
