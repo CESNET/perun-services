@@ -1,3 +1,16 @@
+perun-slave-process-drupal-elixir (3.1.12) stable; urgency=low
+
+  * Check user duplicities and invalid names before moving the
+    files to home directory.
+
+ -- Jan Pavlíček <pavlicek@ics.muni.cz>  Tue, 1 Apr 2025 16:10:00 +0200
+
+perun-slave-process-drupal-elixir (3.1.11) stable; urgency=low
+
+  * Fix always end with 0 exit code.
+
+ -- Jan Pavlíček <pavlicek@ics.muni.cz>  Mon, 31 Mar 2025 14:30:00 +0200
+
 perun-slave-process-drupal-elixir (3.1.10) stable; urgency=low
 
   * Move also duplicities and invalid users files.

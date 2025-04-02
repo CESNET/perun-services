@@ -26,6 +26,20 @@ function process {
 
 	done
 
+	FILE_USER_DUPLICATES="${WORK_DIR}/${FILE_USERS_DUPLICITIES}"
+	#there are some duplicates between emails, need to end with warning
+	if [ -s "${FILE_USER_DUPLICATES}" ]; then
+		DUPLICATES=`cat $FILE_USER_DUPLICATES`
+		log_warn_to_err "Email duplicates: ${DUPLICATES}"
+	fi
+
+	FILE_USER_INVALID_NAMES="${WORK_DIR}/${FILE_USERS_INVALID_NAMES}"
+	#there are some users without first and/or last names, need to end with warning
+	if [ -s "${FILE_USER_INVALID_NAMES}" ]; then
+		INVALID_NAMES=`cat $FILE_USER_INVALID_NAMES`
+		log_warn_to_err "Invalid user names: ${INVALID_NAMES}"
+	fi
+
 	HOME_DIR=`eval echo ~`
 
 	for FILE in $FILE_USERS $FILE_GROUPS $FILE_MEMBERSHIPS $FILE_USERS_DUPLICITIES $FILE_USERS_INVALID_NAMES ; do
@@ -37,23 +51,4 @@ function process {
 			log_msg I_NOT_CHANGED
 		fi
 	done
-
-  EXIT_CODE=1
-	FILE_USER_DUPLICATES="${WORK_DIR}/${FILE_USERS_DUPLICITIES}"
-	#there are some duplicates between emails, need to end with warning
-	if [ -s "${FILE_USER_DUPLICATES}" ]; then
-		DUPLICATES=`cat $FILE_USER_DUPLICATES`
-		log_warn_to_err "Email duplicates: ${DUPLICATES}"
-		EXIT_CODE=0
-	fi
-
-	FILE_USER_INVALID_NAMES="${WORK_DIR}/${FILE_USERS_INVALID_NAMES}"
-	#there are some users without first and/or last names, need to end with warning
-	if [ -s "${FILE_USER_INVALID_NAMES}" ]; then
-		INVALID_NAMES=`cat $FILE_USER_INVALID_NAMES`
-		log_warn_to_err "Invalid user names: ${INVALID_NAMES}"
-		EXIT_CODE=0
-	fi
-
-	exit $EXIT_CODE
 }
