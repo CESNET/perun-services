@@ -23,11 +23,11 @@ sub processMemberships;
 
 #Constants
 our $A_USER_ID;                   *A_USER_ID =               \'urn:perun:user:attribute-def:core:id';
-our $A_USER_LOGIN;                *A_USER_LOGIN =            \'urn:perun:user:attribute-def:def:login-namespace:elixir';
+our $A_USER_LOGIN;                *A_USER_LOGIN =            \'urn:perun:user:attribute-def:def:login-namespace:lifescienceid-username';
 our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:attribute-def:core:status';
 our $A_MEMBER_IS_SUSPENDED;       *A_MEMBER_IS_SUSPENDED =   \'urn:perun:member:attribute-def:virt:isSuspended';
 our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
-our $A_USER_EPPNS;                *A_USER_EPPNS =            \'urn:perun:user:attribute-def:virt:eduPersonPrincipalNames';
+our $A_USER_LS_ID;                *A_USER_LS_ID =            \'urn:perun:user:attribute-def:virt:login-namespace:lifescienceid-persistent';
 our $A_USER_D_NAME;               *A_USER_D_NAME =           \'urn:perun:user:attribute-def:core:displayName';
 our $A_USER_F_NAME;               *A_USER_F_NAME =           \'urn:perun:user:attribute-def:core:firstName';
 our $A_USER_L_NAME;               *A_USER_L_NAME =           \'urn:perun:user:attribute-def:core:lastName';
@@ -52,7 +52,7 @@ our $uEmail = {};
 our $uName = {};
 our $uFirstName = {};
 our $uLastName = {};
-our $uEppn = {};
+our $uLsId = {};
 
 our $duplicityUserStruc = {};
 our $invalidNamesUserStruc = {};
@@ -88,11 +88,11 @@ foreach my $uid (sort keys %$userStruc) {
 	my $status = $userStruc->{$uid}->{$uStatus};
 	my $email = $userStruc->{$uid}->{$uEmail};
 	my $name = $userStruc->{$uid}->{$uName};
-	my $eppn = $userStruc->{$uid}->{$uEppn};
+	my $lsId = $userStruc->{$uid}->{$uLsId};
 	my $firstName = $userStruc->{$uid}->{$uFirstName};
 	my $lastName = $userStruc->{$uid}->{$uLastName};
 
-	print FILE_USERS "$uid,$login,$status,$email,$name,$eppn,$firstName,$lastName\n";
+	print FILE_USERS "$uid,$login,$status,$email,$name,$lsId,$firstName,$lastName\n";
 }
 close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
 
@@ -100,7 +100,7 @@ close (FILE_USERS) or die "Cannot close $fileUsers: $! \n";
 open FILE_GROUPS,">$fileGroups" or die "Cannot open $fileGroups: $! \n";
 foreach my $gid (sort keys %$groupStruc) {
 	my $name = $groupStruc->{$gid}->{$gName};
-	my $type = $groupStruc->{$gid}->{$gType}; 
+	my $type = $groupStruc->{$gid}->{$gType};
 	my $parentId = $groupStruc->{$gid}->{$gParentId} ? $groupStruc->{$gid}->{$gParentId} : 0;
 	print FILE_GROUPS "$gid,$name,$type,$parentId\n";
 }
@@ -159,6 +159,8 @@ sub processUsers {
 	my $uid = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
 	my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
 	my $status = $data->getMemberAttributeValue( member => $memberId, attrName => $A_USER_STATUS );
+	my $lsId = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LS_ID );
+
 	if ($data->getMemberAttributeValue( member => $memberId, attrName => $A_MEMBER_IS_SUSPENDED )) {
 		$status = $STATUS_SUSPENDED;
 	}
@@ -169,7 +171,7 @@ sub processUsers {
 		$displayName = "";
 		$user_name_validity = $USER_NAME_INVALID;
 	}
-	
+
 	my $firstName = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_F_NAME );
 	if (not defined($firstName)) {
 		$firstName = "";
@@ -181,12 +183,6 @@ sub processUsers {
 		$lastName = "";
 		$user_name_validity = $USER_NAME_INVALID;
 	}
-
-	# Select right eppn from the list of eppns
-	my @eppns = @{$data->getUserAttributeValue( member => $memberId, attrName => $A_USER_EPPNS)};
-
-	#select first eppn which ends with '@elixir-europe.org', if there is no one matching select first eppn, if there is no eppn at all use empty string
-	my $eppn = (grep /\@elixir-europe.org$/, @eppns)[0] || $eppns[0] || "";
 
 	if ($user_name_validity eq $USER_NAME_INVALID) {
 		$invalidNamesUserStruc->{$uid}->{$uLogin} = $login;
@@ -223,7 +219,7 @@ sub processUsers {
 			$userStruc->{$uid}->{$uName} = $displayName;
 			$userStruc->{$uid}->{$uFirstName} = $firstName;
 			$userStruc->{$uid}->{$uLastName} = $lastName;
-			$userStruc->{$uid}->{$uEppn} = $eppn;
+			$userStruc->{$uid}->{$uLsId} = $lsId;
 			$lowerCaseEmailStruc->{$lowerCaseEmail} = 1;
 		}
 	}
@@ -244,7 +240,7 @@ sub processGroups {
 	my ($groupId, $resourceId) = @_;
 
 	if($data->getGroupAttributeValue( group => $groupId, attrName => $A_GROUP_NAME )) {
-		my $groupName = $data->getGroupAttributeValue( group => $groupId, attrName => $A_GROUP_NAME ),
+		my $groupName = $data->getGroupAttributeValue( group => $groupId, attrName => $A_GROUP_NAME );
 		my $groupParentID = $data->getGroupAttributeValue( group => $groupId, attrName => $A_PARENT_GROUP_ID );
 		my $groupType;
 
