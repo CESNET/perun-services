@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [16.7.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.6.0...v16.7.0) (2025-04-23)
+
+
+### Features
+
+* s3 destinations customizable filename extension ([0baf505](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/0baf5055ab9a28a054abfa40306e9e6f8fc78534))
+
 ## [16.6.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.5.0...v16.6.0) (2025-04-02)
 
 
