@@ -26,7 +26,11 @@ Access key and secret key must be configured in the service configuration file a
 Additionally, the following can also be specified in this file:
 
 - filename_extension
-  - if `True`, the uploaded file's name will be extended by date&time
+  - if `True`, the uploaded file's name will be by default extended by date&time
+  - the exact format of the extension can be set by the `extension_format` config option
+- extension_format
+  - modifies the format of `filename_extension` if it is set to true.
+  - The content should be a string which is then parsable by `datetime.strftime()`, e.g. '%Y-%m-%d'
 - url_endpoint
   - url endpoint to be called after the upload to S3 has been completed
 - auth_type
