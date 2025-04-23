@@ -311,11 +311,11 @@ class S3Transport(Transport):
         super().__init__(destination, temp)
         # Allow ':' in bucket name; ':' separate tenant and bucket in '<S3-bucket-address>'
         botocore.handlers.VALID_BUCKET = re.compile(r"^[a-zA-Z0-9.\-_:]{1,255}$")
-        access_key, secret_key, filename_extension = (
+        access_key, secret_key, filename_extension, extension_format = (
             SysOperation.get_custom_config_properties(
                 destination.service_name,
                 destination.destination,
-                ["access_key", "secret_key", "filename_extension"],
+                ["access_key", "secret_key", "filename_extension", "extension_format"],
             )
         )
 
@@ -327,14 +327,21 @@ class S3Transport(Transport):
                              
                              credentials = {
                                 "<S3-bucket-address>": { 'access_key': "<key>", 
-                                'secret_key': "<key>", 'filename_extension': True/False, 'url_endpoint': "<url>",
-                                'auth_type': "basic", 'credentials': { 'username': "<ba-username>", 'password': "<ba-password>" } }
+                                'secret_key': "<key>", 'filename_extension': True/False,
+                                 'extension_format': "<strftime()-friendly string>", 'url_endpoint': "<url>",
+                                  'auth_type': "basic",
+                                  'credentials': { 'username': "<ba-username>", 'password': "<ba-password>" } }
                              }
                              """)
 
         self.bucket_name = destination.hostname
         self.filename_extension = (
             filename_extension if isinstance(filename_extension, bool) else False
+        )
+        self.extension_format = (
+            extension_format
+            if isinstance(extension_format, str)
+            else "%Y-%m-%d_%H:%M:%S"
         )
         self.s3_client = boto3.client(
             "s3",
@@ -382,7 +389,7 @@ class S3Transport(Transport):
         filename_extension_string = ""
         if self.filename_extension:
             filename_extension_string = (
-                f"_{datetime.now().strftime('%Y-%m-%d_%H:%M:%S')}"
+                f"_{datetime.now().strftime(self.extension_format)}"
             )
 
         return f"{filename_base}{filename_extension_string}.{format}"
