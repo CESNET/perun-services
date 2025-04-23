@@ -25,17 +25,19 @@ sub processMemberships;
 sub getDenbiMembersForGroup;
 
 #Constants
-our $A_USER_ID;                   *A_USER_ID =               \'urn:perun:user:attribute-def:core:id';
-our $A_USER_STATUS;               *A_USER_STATUS =           \'urn:perun:member:attribute-def:core:status';
-our $A_USER_EMAIL;                *A_USER_EMAIL =            \'urn:perun:user:attribute-def:def:preferredMail';
-our $A_USER_LOGIN_PERSISTENT;     *A_USER_LOGIN_PERSISTENT = \'urn:perun:user:attribute-def:virt:login-namespace:elixir-persistent';
-our $A_USER_LOGIN;                *A_USER_LOGIN =            \'urn:perun:user:attribute-def:def:login-namespace:elixir';
-our $A_USER_MAIL;                 *A_USER_MAIL =             \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_ID;                   *A_USER_ID =                  \'urn:perun:user:attribute-def:core:id';
+our $A_USER_STATUS;               *A_USER_STATUS =              \'urn:perun:member:attribute-def:core:status';
+our $A_USER_EMAIL;                *A_USER_EMAIL =               \'urn:perun:user:attribute-def:def:preferredMail';
+our $A_USER_LOGIN_PERSISTENT;     *A_USER_LOGIN_PERSISTENT =    \'urn:perun:user:attribute-def:virt:login-namespace:elixir-persistent';
+our $A_USER_LS_LOGIN_PERSISTENT;  *A_USER_LS_LOGIN_PERSISTENT = \'urn:perun:user:attribute-def:virt:login-namespace:lifescienceid-persistent';
+our $A_USER_LOGIN;                *A_USER_LOGIN =               \'urn:perun:user:attribute-def:def:login-namespace:elixir';
+our $A_USER_LS_LOGIN;             *A_USER_LS_LOGIN =            \'urn:perun:user:attribute-def:def:login-namespace:lifescienceid-username';
+our $A_USER_MAIL;                 *A_USER_MAIL =                \'urn:perun:user:attribute-def:def:preferredMail';
 
-our $A_GROUP_ID;                  *A_GROUP_ID =              \'urn:perun:group:attribute-def:core:id';
-our $A_GROUP_NAME;                *A_GROUP_NAME =            \'urn:perun:group:attribute-def:core:name';
-our $A_GROUP_DESCRIPTION;         *A_GROUP_DESCRIPTION =     \'urn:perun:group:attribute-def:core:description';
-our $A_GROUP_PAR_ID;              *A_GROUP_PAR_ID =          \'urn:perun:group:attribute-def:core:parentGroupId';
+our $A_GROUP_ID;                  *A_GROUP_ID =                 \'urn:perun:group:attribute-def:core:id';
+our $A_GROUP_NAME;                *A_GROUP_NAME =               \'urn:perun:group:attribute-def:core:name';
+our $A_GROUP_DESCRIPTION;         *A_GROUP_DESCRIPTION =        \'urn:perun:group:attribute-def:core:description';
+our $A_GROUP_PAR_ID;              *A_GROUP_PAR_ID =             \'urn:perun:group:attribute-def:core:parentGroupId';
 
 our $A_GROUP_DENBI_PROJECT_MEMBERS;   *A_GROUP_DENBI_PROJECT_MEMBERS =      \'urn:perun:group:attribute-def:virt:denbiProjectMembers';
 
@@ -64,7 +66,9 @@ our $STATUS_SUSPENDED;            *STATUS_SUSPENDED =        \'SUSPENDED';
 our $idFriendlyName = "id";
 our $mailFriendlyName = "preferredMail";
 our $loginFriendlyName = "login-namespace:elixir";
+our $lsLoginFriendlyName = "login-namespace:lifescienceid-username"
 our $persLoginFriendlyName = "login-namespace:elixir-persistent";
+our $persLsLoginFriendlyName =  "login-namespace:lifescienceid-persistent"
 
 my $userStruc = {};
 my $groupStruc = {};
@@ -203,12 +207,16 @@ sub getDenbiMembersForGroup {
 		my $userId = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_ID );
 		my $email = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_MAIL );
 		my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
+		my $lsLogin = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LS_LOGIN );
 		my $persistentLogin = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_PERSISTENT );
+		my $persistentLsLogin = $data->getUserAttributeValue( member => member => $memberId, attrName => $A_USER_LS_LOGIN_PERSISTENT );
 		my $member = {};
 		$member->{$idFriendlyName} = $userId;
 		$member->{$mailFriendlyName} = $email;
 		$member->{$loginFriendlyName} = $login;
+		$member->{$lsLoginFriendlyName} = $lsLogin;
 		$member->{$persLoginFriendlyName} = $persistentLogin;
+		$member->{$persLsLoginFriendlyName} = $persistentLsLogin;
 		push @denbiMembers, $member;
 	}
 
