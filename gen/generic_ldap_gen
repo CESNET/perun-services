@@ -1,0 +1,370 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use MIME::Base64;
+
+our $A_F_BASE_DN;  *A_F_BASE_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDN';
+our $A_F_BASE_G_DN;  *A_F_BASE_G_DN = \'urn:perun:facility:attribute-def:def:ldapBaseDNGroup';
+our $A_F_ATTR_U_DN;  *A_F_ATTR_U_DN = \'urn:perun:facility:attribute-def:def:ldapUserDNAttribute';
+our $A_F_LDAP_U_MAP;  *A_F_LDAP_U_MAP = \'urn:perun:facility:attribute-def:def:ldapUserAttrMap'; # consider attr module checking whether all the required attributes are listed (could be problematic? multiple services etc)
+our $A_F_LDAP_G_MAP;  *A_F_LDAP_G_MAP = \'urn:perun:facility:attribute-def:def:ldapGroupAttrMap'; # same here
+our $A_F_LDAP_U_CLASSES;  *A_F_LDAP_U_CLASSES = \'urn:perun:facility:attribute-def:def:ldapUserObjectClasses';
+our $A_F_LDAP_G_CLASSES;  *A_F_LDAP_G_CLASSES = \'urn:perun:facility:attribute-def:def:ldapGroupObjectClasses';
+our $A_F_LDAP_DEACTIVATE;  *A_F_LDAP_DEACTIVATE = \'urn:perun:facility:attribute-def:def:ldapDeactivate'; # flag whether to deactivate entities missing in the LDAP server instead of deleting
+our $A_F_LDAP_DEACTIVATE_ATTR;  *A_F_LDAP_DEACTIVATE_ATTR = \'urn:perun:facility:attribute-def:def:ldapDeactivateAttributeName'; # name of the attribute in LDAP which to set instead of deleting the entry
+our $A_F_LDAP_U_FILTER;  *A_F_LDAP_U_FILTER = \'urn:perun:facility:attribute-def:def:ldapUserFilter';
+our $A_F_LDAP_G_FILTER;  *A_F_LDAP_G_FILTER = \'urn:perun:facility:attribute-def:def:ldapGroupFilter';
+
+our $SERVICE_NAME = "generic_ldap_gen";
+our $PROTOCOL_VERSION = "3.0.0";
+our $JSON_FORMAT = "json";
+my $SCRIPT_VERSION = "3.0.1";
+
+perunServicesInit::init;
+my $DIRECTORY = perunServicesInit::getDirectory;
+my $fileName_users = "$DIRECTORY/$::SERVICE_NAME"."_users".".ldif";
+my $fileName_groups = "$DIRECTORY/$::SERVICE_NAME"."_groups".".ldif";
+my $baseDnFileName = "$DIRECTORY/baseDN";
+my $baseDnGroupFileName = "$DIRECTORY/baseDNGroup";
+my $userObjectClassesFileName = "$DIRECTORY/userClasses";
+my $groupObjectClassesFileName = "$DIRECTORY/groupClasses";
+my $deactivateFileName = "$DIRECTORY/deactivate";
+my $deactivateAttrFileName = "$DIRECTORY/deactivateAttribute";
+my $userAttributesFileName = "$DIRECTORY/userAttributes";
+my $groupAttributesFileName = "$DIRECTORY/groupAttributes";
+my $userFilterFileName = "$DIRECTORY/userFilter";
+my $groupFilterFileName = "$DIRECTORY/groupFilter";
+
+my $data = perunServicesInit::getHashedDataWithGroups;
+
+my $agent = perunServicesInit->getAgent;
+my $attributesAgent = $agent->getAttributesAgent;
+
+# check facility attributes
+my $ldapBaseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
+if (!defined($ldapBaseDN)) {
+    print("not found base dn");
+    exit 1;
+}
+my $ldapBaseDNGroup = $data->getFacilityAttributeValue( attrName => $A_F_BASE_G_DN );
+if (!defined($ldapBaseDNGroup)) {
+    print("not found base dn group");
+    exit 1;
+}
+my $ldapUserDNAttr = $data->getFacilityAttributeValue( attrName => $A_F_ATTR_U_DN );
+if (!defined($ldapUserDNAttr)) {
+    print("not found user dn");
+    exit 1;
+}
+my $groupLdapMap = $data->getFacilityAttributeValue( attrName => $A_F_LDAP_G_MAP);
+if (!defined($groupLdapMap)) {
+    print("not found base group map");
+    exit 1;
+}
+my $userLdapMap = $data->getFacilityAttributeValue( attrName => $A_F_LDAP_U_MAP);
+if (!defined($userLdapMap)) {
+    print("not found base user map");
+    exit 1;
+}
+my $userObjectClasses = $data->getFacilityAttributeValue( attrName => $A_F_LDAP_U_CLASSES);
+if (!defined($userObjectClasses)) {
+    print("objectClasses for LDAP user entity not found");
+    exit 1;
+}
+my $groupObjectClasses = $data->getFacilityAttributeValue( attrName => $A_F_LDAP_G_CLASSES);
+if (!defined($groupObjectClasses)) {
+    print("objectClasses for LDAP group entity not found");
+    exit 1;
+}
+my $userFilter = $data->getFacilityAttributeValue( attrName => $A_F_LDAP_U_FILTER);
+if (!defined($userFilter)) {
+    print("filter for LDAP user entity not found");
+    exit 1;
+}
+my $groupFilter= $data->getFacilityAttributeValue( attrName => $A_F_LDAP_G_FILTER);
+if (!defined($groupFilter)) {
+    print("filter for LDAP group entity not found");
+    exit 1;
+}
+### set group attribute for members based on the provided object classes
+my $memberGroupAttr = undef;
+if (grep { $_ eq "groupOfUniqueNames" } @$groupObjectClasses) {
+    $memberGroupAttr = "uniqueMember";
+} elsif ((grep { $_ eq "groupOfNames" } @$groupObjectClasses) ||
+    (grep { $_ eq "group" } @$groupObjectClasses)) {
+    $memberGroupAttr = "member"
+}
+
+my $deactivate = $data->getFacilityAttributeValue( attrName => $A_F_LDAP_DEACTIVATE);
+if (!defined($deactivate)) {
+    $deactivate = 0;
+}
+my $deactivateAttr = $data->getFacilityAttributeValue( attrName => $A_F_LDAP_DEACTIVATE_ATTR);
+if (!defined $deactivateAttr && $deactivate eq 1) {
+    print("deactivate attribute name missing with deactivation active");
+    exit 1;
+}
+
+# gather user data
+# PREPARE DATA
+my $users;  # $users->{$memberId}->{ATTR} = $attrValue;
+my $resources; # $groups->{$id}->{ATTR} = $attrValue;
+my $attrDefs; # $attrDefs->{$attr} = $attributeDef
+my $userIdMap; # serves to track processed users
+my $resourceUsers; # $resourceUsers->{$resourceId}->{$userId}
+
+
+foreach my $resourceId ( $data->getResourceIds() ) {
+        my $resourceAttributes = $data->getAllResourceAttributes(resource => $resourceId);
+        for my $attr (keys %$resourceAttributes) {
+            my $ldapAttrName = $groupLdapMap->{$attr};
+            # silently skip required attributes which are not in the attribute map
+            next unless defined $ldapAttrName;
+            if (!defined $resourceAttributes->{$attr}) {
+                # add default value if resource does not have the attribute set
+                # also store missing attribute definitions not to repeat calls
+                my $attributeDef = $attrDefs->{$attr};
+                print($attributeDef);
+                if (!defined $attributeDef) {
+                    $attributeDef = $attributesAgent->getAttributeDefinition( attributeName => $attr);
+                    $attrDefs->{$attr} = $attributeDef;
+                }
+                if ($attributeDef->getType eq "boolean") {
+                        $resources->{$resourceId}->{$ldapAttrName} = JSON::XS::false;
+                    }
+            } else {
+                $resources->{$resourceId}->{$ldapAttrName} = $resourceAttributes->{$attr};
+            }
+        }
+
+        # FOR EACH MEMBER IN RESOURCE
+        foreach my $memberId ($data->getMemberIdsForResource(resource => $resourceId)) {
+            my $userId = $data->getUserIdForMember(member => $memberId);
+            unless ($userIdMap->{$userId}) {
+                $resourceUsers->{$resourceId}->{$userId} = 1;
+                my $userAttributes = $data->getAllUserAttributes(member => $memberId);
+                for my $attr (keys %$userAttributes) {
+                    my $ldapAttrName = $userLdapMap->{$attr};
+                    # silently skip required attributes which are not in the attribute map
+                    next unless defined $ldapAttrName;
+                    if (!defined $userAttributes->{$attr}) {
+                        # add default value for boolean attributes if user does not have the attribute set
+                        # also store missing attribute definitions not to repeat calls
+                        my $attributeDef = $attrDefs->{$attr};
+                        if (!defined $attributeDef) {
+                            $attributeDef = $attributesAgent->getAttributeDefinition(attributeName => $attr);
+                            $attrDefs->{$attr} = $attributeDef;
+                        }
+                        if ($attributeDef->getType eq "boolean") {
+                            $users->{$userId}->{$ldapAttrName} = JSON::XS::false;
+                        }
+                    }
+                    else {
+                        $users->{$userId}->{$ldapAttrName} = $userAttributes->{$attr};
+                    }
+                }
+            }
+            $userIdMap->{$userId} = 1;
+        }
+}
+
+#
+# PRINT BASE_DN FILE
+#
+open FILE,">:encoding(UTF-8)","$baseDnFileName" or die "Cannot open $baseDnFileName: $! \n";
+print FILE $ldapBaseDN;
+close(FILE);
+
+#
+# PRINT BASE_DN_GROUP FILE
+#
+open FILE,">:encoding(UTF-8)","$baseDnGroupFileName" or die "Cannot open $baseDnGroupFileName: $! \n";
+print FILE $ldapBaseDNGroup;
+close(FILE);
+
+#
+# PRINT USER_OBJECT_CLASSES FILE
+#
+open FILE,">:encoding(UTF-8)",$userObjectClassesFileName or die "Cannot open $userObjectClassesFileName: $! \n";
+for my $objectClass (@$userObjectClasses) {
+    print FILE $objectClass . "\n"
+}
+close(FILE);
+#
+# PRINT GROUP_OBJECT_CLASSES FILE
+#
+open FILE,">:encoding(UTF-8)",$groupObjectClassesFileName or die "Cannot open $groupObjectClassesFileName: $! \n";
+for my $objectClass (@$groupObjectClasses) {
+    print FILE $objectClass . "\n"
+}
+close(FILE);
+
+# PRINT DEACTIVATE FILE
+#
+open FILE,">:encoding(UTF-8)","$deactivateFileName" or die "Cannot open $deactivateFileName: $! \n";
+print FILE $deactivate;
+close(FILE);
+
+# PRINT DEACTIVATE ATTRIBUTE FILE
+#
+open FILE,">:encoding(UTF-8)","$deactivateAttrFileName" or die "Cannot open $deactivateAttrFileName: $! \n";
+print FILE $deactivateAttr || '';
+close(FILE);
+
+# PRINT USER ATTRIBUTES FILE
+#
+open FILE,">:encoding(UTF-8)","$userAttributesFileName" or die "Cannot open $userAttributesFileName: $! \n";
+for my $userAttr (values %$userLdapMap) {
+    print FILE $userAttr . "\n";
+}
+print FILE "objectClass";
+close(FILE);
+
+# PRINT GROUP ATTRIBUTES FILE
+#
+open FILE,">:encoding(UTF-8)","$groupAttributesFileName" or die "Cannot open $groupAttributesFileName: $! \n";
+for my $groupAttr (values %$groupLdapMap) {
+    print FILE $groupAttr . "\n";
+
+}
+print FILE "objectClass" . "\n";
+print FILE $memberGroupAttr;
+close(FILE);
+
+# PRINT DEACTIVATE FILE
+#
+open FILE,">:encoding(UTF-8)","$userFilterFileName" or die "Cannot open $userFilterFileName: $! \n";
+print FILE $userFilter;
+close(FILE);
+
+# PRINT DEACTIVATE FILE
+#
+open FILE,">:encoding(UTF-8)","$groupFilterFileName" or die "Cannot open $groupFilterFileName: $! \n";
+print FILE $groupFilter;
+close(FILE);
+
+#
+# PRINT USERS LDIF FILE
+#
+open FILE,">:encoding(UTF-8)","$fileName_users" or die "Cannot open $fileName_users: $! \n";
+
+for my $userId (sort keys %$users) {
+    print FILE "dn: " . $ldapUserDNAttr . "=" . escapeDnValue($users->{$userId}->{$ldapUserDNAttr}) . "," . $ldapBaseDN . "\n";
+    for my $attr (sort keys %{$users->{$userId}}) {
+        my $value = $users->{$userId}->{$attr};
+
+        if (ref($value) eq 'ARRAY') {
+            # make sure only unique values are included
+            my @items = @$value;
+            for (my $i = 0; $i < @items; $i++) {
+                print FILE $attr . ":" . checkBase64($items[$i]);
+                print FILE "\n" if $i < $#items;  # Only add newline if not the last item
+            }
+        }
+        elsif (ref($value) eq 'HASH') {
+            my @keys = sort keys %{$value};
+            for (my $i = 0; $i < @keys; $i++) {
+                my $key = $keys[$i];
+                print FILE $attr . ":" . checkBase64($key . "=" .  $value->{$key});
+                print FILE "\n" if $i < $#keys;  # Only add newline if not the last key
+            }
+        }
+        elsif (ref($value) eq 'JSON::PP::Boolean') {
+            # only true is needed since false is filled in by default
+            print FILE $attr . ": " . ($value ? 'True' : 'False');
+        }
+        else {
+            print FILE $attr . ":" . checkBase64($value);
+        }
+
+        print FILE "\n";
+
+    }
+    for my $objectClass (@$userObjectClasses) {
+        print FILE "objectClass: ". $objectClass . "\n"
+    }
+
+    print FILE "\n";
+}
+
+#
+# PRINT GROUPS LDIF FILE
+#
+open FILE,">:encoding(UTF-8)","$fileName_groups" or die "Cannot open $fileName_groups: $! \n";
+
+for my $resourceId (sort keys %$resources) {
+    print FILE "dn: cn=" . escapeDnValue($resources->{$resourceId}->{"cn"}) . "," . $ldapBaseDNGroup . "\n";
+    for my $attr (sort keys %{$resources->{$resourceId}}) {
+        my $value = $resources->{$resourceId}->{$attr};
+
+        if (ref($value) eq 'ARRAY') {
+            # make sure only unique values are included
+            my @items = sort keys %{{ map { $_ => 1 } @$value }};
+            for (my $i = 0; $i < @items; $i++) {
+                print FILE $attr . ":" . checkBase64($items[$i]);
+                print FILE "\n" if $i < $#items;  # Only add newline if not the last item
+            }
+
+        }
+        elsif (ref($value) eq 'HASH') {
+            my @keys = sort keys %{$value};
+            for (my $i = 0; $i < @keys; $i++) {
+                my $key = $keys[$i];
+                print FILE $attr . ":" . checkBase64($key . "=" . $value->{$key});
+                print FILE "\n" if $i < $#keys;  # Only add newline if not the last key
+            }
+        }
+        elsif (ref($value) eq 'JSON::PP::Boolean') {
+            # only true is needed since false is filled in by default
+            print FILE $attr . ": " . ($value ? 'TRUE' : 'FALSE');
+        }
+        else {
+            print FILE $attr . ":" . checkBase64($value);
+        }
+
+        print FILE "\n";
+    }
+    for my $objectClass (@$groupObjectClasses) {
+        print FILE "objectClass: ". $objectClass . "\n"
+    }
+    if (defined($memberGroupAttr)) {
+    for my $userId (sort keys %{$resourceUsers->{$resourceId}}) {
+        print FILE $memberGroupAttr . ": " . $ldapUserDNAttr . "=" . escapeDnValue($users->{$userId}->{$ldapUserDNAttr}) . "," . $ldapBaseDN . "\n";
+    }
+}
+    print FILE "\n";
+}
+close FILE;
+
+sub checkBase64 {
+    my $value = shift;
+
+    if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
+        return " " . $value;
+    }
+    return ": " . encode_base64(Encode::encode_utf8($value), '');
+}
+
+# method looks for specific characters/symbols in the scalar $value
+# and escapes each of them using backslash
+sub escapeDnValue {
+    my $value = shift;
+
+    if (defined($value)){
+        # escape one of the characters inside the string: ",", "+", """, "\", "<", ">" or ";"
+        $value =~ s/[,+"\\><;]/\\${^MATCH}/pg;
+
+        # escape a whitespace or "#" character occurring at the beginning of the string
+        $value =~ s/^\s|^#/\\${^MATCH}/pg;
+
+        # escape a whitespace character occurring at the end of the string
+        $value =~ s/\s$/\\ /g;
+    }
+
+    return $value;
+}
+
+perunServicesInit::finalize;
