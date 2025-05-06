@@ -35,7 +35,7 @@ our $A_U_DISPLAY_NAME;  *A_U_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:
 our $A_U_SSH_KEYS;  *A_U_SSH_KEYS = \'urn:perun:user:attribute-def:def:sshPublicKey';
 our $A_U_F_UID;  *A_U_F_UID = \'urn:perun:user_facility:attribute-def:virt:UID';
 our $A_U_LS_ID; *A_U_LS_ID = \'urn:perun:user:attribute-def:def:login-namespace:lifescienceid-persistent-shadow';
-our $A_U_AFFILIATIONS; *$A_U_AFFILIATIONS = \'urn:perun:user:attribute-def:virt:eduPersonScopedAffiliations';
+our $A_U_AFFILIATIONS; *A_U_AFFILIATIONS = \'urn:perun:user:attribute-def:virt:eduPersonScopedAffiliations';
 
 # CHECK ON FACILITY ATTRIBUTES
 my $ldapBaseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
