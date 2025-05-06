@@ -66,9 +66,9 @@ our $STATUS_SUSPENDED;            *STATUS_SUSPENDED =        \'SUSPENDED';
 our $idFriendlyName = "id";
 our $mailFriendlyName = "preferredMail";
 our $loginFriendlyName = "login-namespace:elixir";
-our $lsLoginFriendlyName = "login-namespace:lifescienceid-username"
+our $lsLoginFriendlyName = "login-namespace:lifescienceid-username";
 our $persLoginFriendlyName = "login-namespace:elixir-persistent";
-our $persLsLoginFriendlyName =  "login-namespace:lifescienceid-persistent"
+our $persLsLoginFriendlyName =  "login-namespace:lifescienceid-persistent";
 
 my $userStruc = {};
 my $groupStruc = {};
@@ -209,7 +209,7 @@ sub getDenbiMembersForGroup {
 		my $login = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN );
 		my $lsLogin = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LS_LOGIN );
 		my $persistentLogin = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LOGIN_PERSISTENT );
-		my $persistentLsLogin = $data->getUserAttributeValue( member => member => $memberId, attrName => $A_USER_LS_LOGIN_PERSISTENT );
+		my $persistentLsLogin = $data->getUserAttributeValue( member => $memberId, attrName => $A_USER_LS_LOGIN_PERSISTENT );
 		my $member = {};
 		$member->{$idFriendlyName} = $userId;
 		$member->{$mailFriendlyName} = $email;
