@@ -10,7 +10,7 @@ use Data::Dumper;
 
 local $::SERVICE_NAME = "ldap_lsaai";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.0";
+my $SCRIPT_VERSION = "3.0.2";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -34,6 +34,8 @@ our $A_U_MAIL;  *A_U_MAIL = \'urn:perun:user:attribute-def:def:preferredMail';
 our $A_U_DISPLAY_NAME;  *A_U_DISPLAY_NAME = \'urn:perun:user:attribute-def:core:displayName';
 our $A_U_SSH_KEYS;  *A_U_SSH_KEYS = \'urn:perun:user:attribute-def:def:sshPublicKey';
 our $A_U_F_UID;  *A_U_F_UID = \'urn:perun:user_facility:attribute-def:virt:UID';
+our $A_U_LS_ID; *A_U_LS_ID = \'urn:perun:user:attribute-def:def:login-namespace:lifescienceid-persistent-shadow';
+our $A_U_AFFILIATIONS; *A_U_AFFILIATIONS = \'urn:perun:user:attribute-def:virt:eduPersonScopedAffiliations';
 
 # CHECK ON FACILITY ATTRIBUTES
 my $ldapBaseDN = $data->getFacilityAttributeValue( attrName => $A_F_BASE_DN );
@@ -66,15 +68,19 @@ foreach my $resourceId ( $data->getResourceIds() ) {
 			my $lastName = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_LAST_NAME);
 			my $firstName = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_FIRST_NAME);
 			my $displayName = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_DISPLAY_NAME);
+			my $lsId = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_LS_ID);
 			my $mail = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_MAIL);
 			my $sshKeys = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_SSH_KEYS);
 			my $unixUid = $data->getUserFacilityAttributeValue(member => $memberId, attrName => $A_U_F_UID);
+			my $affiliations = $data->getUserAttributeValue(member => $memberId, attrName => $A_U_AFFILIATIONS);
 
 			# USERS FLAT STRUCTURE
 			$users->{$login}->{$A_U_MAIL} = $mail;
 			$users->{$login}->{$A_U_SSH_KEYS} = $sshKeys;
 			$users->{$login}->{$A_U_F_UID} = $unixUid;
 			$users->{$login}->{$A_U_FIRST_NAME} = $firstName;
+			$users->{$login}->{$A_U_LS_ID} = $lsId;
+			$users->{$login}->{$A_U_AFFILIATIONS} = $affiliations;
 			# FirstName can be undefined, display_name and last_name not (so set them to string null) to avoid it
 			$users->{$login}->{$A_U_LAST_NAME} = $lastName || "null";
 			$users->{$login}->{$A_U_DISPLAY_NAME} = $displayName || "null";
@@ -110,6 +116,7 @@ for my $login (sort keys %$users) {
 	# for now fill primary GID with UID
 	print FILE "gidNumber: " . $users->{$login}->{$A_U_F_UID} . "\n";
 	print FILE "homeDirectory: /home/" . $login . "\n";
+	print FILE "lsaaiUid: " . $users->{$login}->{$A_U_LS_ID} . "\n";
 
 	my $givenName = $users->{$login}->{$A_U_FIRST_NAME};
 	my $mail = $users->{$login}->{$A_U_MAIL};
@@ -133,6 +140,18 @@ for my $login (sort keys %$users) {
 		}
 	}
 
+	my $affiliations = $users->{$login}->{$A_U_AFFILIATIONS};
+	if (defined $affiliations and length $affiliations) {
+		my %already_written;
+		foreach my $affiliation (@$affiliations) {
+			my $lower_case_affiliation = lc($affiliation);
+
+			# do not write duplicity values
+			next if $already_written{$lower_case_affiliation}++;
+			print FILE "voPersonExternalAffiliation: " . $lower_case_affiliation . "\n";
+		}
+	}
+
 	# print GROUP membership information
 	# my @groups = keys %{$groupByUser->{$login}};
 	# for my $groupName (@groups) {
@@ -143,8 +162,10 @@ for my $login (sort keys %$users) {
 	print FILE "objectclass: top\n";
 	print FILE "objectclass: person\n";
 	print FILE "objectclass: inetOrgPerson\n";
+	print FILE "objectclass: lsaaiPerson\n";
 	print FILE "objectclass: posixAccount\n";
 	print FILE "objectclass: ldapPublicKey\n";
+	print FILE "objectclass: voPerson\n";
 
 	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
 	print FILE "\n";

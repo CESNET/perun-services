@@ -444,7 +444,7 @@ class S3Transport(Transport):
         else:
             print(
                 f"No URL endpoint set. If any is to be called, it must be configured in /etc/perun/services/"
-                f"{service_name}/{service_name}.py file."
+                f"{self.destination_class_obj.service_name}/{self.destination_class_obj.service_name}.py file."
             )
 
 
