@@ -1,5 +1,27 @@
 Upgrade notes
 
+## [16.8.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.7.0...v16.8.0) (2025-05-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* Add attribute `urn:perun:user:attribute-def:def:
+login-namespace:lifescienceid-persistent-shadow` as required
+ attribute for the service.
+
+### Features
+
+* add new attributes for ldap_lsaai gen ([8556558](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/85565582eee0f632610a16448f0a434e0561bccc))
+* **denbi_portal_compute_center:** addition of lsaai scoped attributes ([08d6d8a](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/08d6d8a0859ddb278cccc083b61b57eab51366db))
+* **ldap_lsaai:** afiliations to ldap_lsaai gen ([22fd7ba](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/22fd7ba8a0894bd8039631813c2f6672e830d263))
+
+
+### Bug Fixes
+
+* correctly reference service name in case of  no url endpoint in s3 ([cfbc1d2](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/cfbc1d2cfbb3f0f39b2fde2eb35192d1a113cf57))
+* **denbi_portal_compute_center:** typo ([1cdf526](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/1cdf5263aa9cada8bb14e63d1372e543163a34b3))
+* **ldap_lsaai:** typo ([cfc0e46](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/cfc0e46470f625311bb3b56b40c15643ed7014d3))
+
 ## [16.7.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.6.0...v16.7.0) (2025-04-23)
 
 
