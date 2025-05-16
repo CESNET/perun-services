@@ -1,0 +1,53 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use perunServicesInit;
+use perunServicesUtils;
+use File::Basename;
+use URI::Escape;
+
+local $::SERVICE_NAME = basename($0);
+local $::PROTOCOL_VERSION = "1.0.0";
+my $SCRIPT_VERSION = "1.0.0";
+
+perunServicesInit::init;
+my $data = perunServicesInit::getHashedHierarchicalData;
+my $DIRECTORY = perunServicesInit::getDirectory;
+
+our $A_EGI_CUID;		*A_EGI_CUID =		\'urn:perun:user:attribute-def:virt:optional-login-namespace:egi';
+our $A_GROUP_NAMES;		*A_GROUP_NAMES =	\'urn:perun:user:attribute-def:virt:groupNames';
+
+my $result = ();
+
+my $prefix = 'urn:mace:egi.eu:group:';
+my $suffix = ':role=member#aai.egi.eu';
+
+foreach my $memberId (sort $data->getMemberIdsForFacility()) {
+	my $cuid = $data->getUserAttributeValue(member => $memberId, attrName => $A_EGI_CUID);
+	if (defined $cuid and length($cuid) > 0 and index($cuid, '@egi.eu') != -1) {
+		unless (defined $result->{$cuid}) {
+			my @vals;
+			my $groupNames = $data->getUserAttributeValue(member => $memberId, attrName => $A_GROUP_NAMES);
+			foreach my $group (sort @$groupNames) {
+				$group = uri_escape($group, '^A-Za-z0-9\-\._~!$\'()\*,;&=@:+');
+				push (@vals, $prefix . $group . $suffix);
+				# For VOs include "members" system group
+				if (index($group, ":") eq -1) {
+					push(@vals, $prefix . $group . ":members" . $suffix);
+				}
+			}
+			@vals = sort @vals;
+			$result->{$cuid} = \@vals;
+		}
+		# already processed
+	}
+	# has no CUID
+}
+
+my $fileName = "$DIRECTORY/$::SERVICE_NAME.json";
+open FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
+print FILE JSON::XS->new->utf8->pretty->canonical->encode(\%$result);
+close FILE or die "Cannot close $fileName: $! \n";
+
+perunServicesInit::finalize;
