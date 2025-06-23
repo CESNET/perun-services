@@ -104,6 +104,11 @@ close(FILE);
 #
 open FILE,">:encoding(UTF-8)","$fileName_users" or die "Cannot open $fileName_users: $! \n";
 
+#
+# PRINT GROUPS LDIF FILE
+#
+open GROUPS_FILE,">:encoding(UTF-8)","$fileName_groups" or die "Cannot open $fileName_groups: $! \n";
+
 # FLAT structure is stored in ou=perun,ou=users + base DN
 for my $login (sort keys %$users) {
 
@@ -170,12 +175,26 @@ for my $login (sort keys %$users) {
 	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
 	print FILE "\n";
 
-}
+	# PRINT GROUP
+	print GROUPS_FILE "dn: cn=" . $login . ",ou=perun,ou=groups," . $ldapBaseDN . "\n";
+	print GROUPS_FILE "cn: $login\n";
+	print GROUPS_FILE "gidNumber: " . $users->{$login}->{$A_U_F_UID} . "\n";
+	print GROUPS_FILE "objectclass: top\n";
+	print GROUPS_FILE "objectclass: posixGroup\n";
+	print GROUPS_FILE "objectClass: groupOfNames\n";
 
-#
-# PRINT GROUPS LDIF FILE
-#
-open FILE,">:encoding(UTF-8)","$fileName_groups" or die "Cannot open $fileName_groups: $! \n";
+	my $groupDescription = "Primary group for user '$login'";
+	if (defined $groupDescription and length $groupDescription) {
+		print GROUPS_FILE "description: " . $groupDescription . "\n";
+	}
+
+	# PRINT USER AS MEMBER
+	print GROUPS_FILE "member: cn=" . $login . ",ou=perun,ou=users," . $ldapBaseDN . "\n";
+
+	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
+	print GROUPS_FILE "\n";
+
+}
 
 # PRINT ALL GROUPS
 my @groups = sort keys %{$groups};
@@ -189,28 +208,28 @@ for my $groupName (@groups) {
 	}
 
 	# PRINT GROUP
-	print FILE "dn: cn=" . $groupName . ",ou=perun,ou=groups," . $ldapBaseDN . "\n";
-	print FILE "cn: $groupName\n";
-	print FILE "gidNumber: " . $groups->{$groupName}->{$A_G_R_GID} . "\n";
-	print FILE "objectclass: top\n";
-	print FILE "objectclass: posixGroup\n";
-	print FILE "objectClass: groupOfNames\n";
+	print GROUPS_FILE "dn: cn=" . $groupName . ",ou=perun,ou=groups," . $ldapBaseDN . "\n";
+	print GROUPS_FILE "cn: $groupName\n";
+	print GROUPS_FILE "gidNumber: " . $groups->{$groupName}->{$A_G_R_GID} . "\n";
+	print GROUPS_FILE "objectclass: top\n";
+	print GROUPS_FILE "objectclass: posixGroup\n";
+	print GROUPS_FILE "objectClass: groupOfNames\n";
 
     my $groupDescription = $groups->{$groupName}->{$A_G_DESCRIPTION};
 	if (defined $groupDescription and length $groupDescription) {
-		print FILE "description: " . $groupDescription . "\n";
+		print GROUPS_FILE "description: " . $groupDescription . "\n";
 	}
 
 	# PRINT ALL USERS FROM GROUP
 	for my $u (@usrs) {
-		print FILE "member: cn=" . $u . ",ou=perun,ou=users," . $ldapBaseDN . "\n";
+		print GROUPS_FILE "member: cn=" . $u . ",ou=perun,ou=users," . $ldapBaseDN . "\n";
 	}
 
 	# There MUST be an empty line after each entry, so entry sorting and diff works on slave part
-	print FILE "\n";
+	print GROUPS_FILE "\n";
 
 }
 
-close(FILE);
+close(GROUPS_FILE);
 
 perunServicesInit::finalize;
