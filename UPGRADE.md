@@ -1,5 +1,13 @@
 Upgrade notes
 
+## [16.9.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.8.0...v16.9.0) (2025-06-23)
+
+
+### Features
+
+* **checkin:** added new service for managing perun entitlements in checkin ([2d8e275](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/2d8e2758e90c9db6d676c971023fe51a094e4b70))
+* **ldap_lsaai:** create primary group for every user ([efd5257](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/efd5257a5dc78d12ce40250b6fcc7140b66f3b5a))
+
 ## [16.8.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.7.0...v16.8.0) (2025-05-07)
 
 
