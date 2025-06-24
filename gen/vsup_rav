@@ -9,7 +9,7 @@ sub calculateExpiration;
 
 local $::SERVICE_NAME = "vsup_rav";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -145,6 +145,11 @@ sub calculateExpiration() {
 	if ($latest_expiration == Time::Piece->strptime("4000-01-01","%Y-%m-%d")->epoch) {
 		# return without specified expiration date
 		return undef;
+	}
+
+	# (will) expire by studies - add 28 days grace period
+	if ($expirationKosTime and ($latest_expiration == $expirationKosTime->epoch)) {
+		$latest_expiration += (28*24*60*60);
 	}
 
 	# add one day, since we want users to be valid during the last day
