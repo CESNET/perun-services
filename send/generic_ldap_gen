@@ -1,0 +1,377 @@
+#!/usr/bin/env python3
+import os
+import re
+import ssl
+import sys
+from datetime import datetime
+
+import ldap3
+import ldif
+import send_lib
+import sys_operation_classes
+
+# from docs:
+# c.entries[0].GUID
+#     GUID: fd9a0d90-15be-2841-fd82-fd9a0d9015be
+#
+# c.entries[0].GUID.value
+#     'fd9a0d90-15be-2841-fd82-fd9a0d9015be'
+
+DEBUG = True
+MEMBER_ATTRIBUTES = ["member", "uniqueMember"]
+
+counter_added = 0
+counter_updated = 0
+counter_removed = 0
+counter_failed = 0
+users_to_add = []
+groups_to_add = []
+users_to_remove = []
+groups_to_remove = []
+changes_to_attributes: dict[str, dict[str, list[tuple[int, str]]]] = {}
+
+
+def create_connection():
+    credentials = (
+        sys_operation_classes.SysOperation.get_auth_credentials_from_service_file(
+            service_name, destination
+        )
+    )
+    if credentials is not None:
+        username, password = credentials
+        if not username or not password:
+            log(f"No valid configuration found for destination '{destination}'.")
+            send_lib.die_with_error(
+                f"No valid configuration found for destination '{destination}'."
+            )
+
+    tls = sys_operation_classes.SysOperation.get_custom_config_properties(
+        service_name,
+        destination,
+        ["tls"],
+    )[0]
+    if tls is None:
+        tls = ldap3.Tls(validate=ssl.CERT_REQUIRED, version=ssl.PROTOCOL_TLSv1_2)
+    server = ldap3.Server(destination, tls=tls)
+
+    conn = ldap3.Connection(
+        server,
+        user=username,
+        password=password,
+        auto_bind=True,
+        return_empty_attributes=False,
+    )
+    return conn
+
+
+def get_ldap_users(conn):
+    result = {}
+    conn.search(base_dn, user_filter, attributes=user_attributes)
+    for ldap_user in conn.entries:
+        result.update({unescape_ldap_value(ldap_user.entry_dn): ldap_user})
+    return result
+
+
+def get_ldap_groups(conn):
+    result = {}
+    conn.search(
+        base_dn_group,
+        group_filter,
+        attributes=group_attributes,
+    )
+    for ldap_group in conn.entries:
+        result.update({unescape_ldap_value(ldap_group.entry_dn): ldap_group})
+    return result
+
+
+def log(message: str):
+    if DEBUG:
+        print(message)
+    with open(log_file, "a+") as f:
+        f.write(datetime.now().strftime("%Y-%m-%d_%H:%M:%S") + ": " + message + "\n")
+
+
+def unescape_ldap_value(value):
+    # Replace LDAP-escaped hex codes like \2C with actual characters
+    return re.sub(
+        r"\\([0-9A-Fa-f]{2})",
+        lambda m: bytes.fromhex(m.group(1)).decode("utf-8"),
+        value,
+    )
+
+
+def unescape_ldap_value_list(values):
+    if not values:
+        return values
+    return [unescape_ldap_value(value) for value in values]
+
+
+def unescape_ldif_members(values):
+    """
+    Remove escape characters from a list of values
+    :param values: List of values to unescape
+    :return: List with unescaped values
+    """
+    if not values:
+        return values
+    return [str.replace(value, "\\", "") for value in values]
+
+
+def escape_members_dn(values):
+    if not values:
+        return values
+    return [ldap3.utils.dn.safe_dn(value) for value in values]
+
+
+def prepare_user_changes():
+    for our_user in user_entries.items():
+        dn, record = our_user
+        ldap_user = ldap_users.get(dn)
+        if not ldap_user:
+            users_to_add.append(dn)
+        else:
+            prepare_changes(our_user, ldap_user)
+    # check for entities missing in perun
+    for ldap_user_dn in ldap_users:
+        if not user_entries.get(ldap_user_dn):
+            if deactivate and deactivate_attribute not in ldap_users.get(ldap_user_dn):
+                changes_to_attributes.update(
+                    {
+                        ldap_user_dn: {
+                            deactivate_attribute: [(ldap3.MODIFY_REPLACE, ["TRUE"])]
+                        }
+                    }
+                )
+            else:
+                users_to_remove.append(ldap_user_dn)
+
+
+def prepare_group_changes():
+    for our_group in group_entries.items():
+        dn, record = our_group
+        ldap_group = ldap_groups.get(dn)
+        if not ldap_group:
+            groups_to_add.append(dn)
+        else:
+            prepare_changes(our_group, ldap_group)
+    # check for entities missing in perun
+    for ldap_group_dn in ldap_groups:
+        if not group_entries.get(ldap_group_dn):
+            if deactivate and deactivate_attribute not in ldap_groups.get(
+                ldap_group_dn
+            ):
+                changes_to_attributes.update(
+                    {
+                        ldap_group_dn: {
+                            deactivate_attribute: [(ldap3.MODIFY_REPLACE, ["TRUE"])]
+                        }
+                    }
+                )
+            else:
+                groups_to_remove.append(ldap_group_dn)
+
+
+def prepare_changes(our_entity, ldap_entity):
+    dn, record = our_entity
+    entity_changes = {}
+    if deactivate_attribute in ldap_entity:
+        changes_to_attributes.update(
+            {dn: {deactivate_attribute: [(ldap3.MODIFY_DELETE, [])]}}
+        )
+    for attr, value in record.items():
+        if attr not in ldap_entity:
+            entity_changes[attr] = [(ldap3.MODIFY_ADD, value)]
+        else:
+            ldap_value = ldap_entity[attr].value
+            if our_entity in group_entries.items() and attr in MEMBER_ATTRIBUTES:
+                # make sure single value strings are treated as a list as well
+                if not isinstance(value, list):
+                    value = [value]
+                if not isinstance(ldap_value, list):
+                    ldap_value = [ldap_value]
+                value = unescape_ldif_members(value)
+                ldap_value = unescape_ldap_value_list(ldap_value)
+                difference = list(set(value) - set(ldap_value))
+                if len(difference) > 0:
+                    entity_changes[attr] = [
+                        (ldap3.MODIFY_ADD, escape_members_dn(difference))
+                    ]
+                difference = list(set(ldap_value) - set(value))
+                if len(difference) > 0:
+                    if entity_changes.get(attr):
+                        entity_changes[attr].append(
+                            (ldap3.MODIFY_DELETE, escape_members_dn(difference))
+                        )
+                    else:
+                        entity_changes[attr] = [
+                            (ldap3.MODIFY_DELETE, escape_members_dn(difference))
+                        ]
+            elif len(value) == 1:
+                # little hack for boolean values since ldif parses them as strings
+                if isinstance(ldap_value, bool):
+                    value[0] = value[0] == "True"
+                if value[0] != ldap_value:
+                    entity_changes[attr] = [(ldap3.MODIFY_REPLACE, value)]
+            elif sorted(ldap_value) != sorted(value):
+                # TODO test how map values work
+                entity_changes[attr] = [(ldap3.MODIFY_REPLACE, value)]
+
+    for ldap_attr in ldap_entity.entry_attributes_as_dict:
+        if ldap_attr not in record:
+            entity_changes[ldap_attr] = [(ldap3.MODIFY_DELETE, [])]
+    if len(entity_changes) > 0:
+        changes_to_attributes.update({dn: entity_changes})
+
+
+# perform the changes to LDAP server
+def commit_changes_to_ldap(conn):
+    global counter_failed
+    global counter_added
+    global counter_updated
+    global counter_removed
+    for dn, changes in changes_to_attributes.items():
+        if len(changes) == 0:
+            continue
+        conn.modify(dn, changes)
+        if conn.result["result"] == 0:
+            # log whether/which attr was updated/added/removed
+            for attr, value in changes.items():
+                for v in value:
+                    if v[0] == ldap3.MODIFY_ADD:
+                        log(f"Added attribute '{attr}' with value '{v[1]}' to '{dn}'")
+                    elif v[0] == ldap3.MODIFY_REPLACE:
+                        log(f"Updated attribute '{attr}' with value '{v[1]}' in '{dn}'")
+                    elif v[0] == ldap3.MODIFY_DELETE:
+                        log(
+                            f"Deleted attribute '{attr}' with value '{v[1]}' from '{dn}'"
+                        )
+            counter_updated += 1
+        else:
+            counter_failed += 1
+            log(
+                f"Failed to modify '{dn}' with error: '{conn.result['description']}, {conn.result['message']}'"
+            )
+
+    for dn in users_to_add:
+        conn.add(dn, user_object_classes, attributes=user_entries[dn])
+        if conn.result["result"] == 0:
+            counter_added += 1
+            log(f"Successfully added user '{dn}'")
+        else:
+            counter_failed += 1
+            log(
+                f"Failed to add user '{dn}' with error: '{conn.result['description']}, {conn.result['message']}'"
+            )
+
+    for dn in groups_to_add:
+        conn.add(dn, group_object_classes, attributes=group_entries[dn])
+        if conn.result["result"] == 0:
+            counter_added += 1
+            log(f"Successfully added group '{dn}'")
+        else:
+            counter_failed += 1
+            log(
+                f"Failed to add group '{dn}' with error: '{conn.result['description']}, {conn.result['message']}'"
+            )
+
+    for dn in users_to_remove:
+        conn.delete(dn)
+        if conn.result["result"] == 0:
+            counter_removed += 1
+            log(f"Successfully deleted user '{dn}'")
+        else:
+            counter_failed += 1
+            log(
+                f"Failed to delete user '{dn}' with error: '{conn.result['description']}, {conn.result['message']}'"
+            )
+
+    for dn in groups_to_remove:
+        conn.delete(dn)
+        if conn.result["result"] == 0:
+            counter_removed += 1
+            log(f"Successfully deleted group '{dn}'")
+        else:
+            counter_failed += 1
+            log(
+                f"Failed to delete group '{dn}' with error: '{conn.result['description']}, {conn.result['message']}'"
+            )
+
+
+def print_summary():
+    if counter_failed > 0:
+        print(f"Failed to update {counter_failed} entities. See logs for details.")
+    print(f"Added {counter_added} entities.")
+    print(f"Updated {counter_updated} entities.")
+    print(f"Removed {counter_removed} entities.")
+
+
+if __name__ == "__main__":
+    send_lib.check_input_fields(sys.argv, True, True)
+    facility = sys.argv[1]
+    destination = sys.argv[2]
+    destination_type = sys.argv[3]
+
+    service_name = sys.argv[4]
+    spool_folder = sys_operation_classes.SysOperation.get_gen_folder(
+        facility, service_name
+    )
+    # prepare log folder if not exists TODO not sure where exactly to place this (if even we want logs)
+    log_dir = f"./logs/{facility}/{service_name}"
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, f"{service_name}.log")
+
+    deactivate_attribute = None
+    with open(spool_folder + "/deactivate") as f:
+        deactivate = f.read().splitlines()[0] == "1"
+    if deactivate:
+        with open(spool_folder + "/deactivateAttribute") as f:
+            deactivate_attribute = f.read().splitlines()[0]
+
+    with open(spool_folder + "/baseDN") as f:
+        base_dn = f.read().splitlines()[0]
+
+    with open(spool_folder + "/baseDNGroup") as f:
+        base_dn_group = f.read().splitlines()[0]
+
+    with open(spool_folder + "/userClasses") as f:
+        user_object_classes = f.read().splitlines()
+
+    with open(spool_folder + "/groupClasses") as f:
+        group_object_classes = f.read().splitlines()
+
+    with open(spool_folder + "/userFilter") as f:
+        user_filter = f.read().splitlines()[0]
+
+    with open(spool_folder + "/groupFilter") as f:
+        group_filter = f.read().splitlines()[0]
+
+    with open(spool_folder + "/userAttributes") as f:
+        # ensure unique values in case some Perun attributes mapped to same LDAP attr
+        user_attributes = list(set(f.read().splitlines()))
+
+    with open(spool_folder + "/groupAttributes") as f:
+        group_attributes = list(set(f.read().splitlines()))
+
+    user_entries = {}
+    with open(spool_folder + "/" + service_name + "_users.ldif", "rb") as f:
+        parser = ldif.LDIFParser(f)
+        for dn, record in parser.parse():
+            # remove escaping necessary for LDIF parsing
+            user_entries.update({str.replace(dn, "\\", ""): record})
+
+    group_entries = {}
+    with open(spool_folder + "/" + service_name + "_groups.ldif", "rb") as f:
+        parser = ldif.LDIFParser(f)
+        for dn, record in parser.parse():
+            group_entries.update({dn: record})
+
+    connection = create_connection()
+
+    ldap_users = get_ldap_users(connection)
+    ldap_groups = get_ldap_groups(connection)
+    prepare_user_changes()
+    prepare_group_changes()
+    commit_changes_to_ldap(connection)
+    print_summary()
+
+    connection.unbind()
