@@ -1,5 +1,22 @@
 Upgrade notes
 
+## [16.10.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.9.0...v16.10.0) (2025-07-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **generic_ldap_gen:** `ldif` and `ldap3` python packages need to be installed via pip
+
+### Features
+
+* elixir service migration elixir_drupal use ls login and ls id ([446d07d](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/446d07de9c0211efc59998d6dcf1048b7962471d))
+* **generic_ldap_gen:** new generic ldap service ([0c63a90](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/0c63a90295bce5f3b471bd32e41fee1530e6265b))
+
+
+### Bug Fixes
+
+* **vsup_rav:** add 28 days to expiration for students ([080b346](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/080b346e43c8c474e1ca178aa8d185bf7bf2dc1e))
+
 ## [16.9.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.8.0...v16.9.0) (2025-06-23)
 
 
