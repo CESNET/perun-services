@@ -341,10 +341,15 @@ close FILE;
 
 sub checkBase64 {
     my $value = shift;
-
+    # always encode attributes containing new-line characters (return is probably not necessary, but just to be sure)
+    if ($value =~ /[\r\n]/) {
+        return ": " . encode_base64(Encode::encode_utf8($value), '');
+    }
+    # skip conforming values (e.g. no `:`, `<`, and other special chars as first character, then ASCII only)
     if ($value =~ /^[\x01-\x09\x0B-\x0C\x0E-\x1F\x21-\x39\x3B\x3D-\x7F][\x01-\x09\x0B-\x0C\x0E-\x7F]*$/){
         return " " . $value;
     }
+    # encode problematic values to base64
     return ": " . encode_base64(Encode::encode_utf8($value), '');
 }
 
