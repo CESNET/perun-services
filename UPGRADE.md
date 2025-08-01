@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [16.10.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.10.0...v16.10.1) (2025-08-01)
+
+
+### Bug Fixes
+
+* **generic_ldap_gen:** encode newline attributes to base64 ([5e5f391](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/5e5f3915b0eac09a5ae6b3f5a0886e33a1090b41))
+
 ## [16.10.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.9.0...v16.10.0) (2025-07-07)
 
 
