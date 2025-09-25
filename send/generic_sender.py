@@ -291,17 +291,27 @@ class UrlTransport(Transport):
         if return_code == 0:
             # check if curl ended without an error (ERR_CODE = 0)
             # (if not, we can continue as usual, because there is an error on STDERR)
-            if int(stdout) not in self.http_ok_codes:
+            http_code = int(stdout)
+            if http_code not in self.http_ok_codes:
                 # check if HTTP_CODE is different from OK
                 # if yes, then we will use HTTP_CODE as ERROR_CODE which is always non-zero
                 self.temp.seek(0, 0)
-                print(self.temp.read(), file=sys.stderr)
+                # print(self.temp.read(), file=sys.stderr)
+                print(
+                    f"Call to URL JSON endpoint ({self.destination_class_obj.destination}) failed with error message"
+                    f" ({self.temp.read()}): Status code: {http_code}",
+                    file=sys.stderr,
+                )
+                exit(http_code)
             else:
                 # if HTTP_CODE is OK, then call was successful and result call can be printed with info
                 # result call is saved in temp file
                 self.temp.seek(0, 0)
                 print(self.temp.read())
                 exit(0)
+        else:
+            print(stderr.decode("utf-8"), file=sys.stderr, end="")
+            exit(return_code)
 
 
 class S3Transport(Transport):
@@ -437,6 +447,7 @@ class S3Transport(Transport):
                     f"Call to URL endpoint ({url}) with data ({data}) failed. Status code: {response.status_code}",
                     file=sys.stderr,
                 )
+                exit(response.status_code)
             else:
                 print(
                     f"Successfully called URL endpoint ({url}) with data ({data}). Status code: {response.status_code}"
