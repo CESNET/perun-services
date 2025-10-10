@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [16.10.2](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.10.1...v16.10.2) (2025-10-10)
+
+
+### Bug Fixes
+
+* **generic_send:** add missing error code exits ([605d2fa](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/605d2fabe9ac6e046ea5f3c5e7ab499d0ac7e966))
+
 ## [16.10.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.10.0...v16.10.1) (2025-08-01)
 
 
