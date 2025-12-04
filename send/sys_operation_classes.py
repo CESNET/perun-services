@@ -189,11 +189,12 @@ class SysOperation:
             os.path.dirname(os.path.realpath(sys.argv[0])) + "/../gen/spool"
         )
         archive_file_path = service_files_base_dir + "/ARCHIVE"
-        if not os.path.exists(archive_file_path):
+        try:
+            with open(archive_file_path) as archive_file:
+                archive_enabled = int(archive_file.readline())
+                return bool(archive_enabled)
+        except Exception:
             return False
-        with open(archive_file_path) as archive_file:
-            archive_enabled = int(archive_file.readline())
-        return bool(archive_enabled)
 
     @staticmethod
     def archive_files(path: str, archive_name: str, directories: list[str]):
