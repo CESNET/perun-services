@@ -93,6 +93,10 @@ function add_on_exit()
 	on_exit_items[$n]="$*"
 	if [ $n -eq 0 ]; then
 		trap on_exit EXIT
+		trap 'on_exit; exit 129' HUP
+		trap 'on_exit; exit 130' INT
+		trap 'on_exit; exit 131' QUIT
+		trap 'on_exit; exit 143' TERM
 	fi
 }
 
