@@ -112,7 +112,7 @@ class Transport:
             SysOperation.persist_spool_files(
                 self.destination_class_obj.facility_name,
                 self.destination_class_obj.service_name,
-                [hostname_dir, generated_files_dir],
+                [hostname_dir.name, generated_files_dir],
             )
             return hostname_dir, generated_files_dir
 
