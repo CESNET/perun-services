@@ -1,5 +1,13 @@
 Upgrade notes
 
+## [16.10.3](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.10.2...v16.10.3) (2026-01-07)
+
+
+### Bug Fixes
+
+* call on_exit items when scripts are interrupted or similar ([1740b3a](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/1740b3a5bb04449747009c4656083f380dbe46f8))
+* **generic_send:** make archive-enabled file check more robust ([ce152b3](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/ce152b3401b38e06953e5333de3d6d56e82089ff))
+
 ## [16.10.2](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.10.1...v16.10.2) (2025-10-10)
 
 
