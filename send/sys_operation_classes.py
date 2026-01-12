@@ -159,7 +159,7 @@ class SysOperation:
         )
         if int(task_run_id) == -1:
             return
-        archive_enabled = SysOperation.is_archive_enabled()
+        archive_enabled = SysOperation.is_archive_enabled(facility_name, service_name)
         if archive_enabled:
             archive_spool_folder = (
                 f"{SysOperation.LOG_DIR}/{facility_name}/{service_name}"
@@ -184,11 +184,10 @@ class SysOperation:
         return run_id
 
     @staticmethod
-    def is_archive_enabled() -> bool:
-        service_files_base_dir = (
-            os.path.dirname(os.path.realpath(sys.argv[0])) + "/../gen/spool"
+    def is_archive_enabled(facility_name: str, service_name: str) -> bool:
+        archive_file_path = (
+            SysOperation.get_gen_folder(facility_name, service_name) + "/ARCHIVE"
         )
-        archive_file_path = service_files_base_dir + "/ARCHIVE"
         try:
             with open(archive_file_path) as archive_file:
                 archive_enabled = int(archive_file.readline())
@@ -226,7 +225,15 @@ class SysOperation:
         """
         tar_command = ["tar", tar_mode]
         tar_command.extend(["-C", hostname_dir, "."])
-        tar_command.extend(["-C", service_files_dir, "--exclude=_destination", "."])
+        tar_command.extend(
+            [
+                "-C",
+                service_files_dir,
+                "--exclude=_destination",
+                "--exclude=ARCHIVE",
+                ".",
+            ]
+        )
 
         # FIXME - works only for destinations type "host" or do we generate folders like "user@host" for that type?
         # determine DIR with special configuration for destination (this dir may not exist)

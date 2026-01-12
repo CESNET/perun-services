@@ -217,7 +217,7 @@ def persist_spool_files(facility_name: str, service_name: str, directories: [str
     task_run_id = get_run_id(get_gen_folder(facility_name, service_name) + "/RUN_ID")
     if int(task_run_id) == -1:
         return
-    archive_enabled = is_archive_enabled()
+    archive_enabled = is_archive_enabled(facility_name, service_name)
     if archive_enabled:
         archive_spool_folder = f"{LOG_DIR}/{facility_name}/{service_name}"
         if not os.path.exists(archive_spool_folder):
@@ -227,11 +227,8 @@ def persist_spool_files(facility_name: str, service_name: str, directories: [str
         archive_files(archive_spool_folder, archive_name, directories)
 
 
-def is_archive_enabled() -> bool:
-    service_files_base_dir = (
-        os.path.dirname(os.path.realpath(sys.argv[0])) + "/../gen/spool"
-    )
-    archive_file_path = service_files_base_dir + "/ARCHIVE"
+def is_archive_enabled(facility_name: str, service_name: str) -> bool:
+    archive_file_path = get_gen_folder(facility_name, service_name) + "/ARCHIVE"
     try:
         with open(archive_file_path) as archive_file:
             archive_enabled = int(archive_file.readline())
