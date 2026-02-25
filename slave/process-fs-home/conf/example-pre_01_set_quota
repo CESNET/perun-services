@@ -1,6 +1,35 @@
-#!/bin/sh
+#!/bin/bash
 # By default setting qoutas are disabled (0), to enable set next variable to 1
 #QUOTA_ENABLED=0
+
+# FSTAB="/etc/fstab"
+# PROC_MOUNTS="/proc/mounts"
+# PATH="$PATH:/usr/lpp/mmfs/bin"
+
+# Set if get_quotas function is defined
+# GET_QUOTAS_ENABLED=1
+
+# Parse repquota ouput and put quotas, which are already set into an associative array
+# get_quotas() {
+# 	declare -A path_to_mmfs
+#
+# 	if [ "$QUOTA_ENABLED" -gt 0 ]; then
+# 		if [[ "$SET_QUOTA" == "/usr/lpp/mmfs/bin/mmsetquota" ]]; then
+# 			while IFS= read -r fs_path || [[ -n "$fs_path" ]]; do
+# 				file_set_root=$(grep -w "$fs_path" "$PROC_MOUNTS" | cut -d" " -f 1)
+# 				gpfs_path=$(grep "$fs_path" "$FSTAB" | tr -s ' ' | cut -d" " -f 1)
+# 				file_set_name=$(mmlsfileset "$file_set_root" | tr -s ' ' | grep "$gpfs_path" | cut -d" " -f 1)
+# 				path_to_mmfs["${fs_path}"]="${file_set_root}:${file_set_name}"
+#
+# 				while read -r uid fileset type size block_soft block_hard indoubt grace pipe files file_soft file_hard indoubt grace; do
+# 					key="${uid}|${fs_path}"
+# 					current_quotas["$key"]="${block_soft}|${block_hard}|${file_soft}|${file_hard}"
+# 				done < <(mmrepquota -u -n "${path_to_mmfs["$fs_path"]}" | tail -n +3)
+#
+# 			done < <(cat "$QUOTAS_FILE" | cut -f 2 | sort | uniq)
+# 		fi
+# 	fi
+# }
 
 # Set custom setquota program
 #SET_QUOTA_PROGRAM="/usr/lpp/mmfs/bin/mmsetquota"

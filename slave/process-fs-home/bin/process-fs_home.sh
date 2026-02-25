@@ -29,7 +29,7 @@ function process {
 	#if QUOTA_ENABLED is not set in prescript, try to get info from quota_enabled file
 	#if file not exists, set quota_enabled to 0 (false) (for backwards compatibility)
 	if [ -z "${QUOTA_ENABLED}" ]; then
-		if [ -f "$QUOTA_ENABLED_FILE}" ]; then
+		if [ -f "$QUOTA_ENABLED_FILE" ]; then
 			QUOTA_ENABLED=`head -n 1 "$QUOTA_ENABLED_FILE"`
 		else
 			QUOTA_ENABLED=0
@@ -58,14 +58,6 @@ function process {
 		fi
 	fi
 
-	# set quotas
-	while IFS=`echo -e "\t"` read U_UID QUOTA_FS SOFT_QUOTA_DATA HARD_QUOTA_DATA SOFT_QUOTA_FILES HARD_QUOTA_FILES REST_OF_LINE; do
-		if [ "$QUOTA_ENABLED" -gt 0 ]; then
-			SET_QUOTA_PARAMS=`eval echo $SET_QUOTA_TEMPLATE`
-			catch_error E_CANNOT_SET_QUOTA $SET_QUOTA $SET_QUOTA_PARAMS
-		fi
-	done < "${QUOTAS_FILE}"
-
 	SKEL_DIR=
 	#find first path from $PERUN_SKEL_PATH which exists and is a directory
 	if [ -n "$PERUN_SKEL_PATH" ]; then
@@ -78,11 +70,16 @@ function process {
 		done
 	fi
 
+	declare -A VALID_USERS
 	TMP_DIR_BASIC_NAME='tmp-perun-fs_home-'
 	# lines contains homeMountPoint\tlogin\tUID\tGID\t...
 	# create home directories
 	while IFS=`echo -e "\t"` read U_HOME_MNT_POINT U_LOGNAME U_UID U_GID USER_STATUS USER_GROUPS REST_OF_LINE; do
 		HOME_DIR="${U_HOME_MNT_POINT}/${U_LOGNAME}"
+
+		if [[ $USER_STATUS == "VALID" ]]; then
+			VALID_USERS["$U_UID"]="1"
+		fi
 
 		CONT=0
 		run_mid_hooks
@@ -115,4 +112,36 @@ function process {
 		fi
 	done < "${FROM_PERUN}"
 
+	# get current quotas
+	declare -A current_quotas
+	if [ "${QUOTA_ENABLED}" -gt 0 ]; then
+		if [[ "$SET_QUOTA" == "/usr/sbin/setquota" ]]; then
+			while IFS= read -r fs_path || [[ -n "$fs_path" ]]; do
+				while IFS=',' read -r uid _ _ _ block_soft block_hard _ _ file_soft file_hard _; do
+					key="${uid#\#}|${fs_path}"
+					current_quotas["$key"]="${block_soft}|${block_hard}|${file_soft}|${file_hard}"
+				done < <(repquota -n -O csv "$fs_path" | tail -n 2)
+
+			done < <(cat "$QUOTAS_FILE" | cut -f 2 | sort | uniq)
+		elif [ "$GET_QUOTAS_ENABLED" -gt 0 ]; then
+			get_quotas
+		fi
+	fi
+
+	# set quotas
+	while IFS=`echo -e "\t"` read U_UID QUOTA_FS SOFT_QUOTA_DATA HARD_QUOTA_DATA SOFT_QUOTA_FILES HARD_QUOTA_FILES REST_OF_LINE; do
+		if [ "$QUOTA_ENABLED" -gt 0 ]; then
+			SET_QUOTA_PARAMS=`eval echo $SET_QUOTA_TEMPLATE`
+			key="${U_UID}|${QUOTA_FS}"
+			value="${SOFT_QUOTA_DATA}|${HARD_QUOTA_DATA}|${SOFT_QUOTA_FILES}|${HARD_QUOTA_FILES}"
+
+			if [[ ${VALID_USERS[$U_UID]} != "1" ]]; then
+				continue
+			fi
+
+			if [[ "${current_quotas[$key]}" != "${value}" ]]; then
+				catch_error E_CANNOT_SET_QUOTA $SET_QUOTA $SET_QUOTA_PARAMS
+			fi
+		fi
+	done < "${QUOTAS_FILE}"
 }
