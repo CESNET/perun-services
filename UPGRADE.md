@@ -1,5 +1,22 @@
 Upgrade notes
 
+## [16.11.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.10.3...v16.11.0) (2026-03-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* the generated 'users.csv' has an additional column (SUBGROUPS), this should be reflected in parsing scripts
+
+### Features
+
+* **ad_ceitec:** added ad_ceitec service ([02ab5cc](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/02ab5cc6c1e1b978665f9ff8e5e3d1abbdc21b73))
+* add subgroups to calpendo_einfra ([d321234](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/d3212343a7fb98469f6f034b44aaef698c0a2262))
+
+
+### Bug Fixes
+
+* **generic_send:** try not to overwrite ARCHIVE flag file ([7841059](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/7841059cdc6f29e9084b1225543a9b5b0bf416ff))
+
 ## [16.10.3](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.10.2...v16.10.3) (2026-01-07)
 
 
