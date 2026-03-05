@@ -198,8 +198,7 @@ sub createTaskRunIdFile() {
 # is retrieved via a call to backend RPC and updates on every propagation.
 # Contains 1 if enabled, contains 0 if logging disabled. If the file is not found, logging is disabled by default
 sub createArchiveEnabledFile {
-	my $fileName = "spool/ARCHIVE";
-	open ARCHIVE_FILE, ">$fileName" or die "Cannot open $fileName: $! \n";
+	open ARCHIVE_FILE, ">$tmp_directory" . "/ARCHIVE";
 	print ARCHIVE_FILE $archiveEnabled;
 	close ARCHIVE_FILE
 }
