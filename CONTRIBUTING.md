@@ -33,4 +33,3 @@ Use `BREAKING CHANGE:`
 ### Python
 
 - lint and format your code with [ruff](https://docs.astral.sh/ruff/)
-- add names of new Python files into the `PYTHON_FILES` variable in `.gitlab-ci.yml`
