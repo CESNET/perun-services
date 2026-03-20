@@ -1,3 +1,11 @@
+perun-slave-process-fs-home (3.1.12) stable; urgency=low
+
+  * skip setting quotas which were already set
+  * set quotas only for VALID/ACTIVE users – users whose Perun state
+    is EXPIRED or INACTIVE retain their previous quota values
+
+ -- Ales Horna <ales.horna@cesnet.cz>  Fri, 13 Mar 2026 13:00:00 +0100
+
 perun-slave-process-fs-home (3.1.11) stable; urgency=low
 
   * Fixed package priority from 'extra' to 'optional'.
