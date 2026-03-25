@@ -5,7 +5,6 @@ import sys
 import tarfile
 import tempfile
 from importlib import import_module
-from typing import Optional
 
 
 class SysOperation:
@@ -40,7 +39,7 @@ class SysOperation:
         return service_name
 
     @staticmethod
-    def load_custom_transport_command(service_name: str) -> Optional[list[str]]:
+    def load_custom_transport_command(service_name: str) -> list[str] | None:
         """
         Retrieves custom transport command from config file located in service directory.
         Config file must end with .py -> "/etc/perun/services/service_name/service_name.py")
