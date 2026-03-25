@@ -1,5 +1,18 @@
 Upgrade notes
 
+## [16.12.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.11.0...v16.12.0) (2026-03-25)
+
+
+### Features
+
+* **fs_home:** skip setting quota when unchanged ([babc140](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/babc14091ff26de660b32c62978e3d0126ab62a1))
+* **pbsmon_users:** include preferred language and mail for users ([819785a](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/819785a5c35328362040221b2c316f9f119a4acb))
+
+
+### Bug Fixes
+
+* update python version to >=3.11 in pyproject.toml ([7fa5a59](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/7fa5a599eb353944061bf50fb3fe7460838b2eef))
+
 ## [16.11.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.10.3...v16.11.0) (2026-03-05)
 
 
