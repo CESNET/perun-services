@@ -48,7 +48,7 @@ shellcheck:
 
 check_deprecated_modules:
   when: manual
-  image: python:3.11-slim
+  image: python:3.13.5-slim
   script:
     - python -m venv venv
     - source venv/bin/activate
