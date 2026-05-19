@@ -5,7 +5,6 @@ use warnings;
 use perunServicesInit;
 use perunServicesUtils;
 use File::Basename;
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 our $SERVICE_NAME = basename($0);
 our $PROTOCOL_VERSION = "3.5.0";

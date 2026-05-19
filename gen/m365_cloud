@@ -4,7 +4,6 @@ use strict;
 use warnings;
 use File::Basename;
 use perunDataGenerator;
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 local $::SERVICE_NAME = basename($0);
 local $::PROTOCOL_VERSION = "3.0.0";
@@ -20,7 +19,7 @@ my $preparedData = perunDataGenerator::finalizeMemberUsersData($data);
 
 my $licenses_map = $data->getFacilityAttributeValue(attrName => $M365_LICENSES_MAP);
 my @sorted_license_groups = map { $licenses_map->{$_} } sort { $b <=> $a } keys %$licenses_map;
-my @licensed_users;
+my %licensed_users;
 
 foreach my $license_name (@sorted_license_groups) {
 	# check each license group, starting from the most prioritized one, if it is defined in the mapping
@@ -43,10 +42,10 @@ foreach my $license_name (@sorted_license_groups) {
 		# filter the members who have already been assigned to some (prioritized) license group
 		my @members;
 		foreach my $member (@{ $group->{"members"} }) {
-			if ($member->{"link_id"} ~~ @licensed_users) {
+			if ($licensed_users{$member->{"link_id"}}) {
 				next;
 			} else {
-				push @licensed_users, $member->{"link_id"};
+				$licensed_users{$member->{"link_id"}} = 1;
 				push @members, $member;
 			}
 		}
