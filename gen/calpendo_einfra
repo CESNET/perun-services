@@ -4,18 +4,16 @@ use strict;
 use warnings;
 use perunServicesInit;
 use perunServicesUtils;
-use Perun::Agent;
-use Perun::GroupsAgent;
 use open qw/:std :utf8/;
 use Text::CSV;
 
 local $::SERVICE_NAME = "calpendo_einfra";
 local $::PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.2";
+my $SCRIPT_VERSION = "3.0.3";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-my $data = perunServicesInit::getHashedHierarchicalData;
+my $data = perunServicesInit::getHashedDataWithGroups;
 
 #Constants
 my $VMCF_USERS_GROUP_ID = 14298;
@@ -30,9 +28,8 @@ our $A_VMCF_ORG_UNIT;             *A_VMCF_ORG_UNIT =         \'urn:perun:member:
 our $A_VMCF_USER_POSITION;        *A_VMCF_USER_POSITION =    \'urn:perun:member:attribute-def:def:vmcfUserPosition';
 our $A_VMCF_UKCO;                 *A_VMCF_UKCO =             \'urn:perun:member:attribute-def:def:vmcfUKCO';
 our $A_VMCF_UK_LOGIN;             *A_VMCF_UK_LOGIN =         \'urn:perun:member:attribute-def:def:vmcfUKlogin';
+our $A_GROUP_GROUP_NAME;          *A_GROUP_GROUP_NAME =      \'urn:perun:group:attribute-def:core:name';
 
-my $agent = perunServicesInit->getAgent;
-my $groupsAgent = $agent->getGroupsAgent;
 my %printed_logins;
 
 my $csv = Text::CSV->new({ auto_diag => 1, eol => "\n", quote_char => undef, binary => 1 });
@@ -40,21 +37,24 @@ my $fileUsers = $DIRECTORY . "users.csv";
 open my $fh,">$fileUsers" or die "Cannot open $fileUsers: $! \n";
 $csv->print($fh,['LOGIN','EMAIL','FIRSTNAME','LASTNAME','PHONE','ORG_UNIT','USER_POSITION','UKCO','UK_LOGIN','SUBGROUPS']);
 
-my $subgroupNameById = { map {
-	$_->{_id} => ( $_->{_name} || '' ) =~ s/^[^:]*://r #name is stripped of top-level group
-} $groupsAgent->getAllSubGroups( group => $VMCF_USERS_GROUP_ID ) };
-
-my $subgroupMembersByGroupId = {};
-foreach my $subgroupId (keys %{$subgroupNameById}) {
-	my @subgroupMembers = $groupsAgent->getGroupMembers( group => $subgroupId );
-	$subgroupMembersByGroupId->{$subgroupId} = [ map { $_->{_id} } @subgroupMembers ];
-}
+my $vmcf_users_group_name = $data->getGroupAttributeValue( group => $VMCF_USERS_GROUP_ID, attrName => $A_GROUP_GROUP_NAME );
+my $vmcf_users_subgroup_prefix = $vmcf_users_group_name . ':';
 
 my $subgroupsByMember = {};
-foreach my $subgroupId (keys %{$subgroupNameById}) {
-	my $subgroup_shortname = $subgroupNameById->{$subgroupId};
-	foreach my $memberId (@{ $subgroupMembersByGroupId->{$subgroupId} }) {
-		push @{ $subgroupsByMember->{$memberId} }, $subgroup_shortname;
+foreach my $resourceId ( $data->getResourceIds() ) {
+	foreach my $groupId ( $data->getGroupIdsForResource( resource => $resourceId ) ) {
+
+		my $fullGroupName = $data->getGroupAttributeValue(group => $groupId, attrName => $A_GROUP_GROUP_NAME);
+		# skip if the full group name does not start with the prefix
+		next unless defined $fullGroupName && $fullGroupName =~ /^\Q$vmcf_users_subgroup_prefix\E/;
+
+		my $subgroupShortName = substr($fullGroupName, length($vmcf_users_subgroup_prefix));
+		my @subgroupMemberIds = $data->getMemberIdsForResourceAndGroup(resource => $resourceId, group => $groupId);
+
+		foreach my $memberId (@subgroupMemberIds) {
+			# this works as a hash set to avoid duplicate subgroup names
+			$subgroupsByMember->{$memberId}{$subgroupShortName} = undef;
+		}
 	}
 }
 
@@ -73,7 +73,7 @@ foreach my $memberId ($data->getMemberIdsForFacility()) {
 	my $position = $data->getMemberAttributeValue( member => $memberId, attrName => $A_VMCF_USER_POSITION );
 	my $ukco = $data->getMemberAttributeValue( member => $memberId, attrName => $A_VMCF_UKCO );
 	my $ukLogin = $data->getMemberAttributeValue( member => $memberId, attrName => $A_VMCF_UK_LOGIN );
-	my $subgroups_string = join ';', @{ $subgroupsByMember->{$memberId} || [] };
+	my $subgroups_string = join ';', sort keys %{ $subgroupsByMember->{$memberId} // {} };
 
 	unless (exists $printed_logins{$login}) {
 		$printed_logins{$login} = 1;
