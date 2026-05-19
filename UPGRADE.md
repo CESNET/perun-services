@@ -1,5 +1,24 @@
 Upgrade notes
 
+## [17.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.12.0...v17.0.0) (2026-05-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* Add group:attribute-def:core:name as required attribute for calpendo_einfra
+* All services specific to VSUP deployment has been removed.
+* Setup custom services repository in instance vars to deploy VSUP specific services.
+
+### Bug Fixes
+
+* fix check_deprecated_modules.py script for python 3.11+ ([35e6752](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/35e67522644d1fe203e865bd5bbc7dcea206dc7e))
+* remove direct API calls from calpendo_einfra ([846e37f](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/846e37f6a5d4146b429dfb16af5dafdf288f9b3b))
+
+
+### Refactoring
+
+* removed all vsup related services ([f4e4fb1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/f4e4fb1a072598b91768338d147b43ab33e38e27))
+
 ## [16.12.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.11.0...v16.12.0) (2026-03-25)
 
 
