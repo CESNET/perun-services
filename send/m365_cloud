@@ -406,8 +406,9 @@ def create_disable_external_users(their_users, our_users):
                 continue  # we want to skip internal accounts potentially stored in Perun
             their_user = next(
                 filter(
-                    lambda user: our_account
-                    in get_mail_aliases(user["proxyAddresses"]),
+                    lambda user: (
+                        our_account in get_mail_aliases(user["proxyAddresses"])
+                    ),
                     their_users,
                 ),
                 None,
@@ -444,8 +445,9 @@ def create_update_restore_internal_users(their_users, removed_users, our_interna
         if their_user is None:
             removed_user = next(
                 filter(
-                    lambda user: user["onPremisesImmutableId"]
-                    == get_immutable_id(our_internal),
+                    lambda user: (
+                        user["onPremisesImmutableId"] == get_immutable_id(our_internal)
+                    ),
                     removed_users,
                 ),
                 None,
@@ -498,8 +500,10 @@ def delete_users(their_users, our_users):
             if their_user["userPrincipalName"].split("@")[0] in our_internal_logins:
                 our_user = next(
                     filter(
-                        lambda user: their_user["userPrincipalName"]
-                        == f"{user[login_attr_name]}@{SCOPE}",
+                        lambda user: (
+                            their_user["userPrincipalName"]
+                            == f"{user[login_attr_name]}@{SCOPE}"
+                        ),
                         our_users,
                     ),
                     None,
@@ -639,8 +643,9 @@ def remove_groups(our_groups, their_groups):
             continue
         our_group = next(
             filter(
-                lambda g: g[resource_id_attr_name]
-                == their_group[PERUN_ID_EXTENSION_NAME],
+                lambda g: (
+                    g[resource_id_attr_name] == their_group[PERUN_ID_EXTENSION_NAME]
+                ),
                 our_groups,
             ),
             None,
@@ -654,8 +659,9 @@ def create_update_restore_groups(our_groups, removed_groups, their_groups):
     for our_group in our_groups:
         their_group = next(
             filter(
-                lambda g: g.get(PERUN_ID_EXTENSION_NAME)
-                == our_group[resource_id_attr_name],
+                lambda g: (
+                    g.get(PERUN_ID_EXTENSION_NAME) == our_group[resource_id_attr_name]
+                ),
                 their_groups,
             ),
             None,
@@ -663,9 +669,11 @@ def create_update_restore_groups(our_groups, removed_groups, their_groups):
         if their_group is None:
             their_removed_group = next(
                 filter(
-                    lambda g: g.get(PERUN_MANAGED_EXTENSION_NAME, False)
-                    and g.get(PERUN_ID_EXTENSION_NAME)
-                    == our_group[resource_id_attr_name],
+                    lambda g: (
+                        g.get(PERUN_MANAGED_EXTENSION_NAME, False)
+                        and g.get(PERUN_ID_EXTENSION_NAME)
+                        == our_group[resource_id_attr_name]
+                    ),
                     removed_groups,
                 ),
                 None,

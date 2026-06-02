@@ -605,8 +605,9 @@ class GoogleConnector:
         for their_group in their_groups:
             our_group_email = next(
                 filter(
-                    lambda our_group_email: our_group_email.lower()
-                    == their_group.get("email").lower(),
+                    lambda our_group_email: (
+                        our_group_email.lower() == their_group.get("email").lower()
+                    ),
                     our_groups.keys(),
                 ),
                 None,
@@ -648,8 +649,9 @@ class GoogleConnector:
         for their_user in their_users:
             our_user_email = next(
                 filter(
-                    lambda our_user_email: our_user_email.lower()
-                    == their_user.get("primaryEmail").lower(),
+                    lambda our_user_email: (
+                        our_user_email.lower() == their_user.get("primaryEmail").lower()
+                    ),
                     our_users.keys(),
                 ),
                 None,
