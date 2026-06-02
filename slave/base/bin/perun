@@ -38,6 +38,7 @@ fi
 umask 077
 
 ### Status codes
+# Code 0 for informative messages
 I_STARTED=(0 'Service ${SERVICE} processing started')
 I_FINISHED=(0 'Service ${SERVICE} processing done')
 I_PROTOCOL_MINOR_DIFF=(0 'Difference in protocol minor version')
@@ -46,6 +47,11 @@ I_FILE_RECOVERED=(0 'File ${BACKUP_DIR}/${LOCAL} was recovered successfully')
 I_FILE_CANT_RECOVER=(0 'File ${BACKUP_DIR}/${LOCAL} cannot be recovered because backup not exists, was skipped')
 I_BACKUP_COMPLETE=(0 'Backup files and lock file created in directory ${BACKUP_DIR}')
 
+# Codes 100-199 for non-fatal warnings
+W_FACILITY_WHITELIST_NOT_SET=(100 'Perun sent configuration, but FACILITY_WHITELIST is empty or not configured (Facility=${FACILITY},DNS_Alias=${SEND_TO_HOSTNAME})')
+W_FACILITY_NOT_WHITELISTED=(101 'Perun sent configuration to this host via facility which was not whitelisted (Facility=${FACILITY},DNS_Alias=${SEND_TO_HOSTNAME})')
+
+# Other codes for potentially fatal errors
 E_WORK_DIR=(1 'Problem with working directory')
 E_TAR_FILES=(2 'Problem with extracting received files')
 E_LOCK_FILE=(3 'Lock file already exists')
@@ -54,7 +60,7 @@ E_IO=(5 'IO operation failed')
 E_CONCURRENT_PROCESS=(6 'Concurrent process is running right now')
 E_LOCK_DELETE=(7 'Lock file cannot be deleted')
 E_LOCK_PIDFILE=(8 'Lock pid file cannot be created')
-E_DNS_ALIAS_NOT_WHITELISTED=(9 'Perun send configuration to this host via dns alias which was not whitelisted (Facility=${FACILITY},DNS_Alias=${SEND_TO_HOSTNAME})')
+E_NOT_WHITELISTED=(9 'Perun sent configuration to this host, but neither the DNS alias nor the Facility name are whitelisted (Facility=${FACILITY},DNS_Alias=${SEND_TO_HOSTNAME})')
 E_BACKUP_DIR=(10 'Problem with backup directory')
 E_REMOVE_SERVICE_LOCK_FILE=(11 'Cannot remove service lock file and backup files while recovering process')
 E_FILE_CANT_RECOVER=(12 'File ${BACKUP_DIR}/${LOCAL} cannot be recovered. Moving file problems')
@@ -112,6 +118,10 @@ function log_msg {
 		MSG="Info: ${TEXT}"
 		echo "${TIME} ${MSG}"
 		logger -t "${NAME}" -p daemon.info "${SERVICE}: ${MSG}" &>/dev/null
+	elif [ "${CODE}" -ge 100 ] && [ "${CODE}" -le 199 ]; then
+		MSG="Warning: $1 (code=${CODE}): ${TEXT}"
+		echo "${TIME} ${MSG}" >&2
+		logger -t "${NAME}" -p daemon.warning "${SERVICE}: ${MSG}" &>/dev/null
 	else
 		MSG="Error $1 (code=${CODE}): ${TEXT}"
 		echo "${TIME} ${MSG}" >&2
@@ -132,6 +142,10 @@ function log_msg_without_exit {
 		MSG="Info: ${TEXT}"
 		echo "${TIME} ${MSG}"
 		logger -t "${NAME}" -p daemon.info "${SERVICE}: ${MSG}" &>/dev/null
+	elif [ "${CODE}" -ge 100 ] && [ "${CODE}" -le 199 ]; then
+		MSG="Warning: $1 (code=${CODE}): ${TEXT}"
+		echo "${TIME} ${MSG}" >&2
+		logger -t "${NAME}" -p daemon.warning "${SERVICE}: ${MSG}" &>/dev/null
 	else
 		MSG="Error $1 (code=${CODE}): ${TEXT}"
 		echo "${TIME} ${MSG}" >&2
@@ -437,6 +451,7 @@ WARN_USING_OLD_PATH_FOR_SCRIPTS="Warning: Old configuration dir ${OLD_CUSTOM_SCR
 ls "${OLD_CUSTOM_SCRIPTS_DIR}/${SERVICE}.d/" 2>/dev/null | grep '^pre_\|^post_\|^mid_' 1>/dev/null && echo "${WARN_USING_OLD_PATH_FOR_SCRIPTS}" 1>&2
 
 DNS_ALIAS_OK=0
+FACILITY_OK=0
 # check if perun send via allowed hostname
 if [ "${#DNS_ALIAS_WHITELIST[@]}" -gt 0  ]; then
 	if in_array "${SEND_TO_HOSTNAME}" "${DNS_ALIAS_WHITELIST[@]}"; then
@@ -446,11 +461,21 @@ fi
 
 if [ "${#FACILITY_WHITELIST[@]}" -gt 0  ]; then
 	if in_array "${FACILITY}" "${FACILITY_WHITELIST[@]}"; then
-		DNS_ALIAS_OK=1
+		FACILITY_OK=1
 	fi
 fi
 
-[ "$DNS_ALIAS_OK" -ne 1 ] && log_msg E_DNS_ALIAS_NOT_WHITELISTED
+if [ "$DNS_ALIAS_OK" -ne 1 ] && [ "$FACILITY_OK" -ne 1 ]; then
+	log_msg E_NOT_WHITELISTED
+fi
+
+if [ "$FACILITY_OK" -ne 1 ]; then
+	if [ "${#FACILITY_WHITELIST[@]}" -eq 0 ]; then
+		log_msg_without_exit W_FACILITY_WHITELIST_NOT_SET
+	else
+		log_msg_without_exit W_FACILITY_NOT_WHITELISTED
+	fi
+fi
 
 
 
