@@ -1,3 +1,18 @@
+perun-slave-base (3.1.24) stable; urgency=low
+
+  * Create /etc/perunv3.conf during base package installation
+    if it does not already exist.
+
+ -- Michal Berky <michal.berky@cesnet.cz>  Fri, 09 Jun 2026 13:45:00 +0200
+
+perun-slave-base (3.1.23) stable; urgency=low
+
+  * Add warnings when facility is not whitelisted
+  * If neither facility, nor DNS is whitelisted, the error message
+    informs about this more clearly.
+
+ -- Michal Berky <michal.berky@cesnet.cz>  Tue, 02 Jun 2026 17:25:00 +0200
+
 perun-slave-base (3.1.22) stable; urgency=low
 
   * Clear locks on interrupt and similar signals
