@@ -196,7 +196,7 @@ for my $login (@logins) {
 		print FILE "mail: " . $mail . "\n";
 	}
 	if (defined $o and length $o) {
-		print FILE "company: " . $o . "\n";
+		print FILE "company: " . substr($o, 0, 64) . "\n";
 	}
 	if (defined $samAccountName and length $samAccountName) {
 		print FILE "samAccountName: " . $samAccountName . "\n";
