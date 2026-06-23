@@ -41,6 +41,7 @@ function process {
 				if [ "$PROJECT_PATH" != "$PREVIOUS_PROJECT_PATH" ]; then
 					#If projectPaths are not same, set all not managed existing directories to nobady
 					for LINE in $EXISTING_DIRECTORIES; do
+						test -L "$PREVIOUS_PROJECT_PATH"/"$LINE" && continue
 						#Set permission to 2000 and owners to nobody:nogroup
 						setfacl --remove-all --remove-default "$PREVIOUS_PROJECT_PATH"/"$LINE"
 						catch_error E_CANNOT_CHANGE_PERMISSIONS_TO_NOBODY chmod 2000 "$PREVIOUS_PROJECT_PATH"/"$LINE"
@@ -52,7 +53,7 @@ function process {
 			fi
 
 			#If directory not exists, create new one
-			if [ ! -d "$PROJECT_PATH/$PROJECT_NAME" ]; then
+			if [ ! -d "$PROJECT_PATH/$PROJECT_NAME" ] && [ ! -L "$PROJECT_PATH/$PROJECT_NAME" ]; then
 				catch_error E_CANNOT_CREATE_DIR mkdir "$PROJECT_PATH/$PROJECT_NAME"
 				catch_error E_CANNOT_CHANGE_PERMISSIONS chmod 2"$PERMISSIONS" "$PROJECT_PATH"/"$PROJECT_NAME"
 			else
@@ -66,7 +67,7 @@ function process {
 			O_PERMISSION=`echo $PERMISSIONS | sed -e 's/^\(.\)\(.\)\(.\)$/\3/'`
 			setfacl --remove-all --remove-default --modify u::$U_PERMISSION,u:$OWNER:$U_PERMISSION,d:g:$GID:$G_PERMISSION,g:$GID:$G_PERMISSION,d:g::$G_PERMISSION,g::$G_PERMISSION,o:$O_PERMISSION "$PROJECT_PATH"/"$PROJECT_NAME"
 			chmod g+s "$PROJECT_PATH"/"$PROJECT_NAME"
-			catch_error E_CANNOT_CHANGE_OWNER chown "$OWNER":"$UNIX_GROUP_NAME" "$PROJECT_PATH"/"$PROJECT_NAME"
+			test -L "$PROJECT_PATH"/"$PROJECT_NAME" || catch_error E_CANNOT_CHANGE_OWNER chown "$OWNER":"$UNIX_GROUP_NAME" "$PROJECT_PATH"/"$PROJECT_NAME"
 
 			#Set settings for quota if enabled
 			if [ "${QUOTA_ENABLED}" -gt 0 ]; then
@@ -119,6 +120,7 @@ function process {
 	#Need to do it for the last time when while ends
 	for LINE in $EXISTING_DIRECTORIES; do
 		#Set permission to 2000 and owners to nobody:nogroup
+		test -L "$PREVIOUS_PROJECT_PATH"/"$LINE" && continue
 		setfacl --remove-all --remove-default "$PREVIOUS_PROJECT_PATH"/"$LINE"
 		catch_error E_CANNOT_CHANGE_PERMISSIONS_TO_NOBODY chmod 2000 "$PREVIOUS_PROJECT_PATH"/"$LINE"
 		catch_error E_CANNOT_CHANGE_OWNER_TO_NOBODY chown nobody:nogroup "$PREVIOUS_PROJECT_PATH"/"$LINE"
