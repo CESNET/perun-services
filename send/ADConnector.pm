@@ -1,11 +1,11 @@
 package ADConnector;
 use Exporter 'import';
+use List::Util qw(all);
 @ISA = ('Exporter');
 @EXPORT = qw(init_config resolve_domain_controlers ldap_connect_multiple_options resolve_pdc ldap_connect ldap_bind ldap_unbind ldap_log load_perun load_ad load_group_members compare_entry enable_uac disable_uac is_uac_enabled clone_entry_with_specific_attributes add_members_to_entry remove_members_from_entry update_group_membership);
 
 use strict;
 use warnings;
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 
 =pod
 
@@ -457,9 +457,12 @@ sub compare_entry($$$) {
 	my @sorted_ad_entry_value = sort(@ad_entry_value);
 	my @sorted_perun_entry_value = sort(@perun_entry_value);
 
-	# compare using smart-match (perl 5.10.1+)
-	unless(@sorted_ad_entry_value ~~ @sorted_perun_entry_value) {
-		# param values are not equals
+	# compare the sorted arrays
+	unless (
+		@sorted_ad_entry_value == @sorted_perun_entry_value
+			&& all { $sorted_ad_entry_value[$_] eq $sorted_perun_entry_value[$_] } 0 .. $#sorted_ad_entry_value
+	) {
+		# arrays are NOT equal
 		return 1;
 	}
 

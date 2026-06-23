@@ -1,5 +1,4 @@
 #!/usr/bin/perl
-use feature "switch";
 use strict;
 use warnings;
 use perunServicesInit;

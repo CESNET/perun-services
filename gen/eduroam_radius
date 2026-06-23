@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-use Switch;
 use perunServicesInit;
 use perunServicesUtils;
 use File::Basename;

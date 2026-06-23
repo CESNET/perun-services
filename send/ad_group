@@ -1,11 +1,11 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-no if $] >= 5.017011, warnings => 'experimental::smartmatch';
 use Net::LDAPS;
 use Net::LDAP::Entry;
 use Net::LDAP::Message;
 use Net::LDAP::LDIF;
+use List::Util qw(all);
 
 # Import shared AD library
 use ADConnector;
@@ -174,9 +174,11 @@ sub process_update() {
 		my @sorted_ad_val = sort(@ad_val);
 		my @sorted_per_val = sort(@per_val);
 
-		# compare using smart-match (perl 5.10.1+)
-		unless(@sorted_ad_val ~~ @sorted_per_val) {
-
+		# compare the sorted arrays
+		unless (
+			@sorted_ad_val == @sorted_per_val
+				&& all { $sorted_ad_val[$_] eq $sorted_per_val[$_] } 0 .. $#sorted_ad_val
+		) {
 			# members of group are not equals
 			# we must get reference to real group from AD in order to call "replace"
 			my $response_ad = $ldap->search( base => $perun_entry->dn(), filter => $filter, scope => 'base' );

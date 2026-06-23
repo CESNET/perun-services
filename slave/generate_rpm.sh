@@ -62,6 +62,7 @@ fi
 
 CUSTOM_CONF=""
 CUSTOM_FILE_DATA=""
+CUSTOM_POST=""
 # conf predefined settings
 if [ $WITH_CONF == 1 ]; then
 	CUSTOM_CONF="mkdir -p %{buildroot}/etc/perun/${CONF_SERVICE_NAME}.d
@@ -74,6 +75,19 @@ mkdir -p %{buildroot}/opt/perun/lib/${CONF_SERVICE_NAME}/
 cp -r lib/* %{buildroot}/opt/perun/lib/${CONF_SERVICE_NAME}/"
   CUSTOM_FILE_DATA="$CUSTOM_FILE_DATA
 /opt/perun/lib/${CONF_SERVICE_NAME}/"
+fi
+if [ "${GENERATE_RPM_FOR_SERVICE}" = "base" ]; then
+  CUSTOM_POST="$CUSTOM_POST
+if [ ! -e /etc/perunv3.conf ]; then
+	 cat > /etc/perunv3.conf <<'EOF'
+# syntax: (item1 item2 item3)
+SERVICE_BLACKLIST=()
+SERVICE_WHITELIST=()
+DNS_ALIAS_WHITELIST=( \`hostname -f\` )
+FACILITY_WHITELIST=()
+EOF
+chmod 0644 /etc/perunv3.conf
+fi"
 fi
 
 # generate spec file
@@ -140,6 +154,9 @@ $CUSTOM_CONF
 /opt/perun/bin/*
 /var/lib/perun/${GENERATE_RPM_FOR_SERVICE}/
 $CUSTOM_FILE_DATA
+
+%post
+$CUSTOM_POST
 EOF
 
 fi

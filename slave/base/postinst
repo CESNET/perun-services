@@ -1,0 +1,33 @@
+#!/bin/sh
+# postinst script for #base#
+#
+# see: dh_installdeb(1)
+
+set -e
+
+case "$1" in
+    configure)
+    if [ ! -e /etc/perunv3.conf ]; then
+    	cat > /etc/perunv3.conf <<'EOF'
+# syntax: (item1 item2 item3)
+SERVICE_BLACKLIST=()
+SERVICE_WHITELIST=()
+DNS_ALIAS_WHITELIST=( `hostname -f` )
+FACILITY_WHITELIST=()
+EOF
+		chmod 0644 /etc/perunv3.conf
+		fi
+		;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0
