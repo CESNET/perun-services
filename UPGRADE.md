@@ -1,5 +1,19 @@
 Upgrade notes
 
+## [17.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v17.0.0...v17.1.0) (2026-06-23)
+
+
+### Features
+
+* add warnings when facility is not whitelisted ([2f8ef63](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/2f8ef633192f4d6015025420c67e16490c1435b5))
+* create /etc/perunv3.conf during base package install ([d492976](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/d492976541d3c9d23122179d1b4349a54146617b))
+* **fs_project:** support symlinks replacing project directories ([c996ef8](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/c996ef897090bb7a8b4ec4d5c7f65b28c89c38c3))
+
+
+### Bug Fixes
+
+* **ad_ceitec:** limit organization value to 64 chars ([5b63484](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/5b63484cc145d895d299bf60b0fb2cf72fc0bc70))
+
 ## [17.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v16.12.0...v17.0.0) (2026-05-19)
 
 
