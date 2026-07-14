@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [17.1.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v17.1.0...v17.1.1) (2026-07-14)
+
+
+### Bug Fixes
+
+* stop m365_cloud from generating string link_ids ([ebe910c](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/ebe910c0e1834ac262793bea793ec3e6b70ef724))
+
 ## [17.1.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v17.0.0...v17.1.0) (2026-06-23)
 
 
