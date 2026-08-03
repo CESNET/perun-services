@@ -107,51 +107,52 @@ function add_on_exit()
 	fi
 }
 
-function log_msg {
-	CODE=`eval echo '${'$1'[0]}'`
-	TEXT=`eval echo '${'$1'[1]}" ("$2")"'`
-	TEXT=`eval echo \"${TEXT}\"`	# expand variables in message
-	CODE=${CODE:=255}
-	TEXT=${TEXT:=Unknown error $1}
-	TIME=`date "+%H:%M:%S"`
+function _log_msg_impl() {
+    local -n _error_ref="$1"
 
-	if [ "${CODE}" -eq 0 ]; then
-		MSG="Info: ${TEXT}"
-		echo -e "${TIME} ${MSG}"
-		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.info &>/dev/null
-	elif [ "${CODE}" -ge 100 ] && [ "${CODE}" -le 199 ]; then
-		MSG="Warning: $1 (code=${CODE}): ${TEXT}"
-		echo -e "${TIME} ${MSG}" >&2
-		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.warning &>/dev/null
-	else
-		MSG="Error $1 (code=${CODE}): ${TEXT}"
-		echo -e "${TIME} ${MSG}" >&2
-		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.error &>/dev/null
-		exit "${CODE}"
-	fi
+    local CODE="${_error_ref[0]:-255}"
+    local RAW_TEXT="${_error_ref[1]}"
+
+    local SUFFIX=${2:+" ($2)"}
+    local COMBINED_TEXT="${RAW_TEXT}${SUFFIX}"
+
+    local TEXT
+    TEXT=$(eval echo "\"${COMBINED_TEXT}\"")
+    TEXT="${TEXT:-Unknown error $1}"
+
+    local TIME
+    TIME=$(date "+%H:%M:%S")
+
+    local MSG
+
+    if [ "${CODE}" -eq 0 ]; then
+        MSG="Info: ${TEXT}"
+        echo -e"${TIME} ${MSG}"
+        echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.info  &>/dev/null
+
+    elif [ "${CODE}" -ge 100 ] && [ "${CODE}" -le 199 ]; then
+        MSG="Warning: $1 (code=${CODE}): ${TEXT}"
+        echo -e"${TIME} ${MSG}" >&2
+        echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.warning  &>/dev/null
+
+    else
+        MSG="Error $1 (code=${CODE}): ${TEXT}"
+        echo -e"${TIME} ${MSG}" >&2
+        echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.error  &>/dev/null
+    fi
+
+    return "${CODE}"
 }
 
-function log_msg_without_exit {
-	CODE=`eval echo '${'$1'[0]}'`
-	TEXT=`eval echo '${'$1'[1]}" ("$2")"'`
-	TEXT=`eval echo \"${TEXT}\"`  # expand variables in message
-	CODE=${CODE:=255}
-	TEXT=${TEXT:=Unknown error $1}
-	TIME=`date "+%H:%M:%S"`
+function log_msg() {
+    _log_msg_impl "$@"
+    local CODE=$?
 
-	if [ "${CODE}" -eq 0 ]; then
-		MSG="Info: ${TEXT}"
-		echo -e "${TIME} ${MSG}"
-		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.info &>/dev/null
-	elif [ "${CODE}" -ge 100 ] && [ "${CODE}" -le 199 ]; then
-		MSG="Warning: $1 (code=${CODE}): ${TEXT}"
-		echo -e "${TIME} ${MSG}" >&2
-		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.warning &>/dev/null
-	else
-		MSG="Error $1 (code=${CODE}): ${TEXT}"
-		echo -e "${TIME} ${MSG}" >&2
-		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.error &>/dev/null
-	fi
+    [ "${CODE}" -ne 0 ] && exit "${CODE}"
+}
+
+function log_msg_without_exit() {
+    _log_msg_impl "$@"
 }
 
 ### Log message to stderr and exit with 0 return code
