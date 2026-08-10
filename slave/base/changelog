@@ -1,3 +1,11 @@
+perun-slave-base (3.1.25) stable; urgency=low
+
+  * Add ENABLE_FACILITY_WHITELIST variable to /etc/perunv3.conf to
+    toggle the use of FACILITY_WHITELIST.
+  * Tweak error/warning messages related to missing or misconfigured
+    facility/DNS whitelists to be more informative
+
+ -- Michal Berky <michal.berky@cesnet.cz>  Thu, 16 Jun 2026 15:00:00 +0200
 perun-slave-base (3.1.24) stable; urgency=low
 
   * Create /etc/perunv3.conf during base package installation

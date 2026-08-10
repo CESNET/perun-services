@@ -51,6 +51,7 @@ Perun uses _push model_, so when configuration change occur in a Perun, new conf
     SERVICE_WHITELIST=()
     DNS_ALIAS_WHITELIST=( `hostname -f` )
     FACILITY_WHITELIST=()
+    ENABLE_FACILITY_WHITELIST=1		# set to 0 to disable
     ```
 
 ### Service behavior and configuration

@@ -14,6 +14,7 @@ SERVICE_WHITELIST=()
 # prevent someone to configure perun to send malicious configuration via dns alias or ip address
 DNS_ALIAS_WHITELIST=( `hostname -f` )
 FACILITY_WHITELIST=()        # from which facilities this host accept configuration
+ENABLE_FACILITY_WHITELIST=1
 
 # check if lock dir is writable
 if ! [ -w $LOCK_DIR ] ; then
@@ -48,8 +49,8 @@ I_FILE_CANT_RECOVER=(0 'File ${BACKUP_DIR}/${LOCAL} cannot be recovered because 
 I_BACKUP_COMPLETE=(0 'Backup files and lock file created in directory ${BACKUP_DIR}')
 
 # Codes 100-199 for non-fatal warnings
-W_FACILITY_WHITELIST_NOT_SET=(100 'Perun sent configuration, but FACILITY_WHITELIST is empty or not configured (Facility=${FACILITY},DNS_Alias=${SEND_TO_HOSTNAME})')
-W_FACILITY_NOT_WHITELISTED=(101 'Perun sent configuration to this host via facility which was not whitelisted (Facility=${FACILITY},DNS_Alias=${SEND_TO_HOSTNAME})')
+W_FACILITY_WHITELIST_NOT_SET=(100 'In future versions this will be an error! \n----------------------------------------- \nFACILITY_WHITELIST is enabled, but empty. To resolve, edit /etc/perunv3.conf on the destination host and add facility name "${FACILITY}" to the FACILITY_WHITELIST array or set ENABLE_FACILITY_WHITELIST=0 to bypass this check.')
+W_FACILITY_NOT_WHITELISTED=(101 'In future versions this will be an error! \n----------------------------------------- \nFacility name "${FACILITY}" is not whitelisted. To resolve, edit /etc/perunv3.conf on the destination host and add facility name "${FACILITY}" to the FACILITY_WHITELIST array or set ENABLE_FACILITY_WHITELIST=0 to bypass this check.')
 
 # Other codes for potentially fatal errors
 E_WORK_DIR=(1 'Problem with working directory')
@@ -60,7 +61,7 @@ E_IO=(5 'IO operation failed')
 E_CONCURRENT_PROCESS=(6 'Concurrent process is running right now')
 E_LOCK_DELETE=(7 'Lock file cannot be deleted')
 E_LOCK_PIDFILE=(8 'Lock pid file cannot be created')
-E_NOT_WHITELISTED=(9 'Perun sent configuration to this host, but neither the DNS alias nor the Facility name are whitelisted (Facility=${FACILITY},DNS_Alias=${SEND_TO_HOSTNAME})')
+E_NOT_WHITELISTED=(9 'Data from Perun were rejected!\nDestination name in Perun must match FQDN of the destination host and name of the Facility needs to be whitelisted.\nTo resolve both, edit /etc/perunv3.conf on the destination host and add destination name "${SEND_TO_HOSTNAME}" to DNS_ALIAS_WHITELIST array and add facility name "${FACILITY}" to the FACILITY_WHITELIST array or set ENABLE_FACILITY_WHITELIST=0 to bypass facility name check.')
 E_BACKUP_DIR=(10 'Problem with backup directory')
 E_REMOVE_SERVICE_LOCK_FILE=(11 'Cannot remove service lock file and backup files while recovering process')
 E_FILE_CANT_RECOVER=(12 'File ${BACKUP_DIR}/${LOCAL} cannot be recovered. Moving file problems')
@@ -116,16 +117,16 @@ function log_msg {
 
 	if [ "${CODE}" -eq 0 ]; then
 		MSG="Info: ${TEXT}"
-		echo "${TIME} ${MSG}"
-		logger -t "${NAME}" -p daemon.info "${SERVICE}: ${MSG}" &>/dev/null
+		echo -e "${TIME} ${MSG}"
+		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.info &>/dev/null
 	elif [ "${CODE}" -ge 100 ] && [ "${CODE}" -le 199 ]; then
 		MSG="Warning: $1 (code=${CODE}): ${TEXT}"
-		echo "${TIME} ${MSG}" >&2
-		logger -t "${NAME}" -p daemon.warning "${SERVICE}: ${MSG}" &>/dev/null
+		echo -e "${TIME} ${MSG}" >&2
+		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.warning &>/dev/null
 	else
 		MSG="Error $1 (code=${CODE}): ${TEXT}"
-		echo "${TIME} ${MSG}" >&2
-		logger -t "${NAME}" -p daemon.error "${SERVICE}: ${MSG}" &>/dev/null
+		echo -e "${TIME} ${MSG}" >&2
+		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.error &>/dev/null
 		exit "${CODE}"
 	fi
 }
@@ -140,16 +141,16 @@ function log_msg_without_exit {
 
 	if [ "${CODE}" -eq 0 ]; then
 		MSG="Info: ${TEXT}"
-		echo "${TIME} ${MSG}"
-		logger -t "${NAME}" -p daemon.info "${SERVICE}: ${MSG}" &>/dev/null
+		echo -e "${TIME} ${MSG}"
+		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.info &>/dev/null
 	elif [ "${CODE}" -ge 100 ] && [ "${CODE}" -le 199 ]; then
 		MSG="Warning: $1 (code=${CODE}): ${TEXT}"
-		echo "${TIME} ${MSG}" >&2
-		logger -t "${NAME}" -p daemon.warning "${SERVICE}: ${MSG}" &>/dev/null
+		echo -e "${TIME} ${MSG}" >&2
+		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.warning &>/dev/null
 	else
 		MSG="Error $1 (code=${CODE}): ${TEXT}"
-		echo "${TIME} ${MSG}" >&2
-		logger -t "${NAME}" -p daemon.error "${SERVICE}: ${MSG}" &>/dev/null
+		echo -e "${TIME} ${MSG}" >&2
+		echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.error &>/dev/null
 	fi
 }
 
@@ -159,8 +160,8 @@ function log_warn_to_err_exit {
 	TIME=`date "+%H:%M:%S"`
 
 	MSG="Info: ${TEXT}"
-	echo "${TIME} ${MSG}" >&2
-	logger -t "${NAME}" -p daemon.error "${SERVICE}: ${MSG}" &>/dev/null
+	echo -e "${TIME} ${MSG}" >&2
+	echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.error &>/dev/null
 	exit 0
 }
 
@@ -170,15 +171,15 @@ function log_warn_to_err {
 	TIME=`date "+%H:%M:%S"`
 
 	MSG="Info: ${TEXT}"
-	echo "${TIME} ${MSG}" >&2
-	logger -t "${NAME}" -p daemon.error "${SERVICE}: ${MSG}" &>/dev/null
+	echo -e "${TIME} ${MSG}" >&2
+	echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.error &>/dev/null
 }
 
 ### Log debug only if variable DEBUG exists and is the length of this variable is nonzero
 function log_debug {
 	MSG="$1"
 	if [ -n "${DEBUG}" ]; then
-		logger -t "${NAME}" -p daemon.debug "${SERVICE}: ${MSG}" &>/dev/null
+			echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.debug &>/dev/null
 	fi
 }
 
@@ -452,6 +453,8 @@ ls "${OLD_CUSTOM_SCRIPTS_DIR}/${SERVICE}.d/" 2>/dev/null | grep '^pre_\|^post_\|
 
 DNS_ALIAS_OK=0
 FACILITY_OK=0
+
+
 # check if perun send via allowed hostname
 if [ "${#DNS_ALIAS_WHITELIST[@]}" -gt 0  ]; then
 	if in_array "${SEND_TO_HOSTNAME}" "${DNS_ALIAS_WHITELIST[@]}"; then
@@ -459,7 +462,7 @@ if [ "${#DNS_ALIAS_WHITELIST[@]}" -gt 0  ]; then
 	fi
 fi
 
-if [ "${#FACILITY_WHITELIST[@]}" -gt 0  ]; then
+if [ "${ENABLE_FACILITY_WHITELIST}" = "1" ] && [ "${#FACILITY_WHITELIST[@]}" -gt 0 ]; then
 	if in_array "${FACILITY}" "${FACILITY_WHITELIST[@]}"; then
 		FACILITY_OK=1
 	fi
@@ -469,7 +472,7 @@ if [ "$DNS_ALIAS_OK" -ne 1 ] && [ "$FACILITY_OK" -ne 1 ]; then
 	log_msg E_NOT_WHITELISTED
 fi
 
-if [ "$FACILITY_OK" -ne 1 ]; then
+if [ "${ENABLE_FACILITY_WHITELIST}" = "1" ] && [ "$FACILITY_OK" -ne 1 ]; then
 	if [ "${#FACILITY_WHITELIST[@]}" -eq 0 ]; then
 		log_msg_without_exit W_FACILITY_WHITELIST_NOT_SET
 	else

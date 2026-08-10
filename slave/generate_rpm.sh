@@ -85,6 +85,7 @@ SERVICE_BLACKLIST=()
 SERVICE_WHITELIST=()
 DNS_ALIAS_WHITELIST=( \`hostname -f\` )
 FACILITY_WHITELIST=()
+ENABLE_FACILITY_WHITELIST=1		# set to 0 to disable
 EOF
 chmod 0644 /etc/perunv3.conf
 fi"
