@@ -9,7 +9,7 @@ use Tie::IxHash;
 
 our $SERVICE_NAME = "pbsmon_json";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.3";
+my $SCRIPT_VERSION = "3.0.4";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
@@ -72,8 +72,6 @@ my $service = $servicesAgent->getServiceByName(name => $SERVICE_NAME);
 my $pbsmonServer = $agent->getAttributesAgent->getAttribute(attributeName => $A_FACILITY_PBSMON_SERVER, facility => perunServicesInit::getFacility->getId)->getValue;
 unless($pbsmonServer) { die "pbsmonServer not specified for facility ".(perunServicesInit::getFacility->getId()); }
 
-if($pbsmonServer eq 'metavo.metacentrum.cz') { $pbsmonServer = 'segin.vm.cesnet.cz'; }  #FIXME
-
 if($pbsmonServer ne perunServicesInit::getFacility->getName) {
 	my $pbsmonServerFacility;
 	$pbsmonServerFacility = $facilitiesAgent->getFacilityByName(name => $pbsmonServer);
@@ -82,12 +80,14 @@ if($pbsmonServer ne perunServicesInit::getFacility->getName) {
 	exit 0;
 }
 
-
 my @facilities = $facilitiesAgent->getAssignedFacilities(service => $service->getId);
 
-my @facilitesAndAttrbutes;
+my @facilitesAndAttributes;
 foreach my $facility (@facilities) {
-	if($facility->getName eq $pbsmonServer) { next; } # don't want generate data for pbsmonServer itself
+
+	# don't want generate data for pbsmonServer itself
+	if($facility->getName eq $pbsmonServer) { next; }
+
 	my $data = $servicesAgent->getHashedHierarchicalData(service => $service->getId, facility => $facility->getId);
 
 	my @facilityVosShortNames;
@@ -118,7 +118,7 @@ foreach my $facility (@facilities) {
 	);
 
 	my $facilityListingPriority = $data->getFacilityAttributeValue(attrName => $A_FACILITY_LISTING_PRIORITY);
-	push @facilitesAndAttrbutes, {
+	push @facilitesAndAttributes, {
 		"facilityStruct" => \%facilityStruc,
 		"facilityListingPriority" => $facilityListingPriority,
 		"facility" => $facility,
@@ -126,7 +126,7 @@ foreach my $facility (@facilities) {
 }
 
 
-for my $item (sort { $b->{"facilityListingPriority"} <=> $a->{"facilityListingPriority"} } @facilitesAndAttrbutes) {
+for my $item (sort { $b->{"facilityListingPriority"} <=> $a->{"facilityListingPriority"} } @facilitesAndAttributes) {
 	my $facility = $item->{"facility"};
 	my $facilityStruc = $item->{"facilityStruct"};
 
@@ -169,9 +169,6 @@ for my $item (sort { $b->{"facilityListingPriority"} <=> $a->{"facilityListingPr
 for my $key (sort keys %$physicalMachinesStruc) {
 	push @{$struc->{'physical_machines'}}, $physicalMachinesStruc->{$key};
 }
-
-#push @{$struc->{'physical_machines'}}, values %$physicalMachinesStruc;
-
 
 my $fileName = "$DIRECTORY/$SERVICE_NAME";
 open FILE,">$fileName" or die "Cannot open $fileName: $! \n";
