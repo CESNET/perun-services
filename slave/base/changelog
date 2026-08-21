@@ -2,7 +2,7 @@ perun-slave-base (3.1.26) stable; urgency=low
 
   * Refactor logging messages in perun base script to omit `()` on empty params
 
- -- David Flor <flor@ics.muni.cz>  Fri, 03 Aug 2026 13:45:00 +0200
+ -- David Flor <flor@ics.muni.cz>  Mon, 03 Aug 2026 13:45:00 +0200
 
 perun-slave-base (3.1.25) stable; urgency=low
 
