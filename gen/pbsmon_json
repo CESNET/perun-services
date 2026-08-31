@@ -9,11 +9,10 @@ use Tie::IxHash;
 
 our $SERVICE_NAME = "pbsmon_json";
 our $PROTOCOL_VERSION = "3.0.0";
-my $SCRIPT_VERSION = "3.0.4";
+my $SCRIPT_VERSION = "3.0.5";
 
 perunServicesInit::init;
 my $DIRECTORY = perunServicesInit::getDirectory;
-
 
 #Constants
 our $A_FACILITY_NAME;             *A_FACILITY_NAME =              \'urn:perun:facility:attribute-def:def:displayName';
@@ -89,6 +88,10 @@ foreach my $facility (@facilities) {
 	if($facility->getName eq $pbsmonServer) { next; }
 
 	my $data = $servicesAgent->getHashedHierarchicalData(service => $service->getId, facility => $facility->getId);
+
+	# skip facilities belonging to another pbsmon servers
+	my $facilityPbsmonServer = $data->getFacilityAttributeValue(attrName => $A_FACILITY_PBSMON_SERVER) || "";
+	if ($facilityPbsmonServer ne $pbsmonServer) { next; }
 
 	my @facilityVosShortNames;
 	foreach my $resourceId ($data->getResourceIds()) {
