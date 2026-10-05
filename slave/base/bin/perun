@@ -127,17 +127,17 @@ function _log_msg_impl() {
 
     if [ "${CODE}" -eq 0 ]; then
         MSG="Info: ${TEXT}"
-        echo -e"${TIME} ${MSG}"
+        echo -e "${TIME} ${MSG}"
         echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.info  &>/dev/null
 
     elif [ "${CODE}" -ge 100 ] && [ "${CODE}" -le 199 ]; then
         MSG="Warning: $1 (code=${CODE}): ${TEXT}"
-        echo -e"${TIME} ${MSG}" >&2
+        echo -e "${TIME} ${MSG}" >&2
         echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.warning  &>/dev/null
 
     else
         MSG="Error $1 (code=${CODE}): ${TEXT}"
-        echo -e"${TIME} ${MSG}" >&2
+        echo -e "${TIME} ${MSG}" >&2
         echo -e "${SERVICE}: ${MSG}" | logger -t "${NAME}" -p daemon.error  &>/dev/null
     fi
 
