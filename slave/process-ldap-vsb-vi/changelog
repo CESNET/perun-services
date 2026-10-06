@@ -1,3 +1,10 @@
+perun-slave-process-ldap-vsb-vi (3.1.7) stable; urgency=low
+
+  * Use $MODFILE and $MODFILE_GROUPS variables instead of literal filenames
+    for LDIF diff output and ldapmodify input redirections.
+
+ -- David Flor <flor@ics.muni.cz>  Mon, 05 Oct 2026 14:36:28 +0200
+
 perun-slave-process-ldap-vsb-vi (3.1.6) stable; urgency=low
 
   * Fixed package priority from 'extra' to 'optional'.
