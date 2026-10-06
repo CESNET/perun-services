@@ -148,7 +148,9 @@ function log_msg() {
     _log_msg_impl "$@"
     local CODE=$?
 
-    [ "${CODE}" -ne 0 ] && exit "${CODE}"
+    if [ "${CODE}" -ne 0 ] && { [ "${CODE}" -lt 100 ] || [ "${CODE}" -gt 199 ]; }; then
+        exit "${CODE}"
+    fi
 }
 
 function log_msg_without_exit() {
@@ -362,7 +364,7 @@ function diff_update {
 # usage: backup_and_recover_files FILE FILE FILE ...
 # Params: FILE - absolute path to file (more files can be specified)
 function backup_and_recover_files {
-	FILES="$@"
+	FILES=("$@")
 	SERVICE_LOCK_FILE="${BACKUP_DIR}/lock"
 
 	#If backup dir for service not exists, create it
@@ -374,8 +376,8 @@ function backup_and_recover_files {
 	if [ -f "${SERVICE_LOCK_FILE}" ]; then
 
 		#recover existing backup files
-		for FILE in FILES; do
-			LOCAL=`echo $FILE | sed -e 's/^.*\///'`
+		for FILE in "${FILES[@]}"; do
+			LOCAL=$(basename "${FILE}")
 			if [ -f "${BACKUP_DIR}/${LOCAL}" ]; then
 				catch_error E_FILE_CANT_RECOVER  diff_mv_sync "${BACKUP_DIR}/${LOCAL}" "${FILE}"
 				log_msg I_FILE_RECOVERED
@@ -392,12 +394,12 @@ function backup_and_recover_files {
 	catch_error E_BACKUP_DIR mkdir -p "${BACKUP_DIR}"
 
 	#Create backup files
-	for FILE in FILES; do
+	for FILE in "${FILES[@]}"; do
 		catch_error E_CREATE_BACKUP_FILE cp -p "${FILE}" "${BACKUP_DIR}"
 	done
 
 	#Create lock file
-	catch_error E_CREATE_LOCK_FILE touch SERVICE_LOCK_FILE
+	catch_error E_CREATE_LOCK_FILE touch "${SERVICE_LOCK_FILE}"
 
 	log_msg I_BACKUP_COMPLETE
 }
