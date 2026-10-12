@@ -50,10 +50,10 @@ function process {
 		$LDIFSORT -k dn $INFILE >$SINFILE
 
 		# DIFF LDIFs
-		$LDIFDIFF -k dn $SINFILE $SACFILE | sed '/^[^ ].*/N; s/\n //g' > MODFILE
+		$LDIFDIFF -k dn $SINFILE $SACFILE | sed '/^[^ ].*/N; s/\n //g' > "$MODFILE"
 
 		# Update LDAP based on changes
-		catch_error E_WHEN_UPDATING_LDAP ldapmodify -x -H "$LDAP_URL" -D "$LDAP_LOGIN" -w "$LDAP_PASSWORD" -c < MODFILE
+		catch_error E_WHEN_UPDATING_LDAP ldapmodify -x -H "$LDAP_URL" -D "$LDAP_LOGIN" -w "$LDAP_PASSWORD" -c < "$MODFILE"
 
 	else
 	# LDAP is empty under base DN
@@ -80,10 +80,10 @@ function process {
 		$LDIFSORT -k dn $INFILE_GROUPS >$SINFILE_GROUPS
 
 		# DIFF LDIFs
-		$LDIFDIFF -k dn $SINFILE_GROUPS $SACFILE_GROUPS | sed '/^[^ ].*/N; s/\n //g' > MODFILE_GROUPS
+		$LDIFDIFF -k dn $SINFILE_GROUPS $SACFILE_GROUPS | sed '/^[^ ].*/N; s/\n //g' > "$MODFILE_GROUPS"
 
 		# Update LDAP based on changes
-		catch_error E_WHEN_UPDATING_LDAP ldapmodify -x -H "$LDAP_URL" -D "$LDAP_LOGIN" -w "$LDAP_PASSWORD" -c < MODFILE_GROUPS
+		catch_error E_WHEN_UPDATING_LDAP ldapmodify -x -H "$LDAP_URL" -D "$LDAP_LOGIN" -w "$LDAP_PASSWORD" -c < "$MODFILE_GROUPS"
 
 	else
 		# LDAP is empty under base DN
