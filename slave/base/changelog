@@ -1,3 +1,31 @@
+perun-slave-base (3.1.27) stable; urgency=low
+
+  * Fix log_msg so only true error codes exit, restoring the original
+    behavior for info and warning messages.
+  * Fix backup_and_recover_files to iterate over file arguments using a
+    bash array instead of the literal string "FILES".
+  * Create the service lock file at "${SERVICE_LOCK_FILE}" instead of a
+    literal SERVICE_LOCK_FILE in the current directory.
+  * Use basename to derive the local file name in backup_and_recover_files,
+    handling file names with spaces.
+
+ -- David Flor <flor@ics.muni.cz>  Mon, 05 Oct 2026 14:36:28 +0200
+
+perun-slave-base (3.1.26) stable; urgency=low
+
+  * Refactor logging messages in perun base script to omit `()` on empty params
+
+ -- David Flor <flor@ics.muni.cz>  Mon, 03 Aug 2026 13:45:00 +0200
+
+perun-slave-base (3.1.25) stable; urgency=low
+
+  * Add ENABLE_FACILITY_WHITELIST variable to /etc/perunv3.conf to
+    toggle the use of FACILITY_WHITELIST.
+  * Tweak error/warning messages related to missing or misconfigured
+    facility/DNS whitelists to be more informative
+
+ -- Michal Berky <michal.berky@cesnet.cz>  Thu, 16 Jun 2026 15:00:00 +0200
+
 perun-slave-base (3.1.24) stable; urgency=low
 
   * Create /etc/perunv3.conf during base package installation

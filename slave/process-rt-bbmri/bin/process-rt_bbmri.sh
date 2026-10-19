@@ -7,7 +7,7 @@ function process {
 
 	### Status codes
 	I_CHANGED=(0 "${DST_FILE} updated")
-	E_NOT_CHANGE=(50 'Cannot copy file ${FROM_PERUN} to ${DST_FILE}')
+	E_NOT_CHANGED=(50 'Cannot copy file ${FROM_PERUN} to ${DST_FILE}')
 	E_FILE_NOT_EXIST=(51 'Cannot find file with destination file name in ${NAME_FILE}')
 
 	FROM_PERUN="${WORK_DIR}/rt_bbmri"

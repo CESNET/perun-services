@@ -63,9 +63,9 @@ function process {
 
 		#Use filter on members from perun (create temp file with filter)
 		if [ -n "${AFS_MEMBERSHIP_FILTER}" ]; then
-			grep "$AFS_MEMBERHIP_FILTER" "$USERS_FROM_PERUN_FILE" > "$USERS_FROM_PERUN_FILE_FILTERED" 2> "$TMP_ERROR_FILE"
+			grep "$AFS_MEMBERSHIP_FILTER" "$USERS_FROM_PERUN_FILE" > "$USERS_FROM_PERUN_FILE_FILTERED" 2> "$TMP_ERROR_FILE"
 			if [ -s "$TMP_ERROR_FILE" ]; then
-				MSG="Command failed: grep $AFS_MEMBERHIP_FILTER $USERS_FROM_PERUN_FILE > $USERS_FROM_PERUN_FILE_FILTERED Reason: `cat $TMP_ERROR_FILE`"
+				MSG="Command failed: grep $AFS_MEMBERSHIP_FILTER $USERS_FROM_PERUN_FILE > $USERS_FROM_PERUN_FILE_FILTERED Reason: `cat $TMP_ERROR_FILE`"
 				echo "$MSG" >&2
 				logger -t "${NAME}" -p daemon.error "${SERVICE}: ${MSG}" &>/dev/null
 				ERROR=1
