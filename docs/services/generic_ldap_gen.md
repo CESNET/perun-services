@@ -31,15 +31,19 @@ import ldap3
 import ssl
 
 credentials = {
-                        "$destination": { 'username': "$username", 'password': "$password" },
-                        "$destinationCERT": { 'username': "$username", 'password': "$password", "tls": ldap3.Tls(
+    "$destination": {"username": "$username", "password": "$password"},
+    "$destinationCERT": {
+        "username": "$username",
+        "password": "$password",
+        "tls": ldap3.Tls(
             local_private_key_file="$private_key_file",
             local_certificate_file="$cert_file",
             validate=ssl.CERT_REQUIRED,
             version=ssl.PROTOCOL_TLSv1_2,
-            ca_certs_file="$ca_file"
-        ) },
-        }
+            ca_certs_file="$ca_file",
+        ),
+    },
+}
 ```
 
 To learn more about the options for TLS see https://ldap3.readthedocs.io/en/latest/ssltls.html#the-tls-object.
