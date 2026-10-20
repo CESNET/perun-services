@@ -1,5 +1,39 @@
 Upgrade notes
 
+## [18.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v17.1.1...v18.0.0) (2026-10-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* **users_emails:** Gen/send/slave scripts for service users_emails has been removed.
+* **users_emails:** Remove service users_emails before deployment.
+* **rt_data_vocesnet:** Gen/send/slave scripts for service rt_data_vocesnet have been removed.
+* **rt_data_vocesnet:** Remove service rt_data_vocesnet before deployment.
+
+### Features
+
+* add option to turn facility_whitelist check on/off in perun slave script ([537c446](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/537c4467befab8e49c30b76ea3da99b8ff020418))
+
+
+### Bug Fixes
+
+* add missing space in echo command in base slave script ([82fe3ab](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/82fe3abbbdee6dc5ba13620a23d333e852f3fbae))
+* **afs_group:** fixed typo when filtering members from perun ([eddb1dc](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/eddb1dc53b9788ae8b029a7f0d8d9105f730c6e2))
+* build of deb/rpm slave scripts on debian 13 ([a75040a](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/a75040a95d385ca38aa53d4e78542b0936cfcd55))
+* fix log_msg in perun base after refactor ([ee540c1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/ee540c139a6fdef9e2bdae19a5f64a639a26b30a))
+* fixed day of the week in perun-slave-base changelog ([c0ce5ec](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/c0ce5ecc827b6b41e441fe26f7d951feb7dbc079))
+* ldap slave scripts literal modfile ([911baac](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/911baaca927fdd4318f498a4a7dba89924ec19ee))
+* **pbsmon_json:** remove hard-coded pbsmon server name ([1b40b1a](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/1b40b1a447f49eb123a7f21e9033b873b38cdda3))
+* **pbsmon_json:** support multiple independent pbsmon servers ([bbebdf8](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/bbebdf8d522f059ac758e8abf83a31cc204b4fed))
+* refactor log functions in perun base slave script ([81942e2](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/81942e21156eacfdd8d31310577ebb4c325ea833))
+* rt services slave scripts logging issue ([e7a6bc3](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/e7a6bc3a689b197b3c1f7b6c2ab84e5ab362d13d))
+
+
+### Refactoring
+
+* **rt_data_vocesnet:** remove unused service ([01ef0b1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/01ef0b16437556127b1cdd2b0643e40045e42270))
+* **users_emails:** remove service ([f66a8c7](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/f66a8c7c5401c69c7e048436f2dc3399375366ae))
+
 ## [17.1.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v17.1.0...v17.1.1) (2026-07-14)
 
 
