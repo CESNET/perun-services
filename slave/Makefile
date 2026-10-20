@@ -33,7 +33,7 @@ $(processes):
 	@cd $@ && if [ $@ != $(base_package_name) ]; then cat ../templates/makefile_conf_part >> Makefile; fi
 	@cd $@ && if [ -d lib ]; then cat ../templates/makefile_lib_part >> Makefile; fi
 	cd $@ && DEBEMAIL=$(maintainer_email) DEBFULLNAME=$(maintainer_name) dh_make -i -y -n -p "$(package_prefix_name)$@_`head -n 1 changelog | sed -e 's/.*\([0-9]\+[.][0-9]\+[.][0-9]\+\).*/\1/'`" -t "$(realpath templates/dh_make)" --createorig
-	@cd $@/debian && rm *.ex *.EX README.*
+	@cd $@/debian && rm -f *.ex *.EX README.*
 	@cd $@ && if [ -s changelog ]; then cp changelog ./debian/; fi
 	@cd $@ && if [ -s postinst ]; then cp postinst ./debian/; fi
 	@cd $@ && echo -en "\noverride_dh_builddeb:\n\tdh_builddeb -- -Zgzip\noverride_dh_gencontrol:\n\tdh_gencontrol -- -Vmisc:Depends=\"`cat dependencies`\"" >> ./debian/rules;
