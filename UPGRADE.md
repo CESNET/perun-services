@@ -1,5 +1,12 @@
 Upgrade notes
 
+## [18.0.1](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v18.0.0...v18.0.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* mark string as regex to prevent python warnings ([9d6cc4a](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/commit/9d6cc4a62d74a6856a9d1708494173a8389cb04f))
+
 ## [18.0.0](https://gitlab.ics.muni.cz/perun/perun-idm/perun-services/compare/v17.1.1...v18.0.0) (2026-10-20)
 
 
