@@ -10,7 +10,7 @@ import send_lib
 service_name = "ftps_generic"
 port = 21
 
-file_path_pattern = re.compile("[a-zA-Z0-9\+\-~_\./]*")
+file_path_pattern = re.compile(r"[a-zA-Z0-9\+\-~_\./]*")
 
 if __name__ == "__main__":
     # Parse command line arguments
